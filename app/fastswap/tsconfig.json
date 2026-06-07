@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "../../app-dist/fastswap",
+    "declaration": false,
+    "types": ["node", "mocha"]
+  },
+  "include": ["./**/*.ts", "../../src/**/*.ts"],
+  "exclude": ["../../node_modules", "../../dist", "../../app-dist"]
+}

@@ -1,0 +1,176 @@
+server:
+  host: 127.0.0.1
+  apiPort: 4010
+  uiPort: 4011
+  adminPort: 4012
+  nodeApiKey: fastswap-demo-node
+  captchaToken: demo-captcha
+
+wallet:
+  privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+
+quote:
+  feeBps: 75
+  maxDeviationBps: 10000
+  packsUsdMicros:
+    - "10000000"
+    - "20000000"
+    - "25000000"
+    - "40000000"
+    - "50000000"
+    - "100000000"
+    - "200000000"
+
+sweepNode:
+  pollIntervalMs: 2500
+  pageLimit: 500
+  confirmations: 0
+  logScanOverlap: 100
+
+relayNode:
+  pollIntervalMs: 2500
+
+seedInvoice:
+  enabled: true
+  usdAmountMicros: "10000000"
+
+chains:
+  - key: alice
+    demoDeploy: true
+    id: "101"
+    mockChainId: "101"
+    name: AliceChain
+    rpcPort: 9545
+    nativeSymbol: ETH
+    nativePriceUsdMicros: "2000000000"
+    nativeInitialLiquidity: "25000000000000000000"
+    nativeMinLiquidity: "0"
+    stableTokenName: Dummy USDT
+    stableTokenSymbol: DumUSDT
+    stableTokenDecimals: 6
+    stablePriceUsdMicros: "1000000"
+    stableOwnerMint: "1000000000000"
+    stableInitialLiquidity: "10000000000"
+    stableMinLiquidity: "0"
+  - key: bob
+    demoDeploy: true
+    id: "202"
+    mockChainId: "202"
+    name: BobChain
+    rpcPort: 9546
+    nativeSymbol: ETH
+    nativePriceUsdMicros: "2000000000"
+    nativeInitialLiquidity: "25000000000000000000"
+    nativeMinLiquidity: "0"
+    stableTokenName: Bob USDC
+    stableTokenSymbol: BobUSDC
+    stableTokenDecimals: 6
+    stablePriceUsdMicros: "1000000"
+    stableOwnerMint: "1000000000000"
+    stableInitialLiquidity: "10000000000"
+    stableMinLiquidity: "0"
+  - key: sepolia
+    demoDeploy: false
+    id: "11155111"
+    name: Sepolia
+    type: evm
+    rpcUrl: "${SEPOLIA_RPC_URL}"
+    nativeSymbol: ETH
+    sweeperAddress: "${SEPOLIA_SWEEPER_ADDRESS}"
+    fastSwapAddress: "${SEPOLIA_FASTSWAP_ADDRESS}"
+    explorerUrl: https://sepolia.etherscan.io
+    tokens:
+      - symbol: ETH
+        decimals: 18
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: ethereum
+          - type: binance
+            symbol: ETHUSDT
+          - type: dexscreener
+            chainId: ethereum
+            tokenAddress: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+  - key: baseSepolia
+    demoDeploy: false
+    id: "84532"
+    name: Base Sepolia
+    type: evm
+    rpcUrl: "${BASE_SEPOLIA_RPC_URL}"
+    nativeSymbol: ETH
+    sweeperAddress: "${BASE_SEPOLIA_SWEEPER_ADDRESS}"
+    fastSwapAddress: "${BASE_SEPOLIA_FASTSWAP_ADDRESS}"
+    explorerUrl: https://sepolia.basescan.org
+    tokens:
+      - symbol: ETH
+        decimals: 18
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: ethereum
+          - type: binance
+            symbol: ETHUSDT
+          - type: dexscreener
+            chainId: ethereum
+            tokenAddress: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+  - key: bscTestnet
+    demoDeploy: false
+    id: "97"
+    name: BSC Testnet
+    type: evm
+    rpcUrl: "${BSC_TESTNET_RPC_URL}"
+    nativeSymbol: BNB
+    sweeperAddress: "${BSC_TESTNET_SWEEPER_ADDRESS}"
+    fastSwapAddress: "${BSC_TESTNET_FASTSWAP_ADDRESS}"
+    explorerUrl: https://testnet.bscscan.com
+    tokens:
+      - symbol: BNB
+        decimals: 18
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: binancecoin
+          - type: binance
+            symbol: BNBUSDT
+          - type: dexscreener
+            chainId: bsc
+            tokenAddress: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+  - key: tronNile
+    demoDeploy: false
+    id: "3448148188"
+    name: TRON Nile
+    type: tron
+    fullHost: "${NILE_FULL_HOST}"
+    rpcUrl: "${NILE_FULL_HOST}"
+    nativeSymbol: TRX
+    feeLimit: 1000000000
+    sweeperAddress: "${TRON_SWEEPER_ADDRESS}"
+    fastSwapAddress: "${TRON_FASTSWAP_ADDRESS}"
+    explorerUrl: https://nile.tronscan.org
+    tokens:
+      - symbol: TRX
+        decimals: 6
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: tron
+          - type: binance
+            symbol: TRXUSDT
+          - type: dexscreener
+            chainId: tron
+            tokenAddress: TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
+      - symbol: USDT
+        address: "${TRON_USDT_ADDRESS}"
+        decimals: 6
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: tether
+          - type: binance
+            symbol: USDCUSDT
+          - type: static
+            priceUsdMicros: "1000000"

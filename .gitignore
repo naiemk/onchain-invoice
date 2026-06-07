@@ -145,3 +145,22 @@ vite.config.ts.timestamp-*
 # Hardhat
 artifacts/
 cache/
+
+# Sweep node
+node-dist/
+app-dist/
+demo-dist/
+docker-dist/
+lm-dist/
+
+# Docker runtime configs (copy from *.example.*)
+docker/config/api.yaml
+docker/config/sweep.json
+docker/config/relay.json
+docker/config/liqman.json
+docker/.env.api
+docker/.env.nodes
+fastSwapDemo/state/*.json
+fastSwapDemo/integration/deployments.live.json
+*.sqlite
+*.sqlite-*

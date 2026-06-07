@@ -1,0 +1,19 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../demo-dist",
+    "declaration": false,
+    "types": ["node"]
+  },
+  "include": [
+    "./**/*.ts",
+    "../app/fastswap/config/**/*.ts",
+    "../app/fastswap/server/**/*.ts",
+    "../app/fastswap/shared/**/*.ts",
+    "../app/fastswap/nodes/**/*.ts",
+    "../node/**/*.ts",
+    "../src/**/*.ts"
+  ],
+  "exclude": ["../node_modules", "../dist", "../node-dist", "../app-dist", "../demo-dist"]
+}

@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../node-dist",
+    "declaration": false,
+    "types": ["node"]
+  },
+  "include": ["./**/*.ts", "../src/**/*.ts", "../app/fastswap/shared/**/*.ts"],
+  "exclude": ["../node_modules", "../dist", "../node-dist"]
+}

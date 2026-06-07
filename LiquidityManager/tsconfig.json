@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../lm-dist",
+    "declaration": false,
+    "types": ["node"]
+  },
+  "include": ["./bot/**/*.ts", "./shared/**/*.ts"],
+  "exclude": ["../node_modules", "../dist", "../lm-dist", "./test/**/*.ts"]
+}

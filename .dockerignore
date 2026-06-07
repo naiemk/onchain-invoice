@@ -1,0 +1,17 @@
+node_modules
+dist
+docker-dist
+node-dist
+app-dist
+demo-dist
+lm-dist
+artifacts
+cache
+.git
+.cursor
+*.sqlite
+*.sqlite-*
+liquidity-manager.db
+fastSwapDemo/state
+LiquidityManager/bot/config/*.json
+!LiquidityManager/bot/config/example.config.json

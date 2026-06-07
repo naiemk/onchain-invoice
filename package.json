@@ -8,9 +8,20 @@
   "scripts": {
     "build": "tsc",
     "compile": "hardhat compile",
-    "test": "hardhat test",
+    "test": "hardhat test test/*.ts app/fastswap/test/*.ts app/fastswap/test/system/*.ts LiquidityManager/test/*.ts",
     "test:contracts": "hardhat test",
-    "clean": "hardhat clean"
+    "clean": "hardhat clean",
+    "sweep-node:build": "tsc -p node/tsconfig.json",
+    "sweep-node": "node node-dist/node/index.js",
+    "fastswap:build": "tsc -p app/fastswap/tsconfig.json",
+    "fastswap:demo:build": "tsc -p fastSwapDemo/tsconfig.json",
+    "fastswap:demo": "node demo-dist/fastSwapDemo/start.js",
+    "fastswap:demo:pay": "node demo-dist/fastSwapDemo/pay-invoice.js",
+    "fastswap:demo:send": "node demo-dist/fastSwapDemo/pay.js",
+    "fastswap:integ": "npm run compile && npm run fastswap:demo:build && node --env-file=fastSwapDemo/.env demo-dist/fastSwapDemo/integration/live-sepolia-tron.js",
+    "liqman:build": "tsc -p LiquidityManager/tsconfig.json",
+    "liqman": "node lm-dist/LiquidityManager/bot/index.js",
+    "docker:build": "tsc -p docker/tsconfig.json"
   },
   "repository": {
     "type": "git",
@@ -26,6 +37,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.10",
     "@nomicfoundation/hardhat-mocha": "^3.0.18",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
     "@types/node": "^25.6.0",
@@ -37,6 +49,9 @@
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",
     "@openzeppelin/contracts-upgradeable": "^5.6.1",
-    "ethers": "^6.16.0"
+    "better-sqlite3": "^12.9.0",
+    "ethers": "^6.16.0",
+    "tronweb": "^6.3.0",
+    "yaml": "^2.9.0"
   }
 }

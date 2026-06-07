@@ -1,4 +1,5 @@
 export { ERC20_ABI, INVOICE_SWEEPER_ABI, NATIVE_TOKEN } from "./abis.js";
+export { TRC20_ABI, TRON_INVOICE_SWEEPER_ABI, TRON_NATIVE_TOKEN } from "./tron-abis.js";
 export {
   OnchainInvoiceSdk,
   getInvoiceId,
@@ -15,3 +16,34 @@ export {
   type PaymentHit,
   type PaymentRequirement,
 } from "./monitor.js";
+export {
+  TronInvoiceSdk,
+  getTronInvoiceId,
+  monitorTronPayment,
+  type TronInvoiceSdkConfig,
+  type TronMonitorPaymentController,
+  type TronMonitorPaymentOptions,
+  type TronPaymentBalance,
+  type TronPaymentCallback,
+  type TronPaymentHit,
+  type TronPaymentRequirement,
+  type TronSweepInvoiceParams,
+  type TronSweepInvoiceResult,
+} from "./tron.js";
+export {
+  InvoiceWebServer,
+  createCloudflareTurnstileVerifier,
+  type CalculateInvoiceContext,
+  type CaptchaContext,
+  type CreateSessionBody,
+  type CreateSessionResponse,
+  type InvoiceWebServerOptions,
+  type JsonObject,
+  type JsonValue,
+  type ListInvoicesResponse,
+  type RegisterInvoiceBody,
+  type WebInvoiceRecord,
+  type WebRequestContext,
+  type WebSession,
+} from "./web-server.js";
+export { InvoiceWebClient, type InvoiceWebClientOptions, type ListInvoicesParams } from "./web-client.js";

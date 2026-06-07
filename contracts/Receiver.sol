@@ -106,7 +106,7 @@ abstract contract Receiver is Initializable, OwnableUpgradeable, UUPSUpgradeable
         if (keccak256(data) != invoiceId) revert InvalidInvoiceData();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
 
     function _assignPayment(bytes32 invoiceId, address token, address forwarder, uint256 amount) internal {
         ReceiverStorage storage $ = _getReceiverStorage();

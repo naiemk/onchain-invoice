@@ -5,7 +5,7 @@ import { ethers as ethersLib } from "ethers";
 describe("InvoiceSweeper", function () {
   async function deployFixture() {
     const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & {
-      ethers: typeof ethersLib;
+      ethers: any;
     };
     const [owner, payer] = await ethers.getSigners();
 
