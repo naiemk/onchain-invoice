@@ -7,7 +7,9 @@ import { ERC20_ABI, INVOICE_SWEEPER_ABI, NATIVE_TOKEN } from "../src/abis.js";
 import { OnchainInvoiceSdk } from "../src/sdk.js";
 import { TRC20_ABI, TRON_FASTSWAP_RECEIVER_ABI, TRON_NATIVE_TOKEN } from "../src/tron-abis.js";
 import { TronInvoiceSdk } from "../src/tron.js";
-import { sendNodeLog } from "../src/node-log-ingest.js";
+import { AuditLog } from "../app/fastswap/shared/audit.js";
+import { verifyInvoiceSignature } from "../app/fastswap/shared/signing.js";
+import type { FastSwapInvoice } from "../app/fastswap/shared/types.js";
 import { InvoiceWebClient } from "../src/web-client.js";
 import type { JsonObject } from "../src/web-server.js";
 
@@ -27,6 +29,7 @@ const RECONCILED_PLACEHOLDER_TX = `0x${"00".repeat(32)}` as const;
 export class SweepNode {
   private readonly cache: SweepNodeCache;
   private readonly webClient: InvoiceWebClient<unknown, JsonObject>;
+  private readonly audit?: AuditLog;
   private timer?: NodeJS.Timeout;
 
   constructor(private readonly config: SweepNodeConfig) {
@@ -35,6 +38,9 @@ export class SweepNode {
       baseUrl: config.webServer.baseUrl,
       nodeApiKey: config.webServer.nodeApiKey,
     });
+    if (config.auditLogPath) {
+      this.audit = new AuditLog(config.auditLogPath, "sweep");
+    }
   }
 
   async runOnce() {
@@ -57,17 +63,13 @@ export class SweepNode {
         const t0 = Date.now();
         try {
           await this.runOnce();
-          this.nodeHeartbeat("sweep node running", { ms: Date.now() - t0 });
+          this.audit?.append("heartbeat", { payload: { ms: Date.now() - t0 } });
         } catch (error) {
-          this.nodeHeartbeat(
-            "sweep tick failed",
-            {
-              message: error instanceof Error ? error.message : String(error),
-            },
-            "error"
-          );
-          this.nodeLog("error", "sweep tick failed", {
-            message: error instanceof Error ? error.message : String(error),
+          this.audit?.append("error", {
+            payload: { message: error instanceof Error ? error.message : String(error), stage: "tick" },
+          });
+          this.audit?.append("error", {
+            payload: { message: error instanceof Error ? error.message : String(error), stage: "tick" },
           });
           console.error("[sweep-node] tick failed", error);
         }
@@ -95,7 +97,7 @@ export class SweepNode {
       pages += 1;
       const page = await this.webClient.listInvoices({ limit, cursor, lookbackMs });
       for (const record of page.invoices) {
-        const invoice = toSweepNodeInvoice(record.invoice);
+        const invoice = toSweepNodeInvoice(record.invoice, this.config.signingSecret);
         if (invoice) {
           this.cache.upsertInvoice(invoice);
           rows += 1;
@@ -165,18 +167,18 @@ export class SweepNode {
           reconciled += 1;
         }
       } catch (error) {
-        this.nodeLog("warn", "receiver reconcile failed for invoice", {
+        this.auditStage("receiver-reconcile-failed", {
           chainId: chain.id,
           invoiceId: inv.invoiceId,
-          message: error instanceof Error ? error.message : String(error),
+          payload: { message: error instanceof Error ? error.message : String(error) },
         });
       }
     }
 
     if (reconciled > 0) {
-      this.nodeLog("info", "reconciled invoices from on-chain receiver payment", {
+      this.auditStage("receiver-reconciled", {
         chainId: chain.id,
-        count: reconciled,
+        payload: { count: reconciled },
       });
     }
   }
@@ -256,14 +258,16 @@ export class SweepNode {
           blockNumber: log.blockNumber,
         });
         if (!existing || existing.txHash === RECONCILED_PLACEHOLDER_TX) {
-          this.nodeLog("info", "invoice received on-chain", {
+          this.auditStage("invoice-paid", {
             chainId: chain.id,
             invoiceId,
-            token: getAddress(parsed.args.token),
-            amount: parsed.args.amount.toString(),
-            forwarder: getAddress(parsed.args.forwarder),
             txHash: log.transactionHash,
-            blockNumber: log.blockNumber,
+            payload: {
+              token: getAddress(parsed.args.token),
+              amount: parsed.args.amount.toString(),
+              forwarder: getAddress(parsed.args.forwarder),
+              blockNumber: log.blockNumber,
+            },
           });
         }
         await this.ensureInvoiceRowFromEvmPaid(chain, provider, invoiceId, parsed);
@@ -302,17 +306,17 @@ export class SweepNode {
       };
       this.cache.upsertInvoice(synthetic);
       console.log(`[sweep-node] synthesized invoice cache row for paid ${invoiceId.slice(0, 12)}…`);
-      this.nodeLog("info", "synthesized invoice row from InvoicePaid", {
+      this.auditStage("invoice-synthesized", {
         chainId: chain.id,
         invoiceId,
-        invoiceAddress,
+        payload: { invoiceAddress },
       });
     } catch (error) {
       console.error("[sweep-node] could not synthesize invoice row from InvoicePaid log", invoiceId, error);
-      this.nodeLog("error", "could not synthesize invoice from InvoicePaid", {
+      this.auditStage("invoice-synthesize-failed", {
         chainId: chain.id,
         invoiceId,
-        message: error instanceof Error ? error.message : String(error),
+        payload: { message: error instanceof Error ? error.message : String(error) },
       });
     }
   }
@@ -350,14 +354,16 @@ export class SweepNode {
         timestamp: event.timestamp,
       });
       if (!existing || existing.txHash === RECONCILED_PLACEHOLDER_TX) {
-        this.nodeLog("info", "invoice received on-chain", {
+        this.auditStage("invoice-paid", {
           chainId: chain.id,
           invoiceId,
-          token: tronAddressFromEvent(tronWeb, result.token),
-          amount: result.amount?.toString() ?? "0",
-          forwarder: tronAddressFromEvent(tronWeb, result.forwarder),
-          txId: event.transaction_id ?? "",
-          timestamp: event.timestamp,
+          txHash: event.transaction_id ?? "",
+          payload: {
+            token: tronAddressFromEvent(tronWeb, result.token),
+            amount: result.amount?.toString() ?? "0",
+            forwarder: tronAddressFromEvent(tronWeb, result.forwarder),
+            timestamp: event.timestamp,
+          },
         });
       }
       maxTimestamp = Math.max(maxTimestamp, Number(event.timestamp ?? maxTimestamp));
@@ -376,10 +382,10 @@ export class SweepNode {
           : await this.trySweepTron(chain, invoice);
         this.cache.recordSweepAttempt(result);
       } catch (error) {
-        this.nodeLog("error", "sweep attempt threw", {
+        this.auditStage("sweep-failed", {
           chainId: chain.id,
           invoiceId: invoice.invoiceId,
-          message: error instanceof Error ? error.message : String(error),
+          payload: { message: error instanceof Error ? error.message : String(error) },
         });
         this.cache.recordSweepAttempt({
           chainId: chain.id,
@@ -402,7 +408,7 @@ export class SweepNode {
     try {
       const onReceiver = await receiverView.invoicePayment(invoice.invoiceId);
       if (onReceiver.paid) {
-        this.nodeLog("info", "receiver already recorded payment (duplicate sweep avoided)", {
+        this.auditStage("sweep-skipped-paid", {
           chainId: chain.id,
           invoiceId: invoice.invoiceId,
         });
@@ -489,11 +495,11 @@ export class SweepNode {
       },
     });
 
-    this.nodeLog("info", "EVM sweep confirmed", {
+    this.auditStage("sweep-confirmed", {
       chainId: chain.id,
       invoiceId: invoice.invoiceId,
       txHash: sweepHash,
-      status: sweepStatus,
+      payload: { status: sweepStatus },
     });
 
     return {
@@ -519,7 +525,7 @@ export class SweepNode {
       const receiver = await tronWeb.contract(TRON_FASTSWAP_RECEIVER_ABI as never, chain.receiverAddress);
       const payment = await receiver.invoicePayment(invoice.invoiceId).call();
       if (payment.paid) {
-        this.nodeLog("info", "receiver already recorded payment (duplicate Tron sweep avoided)", {
+        this.auditStage("sweep-skipped-paid", {
           chainId: chain.id,
           invoiceId: invoice.invoiceId,
         });
@@ -566,7 +572,11 @@ export class SweepNode {
       },
     });
 
-    this.nodeLog("info", "Tron sweep submitted", { chainId: chain.id, invoiceId: invoice.invoiceId, txId: sweep.txId });
+    this.auditStage("sweep-submitted", {
+      chainId: chain.id,
+      invoiceId: invoice.invoiceId,
+      txHash: sweep.txId,
+    });
 
     return {
       chainId: chain.id,
@@ -576,25 +586,8 @@ export class SweepNode {
     };
   }
 
-  private nodeLog(
-    level: "debug" | "info" | "warn" | "error",
-    message: string,
-    metadata?: Record<string, unknown>
-  ) {
-    void sendNodeLog(this.config.webServer.baseUrl, this.config.webServer.nodeApiKey, "sweep", {
-      level,
-      message,
-      metadata,
-    });
-  }
-
-  private nodeHeartbeat(message: string, metadata?: Record<string, unknown>, level: "info" | "warn" | "error" = "info") {
-    void sendNodeLog(this.config.webServer.baseUrl, this.config.webServer.nodeApiKey, "sweep", {
-      level,
-      message,
-      metadata,
-      eventType: "heartbeat",
-    });
+  private auditStage(stage: string, fields: { invoiceId?: string; chainId?: string; txHash?: string; payload?: Record<string, unknown> } = {}) {
+    this.audit?.append(stage, fields);
   }
 
   private async postInvoiceTrack(invoiceId: string, body: Record<string, unknown>): Promise<boolean> {
@@ -609,10 +602,9 @@ export class SweepNode {
       if (!response.ok) {
         const text = await response.text();
         console.error("[sweep-node] invoice track failed", response.status, text);
-        this.nodeLog("warn", "invoice track POST failed", {
+        this.auditStage("track-failed", {
           invoiceId,
-          status: response.status,
-          body: text.slice(0, 500),
+          payload: { status: response.status, body: text.slice(0, 500) },
         });
         return false;
       }
@@ -620,16 +612,16 @@ export class SweepNode {
       return true;
     } catch (error) {
       console.error("[sweep-node] invoice track error", error);
-      this.nodeLog("error", "invoice track request failed", {
+      this.auditStage("track-error", {
         invoiceId,
-        message: error instanceof Error ? error.message : String(error),
+        payload: { message: error instanceof Error ? error.message : String(error) },
       });
       return false;
     }
   }
 }
 
-function toSweepNodeInvoice(value: Record<string, unknown>): SweepNodeInvoice | undefined {
+function toSweepNodeInvoice(value: Record<string, unknown>, signingSecret?: string): SweepNodeInvoice | undefined {
   const invoice = value.invoice && typeof value.invoice === "object"
     ? (value.invoice as Record<string, unknown>)
     : value;
@@ -639,6 +631,25 @@ function toSweepNodeInvoice(value: Record<string, unknown>): SweepNodeInvoice | 
   const data = stringField(invoice.data) ?? stringField(invoice.encodedInvoiceParams);
 
   if (!chainId || !invoiceId || !invoiceAddress || !data) return undefined;
+
+  if (signingSecret) {
+    const signed = {
+      invoiceId: normalizeInvoiceId(invoiceId),
+      data: normalizeData(data),
+      recipient: stringField(invoice.recipient) ?? "",
+      sourceChainId: stringField(invoice.sourceChainId) ?? chainId,
+      targetChainId: stringField(invoice.targetChainId) ?? "",
+      sourceToken: normalizeTokenField(stringField(invoice.sourceToken) ?? stringField(invoice.token)) ?? "",
+      targetToken: normalizeTokenField(stringField(invoice.targetToken)) ?? "",
+      sourceAmount: String(invoice.sourceAmount ?? invoice.amount ?? ""),
+      targetAmount: String(invoice.targetAmount ?? ""),
+      signature: stringField(invoice.signature),
+    };
+    if (!verifyInvoiceSignature(signed, signingSecret)) {
+      console.warn("[sweep-node] rejected invoice with invalid signature", invoiceId.slice(0, 12));
+      return undefined;
+    }
+  }
 
   const tok = stringField(invoice.token);
   const targetChainId = stringField(invoice.targetChainId);

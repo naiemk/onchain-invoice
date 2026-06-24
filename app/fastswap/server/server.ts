@@ -4,6 +4,8 @@ import { URL } from "node:url";
 import { getInvoiceId } from "../../../src/index.js";
 import { encodeFastSwapIntent, quoteIdFromString, quoteToIntent } from "../shared/encoding.js";
 import { enrichFastSwapInvoiceExplorers } from "../shared/explorers.js";
+import { AuditLog } from "../shared/audit.js";
+import { signInvoice, verifyNodeAuth } from "../shared/signing.js";
 import type {
   FastSwapChainConfig,
   FastSwapInvoice,
@@ -13,7 +15,7 @@ import type {
   FastSwapQuoteRequest,
   FastSwapStatus,
 } from "../shared/types.js";
-import { FASTSWAP_CHAINS, FASTSWAP_DEFAULT_FEE_BPS, FASTSWAP_PACKS } from "../config/default.js";
+import { FASTSWAP_CHAINS, FASTSWAP_DEFAULT_FEE_BPS, FASTSWAP_PACKS } from "../test/fixtures.js";
 import { QuoteEngine } from "./quote-engine.js";
 import type { PriceFetch } from "./price-sources.js";
 import { StaticQuoteSource, type QuoteSource } from "./quote-sources.js";
@@ -26,11 +28,16 @@ export type InvoiceAddressSdk = {
 
 export type FastSwapServerOptions = {
   sqlitePath: string;
+  auditLogPath?: string;
+  signingSecret?: string;
   invoiceSdk: InvoiceAddressSdk;
   invoiceSdksByChainId?: Record<string, InvoiceAddressSdk>;
   quoteSources?: QuoteSource[];
   chains?: FastSwapChainConfig[];
   packs?: FastSwapPack[];
+  /** Shared secret for node-authenticated endpoints (track, list, liquidity). */
+  nodeAuthSecret?: string;
+  /** @deprecated Use nodeAuthSecret */
   nodeApiKey?: string;
   verifyCaptcha?: (token: string | undefined, context: FastSwapCaptchaContext) => Promise<boolean> | boolean;
   requireCaptchaForQuotes?: boolean;
@@ -66,12 +73,16 @@ export class FastSwapServer {
   private readonly chains: FastSwapChainConfig[];
   private readonly packs: FastSwapPack[];
   private readonly quoteEngine: QuoteEngine;
+  private readonly audit?: AuditLog;
   private server?: Server;
 
   constructor(private readonly options: FastSwapServerOptions) {
     this.store = new FastSwapStore(options.sqlitePath);
     this.chains = options.chains ?? FASTSWAP_CHAINS;
     this.packs = options.packs ?? FASTSWAP_PACKS;
+    if (options.auditLogPath) {
+      this.audit = new AuditLog(options.auditLogPath, "api");
+    }
     this.quoteEngine = new QuoteEngine({
       sources: options.quoteSources ?? [
         new StaticQuoteSource("static-a", {}),
@@ -121,7 +132,9 @@ export class FastSwapServer {
         });
       }
       if (request.method === "POST" && url.pathname === "/quotes") {
+        const traceId = this.audit?.traceId();
         const body = await readJson<FastSwapQuoteRequest & CaptchaBody>(request);
+        this.audit?.append("quote.requested", { traceId, payload: { ...body, captchaToken: undefined } });
         await this.verifyCaptchaIfRequired(body.captchaToken, {
           action: "quote",
           request: getRequestContext(request),
@@ -130,6 +143,7 @@ export class FastSwapServer {
         if (url.searchParams.get("preview") !== "1") {
           this.store.saveQuote(quote);
         }
+        this.audit?.append("quote.issued", { traceId, payload: { quoteId: quote.quoteId, expiresAt: quote.expiresAt } });
         return writeJson(response, 201, quote);
       }
       if (request.method === "POST" && url.pathname === "/invoices") {
@@ -156,22 +170,36 @@ export class FastSwapServer {
           amount: quote.sourceAmount,
           status: "waiting_payment",
         };
+        if (this.options.signingSecret) {
+          invoice.signature = signInvoice(invoice, this.options.signingSecret);
+        }
         this.store.saveInvoice(invoice);
+        this.audit?.append("invoice.created", {
+          invoiceId: invoice.invoiceId,
+          payload: {
+            sourceChainId: invoice.sourceChainId,
+            targetChainId: invoice.targetChainId,
+            recipient: invoice.recipient,
+            invoiceAddress: invoice.invoiceAddress,
+            signature: invoice.signature,
+          },
+        });
         return writeJson(response, 201, invoice);
       }
       if (request.method === "POST" && url.pathname.match(/^\/invoices\/[^/]+\/track$/)) {
-        if (!this.options.nodeApiKey || request.headers["x-api-key"] !== this.options.nodeApiKey) {
-          throw new HttpError(401, "Invalid node API key");
+        if (!this.requireNodeAuth(request)) {
+          throw new HttpError(401, "Invalid node credentials");
         }
         const invoiceId = decodeURIComponent(url.pathname.slice("/invoices/".length, -"/track".length));
         const body = await readJson<FastSwapInvoiceTrackPatch>(request);
         const merged = this.store.applyInvoiceTrackPatch(invoiceId, body);
         if (!merged) throw new HttpError(404, "Invoice not found");
+        this.audit?.append("invoice.track", { invoiceId, payload: body as Record<string, unknown> });
         return writeJson(response, 200, await this.finalizeInvoiceResponse(merged));
       }
       if (request.method === "GET" && url.pathname === "/invoices") {
-        if (this.options.nodeApiKey && request.headers["x-api-key"] !== this.options.nodeApiKey) {
-          throw new HttpError(401, "Invalid node API key");
+        if (!this.requireNodeAuth(request)) {
+          throw new HttpError(401, "Invalid node credentials");
         }
         const limit = Math.min(Number(url.searchParams.get("limit") ?? 100), 1_000);
         const cursor = url.searchParams.get("cursor") ?? undefined;
@@ -222,50 +250,11 @@ export class FastSwapServer {
         return writeJson(response, 200, { swaps });
       }
       if (request.method === "GET" && url.pathname === "/liquidity") {
-        if (!this.options.nodeApiKey || request.headers["x-api-key"] !== this.options.nodeApiKey) {
-          throw new HttpError(401, "Invalid node API key");
+        if (!this.requireNodeAuth(request)) {
+          throw new HttpError(401, "Invalid node credentials");
         }
         const liquidity = this.options.resolveLiquidity ? await this.options.resolveLiquidity() : [];
         return writeJson(response, 200, { liquidity });
-      }
-      if (request.method === "GET" && url.pathname === "/node-health") {
-        if (!this.options.nodeApiKey || request.headers["x-api-key"] !== this.options.nodeApiKey) {
-          throw new HttpError(401, "Invalid node API key");
-        }
-        return writeJson(response, 200, { nodes: this.store.listNodeHealth() });
-      }
-      const nodeLogMatch = url.pathname.match(/^\/node-logs\/(sweep|relay)$/);
-      if (nodeLogMatch) {
-        if (!this.options.nodeApiKey || request.headers["x-api-key"] !== this.options.nodeApiKey) {
-          throw new HttpError(401, "Invalid node API key");
-        }
-        const source = nodeLogMatch[1];
-        if (request.method === "GET") {
-          const limit = Math.min(Number(url.searchParams.get("limit") ?? 200), 500);
-          return writeJson(response, 200, { logs: this.store.listNodeLogs(source, limit) });
-        }
-        if (request.method === "POST") {
-          const body = await readJson<{
-            level?: string;
-            message: string;
-            metadata?: Record<string, unknown>;
-            eventType?: "event" | "heartbeat";
-          }>(request);
-          if (!body.message || typeof body.message !== "string") throw new HttpError(400, "message is required");
-          const entry = {
-            source,
-            level: body.level,
-            message: body.message,
-            metadata: body.metadata,
-          };
-          if (body.eventType === "heartbeat") {
-            this.store.updateNodeHealth(entry);
-          } else {
-            this.store.appendNodeLog(entry);
-          }
-          response.writeHead(204, corsHeaders());
-          return response.end();
-        }
       }
       throw new HttpError(404, "Not found");
     } catch (error) {
@@ -273,6 +262,13 @@ export class FastSwapServer {
         error: error instanceof Error ? error.message : "Internal server error",
       });
     }
+  }
+
+  private requireNodeAuth(request: IncomingMessage): boolean {
+    const secret = this.options.nodeAuthSecret ?? this.options.nodeApiKey;
+    if (!secret) return true;
+    const provided = headerAsString(request.headers["x-api-key"]);
+    return verifyNodeAuth(secret, provided);
   }
 
   private async verifyCaptchaIfRequired(token: string | undefined, context: FastSwapCaptchaContext) {

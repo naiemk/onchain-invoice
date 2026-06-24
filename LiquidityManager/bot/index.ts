@@ -1,4 +1,6 @@
 import { JsonRpcProvider } from "ethers";
+import { loadFastSwapConfig } from "../../app/fastswap/config/load.js";
+import { toLiquidityManagerConfig } from "../../app/fastswap/config/adapters/liqman.js";
 import { loadConfig } from "./config.js";
 import { bandKey, decideChain } from "./decide.js";
 import { decideQueuedSwaps } from "./decide-queue.js";
@@ -15,13 +17,16 @@ import {
 
 interface Cli {
   configPath: string;
+  fastswapConfigPath?: string;
   once: boolean;
   dryRun: boolean;
 }
 
 function parseArgs(argv: string[]): Cli {
+  const fastswapConfigPath = argValue(argv, "--fastswap-config");
   return {
-    configPath: argValue(argv, "--config") ?? "LiquidityManager/config/example.config.json",
+    configPath: fastswapConfigPath ?? argValue(argv, "--config") ?? "LiquidityManager/config/example.config.json",
+    fastswapConfigPath,
     once: argv.includes("--once"),
     dryRun: argv.includes("--dry-run"),
   };
@@ -183,13 +188,15 @@ function formatAmount(amount: bigint): string {
 
 async function main(): Promise<void> {
   const cli = parseArgs(process.argv.slice(2));
-  const config = loadConfig(cli.configPath);
+  const config = cli.fastswapConfigPath
+    ? toLiquidityManagerConfig(loadFastSwapConfig(cli.fastswapConfigPath))
+    : loadConfig(cli.configPath);
   const prices = new SimplePriceFetcher();
   const routes = new OpenOceanRouteProvider();
   const store = new RebalancerStore(config.sqlitePath ?? "liquidity-manager.db");
 
   log.section("LiquidityManager — scan, decide, act");
-  log.info(`config: ${cli.configPath}`);
+  log.info(`config: ${cli.fastswapConfigPath ?? cli.configPath}`);
   log.info(`mode: ${cli.dryRun ? "dry-run" : "live"}${cli.once ? " (single cycle)" : ""}`);
 
   do {

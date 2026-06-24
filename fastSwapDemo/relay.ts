@@ -7,7 +7,7 @@ import {
   scanSwapRequested,
   type RelayChain,
 } from "../app/fastswap/nodes/relay-node/index.js";
-import { sendNodeLog } from "../src/node-log-ingest.js";
+import { AuditLog } from "../app/fastswap/shared/audit.js";
 import {
   API_PORT,
   DEMO_HOST,
@@ -29,6 +29,7 @@ export class DemoRelayNode {
   private timer?: NodeJS.Timeout;
   private progress: RelayProgress = {};
   private readonly progressPath = join(process.cwd(), "fastSwapDemo", "state", "relay-progress.json");
+  private readonly audit = new AuditLog(join(process.cwd(), "fastSwapDemo", "state", "relay-audit.jsonl"), "relay");
   private readonly chains: RelayChain[];
 
   constructor(private readonly deployment: DemoDeployment) {
@@ -54,15 +55,13 @@ export class DemoRelayNode {
         this.chains.flatMap((source) => this.chains.map((target) => this.relayFrom(source, target)))
       );
       await writeFile(this.progressPath, JSON.stringify(this.progress, null, 2));
-      this.nodeHeartbeat("relay node running", { ms: Date.now() - t0 });
+      this.audit.append("heartbeat", { payload: { ms: Date.now() - t0 } });
     } catch (error) {
-      this.nodeHeartbeat(
-        "relay tick failed",
-        { message: error instanceof Error ? error.message : String(error) },
-        "error"
-      );
-      this.nodeLog("error", "relay tick failed", {
-        message: error instanceof Error ? error.message : String(error),
+      this.audit.append("error", {
+        payload: { message: error instanceof Error ? error.message : String(error), stage: "tick" },
+      });
+      this.audit.append("relay-tick-failed", {
+        payload: { message: error instanceof Error ? error.message : String(error) },
       });
       throw error;
     }
@@ -76,9 +75,8 @@ export class DemoRelayNode {
     try {
       scan = await scanSwapRequested(source, cursor);
     } catch (error) {
-      this.nodeLog("warn", "relay: source scan failed", {
-        source: source.name,
-        message: error instanceof Error ? error.message : String(error),
+      this.audit.append("scan-failed", {
+        payload: { source: source.name, message: error instanceof Error ? error.message : String(error) },
       });
       return;
     }
@@ -103,10 +101,10 @@ export class DemoRelayNode {
             },
           },
         });
-        this.nodeLog("info", "relay: swapRequested tx recorded", {
-          swapId: event.swapId,
-          source: source.name,
+        this.audit.append("swap-requested", {
+          invoiceId: event.swapId,
           txHash: event.txHash,
+          payload: { source: source.name },
         });
 
         const relay = await relaySwapOnTarget(target, event.swapId, invoice.data);
@@ -133,18 +131,20 @@ export class DemoRelayNode {
 
         await postInvoiceTrack(RELAY_API_BASE, NODE_API_KEY, event.swapId, patch);
         console.log(`[fastswap-demo:relay] ${source.name} -> ${target.name} relayed ${event.swapId}`);
-        this.nodeLog("info", "relay: swap relayed", {
-          swapId: event.swapId,
-          source: source.name,
-          target: target.name,
-          relayTxHash: relay.txHash,
-          relayStatus: relay.status,
-          processed: relay.processed,
+        this.audit.append("relay-confirmed", {
+          invoiceId: event.swapId,
+          txHash: relay.txHash,
+          payload: {
+            source: source.name,
+            target: target.name,
+            relayStatus: relay.status,
+            processed: relay.processed,
+          },
         });
       } catch (error) {
-        this.nodeLog("error", "relay: iteration failed", {
-          message: error instanceof Error ? error.message : String(error),
+        this.audit.append("relay-failed", {
           txHash: event.txHash,
+          payload: { message: error instanceof Error ? error.message : String(error) },
         });
         console.error("[fastswap-demo:relay]", error);
       }
@@ -159,14 +159,6 @@ export class DemoRelayNode {
     } catch {
       this.progress = {};
     }
-  }
-
-  private nodeLog(level: "debug" | "info" | "warn" | "error", message: string, metadata?: Record<string, unknown>) {
-    void sendNodeLog(RELAY_API_BASE, NODE_API_KEY, "relay", { level, message, metadata });
-  }
-
-  private nodeHeartbeat(message: string, metadata?: Record<string, unknown>, level: "info" | "warn" | "error" = "info") {
-    void sendNodeLog(RELAY_API_BASE, NODE_API_KEY, "relay", { level, message, metadata, eventType: "heartbeat" });
   }
 }
 

@@ -1,0 +1,20 @@
+# FastSwap API — expose only this service to the internet (e.g. behind Caddy/nginx).
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    command: ["node", "app-dist/fastswap/app/fastswap/server/main.js", "/config/FastSwapConfig.yaml"]
+    env_file:
+      - .env
+    environment:
+      API_SIGNING_SECRET: ${API_SIGNING_SECRET}
+    volumes:
+      - ../../FastSwapConfig.yaml:/config/FastSwapConfig.yaml:ro
+      - api-data:/app/data
+    ports:
+      - "${API_PORT:-4010}:4010"
+    restart: unless-stopped
+
+volumes:
+  api-data:

@@ -17,8 +17,10 @@ export type SweepNodeConfig = {
     sqlitePath: string;
   };
   pollIntervalMs?: number;
-  /** Max cached invoices per chain to check against `invoicePayment` each tick (default 500). */
   reconcileReceiverLimitPerChain?: number;
+  auditLogPath?: string;
+  /** Verifies API invoice signatures before sweep (same value as API signing secret). */
+  signingSecret?: string;
   chains: ChainConfig[];
 };
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ITrc20} from "./interfaces/ITrc20.sol";
 import {ITronReceiver} from "./interfaces/ITronReceiver.sol";
 
 abstract contract TronReceiver is Initializable, OwnableUpgradeable, UUPSUpgradeable, ITronReceiver {
@@ -65,6 +66,7 @@ abstract contract TronReceiver is Initializable, OwnableUpgradeable, UUPSUpgrade
         bytes calldata data
     ) external {
         if (amount == 0) revert NoPayment();
+        if (ITrc20(token).balanceOf(address(this)) < amount) revert NoPayment();
 
         _handleInvoice(invoiceId, token, msg.sender, amount, data);
     }
@@ -106,7 +108,7 @@ abstract contract TronReceiver is Initializable, OwnableUpgradeable, UUPSUpgrade
         if (keccak256(data) != invoiceId) revert InvalidInvoiceData();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
 
     function _assignPayment(bytes32 invoiceId, address token, address forwarder, uint256 amount) internal {
         TronReceiverStorage storage $ = _getTronReceiverStorage();

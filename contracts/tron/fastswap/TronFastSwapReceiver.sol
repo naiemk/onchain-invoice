@@ -50,4 +50,6 @@ contract TronFastSwapReceiver is TronReceiver, FastSwapCore {
     function _tokenBalanceOf(address token) internal view override returns (uint256) {
         return ITrc20(token).balanceOf(address(this));
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override(TronReceiver) onlyRole(ADMIN_ROLE) {}
 }

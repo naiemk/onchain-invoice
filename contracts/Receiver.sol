@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IReceiver} from "./interfaces/IReceiver.sol";
 
 abstract contract Receiver is Initializable, OwnableUpgradeable, UUPSUpgradeable, IReceiver {
@@ -65,6 +66,7 @@ abstract contract Receiver is Initializable, OwnableUpgradeable, UUPSUpgradeable
         bytes calldata data
     ) external {
         if (amount == 0) revert NoPayment();
+        if (IERC20(token).balanceOf(address(this)) < amount) revert NoPayment();
 
         _handleInvoice(invoiceId, token, msg.sender, amount, data);
     }

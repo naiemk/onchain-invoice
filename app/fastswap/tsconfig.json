@@ -6,6 +6,11 @@
     "declaration": false,
     "types": ["node", "mocha"]
   },
-  "include": ["./**/*.ts", "../../src/**/*.ts"],
+  "include": [
+    "./**/*.ts",
+    "../../src/**/*.ts",
+    "../../node/config.ts",
+    "../../LiquidityManager/shared/**/*.ts"
+  ],
   "exclude": ["../../node_modules", "../../dist", "../../app-dist"]
 }

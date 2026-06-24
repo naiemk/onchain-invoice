@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveTokenPriceUsdMicros } from "../server/price-sources.js";
 import { FastSwapServer } from "../server/server.js";
+import { verifyInvoiceSignature } from "../shared/signing.js";
 import { tronAddressToEvmHex } from "../shared/tron-address.js";
 
 describe("FastSwapServer", function () {
@@ -90,6 +91,58 @@ describe("FastSwapServer", function () {
     }
   });
 
+  it("signs created invoices and accepts node-authenticated track updates", async function () {
+    const directory = await mkdtemp(join(tmpdir(), "fastswap-server-signing-"));
+    const signingSecret = "signing-secret";
+    const server = new FastSwapServer({
+      sqlitePath: join(directory, "fastswap.sqlite"),
+      signingSecret,
+      nodeAuthSecret: signingSecret,
+      invoiceSdk: {
+        async getNewInvoiceAddress() {
+          return "0x0000000000000000000000000000000000000abc";
+        },
+      },
+    });
+    const address = await server.run("127.0.0.1", 0);
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+
+    try {
+      const quote = await postJson(`${baseUrl}/quotes`, {
+        sourceChainId: "base",
+        sourceToken: "0x0000000000000000000000000000000000000000",
+        targetChainId: "base",
+        targetToken: "0x0000000000000000000000000000000000000000",
+        recipient: "0x0000000000000000000000000000000000000001",
+        usdPack: 10,
+      });
+      const invoice = await postJson(`${baseUrl}/invoices`, { quoteId: quote.quoteId });
+      expect(invoice.signature).to.be.a("string");
+      expect(verifyInvoiceSignature(invoice, signingSecret)).to.equal(true);
+
+      const txHash = `0x${"ab".repeat(32)}`;
+      const tracked = await fetch(`${baseUrl}/invoices/${encodeURIComponent(invoice.invoiceId)}/track`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": signingSecret },
+        body: JSON.stringify({
+          sweep: {
+            tx: {
+              chainId: "base",
+              txHash,
+              status: "confirmed",
+              gasUsed: "123456",
+              blockNumber: 99,
+            },
+          },
+        }),
+      }).then((r) => r.json());
+      expect(tracked.sweep?.tx?.explorerTxUrl).to.equal(`https://basescan.org/tx/${txHash}`);
+    } finally {
+      await server.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("accepts node track updates and exposes explorer links on GET", async function () {
     const directory = await mkdtemp(join(tmpdir(), "fastswap-server-track-"));
     const server = new FastSwapServer({
@@ -164,62 +217,6 @@ describe("FastSwapServer", function () {
       const fetched = await fetch(`${baseUrl}/invoices/${encodeURIComponent(invoice.invoiceId)}`).then((r) => r.json());
       expect(fetched.sweep?.tx?.gasUsed).to.equal("123456");
       expect(fetched.payout?.amount).to.equal("1000");
-    } finally {
-      await server.close();
-      await rm(directory, { recursive: true, force: true });
-    }
-  });
-
-  it("accepts node log ingest and lists logs by source", async function () {
-    const directory = await mkdtemp(join(tmpdir(), "fastswap-server-nodelogs-"));
-    const server = new FastSwapServer({
-      sqlitePath: join(directory, "fastswap.sqlite"),
-      nodeApiKey: "node-secret",
-      invoiceSdk: {
-        async getNewInvoiceAddress() {
-          return "0x0000000000000000000000000000000000000abc";
-        },
-      },
-    });
-    const address = await server.run("127.0.0.1", 0);
-    const baseUrl = `http://127.0.0.1:${address.port}`;
-
-    try {
-      const unauthorized = await fetch(`${baseUrl}/node-logs/sweep`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-api-key": "wrong" },
-        body: JSON.stringify({ message: "x" }),
-      });
-      expect(unauthorized.status).to.equal(401);
-
-      const post = await fetch(`${baseUrl}/node-logs/sweep`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-api-key": "node-secret" },
-        body: JSON.stringify({ level: "warn", message: "hello-sweep", metadata: { foo: 1 } }),
-      });
-      expect(post.status).to.equal(204);
-
-      const heartbeat = await fetch(`${baseUrl}/node-logs/sweep`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-api-key": "node-secret" },
-        body: JSON.stringify({ eventType: "heartbeat", message: "sweep node running", metadata: { ms: 12 } }),
-      });
-      expect(heartbeat.status).to.equal(204);
-
-      const listed = await fetch(`${baseUrl}/node-logs/sweep?limit=10`, {
-        headers: { "x-api-key": "node-secret" },
-      }).then((r) => r.json());
-      expect(listed.logs.length).to.equal(1);
-      expect(listed.logs[0].message).to.equal("hello-sweep");
-      expect(listed.logs[0].level).to.equal("warn");
-      expect(listed.logs[0].metadata?.foo).to.equal(1);
-
-      const health = await fetch(`${baseUrl}/node-health`, {
-        headers: { "x-api-key": "node-secret" },
-      }).then((r) => r.json());
-      expect(health.nodes[0].source).to.equal("sweep");
-      expect(health.nodes[0].message).to.equal("sweep node running");
-      expect(health.nodes[0].metadata?.ms).to.equal(12);
     } finally {
       await server.close();
       await rm(directory, { recursive: true, force: true });

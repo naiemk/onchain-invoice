@@ -143,6 +143,8 @@ export type FastSwapInvoice = FastSwapQuote & {
   token?: string;
   amount: string;
   status: FastSwapStatus;
+  /** HMAC-SHA256 hex over canonical invoice fields; nodes verify before acting. */
+  signature?: string;
   sweep?: FastSwapSweepInfo;
   relay?: FastSwapRelayInfo;
   payout?: FastSwapPayoutInfo;

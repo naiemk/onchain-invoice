@@ -14,14 +14,19 @@
     "sweep-node:build": "tsc -p node/tsconfig.json",
     "sweep-node": "node node-dist/node/index.js",
     "fastswap:build": "tsc -p app/fastswap/tsconfig.json",
+    "fastswap:server": "npm run fastswap:build && node app-dist/fastswap/app/fastswap/server/main.js",
+    "fastswap:sweep": "npm run fastswap:build && node app-dist/fastswap/app/fastswap/nodes/sweep-main.js",
+    "fastswap:relay": "npm run fastswap:build && node app-dist/fastswap/app/fastswap/nodes/relay-node/main.js",
+    "fastswap:liqman": "npm run liqman:build && node lm-dist/LiquidityManager/bot/index.js --fastswap-config FastSwapConfig.yaml",
+    "fastswap:cli": "node app-dist/fastswap/app/fastswap/cli/index.js",
+    "fastswap:cli:predict": "npm run fastswap:build && node app-dist/fastswap/app/fastswap/cli/index.js --predict",
     "fastswap:demo:build": "tsc -p fastSwapDemo/tsconfig.json",
     "fastswap:demo": "node demo-dist/fastSwapDemo/start.js",
     "fastswap:demo:pay": "node demo-dist/fastSwapDemo/pay-invoice.js",
     "fastswap:demo:send": "node demo-dist/fastSwapDemo/pay.js",
     "fastswap:integ": "npm run compile && npm run fastswap:demo:build && node --env-file=fastSwapDemo/.env demo-dist/fastSwapDemo/integration/live-sepolia-tron.js",
     "liqman:build": "tsc -p LiquidityManager/tsconfig.json",
-    "liqman": "node lm-dist/LiquidityManager/bot/index.js",
-    "docker:build": "tsc -p docker/tsconfig.json"
+    "liqman": "node lm-dist/LiquidityManager/bot/index.js"
   },
   "repository": {
     "type": "git",

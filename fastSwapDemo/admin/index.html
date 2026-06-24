@@ -167,8 +167,7 @@
       <button type="button" data-tab="relay-logs" role="tab" aria-selected="false">Relay node log</button>
     </nav>
     <p class="muted log-hint">
-      Event logs show meaningful invoice, sweep, relay, payout, and error activity. Routine liveness is summarized below and
-      refreshes every 3 seconds.
+      Node audit logs are append-only JSONL files under <code>fastSwapDemo/state/</code> (not served by the API).
     </p>
 
     <section id="panel-dashboard" class="panel active" role="tabpanel">
@@ -234,23 +233,14 @@
           .replace(/"/g, "&quot;");
       }
 
-      async function fetchNodeLogs(source) {
-        const r = await fetch(`${api}/node-logs/${source}?limit=100`, { headers: nodeHeaders });
-        if (!r.ok) return { logs: [], error: await r.text() };
-        return r.json();
+      async function fetchNodeLogs() {
+        return { logs: [] };
       }
 
       async function refreshNodeHealth() {
         const el = document.querySelector("#node-health");
-        const r = await fetch(`${api}/node-health`, { headers: nodeHeaders });
-        if (!r.ok) {
-          el.innerHTML = `<span class="health-pill"><span class="health-dot error"></span>${escapeHtml(await r.text())}</span>`;
-          return;
-        }
-        const data = await r.json();
         el.innerHTML =
-          (data.nodes || []).map(formatNodeHealth).join("") ||
-          '<span class="health-pill"><span class="health-dot stale"></span>No node heartbeats yet.</span>';
+          '<span class="health-pill"><span class="health-dot ok"></span><strong>nodes</strong><span>Audit logs: fastSwapDemo/state/*-audit.jsonl</span></span>';
       }
 
       async function refreshDashboard() {
@@ -328,25 +318,13 @@
       }
 
       async function refreshSweepLogs() {
-        const data = await fetchNodeLogs("sweep");
         const el = document.querySelector("#sweep-logs");
-        if (data.error) {
-          el.innerHTML = `<div class="log-row muted">${escapeHtml(data.error)}</div>`;
-          return;
-        }
-        const rows = (data.logs || []).map(formatLogRow).join("") || '<div class="log-row muted">No sweep logs yet.</div>';
-        el.innerHTML = rows;
+        el.innerHTML = '<div class="log-row muted">See fastSwapDemo/state/sweep-audit.jsonl (if sweep node is running with audit enabled).</div>';
       }
 
       async function refreshRelayLogs() {
-        const data = await fetchNodeLogs("relay");
         const el = document.querySelector("#relay-logs");
-        if (data.error) {
-          el.innerHTML = `<div class="log-row muted">${escapeHtml(data.error)}</div>`;
-          return;
-        }
-        const rows = (data.logs || []).map(formatLogRow).join("") || '<div class="log-row muted">No relay logs yet.</div>';
-        el.innerHTML = rows;
+        el.innerHTML = '<div class="log-row muted">See fastSwapDemo/state/relay-audit.jsonl.</div>';
       }
 
       function setTab(id) {

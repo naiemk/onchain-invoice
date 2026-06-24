@@ -24,6 +24,8 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
  *         `_executeInvoice` to `_executeFastSwapInvoice`.
  */
 abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable {
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
     bytes32 public constant LIQUIDITY_ROLE = keccak256("LIQUIDITY_ROLE");
@@ -61,6 +63,7 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
         mapping(bytes32 swapId => SwapState state) swaps;
         mapping(address token => uint256 amount) liquidityFloor;
         bytes32[] queuedSwapIds;
+        uint256 reentrancyStatus;
     }
 
     // keccak256(abi.encode(uint256(keccak256("fastswap.storage.FastSwapCore")) - 1)) & ~bytes32(uint256(0xff))
@@ -95,6 +98,15 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
     error InsufficientLiquidity();
     error ReservedLiquidity();
     error TransferFailed();
+    error ReentrantCall();
+
+    modifier nonReentrant() {
+        FastSwapStorage storage $ = _getFastSwapStorage();
+        if ($.reentrancyStatus == _ENTERED) revert ReentrantCall();
+        $.reentrancyStatus = _ENTERED;
+        _;
+        $.reentrancyStatus = _NOT_ENTERED;
+    }
 
     // --- chain-specific token primitives (implemented by each receiver) ---
 
@@ -116,6 +128,7 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
     function __FastSwapCore_init(address owner) internal onlyInitializing {
         __AccessControl_init();
         __Pausable_init();
+        _getFastSwapStorage().reentrancyStatus = _NOT_ENTERED;
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(ADMIN_ROLE, owner);
         _grantRole(RELAYER_ROLE, owner);
@@ -154,7 +167,7 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
         emit LiquidityAdded(token, msg.sender, amount);
     }
 
-    function relaySwap(bytes calldata data) external onlyRole(RELAYER_ROLE) whenNotPaused {
+    function relaySwap(bytes calldata data) external onlyRole(RELAYER_ROLE) whenNotPaused nonReentrant {
         SwapIntent memory intent = _decodeIntent(data);
         bytes32 swapId = keccak256(data);
         FastSwapStorage storage $ = _getFastSwapStorage();
@@ -174,7 +187,7 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
         }
     }
 
-    function processQueued(bytes32 swapId) external onlyRole(LIQUIDITY_ROLE) whenNotPaused {
+    function processQueued(bytes32 swapId) external onlyRole(LIQUIDITY_ROLE) whenNotPaused nonReentrant {
         FastSwapStorage storage $ = _getFastSwapStorage();
         SwapState storage state = $.swaps[swapId];
         if (!state.queued || state.processed) revert SwapNotQueued();
@@ -195,7 +208,7 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
         _unpause();
     }
 
-    function adminSweep(address token, address to, uint256 amount) external onlyRole(ADMIN_ROLE) {
+    function adminSweep(address token, address to, uint256 amount) external onlyRole(ADMIN_ROLE) nonReentrant {
         if (to == address(0)) revert InvalidRecipient();
         uint256 available = _availableLiquidity(token);
         if (amount > available) revert ReservedLiquidity();
@@ -209,7 +222,7 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
      *         broad powers of `ADMIN_ROLE`. Like `adminSweep`, it can never touch reserved
      *         liquidity below `liquidityFloor`, so the swap-payout path stays protected.
      */
-    function withdrawExcess(address token, address to, uint256 amount) external onlyRole(REBALANCER_ROLE) {
+    function withdrawExcess(address token, address to, uint256 amount) external onlyRole(REBALANCER_ROLE) nonReentrant {
         if (to == address(0)) revert InvalidRecipient();
         if (amount > _availableLiquidity(token)) revert ReservedLiquidity();
         _transferOut(token, to, amount);

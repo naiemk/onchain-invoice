@@ -1,0 +1,383 @@
+# FastSwap global configuration — single source of truth (no private keys).
+# Amounts are human decimals: "10" USDT = 10.00 USDT, "0.05" ETH = 0.05 ETH.
+# Tokens are defined once per chain; reference them by symbol elsewhere.
+version: 1
+
+active-chains:
+  - base
+  - arbitrum
+  - bsc
+  - tron
+  # Optional — deploy and add to active-chains when ready:
+  # - ethereum
+  # - polygon
+
+server:
+  host: 0.0.0.0
+  apiPort: 4010
+  publicUrl: https://api.example.com
+  sqlitePath: ./data/fastswap.sqlite
+  auditLogPath: ./data/api-audit.jsonl
+  signingSecretEnv: API_SIGNING_SECRET
+  captcha:
+    provider: cloudflare-turnstile
+    siteKey: ""
+    secretKey: ""
+    requireForQuotes: true
+    requireForInvoices: true
+
+quote:
+  feeBps: 75
+  maxDeviationBps: 100
+  quoteTtlSec: 900
+  packsUsd:
+    - "10"
+    - "20"
+    - "25"
+    - "40"
+    - "50"
+    - "100"
+    - "200"
+
+sweepNode:
+  pollIntervalMs: 30000
+  pageLimit: 500
+  confirmations: 3
+  logScanOverlap: 100
+  sqlitePath: "./data/sweep-node.sqlite"
+
+relayNode:
+  pollIntervalMs: 5000
+  confirmations: 3
+
+liquidityMonitor:
+  pollIntervalMs: 15000
+
+deploy:
+  createx: "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed"
+  owner: "${FASTSWAP_OWNER_ADDRESS}"
+  # CREATE2 salts = keccak256("namespace/version/contract"), e.g. fastswap/1/fastSwapProxy
+  salts:
+    namespace: fastswap
+    version: "1"
+  contracts:
+    fastSwapImplementation: ""
+    fastSwapAddress: ""
+    sweeperAddress: ""
+    forwarderImplementation: ""
+    liquidityManagerImplementation: ""
+    liquidityManagerAddress: ""
+
+liquidityManager:
+  pollIntervalMs: 60000
+  sqlitePath: "./data/liquidity-manager.sqlite"
+  economics:
+    gasGateBps: 50
+    minNotionalUsd: 100
+    maxStalenessSec: 3600
+    riskCapUsd: 5000
+    cooldownSec: 300
+    slippageBps: 50
+    maxGasPriceGwei: 40
+
+nodes:
+  sweep:
+    auditLogPath: ./data/sweep-audit.jsonl
+  relay:
+    progressPath: ./data/relay-progress.json
+    auditLogPath: ./data/relay-audit.jsonl
+  liqman:
+    auditLogPath: ./data/liqman-audit.jsonl
+
+chains:
+  - key: base
+    id: "8453"
+    type: evm
+    name: Base
+    optional: false
+    rpcUrl: "${BASE_RPC_URL}"
+    explorerUrl: https://basescan.org
+    confirmations: 3
+    startBlock: 0
+    aggregatorSlug: base
+    nativeSentinel: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+    router: "${BASE_ROUTER_ADDRESS}"
+    tokens:
+      ETH:
+        decimals: 18
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: ethereum
+          - type: binance
+            symbol: ETHUSDT
+      USDC:
+        address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+        decimals: 6
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: usd-coin
+    liquidity:
+      reserveStable: USDC
+      receivers:
+        - tokens:
+            ETH:
+              floor: "0.02"
+              target: "0.05"
+              ceiling: "0.12"
+            USDC:
+              isStable: true
+              floor: "100"
+              target: "300"
+              ceiling: "800"
+
+  - key: arbitrum
+    id: "42161"
+    type: evm
+    name: Arbitrum One
+    optional: false
+    rpcUrl: "${ARBITRUM_RPC_URL}"
+    explorerUrl: https://arbiscan.io
+    confirmations: 3
+    startBlock: 0
+    aggregatorSlug: arbitrum
+    nativeSentinel: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+    router: "${ARBITRUM_ROUTER_ADDRESS}"
+    tokens:
+      ETH:
+        decimals: 18
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: ethereum
+          - type: binance
+            symbol: ETHUSDT
+      USDC:
+        address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+        decimals: 6
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: usd-coin
+      USDT:
+        address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
+        decimals: 6
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: tether
+    liquidity:
+      reserveStable: USDC
+      receivers:
+        - tokens:
+            ETH:
+              floor: "0.02"
+              target: "0.05"
+              ceiling: "0.12"
+            USDC:
+              isStable: true
+              floor: "100"
+              target: "300"
+              ceiling: "800"
+
+  - key: bsc
+    id: "56"
+    type: evm
+    name: BNB Smart Chain
+    optional: false
+    rpcUrl: "${BSC_RPC_URL}"
+    explorerUrl: https://bscscan.com
+    confirmations: 3
+    startBlock: 0
+    aggregatorSlug: bsc
+    nativeSentinel: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+    router: "${BSC_ROUTER_ADDRESS}"
+    tokens:
+      BNB:
+        decimals: 18
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: binancecoin
+          - type: binance
+            symbol: BNBUSDT
+      USDT:
+        address: "0x55d398326f99059ff775485246999027b3197955"
+        decimals: 18
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: tether
+    liquidity:
+      reserveStable: USDT
+      receivers:
+        - tokens:
+            BNB:
+              floor: "0.05"
+              target: "0.15"
+              ceiling: "0.4"
+            USDT:
+              isStable: true
+              floor: "100"
+              target: "300"
+              ceiling: "800"
+
+  - key: tron
+    id: "728126428"
+    type: tron
+    name: TRON Mainnet
+    optional: false
+    fullHost: "${TRON_FULL_HOST}"
+    feeLimit: "150"
+    explorerUrl: https://tronscan.org
+    startTimestamp: 0
+    aggregatorSlug: tron
+    router: "${TRON_ROUTER_ADDRESS}"
+    contracts:
+      fastSwapAddress: ""
+      sweeperAddress: ""
+      forwarderImplementation: ""
+      liquidityManagerAddress: ""
+    tokens:
+      TRX:
+        decimals: 6
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: tron
+          - type: binance
+            symbol: TRXUSDT
+      USDT:
+        address: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+        decimals: 6
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: tether
+    liquidity:
+      reserveStable: USDT
+      receivers:
+        - tokens:
+            TRX:
+              floor: "200"
+              target: "500"
+              ceiling: "1500"
+            USDT:
+              isStable: true
+              floor: "100"
+              target: "300"
+              ceiling: "800"
+
+  - key: ethereum
+    id: "1"
+    type: evm
+    name: Ethereum
+    optional: true
+    rpcUrl: "${ETHEREUM_RPC_URL}"
+    explorerUrl: https://etherscan.io
+    confirmations: 6
+    startBlock: 0
+    aggregatorSlug: eth
+    nativeSentinel: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+    router: "${ETHEREUM_ROUTER_ADDRESS}"
+    tokens:
+      ETH:
+        decimals: 18
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: ethereum
+          - type: binance
+            symbol: ETHUSDT
+      USDC:
+        address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        decimals: 6
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: usd-coin
+      USDT:
+        address: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+        decimals: 6
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: tether
+    liquidity:
+      reserveStable: USDC
+      receivers:
+        - tokens:
+            ETH:
+              floor: "0.2"
+              target: "0.5"
+              ceiling: "2"
+            USDC:
+              isStable: true
+              floor: "500"
+              target: "1500"
+              ceiling: "5000"
+
+  - key: polygon
+    id: "137"
+    type: evm
+    name: Polygon PoS
+    optional: true
+    rpcUrl: "${POLYGON_RPC_URL}"
+    explorerUrl: https://polygonscan.com
+    confirmations: 3
+    startBlock: 0
+    aggregatorSlug: polygon
+    nativeSentinel: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+    router: "${POLYGON_ROUTER_ADDRESS}"
+    tokens:
+      POL:
+        decimals: 18
+        isNative: true
+        minLiquidity: "0"
+        priceSources:
+          - type: coingecko
+            coinId: polygon-ecosystem-token
+          - type: binance
+            symbol: POLUSDT
+      USDC:
+        address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
+        decimals: 6
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: usd-coin
+      USDT:
+        address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+        decimals: 6
+        minLiquidity: "0"
+        priceUsd: "1"
+        priceSources:
+          - type: coingecko
+            coinId: tether
+    liquidity:
+      reserveStable: USDC
+      receivers:
+        - tokens:
+            POL:
+              floor: "5"
+              target: "15"
+              ceiling: "40"
+            USDC:
+              isStable: true
+              floor: "100"
+              target: "300"
+              ceiling: "800"
