@@ -81,6 +81,16 @@ Sweep node work belongs in `node/`, not `src/`; it is an app that uses the libra
 
 FastSwap app work belongs in `app/fastswap`; it should not change the root library export surface unless the user explicitly asks for that.
 
+**Production** (see [`docs/PROD_LAUNCH.md`](../../docs/PROD_LAUNCH.md)):
+
+- Config: `FastSwapConfig.yaml` at repo root; secrets only in `.env` (`API_SIGNING_SECRET`, node private keys, RPC URLs, routers).
+- API: `npm run fastswap:server` or Docker `docker/compose/api.yml` (`GET /health`, HMAC-signed invoices).
+- Nodes: `npm run fastswap:sweep`, `fastswap:relay`, `fastswap:liqman` or Docker `docker/compose/nodes.yml`.
+- Deploy CLI: `npm run fastswap:cli` with `--predict`, `--deploy-evm-all`, `--deploy-tron`, `--validate`, `--verifyAll`, and `--configure-*` flags.
+- UI: static `app/fastswap/ui` on Vercel with `FASTSWAP_API_BASE`.
+
+`fastSwapDemo/` is local dev only — not used in production.
+
 - `FastSwapReceiver` is the invoice receiver. It extends `Receiver`, decodes ABI-encoded swap terms, verifies the swept token/amount against the quote, emits source-chain swap requests, and supports relay, queue, liquidity, admin, and `AGGREGATE_ALL_ROLE` flows.
 - Keep a compile wrapper under `contracts/fastswap` when Hardhat needs to compile app contracts from the root sources path.
 - Shared quote and invoice schemas live in `app/fastswap/shared` and must be used by server, UI, nodes, and tests.
@@ -98,7 +108,7 @@ TRON is a full bidirectional FastSwap chain (source and target) for TRX (gas) an
 - The server derives the source invoice address through a per-chain SDK: `OnchainInvoiceSdk` for `type: "evm"` and `TronInvoiceSdk` for `type: "tron"` (both satisfy the `InvoiceAddressSdk` interface).
 - The relay (`app/fastswap/nodes/relay-node`) and liquidity monitor (`app/fastswap/nodes/liquidity-monitor`) branch by chain type: EVM uses ethers `getLogs`/`Wallet`; TRON uses TronWeb `getEventResult`/contract `.send({ feeLimit })`. The sweep node resolves TRON target `swapState` and avoids `getAddress()` on `T...` tokens.
 - Token prices come from configurable `priceSources` (CoinGecko, Binance, DexScreener, or static); base58 contract addresses are never lowercased.
-- Configure chains centrally in `fastSwapDemo/config.yaml` (each chain has `type`, and TRON chains add `fullHost`/`feeLimit`); env placeholders carry RPC/host and deployed addresses.
+- Configure chains centrally in `FastSwapConfig.yaml` for production or `fastSwapDemo/config.yaml` for the local demo.
 
 ## Monitoring Workflow
 

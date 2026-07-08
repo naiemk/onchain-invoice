@@ -12,11 +12,13 @@ const ROLE_NAMES = [
   "REBALANCER_ROLE",
 ] as const;
 
+type FastSwapRoleName = (typeof ROLE_NAMES)[number];
+
 export async function configureFastSwapRole(input: {
   config: FastSwapConfigFile;
   chainKey: string;
   privateKey: string;
-  role: (typeof ROLE_NAMES)[number];
+  role: FastSwapRoleName;
   account: string;
   grant: boolean;
 }) {
@@ -82,6 +84,43 @@ export async function addNativeLiquidity(input: {
   return { chainKey: input.chainKey, amount: input.amount, txHash: tx.hash };
 }
 
+export async function setAggregatorAllowed(input: {
+  config: FastSwapConfigFile;
+  chainKey: string;
+  privateKey: string;
+  aggregator: string;
+  allowed: boolean;
+}) {
+  const chain = getChainDefinition(input.config, input.chainKey);
+  if (chain.type !== "evm") throw new Error("setAggregatorAllowed currently supports EVM only");
+  if (!chain.rpcUrl) throw new Error(`Missing rpcUrl for ${input.chainKey}`);
+  const contracts = resolveChainContracts(input.config, chain);
+  const artifact = await readArtifact("contracts/fastswap/FastSwapReceiver.sol/FastSwapReceiver.json");
+  const wallet = new Wallet(input.privateKey, new JsonRpcProvider(chain.rpcUrl));
+  const fastSwap = new Contract(contracts.fastSwapAddress, artifact.abi, wallet);
+  const tx = await fastSwap.setAggregatorAllowed(input.aggregator, input.allowed);
+  await tx.wait();
+  return { chainKey: input.chainKey, aggregator: input.aggregator, allowed: input.allowed, txHash: tx.hash };
+}
+
+export async function setFastSwapPaused(input: {
+  config: FastSwapConfigFile;
+  chainKey: string;
+  privateKey: string;
+  paused: boolean;
+}) {
+  const chain = getChainDefinition(input.config, input.chainKey);
+  if (chain.type !== "evm") throw new Error("pause/unpause currently supports EVM only");
+  if (!chain.rpcUrl) throw new Error(`Missing rpcUrl for ${input.chainKey}`);
+  const contracts = resolveChainContracts(input.config, chain);
+  const artifact = await readArtifact("contracts/fastswap/FastSwapReceiver.sol/FastSwapReceiver.json");
+  const wallet = new Wallet(input.privateKey, new JsonRpcProvider(chain.rpcUrl));
+  const fastSwap = new Contract(contracts.fastSwapAddress, artifact.abi, wallet);
+  const tx = input.paused ? await fastSwap.pause() : await fastSwap.unpause();
+  await tx.wait();
+  return { chainKey: input.chainKey, paused: input.paused, txHash: tx.hash };
+}
+
 export async function allowLiquidityManagerRouter(input: {
   config: FastSwapConfigFile;
   chainKey: string;
@@ -102,7 +141,9 @@ export async function allowLiquidityManagerRouter(input: {
   return { chainKey: input.chainKey, router: input.router, allowed: input.allowed, txHash: tx.hash };
 }
 
-export function listRoleNames(): readonly string[] {
+export type { FastSwapRoleName };
+
+export function listRoleNames(): readonly FastSwapRoleName[] {
   return ROLE_NAMES;
 }
 

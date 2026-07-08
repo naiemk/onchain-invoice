@@ -1,7 +1,7 @@
 import { Interface } from "ethers";
 import { TronWeb } from "tronweb";
 import { tronAddressToEvmHex } from "../app/fastswap/shared/tron-address.js";
-import { readArtifact } from "./artifacts.js";
+import { readArtifact } from "../app/fastswap/cli/artifacts.js";
 
 /**
  * Deploys the TRON FastSwap stack (TronFastSwapReceiver behind a ReceiverProxy plus a

@@ -154,6 +154,15 @@ export async function predictStackAddresses(input: {
   };
 }
 
+export type DeployProgressPatch = Partial<{
+  fastSwapImplementation: string;
+  fastSwapAddress: string;
+  sweeperAddress: string;
+  forwarderImplementation: string;
+  liquidityManagerImplementation: string;
+  liquidityManagerAddress: string;
+}>;
+
 export async function deployEvmStackViaCreateX(input: {
   signer: Signer;
   createx: string;
@@ -166,6 +175,7 @@ export async function deployEvmStackViaCreateX(input: {
     liquidityManager: { abi: unknown; bytecode: string };
   };
   includeLiquidityManager?: boolean;
+  onProgress?: (patch: DeployProgressPatch) => void | Promise<void>;
 }): Promise<{
   fastSwapImplementation: string;
   fastSwapAddress: string;
@@ -196,15 +206,18 @@ export async function deployEvmStackViaCreateX(input: {
     input.salts.fastSwapImplementation,
     fastSwapImplementationInit
   );
+  await input.onProgress?.({ fastSwapImplementation });
 
   const proxyInit = await buildInitCode(input.artifacts.proxy, [fastSwapImplementation, initData]);
   const fastSwapAddress = await deployViaCreateX(input.signer, createx, input.salts.fastSwapProxy, proxyInit);
+  await input.onProgress?.({ fastSwapImplementation, fastSwapAddress });
 
   const sweeperInit = await buildInitCode(input.artifacts.sweeper, [fastSwapAddress]);
   const sweeperAddress = await deployViaCreateX(input.signer, createx, input.salts.invoiceSweeper, sweeperInit);
 
   const sweeperRead = new Contract(sweeperAddress, input.artifacts.sweeper.abi as never, provider);
   const forwarderImplementation = String(await sweeperRead.getFunction("forwarderImplementation")());
+  await input.onProgress?.({ fastSwapImplementation, fastSwapAddress, sweeperAddress, forwarderImplementation });
 
   let liquidityManagerImplementation = "";
   let liquidityManagerAddress = "";
@@ -216,6 +229,13 @@ export async function deployEvmStackViaCreateX(input: {
       input.salts.liquidityManagerImplementation,
       lmImplementationInit
     );
+    await input.onProgress?.({
+      fastSwapImplementation,
+      fastSwapAddress,
+      sweeperAddress,
+      forwarderImplementation,
+      liquidityManagerImplementation,
+    });
 
     const lmProxyInit = await buildInitCode(input.artifacts.proxy, [liquidityManagerImplementation, lmInitData]);
     liquidityManagerAddress = await deployViaCreateX(
@@ -224,6 +244,14 @@ export async function deployEvmStackViaCreateX(input: {
       input.salts.liquidityManagerProxy,
       lmProxyInit
     );
+    await input.onProgress?.({
+      fastSwapImplementation,
+      fastSwapAddress,
+      sweeperAddress,
+      forwarderImplementation,
+      liquidityManagerImplementation,
+      liquidityManagerAddress,
+    });
   }
 
   return {

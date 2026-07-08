@@ -1,6 +1,5 @@
 import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import type { FastSwapConfigFile } from "../config/types.js";
-import type { ResolvedDeploySalts } from "../config/salts.js";
 import {
   getChainDefinition,
   getEvmActiveChains,
@@ -61,6 +60,8 @@ export async function deployEvmStackToChain(input: {
     );
   }
 
+  let workingConfig = input.config;
+
   const addresses = await deployEvmStackViaCreateX({
     signer: wallet,
     createx: resolveCreateXAddress(input.config),
@@ -68,10 +69,18 @@ export async function deployEvmStackToChain(input: {
     salts: getResolvedDeploySalts(input.config),
     artifacts,
     includeLiquidityManager: input.includeLiquidityManager,
+    onProgress:
+      input.save === false
+        ? undefined
+        : async (patch) => {
+            workingConfig = updateDeployContracts(workingConfig, patch);
+            saveFastSwapConfig(workingConfig, input.configPath);
+            console.log(`[deploy] updated FastSwapConfig.yaml (${Object.keys(patch).join(", ")})`);
+          },
   });
 
   if (input.save !== false) {
-    const next = updateDeployContracts(input.config, addresses);
+    const next = updateDeployContracts(workingConfig, addresses);
     saveFastSwapConfig(next, input.configPath);
   }
 

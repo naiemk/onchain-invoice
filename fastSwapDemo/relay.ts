@@ -19,7 +19,7 @@ import {
   type DemoDeployment,
 } from "./config.js";
 import { DEMO_DEPLOYMENT_PATH } from "./deploy.js";
-import { postInvoiceTrack } from "./invoice-track.js";
+import { postInvoiceTrack } from "../app/fastswap/shared/invoice-track.js";
 
 const RELAY_API_BASE = `http://${DEMO_HOST}:${API_PORT}`;
 

@@ -1,4 +1,4 @@
-import type { FastSwapInvoiceTrackPatch } from "../app/fastswap/shared/types.js";
+import type { FastSwapInvoiceTrackPatch } from "./types.js";
 
 export async function postInvoiceTrack(
   baseUrl: string,

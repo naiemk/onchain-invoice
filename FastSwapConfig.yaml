@@ -23,8 +23,8 @@ server:
     provider: cloudflare-turnstile
     siteKey: ""
     secretKey: ""
-    requireForQuotes: true
-    requireForInvoices: true
+    requireForQuotes: false
+    requireForInvoices: false
 
 quote:
   feeBps: 75

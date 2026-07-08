@@ -62,6 +62,7 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
     struct FastSwapStorage {
         mapping(bytes32 swapId => SwapState state) swaps;
         mapping(address token => uint256 amount) liquidityFloor;
+        mapping(address aggregator => bool allowed) allowedAggregator;
         bytes32[] queuedSwapIds;
         uint256 reentrancyStatus;
     }
@@ -86,6 +87,7 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
     event LiquidityAdded(address indexed token, address indexed from, uint256 amount);
     event LiquidityFloorSet(address indexed token, uint256 amount);
     event AggregatorExecuted(address indexed token, address indexed aggregator, uint256 amountIn, bytes result);
+    event AggregatorAllowedSet(address indexed aggregator, bool allowed);
     event AdminSweep(address indexed token, address indexed to, uint256 amount);
     event ExcessWithdrawn(address indexed token, address indexed to, uint256 amount);
 
@@ -153,6 +155,15 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
 
     function liquidityFloor(address token) external view returns (uint256) {
         return _getFastSwapStorage().liquidityFloor[token];
+    }
+
+    function aggregatorAllowed(address aggregator) external view returns (bool) {
+        return _getFastSwapStorage().allowedAggregator[aggregator];
+    }
+
+    function setAggregatorAllowed(address aggregator, bool allowed) external onlyRole(ADMIN_ROLE) {
+        _getFastSwapStorage().allowedAggregator[aggregator] = allowed;
+        emit AggregatorAllowedSet(aggregator, allowed);
     }
 
     // --- liquidity & relay ---
@@ -232,13 +243,12 @@ abstract contract FastSwapCore is AccessControlUpgradeable, PausableUpgradeable 
     function aggregateAll(
         address token,
         address aggregator,
-        uint256 minReserve,
         bytes calldata callData
-    ) external onlyRole(AGGREGATE_ALL_ROLE) returns (bytes memory result) {
-        if (aggregator == address(0)) revert InvalidRecipient();
-        uint256 balance = _balanceOf(token);
-        if (balance <= minReserve) revert ReservedLiquidity();
-        uint256 amountIn = balance - minReserve;
+    ) external onlyRole(AGGREGATE_ALL_ROLE) whenNotPaused nonReentrant returns (bytes memory result) {
+        FastSwapStorage storage $ = _getFastSwapStorage();
+        if (aggregator == address(0) || !$.allowedAggregator[aggregator]) revert InvalidRecipient();
+        uint256 amountIn = _availableLiquidity(token);
+        if (amountIn == 0) revert ReservedLiquidity();
 
         if (token == address(0)) {
             (bool ok, bytes memory data) = aggregator.call{value: amountIn}(callData);

@@ -10,7 +10,9 @@
     "./**/*.ts",
     "../../src/**/*.ts",
     "../../node/config.ts",
+    "../../node/sweep-node.ts",
+    "../../node/cache.ts",
     "../../LiquidityManager/shared/**/*.ts"
   ],
-  "exclude": ["../../node_modules", "../../dist", "../../app-dist"]
+  "exclude": ["../../node_modules", "../../dist", "../../app-dist", "./test/**"]
 }
