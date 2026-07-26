@@ -124,9 +124,11 @@ describe("FastSwapReceiver", function () {
   it("allows aggregate role to execute an aggregator call with excess funds", async function () {
     const { aggregator, fastSwap } = await deployFixture();
     await fastSwap.addLiquidity(ethersLib.ZeroAddress, 1000n, { value: 1000n });
+    await fastSwap.setLiquidityFloor(ethersLib.ZeroAddress, 400n);
+    await fastSwap.setAggregatorAllowed(aggregator.address, true);
 
     const before = await aggregator.provider.getBalance(aggregator.address);
-    await fastSwap.aggregateAll(ethersLib.ZeroAddress, aggregator.address, 400n, "0x");
+    await fastSwap.aggregateAll(ethersLib.ZeroAddress, aggregator.address, "0x");
     const after = await aggregator.provider.getBalance(aggregator.address);
 
     expect(after - before).to.equal(600n);

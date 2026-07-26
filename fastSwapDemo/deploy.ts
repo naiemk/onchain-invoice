@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import { DEMO_DEPLOY_CHAINS, DEMO_PRIVATE_KEY, type DemoChainConfig, type DemoChainDeployment, type DemoDeployment } from "./config.js";
-import { readArtifact, type ContractArtifact } from "./artifacts.js";
+import { readArtifact, type ContractArtifact } from "../app/fastswap/cli/artifacts.js";
 
 export const DEMO_DEPLOYMENT_PATH = join(process.cwd(), "fastSwapDemo", "state", "deployment.json");
 

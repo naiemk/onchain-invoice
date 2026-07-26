@@ -9,11 +9,18 @@ services:
       - .env
     environment:
       API_SIGNING_SECRET: ${API_SIGNING_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
     volumes:
       - ../../FastSwapConfig.yaml:/config/FastSwapConfig.yaml:ro
       - api-data:/app/data
     ports:
       - "${API_PORT:-4010}:4010"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
 volumes:

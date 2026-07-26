@@ -1,7 +1,7 @@
 import { Interface } from "ethers";
 import { TronWeb } from "tronweb";
 import { tronAddressToEvmHex } from "../shared/tron-address.js";
-import type { FastSwapConfigFile } from "../config/types.js";
+import type { FastSwapConfigFile, ResolvedChainContracts } from "../config/types.js";
 import { getChainDefinition, saveFastSwapConfig, updateTronContracts } from "../config/load.js";
 import { readArtifact } from "./artifacts.js";
 
@@ -35,28 +35,57 @@ export async function deployTronStack(input: {
   const initIface = new Interface(["function initialize(address initialOwner)"]);
   const ownerHex = tronAddressToEvmHex(ownerBase58);
 
+  let workingConfig = input.config;
+
+  const saveProgress = async (patch: Partial<ResolvedChainContracts>) => {
+    if (input.save === false) return;
+    workingConfig = updateTronContracts(workingConfig, patch, chainKey);
+    saveFastSwapConfig(workingConfig, input.configPath);
+    console.log(`[deploy:tron] updated FastSwapConfig.yaml (${Object.keys(patch).join(", ")})`);
+  };
+
   const fastSwapImplementation = await deployTronContract(tronWeb, fastSwapArtifact, feeLimit);
+  await saveProgress({ fastSwapImplementation });
+
   const initData = initIface.encodeFunctionData("initialize", [ownerHex]);
   const fastSwapAddress = await deployTronContract(tronWeb, proxyArtifact, feeLimit, [
     fastSwapImplementation,
     initData,
   ]);
+  await saveProgress({ fastSwapImplementation, fastSwapAddress });
+
   const sweeperAddress = await deployTronContract(tronWeb, sweeperArtifact, feeLimit, [fastSwapAddress]);
 
   const sweeperContract = await tronWeb.contract().at(sweeperAddress);
   const forwarderImplementation = tronWeb.address.fromHex(
     await sweeperContract.forwarderImplementation().call()
   ) as string;
+  await saveProgress({ fastSwapImplementation, fastSwapAddress, sweeperAddress, forwarderImplementation });
 
   let liquidityManagerImplementation = "";
   let liquidityManagerAddress = "";
   if (input.includeLiquidityManager !== false) {
     liquidityManagerImplementation = await deployTronContract(tronWeb, lmArtifact, feeLimit);
+    await saveProgress({
+      fastSwapImplementation,
+      fastSwapAddress,
+      sweeperAddress,
+      forwarderImplementation,
+      liquidityManagerImplementation,
+    });
     const lmInitData = initIface.encodeFunctionData("initialize", [ownerHex]);
     liquidityManagerAddress = await deployTronContract(tronWeb, proxyArtifact, feeLimit, [
       liquidityManagerImplementation,
       lmInitData,
     ]);
+    await saveProgress({
+      fastSwapImplementation,
+      fastSwapAddress,
+      sweeperAddress,
+      forwarderImplementation,
+      liquidityManagerImplementation,
+      liquidityManagerAddress,
+    });
   }
 
   const addresses = {
@@ -69,7 +98,7 @@ export async function deployTronStack(input: {
   };
 
   if (input.save !== false) {
-    const next = updateTronContracts(input.config, addresses);
+    const next = updateTronContracts(workingConfig, addresses, chainKey);
     saveFastSwapConfig(next, input.configPath);
   }
 

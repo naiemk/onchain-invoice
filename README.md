@@ -275,12 +275,14 @@ The node expects invoice records returned by the web server to contain:
 
 The app includes a three-source quote backend with SQLite persistence, a no-login static checkout UI, relay/liquidity/admin node helpers, and local E2E tests for quote creation, invoice payment, sweep, relay, queueing, and payout.
 
+**Production launch**: see [`docs/PROD_LAUNCH.md`](docs/PROD_LAUNCH.md). Config lives in `FastSwapConfig.yaml`; API and nodes run via Docker (`npm run docker:build`, `docker:up:api`, `docker:up:nodes`). The UI deploys to Vercel from `app/fastswap/ui`.
+
 ```bash
 npm run fastswap:build
 npm test
 ```
 
-The local two-chain demo in `fastSwapDemo` starts AliceChain and BobChain Hardhat nodes, deploys `DumUSDT`, `BobUSDC`, FastSwap receivers/sweepers on both chains, and runs the API, user UI, admin UI, sweep node, and relay node:
+The local two-chain demo in `fastSwapDemo` is for development only — it starts AliceChain and BobChain Hardhat nodes, deploys `DumUSDT`, `BobUSDC`, FastSwap receivers/sweepers on both chains, and runs the API, user UI, admin UI, sweep node, and relay node:
 
 ```bash
 npm run fastswap:demo:build

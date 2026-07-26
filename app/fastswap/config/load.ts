@@ -140,12 +140,13 @@ export function updateDeployContracts(
 
 export function updateTronContracts(
   config: FastSwapConfigFile,
-  patch: Partial<ResolvedChainContracts>
+  patch: Partial<ResolvedChainContracts>,
+  chainKey = "tron"
 ): FastSwapConfigFile {
   return {
     ...config,
     chains: config.chains.map((chain) => {
-      if (chain.key !== "tron") return chain;
+      if (chain.key !== chainKey) return chain;
       return {
         ...chain,
         contracts: {
@@ -156,6 +157,24 @@ export function updateTronContracts(
           liquidityManagerAddress:
             patch.liquidityManagerAddress ?? chain.contracts?.liquidityManagerAddress ?? "",
         },
+      };
+    }),
+  };
+}
+
+export function updateChainTokenAddress(
+  config: FastSwapConfigFile,
+  chainKey: string,
+  symbol: string,
+  address: string
+): FastSwapConfigFile {
+  return {
+    ...config,
+    chains: config.chains.map((chain) => {
+      if (chain.key !== chainKey) return chain;
+      return {
+        ...chain,
+        tokens: chain.tokens.map((token) => (token.symbol === symbol ? { ...token, address } : token)),
       };
     }),
   };

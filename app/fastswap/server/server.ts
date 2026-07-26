@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { URL } from "node:url";
 import { getInvoiceId } from "../../../src/index.js";
 import { encodeFastSwapIntent, quoteIdFromString, quoteToIntent } from "../shared/encoding.js";
@@ -15,7 +17,7 @@ import type {
   FastSwapQuoteRequest,
   FastSwapStatus,
 } from "../shared/types.js";
-import { FASTSWAP_CHAINS, FASTSWAP_DEFAULT_FEE_BPS, FASTSWAP_PACKS } from "../test/fixtures.js";
+import { FASTSWAP_CHAINS, FASTSWAP_DEFAULT_FEE_BPS, FASTSWAP_PACKS } from "../shared/defaults.js";
 import { QuoteEngine } from "./quote-engine.js";
 import type { PriceFetch } from "./price-sources.js";
 import { StaticQuoteSource, type QuoteSource } from "./quote-sources.js";
@@ -119,6 +121,9 @@ export class FastSwapServer {
       if (request.method === "OPTIONS") {
         response.writeHead(204, corsHeaders());
         return response.end();
+      }
+      if (request.method === "GET" && url.pathname === "/health") {
+        return writeJson(response, 200, { ok: true, service: "fastswap-api", version: readPackageVersion() });
       }
       if (request.method === "GET" && url.pathname === "/config") {
         return writeJson(response, 200, {
@@ -320,11 +325,21 @@ function writeJson(response: ServerResponse, status: number, body: unknown) {
 }
 
 function corsHeaders() {
+  const origin = process.env.CORS_ORIGIN ?? "*";
   return {
-    "access-control-allow-origin": "*",
+    "access-control-allow-origin": origin,
     "access-control-allow-methods": "GET,POST,OPTIONS",
     "access-control-allow-headers": "content-type,authorization,x-api-key",
   };
+}
+
+function readPackageVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as { version?: string };
+    return pkg.version ?? "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 class HttpError extends Error {

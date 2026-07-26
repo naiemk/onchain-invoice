@@ -11,7 +11,7 @@ import {
   type Signer,
 } from "ethers";
 import { TronWeb } from "tronweb";
-import { readArtifact, type ContractArtifact } from "../artifacts.js";
+import { readArtifact, type ContractArtifact } from "../../app/fastswap/cli/artifacts.js";
 
 /* ------------------------------------------------------------------ *
  * Human-readable logging — the log stream should read like a story.

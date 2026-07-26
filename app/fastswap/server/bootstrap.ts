@@ -25,6 +25,10 @@ export function buildFastSwapServerOptions(config: FastSwapConfigFile): FastSwap
   const resolved = resolveActiveFastSwapChains(config);
   const chains = resolved.map((entry) => entry.fastSwap);
   const captcha = config.server.captcha;
+  const captchaRequired = captcha.requireForQuotes === true || captcha.requireForInvoices === true;
+  if (captchaRequired && (!captcha.siteKey || !captcha.secretKey)) {
+    throw new Error("Captcha is required but server.captcha.siteKey/secretKey are empty");
+  }
 
   const invoiceSdksByChainId: Record<string, InvoiceAddressSdk> = {};
   for (const entry of resolved) {
