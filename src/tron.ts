@@ -1,10 +1,18 @@
 import { BigNumberish, BytesLike, dataLength, hexlify, keccak256 } from "ethers";
 import { TRC20_ABI, TRON_INVOICE_SWEEPER_ABI, TRON_NATIVE_TOKEN } from "./tron-abis.js";
+import { deriveTronInvoiceAddress } from "./tron-eoa.js";
+
+export type TronInvoiceMode = "eoa" | "contract";
 
 export interface TronInvoiceSdkConfig {
   tronWeb: any;
-  sweeperAddress: string;
+  /** Required for contract mode. */
+  sweeperAddress?: string;
   feeLimit?: number;
+  /** `eoa` derives invoice addresses from master secret (default when master secret is set). */
+  mode?: TronInvoiceMode;
+  chainId?: string | bigint;
+  invoiceMasterSecret?: string;
 }
 
 export interface TronSweepInvoiceParams {
@@ -69,10 +77,19 @@ export function getTronInvoiceId(encodedInvoiceParams: BytesLike): string {
   return keccak256(encodedInvoiceParams);
 }
 
+export function resolveTronInvoiceMode(config: TronInvoiceSdkConfig): TronInvoiceMode {
+  if (config.mode) return config.mode;
+  if (config.invoiceMasterSecret && config.chainId != null) return "eoa";
+  return "contract";
+}
+
 export class TronInvoiceSdk {
   readonly tronWeb: any;
-  readonly sweeperAddress: string;
+  readonly sweeperAddress?: string;
   readonly feeLimit: number;
+  readonly mode: TronInvoiceMode;
+  readonly chainId?: string | bigint;
+  readonly invoiceMasterSecret?: string;
 
   private readonly sweeper: any;
 
@@ -80,7 +97,18 @@ export class TronInvoiceSdk {
     this.tronWeb = config.tronWeb;
     this.sweeperAddress = config.sweeperAddress;
     this.feeLimit = config.feeLimit ?? 100_000_000;
-    this.sweeper = this.tronWeb.contract(TRON_INVOICE_SWEEPER_ABI, config.sweeperAddress);
+    this.mode = resolveTronInvoiceMode(config);
+    this.chainId = config.chainId;
+    this.invoiceMasterSecret = config.invoiceMasterSecret;
+
+    if (this.mode === "contract") {
+      if (!config.sweeperAddress) throw new Error("sweeperAddress is required for contract mode");
+      this.sweeper = this.tronWeb.contract(TRON_INVOICE_SWEEPER_ABI, config.sweeperAddress);
+    } else {
+      if (!config.invoiceMasterSecret) throw new Error("invoiceMasterSecret is required for eoa mode");
+      if (config.chainId == null) throw new Error("chainId is required for eoa mode");
+      this.sweeper = undefined;
+    }
   }
 
   async getNewInvoiceAddress(encodedInvoiceParams: BytesLike): Promise<string> {
@@ -89,6 +117,14 @@ export class TronInvoiceSdk {
 
   async getInvoiceAddress(invoiceId: BytesLike): Promise<string> {
     const normalizedInvoiceId = normalizeBytes32(invoiceId);
+    if (this.mode === "eoa") {
+      return deriveTronInvoiceAddress(
+        this.invoiceMasterSecret!,
+        this.chainId!,
+        normalizedInvoiceId,
+        this.tronWeb.fullHost ?? this.tronWeb.fullNode?.host
+      );
+    }
     const address = await this.sweeper.getInvoiceAddress(normalizedInvoiceId).call();
     return this.toBase58(address);
   }
@@ -107,6 +143,13 @@ export class TronInvoiceSdk {
     txId: string;
   }> {
     const normalizedInvoiceId = normalizeBytes32(invoiceId);
+    if (this.mode === "eoa") {
+      return {
+        invoiceId: normalizedInvoiceId,
+        invoiceAddress: await this.getInvoiceAddress(normalizedInvoiceId),
+        txId: "",
+      };
+    }
     const txId = await this.sweeper.createInvoice(normalizedInvoiceId).send({ feeLimit });
     return {
       invoiceId: normalizedInvoiceId,
@@ -116,6 +159,9 @@ export class TronInvoiceSdk {
   }
 
   async sweepInvoice(invoiceAddress: string, params: TronSweepInvoiceParams): Promise<TronSweepInvoiceResult> {
+    if (this.mode === "eoa") {
+      throw new Error("EOA mode sweeps are performed by the sweep node sponsor wallet, not TronInvoiceSdk.sweepInvoice");
+    }
     const data = params.data ?? params.encodedInvoiceParams;
     if (!data) throw new Error("Invoice execution data is required");
 
@@ -148,13 +194,7 @@ export class TronInvoiceSdk {
   }
 
   async getBalance(address: string, token = TRON_NATIVE_TOKEN): Promise<bigint> {
-    if (this.toHexAddress(token) === this.toHexAddress(TRON_NATIVE_TOKEN)) {
-      return BigInt(await this.tronWeb.trx.getBalance(address));
-    }
-
-    const trc20 = this.tronWeb.contract(TRC20_ABI, token);
-    const balance = await trc20.balanceOf(address).call();
-    return BigInt(balance.toString());
+    return readTronTokenBalance(this.tronWeb, address, token);
   }
 
   private resolveInvoiceId(params: TronSweepInvoiceParams, data: BytesLike): string {
@@ -274,14 +314,34 @@ async function collectTronHits(tronWeb: any, tracked: TronTrackedAddress[]): Pro
 }
 
 async function readTronBalance(tronWeb: any, address: string, token: string): Promise<bigint> {
+  return readTronTokenBalance(tronWeb, address, token);
+}
+
+/** Read TRX or TRC20 balance; works without a TronWeb private key (uses triggerConstantContract). */
+export async function readTronTokenBalance(
+  tronWeb: any,
+  address: string,
+  token: string = TRON_NATIVE_TOKEN
+): Promise<bigint> {
   const nativeHex = tronWeb.address.toHex(TRON_NATIVE_TOKEN).toLowerCase();
   if (tronWeb.address.toHex(token).toLowerCase() === nativeHex) {
     return BigInt(await tronWeb.trx.getBalance(address));
   }
 
-  const trc20 = tronWeb.contract(TRC20_ABI, token);
-  const balance = await trc20.balanceOf(address).call();
-  return BigInt(balance.toString());
+  const caller: string =
+    typeof tronWeb.defaultAddress?.base58 === "string" && tronWeb.defaultAddress.base58
+      ? tronWeb.defaultAddress.base58
+      : address;
+  const response = await tronWeb.transactionBuilder.triggerConstantContract(
+    token,
+    "balanceOf(address)",
+    {},
+    [{ type: "address", value: address }],
+    caller
+  );
+  const hex = response?.constant_result?.[0];
+  if (!hex) throw new Error("TRC20 balanceOf call failed");
+  return BigInt(`0x${hex}`);
 }
 
 function normalizeTronRequirements(tronWeb: any, requirements: TronPaymentRequirement[]): TronNormalizedRequirement[] {

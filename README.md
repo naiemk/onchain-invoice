@@ -204,7 +204,7 @@ Endpoints:
 
 ## Sweep Node
 
-The `node/` folder contains an optional sweep worker application. It is not part of the library export surface. It uses the library SDKs, a local SQLite cache, and the web-server invoice list.
+The `node/` folder contains the generic invoice sweep worker. Product apps (for example FastSwap) adapt their config into `SweepNodeConfig` and may supply `parseInvoice` / `resolveTrackStatus` hooks.
 
 Responsibilities:
 
@@ -255,8 +255,14 @@ Create a config from `node/example.config.json`:
 Build and run:
 
 ```bash
-npm run sweep-node:build
+npm run build
 npm run sweep-node -- node/example.config.json
+```
+
+Import the worker from another package:
+
+```ts
+import { SweepNode, type SweepNodeConfig } from "onchain-invoice/sweep-node";
 ```
 
 The node expects invoice records returned by the web server to contain:
@@ -269,47 +275,9 @@ The node expects invoice records returned by the web server to contain:
 - optional exact `amount`
 - optional `minAmount`
 
-## FastSwap App
+## FastSwap product
 
-`app/fastswap` is a self-contained swap app built on the invoice system without changing the library export surface. FastSwap and the invoice receiver are the same contract: `FastSwapReceiver` extends `Receiver`, validates swept payments against ABI-encoded quote data, emits source-chain swap requests, and lets relayers process or queue target-chain payouts based on available liquidity.
-
-The app includes a three-source quote backend with SQLite persistence, a no-login static checkout UI, relay/liquidity/admin node helpers, and local E2E tests for quote creation, invoice payment, sweep, relay, queueing, and payout.
-
-**Production launch**: see [`docs/PROD_LAUNCH.md`](docs/PROD_LAUNCH.md). Config lives in `FastSwapConfig.yaml`; API and nodes run via Docker (`npm run docker:build`, `docker:up:api`, `docker:up:nodes`). The UI deploys to Vercel from `app/fastswap/ui`.
-
-```bash
-npm run fastswap:build
-npm test
-```
-
-The local two-chain demo in `fastSwapDemo` is for development only — it starts AliceChain and BobChain Hardhat nodes, deploys `DumUSDT`, `BobUSDC`, FastSwap receivers/sweepers on both chains, and runs the API, user UI, admin UI, sweep node, and relay node:
-
-```bash
-npm run fastswap:demo:build
-npm run fastswap:demo
-```
-
-The demo enforces captcha on quote and invoice creation with a fixed local demo token. Production FastSwap servers should configure `verifyCaptcha` with Cloudflare Turnstile or another provider.
-
-Chains, fees, RPCs, price sources, and node settings are configured centrally in `fastSwapDemo/config.yaml`. Each chain declares a `type` (`evm` or `tron`) and supports any number of source/target chains (Sepolia, Base Sepolia, BSC Testnet, and TRON Nile are pre-wired with env placeholders).
-
-### TRON as a full FastSwap chain
-
-TRON participates as both a source and target chain for TRX (gas) and USDT (TRC20):
-
-- `contracts/tron/fastswap/TronFastSwapReceiver.sol` mirrors `FastSwapReceiver` on TVM (low-level TRC20 transfers, TRX native, relay/queue/liquidity/aggregate flows). Deploy it with `contracts/tron/fastswap/TronFastSwapDeployer.sol` or the TronWeb helper `fastSwapDemo/deploy-tron-fastswap.ts`.
-- Intent encoding is chain-type-aware: TRON base58 (`T...`) addresses are encoded as their 20-byte hex body so `invoiceId = keccak256(data)` is identical across source derivation, sweep, and target `relaySwap`.
-- The server, relay node, liquidity monitor, and sweep node all branch by chain type (ethers for EVM, TronWeb for TRON). TRON is wired as an external testnet (Nile) via env vars; there is no local TRON node in the demo.
-
-Configure the external TRON chain with these env vars (see `fastSwapDemo/config.yaml`): `NILE_FULL_HOST`, `TRON_SWEEPER_ADDRESS`, `TRON_FASTSWAP_ADDRESS`, `TRON_USDT_ADDRESS`, and `TRON_PRIVATE_KEY` for deploys.
-
-For manual demo payments, use:
-
-```bash
-fastSwapDemo/pay.sh <to_address> <amount> <token> --from <from> --network <aliceChain|bobChain>
-fastSwapDemo/pay.sh --invoice <invoiceId> --from <from>
-fastSwapDemo/pay.sh --list-addresses
-```
+The FastSwap cross-chain swap product lives in the sibling repo [`naiemk/fastswap`](https://github.com/naiemk/fastswap). It depends on this package (`file:../onchain-invoice` in local checkouts) for the SDK, `InvoiceWebServer` helpers, SweepNode, and base `Receiver` contracts.
 
 ## Custom Receivers
 

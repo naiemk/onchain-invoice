@@ -17,9 +17,32 @@ export {
   type PaymentRequirement,
 } from "./monitor.js";
 export {
+  deriveTronInvoiceAddress,
+  deriveTronInvoicePrivateKey,
+  hashTronInvoiceMasterSecret,
+  isTronAccountActivated,
+} from "./tron-eoa.js";
+export {
+  delegateEnergyToInvoice,
+  ensureEnergyForBatch,
+  isNativeTronToken,
+  readTronAccountResources,
+  sponsorBase58,
+  sponsorTronWeb,
+  sweepTrc20FromInvoice,
+  sweepTrxFromInvoice,
+  transferTrc20FromNodeWallet,
+  transferTrxFromNodeWallet,
+  type TronEnergyMode,
+  type TronSponsorConfig,
+} from "./tron-sponsor.js";
+export {
   TronInvoiceSdk,
   getTronInvoiceId,
   monitorTronPayment,
+  resolveTronInvoiceMode,
+  readTronTokenBalance,
+  type TronInvoiceMode,
   type TronInvoiceSdkConfig,
   type TronMonitorPaymentController,
   type TronMonitorPaymentOptions,

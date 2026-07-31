@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "onchain-invoice",
+			"path": "."
+		},
+		{
+			"name": "fastswap",
+			"path": "../fastswap"
+		}
+	],
+	"settings": {}
+}

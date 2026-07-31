@@ -1,6 +1,6 @@
 ---
 name: onchain-invoice
-description: Build and use the on-chain invoice system, including forwarder proxies, invoice sweeping, receiver contracts, the TypeScript SDK, web server/client, sweep node, FastSwap app, and background payment monitoring. Use when implementing contracts, creating invoice addresses, sweeping ETH/ERC20/TRX/TRC20 payments, writing receiver subclasses, integrating the SDK/service helper, adding web API behavior, changing the sweep node, or working on app/fastswap.
+description: Build and use the on-chain invoice system, including forwarder proxies, invoice sweeping, receiver contracts, the TypeScript SDK, web server/client, sweep node, and background payment monitoring. FastSwap product work belongs in the sibling fastswap repo. Use when implementing contracts, creating invoice addresses, sweeping ETH/ERC20/TRX/TRC20 payments, writing receiver subclasses, integrating the SDK/service helper, adding web API behavior, or changing the sweep node.
 ---
 
 # On-Chain Invoice
@@ -77,38 +77,20 @@ Sweep node work belongs in `node/`, not `src/`; it is an app that uses the libra
 - Sweep funded unpaid invoices through `OnchainInvoiceSdk` or `TronInvoiceSdk`.
 - Keep `node/example.config.json` and README instructions aligned when config changes.
 
-## FastSwap App
+## FastSwap Product
 
-FastSwap app work belongs in `app/fastswap`; it should not change the root library export surface unless the user explicitly asks for that.
+FastSwap (quotes, packs, FastSwapServer, UI, relay/liqman/aggregate, FastSwapReceiver contracts, LiquidityManager, Docker/testnet ops) lives in the sibling repo [`../fastswap`](../../../fastswap) (`https://github.com/naiemk/fastswap`).
 
-**Production** (see [`docs/PROD_LAUNCH.md`](../../docs/PROD_LAUNCH.md)):
+This package is payment infrastructure only:
 
-- Config: `FastSwapConfig.yaml` at repo root; secrets only in `.env` (`API_SIGNING_SECRET`, node private keys, RPC URLs, routers).
-- API: `npm run fastswap:server` or Docker `docker/compose/api.yml` (`GET /health`, HMAC-signed invoices).
-- Nodes: `npm run fastswap:sweep`, `fastswap:relay`, `fastswap:liqman` or Docker `docker/compose/nodes.yml`.
-- Deploy CLI: `npm run fastswap:cli` with `--predict`, `--deploy-evm-all`, `--deploy-tron`, `--validate`, `--verifyAll`, and `--configure-*` flags.
-- UI: static `app/fastswap/ui` on Vercel with `FASTSWAP_API_BASE`.
+- SDK / Tron EOA / sponsor helpers (`src/`)
+- `InvoiceWebServer` / `InvoiceWebClient`
+- Generic `SweepNode` (`node/`, import via `onchain-invoice/sweep-node`) with optional `parseInvoice` / `resolveTrackStatus` hooks
+- Base contracts: `Forwarder`, `Receiver`, `InvoiceSweeper`, Tron equivalents, `ReceiverProxy`
 
-`fastSwapDemo/` is local dev only — not used in production.
+Do not reintroduce FastSwap product code under `app/fastswap` here. When FastSwap work is requested, edit the sibling `fastswap` checkout (mounted at `/workspaces/fastswap` in the devcontainer).
 
-- `FastSwapReceiver` is the invoice receiver. It extends `Receiver`, decodes ABI-encoded swap terms, verifies the swept token/amount against the quote, emits source-chain swap requests, and supports relay, queue, liquidity, admin, and `AGGREGATE_ALL_ROLE` flows.
-- Keep a compile wrapper under `contracts/fastswap` when Hardhat needs to compile app contracts from the root sources path.
-- Shared quote and invoice schemas live in `app/fastswap/shared` and must be used by server, UI, nodes, and tests.
-- The server belongs in `app/fastswap/server`; it should use three quote-source adapters, conservative 2-of-3 quote acceptance, quote expiry, SQLite persistence, and deterministic invoice data.
-- The UI belongs in `app/fastswap/ui`; keep it no-login and no-wallet-connect with clear quote, payment, status, recent swaps, fee, liquidity, and support/trust information.
-- FastSwap-specific operational workers belong in `app/fastswap/nodes`: relay node, liquidity monitor, and aggregate-all admin CLI.
-- Tests should cover quote creation, invoice registration, payment sweep, relay, payout, queueing, liquidity, roles, and aggregate-all behavior.
-
-### TRON FastSwap support
-
-TRON is a full bidirectional FastSwap chain (source and target) for TRX (gas) and USDT (TRC20). It is wired as an external testnet (Nile/Shasta) via env vars; there is no local TRON node in the demo.
-
-- `contracts/tron/fastswap/TronFastSwapReceiver.sol` mirrors `FastSwapReceiver` but extends `TronReceiver`, uses low-level TRC20 calls (`ITrc20`) instead of `SafeERC20`, treats TRX as native value, and uses its own ERC-7201 storage namespace. Deploy it with `contracts/tron/fastswap/TronFastSwapDeployer.sol` or the TronWeb script `fastSwapDemo/deploy-tron-fastswap.ts`.
-- Intent encoding is chain-type-aware. `app/fastswap/shared/encoding.ts` `quoteToIntent(quote, chains)` encodes each address slot in the format of the chain that interprets it; TRON base58 (`T...`) addresses are converted to their 20-byte hex body via `app/fastswap/shared/tron-address.ts` so `invoiceId = keccak256(data)` stays consistent across source derivation, sweep, and target `relaySwap`.
-- The server derives the source invoice address through a per-chain SDK: `OnchainInvoiceSdk` for `type: "evm"` and `TronInvoiceSdk` for `type: "tron"` (both satisfy the `InvoiceAddressSdk` interface).
-- The relay (`app/fastswap/nodes/relay-node`) and liquidity monitor (`app/fastswap/nodes/liquidity-monitor`) branch by chain type: EVM uses ethers `getLogs`/`Wallet`; TRON uses TronWeb `getEventResult`/contract `.send({ feeLimit })`. The sweep node resolves TRON target `swapState` and avoids `getAddress()` on `T...` tokens.
-- Token prices come from configurable `priceSources` (CoinGecko, Binance, DexScreener, or static); base58 contract addresses are never lowercased.
-- Configure chains centrally in `FastSwapConfig.yaml` for production or `fastSwapDemo/config.yaml` for the local demo.
+TRON invoice EOAs and sponsor energy/sweep helpers remain in this repo (`src/tron-eoa.ts`, `src/tron-sponsor.ts`, `node/tron-sweep/`) because they are payment infrastructure reused by FastSwap.
 
 ## Monitoring Workflow
 

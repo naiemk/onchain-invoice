@@ -70,6 +70,7 @@ web_modules/
 .env.*
 !.env.example
 !.env.testnet.example
+FastSwapConfig.testnet.live.yaml
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -165,3 +166,4 @@ fastSwapDemo/state/*.json
 fastSwapDemo/integration/deployments.live.json
 *.sqlite
 *.sqlite-*
+liquidity-manager.db
