@@ -3,9 +3,10 @@
   "compilerOptions": {
     "rootDir": "..",
     "outDir": "../node-dist",
-    "declaration": false,
+    "declaration": true,
+    "declarationMap": true,
     "types": ["node"]
   },
-  "include": ["./**/*.ts", "../src/**/*.ts", "../app/fastswap/shared/**/*.ts"],
+  "include": ["./**/*.ts", "../src/**/*.ts"],
   "exclude": ["../node_modules", "../dist", "../node-dist"]
 }

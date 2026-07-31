@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { TronEnergyMode } from "../src/tron-sponsor.js";
 
 function expandEnvDeep<T>(value: T): T {
   return JSON.parse(JSON.stringify(value), (_key, v) =>
@@ -19,17 +20,35 @@ export type SweepNodeConfig = {
   pollIntervalMs?: number;
   reconcileReceiverLimitPerChain?: number;
   auditLogPath?: string;
-  /** Verifies API invoice signatures before sweep (same value as API signing secret). */
-  signingSecret?: string;
+  /**
+   * Optional product-specific invoice parser (e.g. FastSwap HMAC verify).
+   * Defaults to extracting chainId / invoiceId / address / data fields.
+   */
+  parseInvoice?: (value: Record<string, unknown>) => SweepNodeInvoice | undefined;
+  /**
+   * Optional product-specific track status after payment (e.g. FastSwap swapState).
+   * Defaults to `"paid"`.
+   */
+  resolveTrackStatus?: (inv: SweepNodeInvoice) => Promise<string> | string;
   chains: ChainConfig[];
 };
 
 export type ChainConfig = EvmChainConfig | TronChainConfig;
 
+export type TronTokenHint = {
+  symbol: string;
+  address?: string;
+  decimals?: number;
+  priceUsd?: number;
+  isNative?: boolean;
+};
+
 export type BaseChainConfig = {
   id: string;
-  sweeperAddress: string;
-  receiverAddress: string;
+  /** EVM: sweeper contract. TRON EOA: optional / empty. */
+  sweeperAddress?: string;
+  /** EVM: receiver. TRON EOA: optional / empty. */
+  receiverAddress?: string;
   confirmations?: number;
   logScanChunkSize?: number;
   logScanOverlap?: number;
@@ -41,6 +60,8 @@ export type EvmChainConfig = BaseChainConfig & {
   rpcUrl: string;
   privateKey: string;
   startBlock?: number;
+  sweeperAddress: string;
+  receiverAddress: string;
 };
 
 export type TronChainConfig = BaseChainConfig & {
@@ -50,6 +71,16 @@ export type TronChainConfig = BaseChainConfig & {
   startTimestamp?: number;
   eventPollLimit?: number;
   feeLimit?: number;
+  /** `eoa` (default) or legacy `contract`. */
+  sweepMode?: "eoa" | "contract";
+  invoiceMasterSecret?: string;
+  sponsorAddress?: string;
+  batchSweepThresholdUsd?: number;
+  batchSweepMaxInvoices?: number;
+  energyMode?: TronEnergyMode;
+  energyRentProvider?: string;
+  minDelegateEnergy?: number;
+  tokens?: TronTokenHint[];
 };
 
 export type SweepNodeInvoice = {
@@ -80,14 +111,23 @@ function validateSweepNodeConfig(config: SweepNodeConfig) {
 
   for (const chain of config.chains) {
     if (!chain.id) throw new Error("chain.id is required");
-    if (!chain.sweeperAddress) throw new Error(`${chain.id}: sweeperAddress is required`);
-    if (!chain.receiverAddress) throw new Error(`${chain.id}: receiverAddress is required`);
     if (chain.type === "evm") {
+      if (!chain.sweeperAddress) throw new Error(`${chain.id}: sweeperAddress is required`);
+      if (!chain.receiverAddress) throw new Error(`${chain.id}: receiverAddress is required`);
       if (!chain.rpcUrl) throw new Error(`${chain.id}: rpcUrl is required`);
       if (!chain.privateKey) throw new Error(`${chain.id}: privateKey is required`);
     } else if (chain.type === "tron") {
       if (!chain.fullHost) throw new Error(`${chain.id}: fullHost is required`);
       if (!chain.privateKey) throw new Error(`${chain.id}: privateKey is required`);
+      const eoa = chain.sweepMode !== "contract";
+      if (eoa) {
+        if (!chain.invoiceMasterSecret) {
+          throw new Error(`${chain.id}: invoiceMasterSecret is required for TRON EOA sweep`);
+        }
+      } else {
+        if (!chain.sweeperAddress) throw new Error(`${chain.id}: sweeperAddress is required for contract mode`);
+        if (!chain.receiverAddress) throw new Error(`${chain.id}: receiverAddress is required for contract mode`);
+      }
     } else {
       throw new Error(`${(chain as { id?: string }).id ?? "chain"}: unsupported chain type`);
     }

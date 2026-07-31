@@ -1,17 +1,21 @@
 import { Contract, Interface, JsonRpcProvider, Wallet, ZeroAddress, getAddress, hexlify } from "ethers";
 import { TronWeb } from "tronweb";
+import { AuditLog } from "./audit.js";
 import { SweepNodeCache, normalizeInvoiceId, type PaidInvoice } from "./cache.js";
 import type { ChainConfig, EvmChainConfig, SweepNodeConfig, SweepNodeInvoice, TronChainConfig } from "./config.js";
-import { FASTSWAP_RECEIVER_ABI } from "../app/fastswap/shared/fastswap-abi.js";
 import { ERC20_ABI, INVOICE_SWEEPER_ABI, NATIVE_TOKEN } from "../src/abis.js";
 import { OnchainInvoiceSdk } from "../src/sdk.js";
-import { TRC20_ABI, TRON_FASTSWAP_RECEIVER_ABI, TRON_NATIVE_TOKEN } from "../src/tron-abis.js";
+import { TRC20_ABI, TRON_NATIVE_TOKEN } from "../src/tron-abis.js";
 import { TronInvoiceSdk } from "../src/tron.js";
-import { AuditLog } from "../app/fastswap/shared/audit.js";
-import { verifyInvoiceSignature } from "../app/fastswap/shared/signing.js";
-import type { FastSwapInvoice } from "../app/fastswap/shared/types.js";
+import { executeTronSweepItem, planTronSweepBatch } from "./tron-sweep/executor.js";
 import { InvoiceWebClient } from "../src/web-client.js";
 import type { JsonObject } from "../src/web-server.js";
+
+export type { ChainConfig, EvmChainConfig, SweepNodeConfig, SweepNodeInvoice, TronChainConfig } from "./config.js";
+export { normalizeInvoiceId } from "./cache.js";
+export type { PaidInvoice } from "./cache.js";
+export { executeTronSweepItem, planTronSweepBatch } from "./tron-sweep/executor.js";
+export { estimateInvoiceUsdValue } from "./tron-sweep/planner.js";
 
 const RECEIVER_EVENT_ABI = [
   "event InvoicePaid(bytes32 indexed invoiceId,address indexed token,address indexed forwarder,uint256 amount,bytes data)",
@@ -19,6 +23,28 @@ const RECEIVER_EVENT_ABI = [
 
 const RECEIVER_INVOICE_PAYMENT_ABI = [
   "function invoicePayment(bytes32 invoiceId) view returns (address token,uint256 amount,address forwarder,bool paid)",
+] as const;
+
+/** Minimal Tron receiver view used to skip already-paid invoices (base Receiver shape). */
+const TRON_RECEIVER_INVOICE_PAYMENT_ABI = [
+  {
+    type: "function",
+    name: "invoicePayment",
+    stateMutability: "view",
+    inputs: [{ name: "invoiceId", type: "bytes32" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "token", type: "address" },
+          { name: "amount", type: "uint256" },
+          { name: "forwarder", type: "address" },
+          { name: "paid", type: "bool" },
+        ],
+      },
+    ],
+  },
 ] as const;
 
 const receiverInterface = new Interface(RECEIVER_EVENT_ABI);
@@ -97,7 +123,8 @@ export class SweepNode {
       pages += 1;
       const page = await this.webClient.listInvoices({ limit, cursor, lookbackMs });
       for (const record of page.invoices) {
-        const invoice = toSweepNodeInvoice(record.invoice, this.config.signingSecret);
+        const parse = this.config.parseInvoice ?? defaultParseInvoice;
+        const invoice = parse(record.invoice as Record<string, unknown>);
         if (invoice) {
           this.cache.upsertInvoice(invoice);
           rows += 1;
@@ -148,7 +175,7 @@ export class SweepNode {
           });
         }
 
-        const status = await this.resolveFastSwapTrackStatus(inv);
+        const status = await this.resolveTrackStatus(inv);
         const ok = await this.postInvoiceTrack(inv.invoiceId, {
           status,
           sweep: {
@@ -183,42 +210,17 @@ export class SweepNode {
     }
   }
 
-  private async resolveFastSwapTrackStatus(inv: SweepNodeInvoice): Promise<string> {
-    const targetId = inv.targetChainId;
-    if (!targetId) return "paid";
-    const targetChain = this.config.chains.find((c) => c.id === targetId);
-    if (!targetChain) return "paid";
-    try {
-      const state = targetChain.type === "tron"
-        ? await this.readTronSwapState(targetChain, inv.invoiceId)
-        : await this.readEvmSwapState(targetChain, inv.invoiceId);
-      if (state.processed) return "complete";
-      if (state.queued) return "queued";
-      if (state.relayed) return "relaying";
-      return "paid";
-    } catch {
-      return "paid";
+  private async resolveTrackStatus(inv: SweepNodeInvoice): Promise<string> {
+    if (this.config.resolveTrackStatus) {
+      return this.config.resolveTrackStatus(inv);
     }
-  }
-
-  private async readEvmSwapState(chain: EvmChainConfig, invoiceId: string) {
-    const provider = new JsonRpcProvider(chain.rpcUrl);
-    const targetContract = new Contract(chain.receiverAddress, FASTSWAP_RECEIVER_ABI, provider);
-    const state = await targetContract.swapState(invoiceId);
-    return { relayed: Boolean(state.relayed), processed: Boolean(state.processed), queued: Boolean(state.queued) };
-  }
-
-  private async readTronSwapState(chain: TronChainConfig, invoiceId: string) {
-    const tronWeb = new TronWeb({ fullHost: chain.fullHost });
-    const contract = await tronWeb.contract(TRON_FASTSWAP_RECEIVER_ABI as never, chain.receiverAddress);
-    const state = await contract.swapState(invoiceId).call();
-    return { relayed: Boolean(state.relayed), processed: Boolean(state.processed), queued: Boolean(state.queued) };
+    return "paid";
   }
 
   private async scanPaidLogs(chain: ChainConfig) {
     if (chain.type === "evm") {
       await this.scanEvmPaidLogs(chain);
-    } else {
+    } else if (chain.sweepMode !== "eoa") {
       await this.scanTronPaidLogs(chain);
     }
   }
@@ -322,6 +324,7 @@ export class SweepNode {
   }
 
   private async scanTronPaidLogs(chain: TronChainConfig) {
+    if (!chain.receiverAddress) return;
     const tronWeb = new TronWeb({
       fullHost: chain.fullHost,
       privateKey: chain.privateKey,
@@ -373,6 +376,10 @@ export class SweepNode {
   }
 
   private async checkAndSweep(chain: ChainConfig) {
+    if (chain.type === "tron" && chain.sweepMode === "eoa") {
+      await this.checkAndSweepTronEoa(chain);
+      return;
+    }
     const limit = chain.sweepBatchSize ?? 100;
     const invoices = this.cache.listAwaitingSweepInvoices(chain.id, limit);
     for (const invoice of invoices) {
@@ -381,6 +388,85 @@ export class SweepNode {
           ? await this.trySweepEvm(chain, invoice)
           : await this.trySweepTron(chain, invoice);
         this.cache.recordSweepAttempt(result);
+      } catch (error) {
+        this.auditStage("sweep-failed", {
+          chainId: chain.id,
+          invoiceId: invoice.invoiceId,
+          payload: { message: error instanceof Error ? error.message : String(error) },
+        });
+        this.cache.recordSweepAttempt({
+          chainId: chain.id,
+          invoiceId: invoice.invoiceId,
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        this.cache.markInvoiceChecked(chain.id, invoice.invoiceId);
+      }
+    }
+  }
+
+  private async checkAndSweepTronEoa(chain: TronChainConfig) {
+    const limit = chain.batchSweepMaxInvoices ?? chain.sweepBatchSize ?? 50;
+    const invoices = this.cache.listAwaitingSweepInvoices(chain.id, limit * 2);
+    const tokenPrices: Record<string, number> = {};
+    const tokenDecimals: Record<string, number> = {};
+    for (const t of chain.tokens ?? []) {
+      tokenPrices[t.symbol] = t.priceUsd ?? (t.symbol === "USDT" ? 1 : 0.3);
+      if (t.decimals != null) tokenDecimals[t.symbol] = t.decimals;
+    }
+
+    const plan = await planTronSweepBatch({ chain, invoices, tokenPricesUsd: tokenPrices, tokenDecimals });
+    if (plan.action === "wait") {
+      for (const invoice of invoices.slice(0, limit)) {
+        this.cache.markInvoiceChecked(chain.id, invoice.invoiceId);
+      }
+      return;
+    }
+
+    for (const item of plan.items) {
+      const invoice = item.invoice;
+      try {
+        const sweep = await executeTronSweepItem(chain, item);
+        this.cache.upsertPaidInvoice({
+          chainId: chain.id,
+          invoiceId: invoice.invoiceId,
+          token: item.token,
+          amount: sweep.amount.toString(),
+          forwarder: invoice.invoiceAddress,
+          txHash: sweep.txId,
+          logIndex: 0,
+        });
+        const paidStatus = await this.resolveTrackStatus(invoice);
+        await this.postInvoiceTrack(invoice.invoiceId, {
+          status: paidStatus,
+          sweep: {
+            tx: {
+              chainId: chain.id,
+              txHash: sweep.txId,
+              status: "confirmed" as const,
+            },
+            forwarder: invoice.invoiceAddress,
+            paymentToken: item.token,
+            paymentAmount: sweep.amount.toString(),
+            sourcePayment: {
+              chainId: chain.id,
+              txHash: sweep.txId,
+              status: "confirmed" as const,
+            },
+          },
+        });
+        this.cache.recordSweepAttempt({
+          chainId: chain.id,
+          invoiceId: invoice.invoiceId,
+          status: "swept",
+          txId: sweep.txId,
+        });
+        this.auditStage("sweep-confirmed", {
+          chainId: chain.id,
+          invoiceId: invoice.invoiceId,
+          txHash: sweep.txId,
+        });
       } catch (error) {
         this.auditStage("sweep-failed", {
           chainId: chain.id,
@@ -413,7 +499,7 @@ export class SweepNode {
           invoiceId: invoice.invoiceId,
         });
         const paid = this.cache.getPaidInvoice(chain.id, invoice.invoiceId);
-        const status = await this.resolveFastSwapTrackStatus(invoice);
+        const status = await this.resolveTrackStatus(invoice);
         await this.postInvoiceTrack(invoice.invoiceId, {
           status,
           sweep: {
@@ -467,7 +553,7 @@ export class SweepNode {
     const paid = this.cache.getPaidInvoice(chain.id, invoice.invoiceId);
     const sweepHash = receipt?.hash ?? sweep.tx.hash;
     const sweepStatus = receipt?.status === 1 ? ("confirmed" as const) : ("failed" as const);
-    const paidStatus = await this.resolveFastSwapTrackStatus(invoice);
+    const paidStatus = await this.resolveTrackStatus(invoice);
     await this.postInvoiceTrack(invoice.invoiceId, {
       status: paidStatus,
       sweep: {
@@ -511,6 +597,9 @@ export class SweepNode {
   }
 
   private async trySweepTron(chain: TronChainConfig, invoice: SweepNodeInvoice) {
+    if (chain.sweepMode === "eoa") {
+      throw new Error("TRON EOA sweeps use batch planner in checkAndSweepTronEoa");
+    }
     const tronWeb = new TronWeb({
       fullHost: chain.fullHost,
       privateKey: chain.privateKey,
@@ -522,7 +611,8 @@ export class SweepNode {
     });
 
     try {
-      const receiver = await tronWeb.contract(TRON_FASTSWAP_RECEIVER_ABI as never, chain.receiverAddress);
+      if (!chain.receiverAddress) throw new Error("no receiver");
+      const receiver = await tronWeb.contract(TRON_RECEIVER_INVOICE_PAYMENT_ABI as never, chain.receiverAddress);
       const payment = await receiver.invoicePayment(invoice.invoiceId).call();
       if (payment.paid) {
         this.auditStage("sweep-skipped-paid", {
@@ -530,13 +620,13 @@ export class SweepNode {
           invoiceId: invoice.invoiceId,
         });
         await this.postInvoiceTrack(invoice.invoiceId, {
-          status: await this.resolveFastSwapTrackStatus(invoice),
+          status: await this.resolveTrackStatus(invoice),
           sweep: { sweeperAddress: chain.sweeperAddress },
         });
         return { chainId: chain.id, invoiceId: invoice.invoiceId, status: "swept" as const };
       }
     } catch {
-      // Non-FastSwap receiver or RPC hiccup; fall through to normal sweep.
+      // Receiver without invoicePayment or RPC hiccup; fall through to normal sweep.
     }
 
     const token = invoice.token ?? TRON_NATIVE_TOKEN;
@@ -560,7 +650,7 @@ export class SweepNode {
       amount: invoice.amount,
     });
 
-    const paidStatus = await this.resolveFastSwapTrackStatus(invoice);
+    const paidStatus = await this.resolveTrackStatus(invoice);
     await this.postInvoiceTrack(invoice.invoiceId, {
       status: paidStatus,
       sweep: {
@@ -621,7 +711,7 @@ export class SweepNode {
   }
 }
 
-function toSweepNodeInvoice(value: Record<string, unknown>, signingSecret?: string): SweepNodeInvoice | undefined {
+function defaultParseInvoice(value: Record<string, unknown>): SweepNodeInvoice | undefined {
   const invoice = value.invoice && typeof value.invoice === "object"
     ? (value.invoice as Record<string, unknown>)
     : value;
@@ -631,25 +721,6 @@ function toSweepNodeInvoice(value: Record<string, unknown>, signingSecret?: stri
   const data = stringField(invoice.data) ?? stringField(invoice.encodedInvoiceParams);
 
   if (!chainId || !invoiceId || !invoiceAddress || !data) return undefined;
-
-  if (signingSecret) {
-    const signed = {
-      invoiceId: normalizeInvoiceId(invoiceId),
-      data: normalizeData(data),
-      recipient: stringField(invoice.recipient) ?? "",
-      sourceChainId: stringField(invoice.sourceChainId) ?? chainId,
-      targetChainId: stringField(invoice.targetChainId) ?? "",
-      sourceToken: normalizeTokenField(stringField(invoice.sourceToken) ?? stringField(invoice.token)) ?? "",
-      targetToken: normalizeTokenField(stringField(invoice.targetToken)) ?? "",
-      sourceAmount: String(invoice.sourceAmount ?? invoice.amount ?? ""),
-      targetAmount: String(invoice.targetAmount ?? ""),
-      signature: stringField(invoice.signature),
-    };
-    if (!verifyInvoiceSignature(signed, signingSecret)) {
-      console.warn("[sweep-node] rejected invoice with invalid signature", invoiceId.slice(0, 12));
-      return undefined;
-    }
-  }
 
   const tok = stringField(invoice.token);
   const targetChainId = stringField(invoice.targetChainId);
