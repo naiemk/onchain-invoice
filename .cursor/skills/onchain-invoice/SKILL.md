@@ -83,7 +83,7 @@ FastSwap (quotes, packs, FastSwapServer, UI, relay/liqman/aggregate, FastSwapRec
 
 ## Trustless Commerce Product
 
-Trustless Commerce (merchant pay links, customer checkout, platform fee, commerce sweeper worker, backoffice) lives in the sibling repo [`../trustless-commerce`](../../../trustless-commerce). It uses **Commerce** contracts (`contracts/commerce/CommerceInvoiceSweeper`, `CommerceForwarder`) and `CommerceInvoiceSdk` / `getCommerceInvoiceId` from this package — salt-bound merchant `to`, `sweep(token, amount, to, invoiceId)`, and fee split. Do not reintroduce that product UI/server under this repo.
+Trustless Commerce API/sweeper lives in the sibling repo [`../trustless-commerce`](../../../trustless-commerce). The **UI** lives in this repo under [`ui/`](../../ui/) (`npm run ui` / `npm run ui:build`). It uses **Commerce** contracts (`contracts/commerce/CommerceInvoiceSweeper`, `CommerceForwarder`) and `CommerceInvoiceSdk` / `getCommerceInvoiceId` — salt-bound merchant `to`, `sweep(token, amount, to, invoiceId)`, and fee split. Keep the product API/sweeper in the sibling repo; do not fold FastSwap into either place.
 
 This package is payment infrastructure only:
 
