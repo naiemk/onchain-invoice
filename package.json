@@ -31,7 +31,9 @@
     "test:contracts": "hardhat test",
     "clean": "hardhat clean",
     "sweep-node:build": "tsc -p node/tsconfig.json",
-    "sweep-node": "node node-dist/node/index.js"
+    "sweep-node": "node node-dist/node/index.js",
+    "ui": "vite --config ui/vite.config.ts",
+    "ui:build": "vite build --config ui/vite.config.ts"
   },
   "repository": {
     "type": "git",
@@ -52,9 +54,11 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "^25.6.0",
     "chai": "^6.2.2",
+    "dotenv": "^17.4.2",
     "hardhat": "^3.4.3",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "^8.2.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",

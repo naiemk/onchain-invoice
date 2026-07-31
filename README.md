@@ -333,3 +333,12 @@ npm run compile
 npm test
 npm run build
 ```
+
+Trustless Commerce UI (Vite):
+
+```bash
+npm run ui        # http://localhost:5173 — proxies /api to :8080
+npm run ui:build  # → dist-ui/
+```
+
+UI source lives under [`ui/`](ui/). The product API/sweeper remains in the sibling `trustless-commerce` repo.
