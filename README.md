@@ -25,6 +25,30 @@ Tron equivalents live under `contracts/tron`:
 
 Tron uses a different `CREATE2` prediction prefix (`0x41`), so the Tron sweeper uses `TronClones` instead of OpenZeppelin `Clones`.
 
+## Commerce (trustless merchant payout)
+
+For products that pay merchants directly (see sibling `trustless-commerce`), use the commerce contracts under `contracts/commerce/`:
+
+- `CommerceForwarder`: invoice proxy; only the sweeper may move funds.
+- `CommerceInvoiceSweeper`: CREATE2 salt = `keccak256(abi.encodePacked(to, invoiceId))`. `sweep(token, amount, to, invoiceId)` sends `amount - fee` to `to` and the fee to the platform. A wrong `to` targets a different empty address, so the sweeper cannot redirect funds.
+- Fee = `max(amount * feeBps / 10000, minFeeByToken[token])` (default 0.5%).
+- Supports partial sweeps and `bulkSweep`.
+
+```ts
+import { CommerceInvoiceSdk, getCommerceInvoiceId } from "onchain-invoice";
+
+const sdk = new CommerceInvoiceSdk({ provider, signer, sweeperAddress });
+const invoiceId = getCommerceInvoiceId({
+  priceUsd: "10",
+  toAddresses: [merchant],
+  clientInvoiceId: "order-1",
+});
+const invoiceAddress = await sdk.getInvoiceAddress(merchant, invoiceId);
+await sdk.sweep({ token: usdc, amount, to: merchant, invoiceId });
+```
+
+Deploy locally: `npx hardhat run scripts/deploy-commerce.ts`
+
 ## SDK
 
 ```ts
