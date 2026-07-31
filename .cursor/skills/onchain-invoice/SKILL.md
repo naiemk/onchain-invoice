@@ -81,6 +81,10 @@ Sweep node work belongs in `node/`, not `src/`; it is an app that uses the libra
 
 FastSwap (quotes, packs, FastSwapServer, UI, relay/liqman/aggregate, FastSwapReceiver contracts, LiquidityManager, Docker/testnet ops) lives in the sibling repo [`../fastswap`](../../../fastswap) (`https://github.com/naiemk/fastswap`).
 
+## Trustless Commerce Product
+
+Trustless Commerce (merchant pay links, customer checkout, platform fee, commerce sweeper worker, backoffice) lives in the sibling repo [`../trustless-commerce`](../../../trustless-commerce). It uses **Commerce** contracts (`contracts/commerce/CommerceInvoiceSweeper`, `CommerceForwarder`) and `CommerceInvoiceSdk` / `getCommerceInvoiceId` from this package — salt-bound merchant `to`, `sweep(token, amount, to, invoiceId)`, and fee split. Do not reintroduce that product UI/server under this repo.
+
 This package is payment infrastructure only:
 
 - SDK / Tron EOA / sponsor helpers (`src/`)
