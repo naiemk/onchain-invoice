@@ -4,8 +4,9 @@
 
 docker:
   image: ghcr.io/naiemk/trustless-commerce-api:main
+  # For HTTPS gateway use DOCKER_NAME=testnet-api|mainnet-api in .env (overrides this name).
   name: onchain-invoice-api
-  # Host port published to the container's 8080
+  # Host port published to the container's 8080 (use 8081 for a second API on the same host)
   port: 8080
   dataDir: ./data/onchain-invoice-api
   restart: unless-stopped

@@ -91,10 +91,12 @@ DATA_DIR="$(yaml_get docker.dataDir)"
 RESTART="$(yaml_get docker.restart)"
 
 IMAGE="${IMAGE:-ghcr.io/naiemk/trustless-commerce-api:main}"
-NAME="${NAME:-onchain-invoice-api}"
+# DOCKER_NAME overrides yaml (use testnet-api / mainnet-api for HTTPS gateway).
+NAME="${DOCKER_NAME:-${NAME:-onchain-invoice-api}}"
 HOST_PORT="${HOST_PORT:-8080}"
 DATA_DIR="${DATA_DIR:-./data/onchain-invoice-api}"
 RESTART="${RESTART:-unless-stopped}"
+DOCKER_NETWORK="${DOCKER_NETWORK:-}"
 
 CONFIG_ABS="$(cd "$(dirname "$CONFIG")" && pwd)/$(basename "$CONFIG")"
 
@@ -141,10 +143,18 @@ add_env SWEEPER_ADDRESS "${SWEEPER_ADDRESS:-}"
 add_env FORWARDER_IMPLEMENTATION "${FORWARDER_IMPLEMENTATION:-}"
 add_env CORS_ORIGINS "${CORS_ORIGINS:-}"
 
+NET_ARGS=()
+if [[ -n "$DOCKER_NETWORK" ]]; then
+  docker network create "$DOCKER_NETWORK" >/dev/null 2>&1 || true
+  NET_ARGS+=(--network "$DOCKER_NETWORK")
+  echo "Docker network: $DOCKER_NETWORK"
+fi
+
 echo "Creating $NAME (host port $HOST_PORT) ..."
 docker create \
   --name "$NAME" \
   --restart "$RESTART" \
+  "${NET_ARGS[@]}" \
   -p "${HOST_PORT}:8080" \
   -e CONFIG_PATH=/config/server.yaml \
   -e DB_PATH=/data/trustless-commerce.db \
@@ -160,3 +170,6 @@ docker start "$NAME" >/dev/null
 
 echo "API listening on http://localhost:${HOST_PORT} (container $NAME)"
 echo "Health: curl -s http://localhost:${HOST_PORT}/api/health"
+if [[ -n "$DOCKER_NETWORK" ]]; then
+  echo "On network $DOCKER_NETWORK as hostname $NAME (use with install-gateway.sh)"
+fi
