@@ -1,48 +1,46 @@
 import { network } from "hardhat";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 
-/** Deploy CommerceInvoiceSweeper to the in-process Hardhat network (or configured network). */
+/** Deploy CommerceInvoiceSweeper. Pass `--network sepolia` for testnet. */
 async function main() {
-  const { ethers } = await network.create();
+  const connection = await network.connect();
+  const { ethers, networkName } = connection as typeof connection & { networkName?: string };
   const [deployer] = await ethers.getSigners();
 
   const feeBps = Number(process.env.FEE_BPS ?? "50");
   const feeRecipient = process.env.FEE_RECIPIENT ?? deployer.address;
   const owner = process.env.OWNER ?? deployer.address;
 
-  const Deployer = await ethers.getContractFactory("CommerceSystemDeployer");
-  const systemDeployer = await Deployer.deploy();
-  await systemDeployer.waitForDeployment();
+  console.error(`Deploying CommerceInvoiceSweeper on network=${networkName ?? "default"} as ${deployer.address}`);
+  console.error(`feeRecipient=${feeRecipient} feeBps=${feeBps} owner=${owner}`);
 
-  const tx = await systemDeployer.deploy(feeRecipient, feeBps, owner);
-  const receipt = await tx.wait();
+  const Factory = await ethers.getContractFactory("CommerceInvoiceSweeper");
+  const sweeper = await Factory.deploy(feeRecipient, feeBps, owner, {
+    gasLimit: 5_000_000n,
+  });
+  await sweeper.waitForDeployment();
+  const sweeperAddress = await sweeper.getAddress();
+  const forwarderImplementation = await sweeper.forwarderImplementation();
 
-  const event = receipt?.logs
-    .map((log: any) => {
-      try {
-        return systemDeployer.interface.parseLog(log);
-      } catch {
-        return null;
-      }
-    })
-    .find((log: any) => log?.name === "CommerceSystemDeployed");
+  const result = {
+    network: networkName ?? "unknown",
+    chainId: Number((await ethers.provider.getNetwork()).chainId),
+    sweeper: sweeperAddress,
+    feeRecipient,
+    forwarderImplementation,
+    feeBps,
+    deployer: deployer.address,
+    deployedAt: new Date().toISOString(),
+  };
 
-  if (!event) {
-    throw new Error("CommerceSystemDeployed event not found");
-  }
+  console.log(JSON.stringify(result, null, 2));
 
-  console.log(
-    JSON.stringify(
-      {
-        sweeper: event.args.sweeper,
-        feeRecipient: event.args.feeRecipient,
-        forwarderImplementation: event.args.forwarderImplementation,
-        feeBps: Number(event.args.feeBps),
-        deployer: deployer.address,
-      },
-      null,
-      2
-    )
-  );
+  const outDir = resolve("data");
+  mkdirSync(outDir, { recursive: true });
+  const outPath = resolve(outDir, `commerce-deploy-${result.network}.json`);
+  writeFileSync(outPath, `${JSON.stringify(result, null, 2)}\n`);
+  console.error(`Wrote ${outPath}`);
 }
 
 main().catch((error) => {

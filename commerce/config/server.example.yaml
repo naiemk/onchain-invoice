@@ -1,0 +1,20 @@
+port: 8080
+baseUrl: ${BASE_URL}
+db:
+  path: ${DB_PATH}
+adminApiKey: ${ADMIN_API_KEY}
+sweeperApiKey: ${SWEEPER_API_KEY}
+evm:
+  rpcUrl: ${EVM_RPC_URL}
+  sweeperAddress: ${SWEEPER_ADDRESS}
+cors:
+  origins:
+    - http://localhost:5173
+    - http://localhost:5174
+    - https://trustlesscommerce.app
+rateLimit:
+  # Max POST /api/invoices creates per client IP per second
+  createPerSecond: 1
+  publicPerIpPerSecond: 20
+  sweeperPerIpPerSecond: 50
+claimLeaseMs: 180000

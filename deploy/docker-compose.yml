@@ -1,0 +1,49 @@
+# From repo root:
+#   npm run docker:up
+#   npm run docker:smoke
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    image: ghcr.io/naiemk/trustless-commerce-api:local
+    environment:
+      CONFIG_PATH: /config/server.yaml
+      BASE_URL: https://localhost
+      DB_PATH: /data/trustless-commerce.db
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-key}
+      SWEEPER_API_KEY: ${SWEEPER_API_KEY:-dev-sweeper-key}
+      CORS_ORIGINS: "*"
+      RATE_LIMIT_CREATE_PER_SECOND: "1"
+    volumes:
+      - api-data:/data
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - internal
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    image: ghcr.io/naiemk/trustless-commerce-nginx:local
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "18080:80"
+      - "18443:443"
+    networks:
+      - internal
+
+volumes:
+  api-data:
+
+networks:
+  internal:
+    driver: bridge

@@ -3,7 +3,7 @@
 Crypto invoices with deterministic on-chain payment addresses. Merchants share a pay link; customers pay USDC (stablecoins only at launch); a sweeper settles to the merchant wallet.
 
 - **UI:** Vercel (`ui/` in this repo)
-- **API + sweeper:** sibling [`trustless-commerce`](https://github.com/naiemk/trustless-commerce)
+- **API + sweeper:** `commerce/` in this repo (Docker images via `deploy/`)
 - **Docs source:** this MkDocs site
 
 !!! note "EVM launch"

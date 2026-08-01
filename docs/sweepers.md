@@ -7,6 +7,6 @@ One worker role: **sweeper node** (detect → claim → track paid → sweep →
 - **Claim** before broadcasting on-chain (`claimed_by` / `claimed_until` lease)
 - **Optimistic version** on every write; retry on 409
 
-Config: YAML `config/sweeper.example.yaml` in trustless-commerce. Run one container per chain host if needed (same image).
+Config: YAML `commerce/config/sweeper.example.yaml`. Run one container per chain host if needed (same image).
 
 Docker image: `ghcr.io/<org>/trustless-commerce-sweeper` (built on every `main` push).
