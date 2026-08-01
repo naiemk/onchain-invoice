@@ -9,18 +9,19 @@ docker:
 
 # Worker settings (this file is mounted as SWEEPER_CONFIG; ${ENV} from .env)
 # Prefer https://testnet.trustless-commerce.com (or your API). host.docker.internal:8080 only if API publishes 8080 on this host.
-serverUrl: ${SERVER_URL}
+serverUrl: "${SERVER_URL}"
 # Wallet that signs sweeper API requests (./register-onchain-invoice-node.sh)
-sweeperWalletKey: ${SWEEPER_WALLET_KEY}
+# Quote 0x values — unquoted YAML 1.1 treats them as integers and corrupts keys.
+sweeperWalletKey: "${SWEEPER_WALLET_KEY}"
 # Optional legacy shared key
-apiKey: ${SWEEPER_API_KEY}
+apiKey: "${SWEEPER_API_KEY}"
 intervalMs: 15000
 maxRetries: 5
 chains:
   - chainId: "11155111"
-    rpcUrl: ${EVM_RPC_URL}
-    sweeperAddress: ${SWEEPER_ADDRESS}
-    privateKey: ${SWEEPER_PRIVATE_KEY}
+    rpcUrl: "${EVM_RPC_URL}"
+    sweeperAddress: "${SWEEPER_ADDRESS}"
+    privateKey: "${SWEEPER_PRIVATE_KEY}"
     tokens:
       - symbol: USDC
         address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"

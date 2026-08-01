@@ -6,16 +6,21 @@ CONFIG="${ONCHAIN_INVOICE_NODES_CONFIG:-onchain-invoice-nodes.yaml}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Load .env for unset vars only (existing exports win).
+# Load .env when unset or empty (blank shell exports must not block defaults).
 if [[ -f .env ]]; then
   while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
     [[ -z "${line//[[:space:]]/}" || "$line" =~ ^[[:space:]]*# ]] && continue
     key="${line%%=*}"
     val="${line#*=}"
     key="${key%%[[:space:]]*}"
     key="${key##[[:space:]]*}"
+    key="${key%$'\r'}"
+    val="${val%$'\r'}"
+    if [[ "$val" =~ ^\"(.*)\"$ ]]; then val="${BASH_REMATCH[1]}"; fi
+    if [[ "$val" =~ ^\'(.*)\'$ ]]; then val="${BASH_REMATCH[1]}"; fi
     [[ -z "$key" || "$key" == *[!A-Za-z0-9_]* ]] && continue
-    if [[ -z "${!key+x}" ]]; then
+    if [[ -z "${!key-}" ]]; then
       export "$key=$val"
     fi
   done < .env
@@ -109,6 +114,15 @@ fi
 # Prefer SERVER_URL; fall back to API_URL for operators who only set one.
 if [[ -z "${SERVER_URL:-}" && -n "${API_URL:-}" ]]; then
   SERVER_URL="$API_URL"
+fi
+
+# Fail fast: ethers crashes with a redacted "invalid private key" if these are empty/malformed.
+pk="${SWEEPER_WALLET_KEY:-${SWEEPER_PRIVATE_KEY:-}}"
+pk="${pk#0x}"
+if [[ ! "$pk" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  echo "Invalid or missing SWEEPER_WALLET_KEY / SWEEPER_PRIVATE_KEY in .env (need 64 hex chars, optional 0x)." >&2
+  echo "Unset any empty exports (unset SWEEPER_WALLET_KEY SWEEPER_PRIVATE_KEY) and ensure .env has the Hardhat #0 key for testnet." >&2
+  exit 1
 fi
 
 add_env SERVER_URL "${SERVER_URL:-}"

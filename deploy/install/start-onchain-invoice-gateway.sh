@@ -8,13 +8,18 @@ cd "$SCRIPT_DIR"
 
 if [[ -f .env ]]; then
   while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
     [[ -z "${line//[[:space:]]/}" || "$line" =~ ^[[:space:]]*# ]] && continue
     key="${line%%=*}"
     val="${line#*=}"
     key="${key%%[[:space:]]*}"
     key="${key##[[:space:]]*}"
+    key="${key%$'\r'}"
+    val="${val%$'\r'}"
+    if [[ "$val" =~ ^\"(.*)\"$ ]]; then val="${BASH_REMATCH[1]}"; fi
+    if [[ "$val" =~ ^\'(.*)\'$ ]]; then val="${BASH_REMATCH[1]}"; fi
     [[ -z "$key" || "$key" == *[!A-Za-z0-9_]* ]] && continue
-    if [[ -z "${!key+x}" ]]; then
+    if [[ -z "${!key-}" ]]; then
       export "$key=$val"
     fi
   done < .env
