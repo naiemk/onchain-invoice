@@ -31,4 +31,15 @@ if [[ "$failed" -ne 0 ]]; then
 fi
 
 echo ""
+echo "Compose system tests OK — tearing down before wget install e2e"
+bash "$ROOT/scripts/down.sh" || true
+# Avoid double-down noise on EXIT after a clean handoff.
+trap - EXIT
+# Let Docker settle before installer containers claim host port 8080.
+sleep 2
+
+echo ""
+bash "$ROOT/scripts/run-install-e2e.sh"
+
+echo ""
 echo "SYSTEM TESTS OK"

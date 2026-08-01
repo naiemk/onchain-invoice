@@ -6,6 +6,21 @@ CONFIG="${ONCHAIN_INVOICE_API_CONFIG:-onchain-invoice-api.yaml}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Load .env for unset vars only (existing exports win).
+if [[ -f .env ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "${line//[[:space:]]/}" || "$line" =~ ^[[:space:]]*# ]] && continue
+    key="${line%%=*}"
+    val="${line#*=}"
+    key="${key%%[[:space:]]*}"
+    key="${key##[[:space:]]*}"
+    [[ -z "$key" || "$key" == *[!A-Za-z0-9_]* ]] && continue
+    if [[ -z "${!key+x}" ]]; then
+      export "$key=$val"
+    fi
+  done < .env
+fi
+
 if [[ ! -f "$CONFIG" ]]; then
   echo "Missing $CONFIG — run install-api.sh first." >&2
   exit 1
@@ -59,6 +74,16 @@ else:
 PY
 }
 
+# Only pass -e when non-empty so blank env does not override YAML literals.
+env_args=()
+add_env() {
+  local name="$1"
+  local value="${2-}"
+  if [[ -n "$value" ]]; then
+    env_args+=(-e "${name}=${value}")
+  fi
+}
+
 IMAGE="$(yaml_get docker.image)"
 NAME="$(yaml_get docker.name)"
 HOST_PORT="$(yaml_get docker.port)"
@@ -71,35 +96,67 @@ HOST_PORT="${HOST_PORT:-8080}"
 DATA_DIR="${DATA_DIR:-./data/onchain-invoice-api}"
 RESTART="${RESTART:-unless-stopped}"
 
-mkdir -p "$DATA_DIR"
 CONFIG_ABS="$(cd "$(dirname "$CONFIG")" && pwd)/$(basename "$CONFIG")"
-DATA_ABS="$(cd "$DATA_DIR" && pwd)"
 
-echo "Pulling $IMAGE ..."
-docker pull "$IMAGE"
+if [[ "${ONCHAIN_INVOICE_SKIP_PULL:-}" == "1" || "${PULL:-1}" == "0" ]]; then
+  echo "Skipping docker pull ($IMAGE)"
+else
+  echo "Pulling $IMAGE ..."
+  docker pull "$IMAGE"
+fi
 
 if docker inspect "$NAME" >/dev/null 2>&1; then
   echo "Removing existing container $NAME ..."
   docker rm -f "$NAME" >/dev/null
 fi
 
-echo "Starting $NAME (host port $HOST_PORT) ..."
-docker run -d \
+# Config is docker cp'd (works with remote/DoD Docker where host bind-mounts fail).
+# Data: host bind by default; named volume when ONCHAIN_INVOICE_SKIP_HOST_MOUNTS=1.
+VOLUME_ARGS=()
+if [[ "${ONCHAIN_INVOICE_SKIP_HOST_MOUNTS:-}" == "1" ]]; then
+  DATA_VOLUME="${NAME}-data"
+  docker volume create "$DATA_VOLUME" >/dev/null
+  VOLUME_ARGS+=(-v "${DATA_VOLUME}:/data")
+else
+  mkdir -p "$DATA_DIR"
+  DATA_ABS="$(cd "$DATA_DIR" && pwd)"
+  # Image runs as USER node (uid/gid 1000). Root-created bind mounts otherwise cause SQLITE_CANTOPEN.
+  if [[ "$(id -u)" -eq 0 ]]; then
+    chown -R 1000:1000 "$DATA_ABS" || true
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo chown -R 1000:1000 "$DATA_ABS" 2>/dev/null || \
+      echo "warning: could not chown $DATA_ABS to 1000:1000 — fix if API fails to open SQLite" >&2
+  else
+    echo "warning: ensure $DATA_ABS is writable by uid 1000 (container user node)" >&2
+  fi
+  chmod 755 "$DATA_ABS" 2>/dev/null || true
+  VOLUME_ARGS+=(-v "${DATA_ABS}:/data")
+fi
+
+add_env BASE_URL "${BASE_URL:-}"
+add_env ADMIN_API_KEY "${ADMIN_API_KEY:-}"
+add_env SWEEPER_API_KEY "${SWEEPER_API_KEY:-}"
+add_env EVM_RPC_URL "${EVM_RPC_URL:-}"
+add_env SWEEPER_ADDRESS "${SWEEPER_ADDRESS:-}"
+add_env FORWARDER_IMPLEMENTATION "${FORWARDER_IMPLEMENTATION:-}"
+add_env CORS_ORIGINS "${CORS_ORIGINS:-}"
+
+echo "Creating $NAME (host port $HOST_PORT) ..."
+docker create \
   --name "$NAME" \
   --restart "$RESTART" \
   -p "${HOST_PORT}:8080" \
   -e CONFIG_PATH=/config/server.yaml \
   -e DB_PATH=/data/trustless-commerce.db \
-  -e BASE_URL="${BASE_URL:-http://localhost:${HOST_PORT}}" \
-  -e ADMIN_API_KEY="${ADMIN_API_KEY:-}" \
-  -e SWEEPER_API_KEY="${SWEEPER_API_KEY:-}" \
-  -e EVM_RPC_URL="${EVM_RPC_URL:-}" \
-  -e SWEEPER_ADDRESS="${SWEEPER_ADDRESS:-}" \
-  -e FORWARDER_IMPLEMENTATION="${FORWARDER_IMPLEMENTATION:-}" \
-  -e CORS_ORIGINS="${CORS_ORIGINS:-*}" \
-  -v "$CONFIG_ABS:/config/server.yaml:ro" \
-  -v "$DATA_ABS:/data" \
-  "$IMAGE"
+  "${env_args[@]}" \
+  "${VOLUME_ARGS[@]}" \
+  "$IMAGE" >/dev/null
+
+echo "Copying config into $NAME ..."
+docker cp "$CONFIG_ABS" "$NAME:/config/server.yaml"
+
+echo "Starting $NAME ..."
+docker start "$NAME" >/dev/null
 
 echo "API listening on http://localhost:${HOST_PORT} (container $NAME)"
 echo "Health: curl -s http://localhost:${HOST_PORT}/api/health"

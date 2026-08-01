@@ -10,13 +10,13 @@ docker:
   dataDir: ./data/onchain-invoice-api
   restart: unless-stopped
 
-# Application settings (mounted as CONFIG_PATH; ${ENV} expanded at runtime)
+# Application settings (mounted as CONFIG_PATH; ${ENV} expanded at runtime from .env)
 port: 8080
-baseUrl: http://localhost:8080
+baseUrl: ${BASE_URL}
 db:
   path: /data/trustless-commerce.db
-adminApiKey: change-me-admin
-sweeperApiKey: change-me-sweeper
+adminApiKey: ${ADMIN_API_KEY}
+sweeperApiKey: ${SWEEPER_API_KEY}
 evm:
   rpcUrl: ${EVM_RPC_URL}
   sweeperAddress: ${SWEEPER_ADDRESS}

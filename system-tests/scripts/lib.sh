@@ -21,10 +21,9 @@ api_json() {
   if [[ -n "$extra_headers" && "$extra_headers" != "{}" ]]; then
     api_key="$(printf '%s' "$extra_headers" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("x-api-key",""))')"
   fi
-  local attempts=1
-  if [[ "$method" == "GET" ]]; then
-    attempts=5
-  fi
+  # Retry only when docker exec / fetch returns empty (transport flake).
+  # Do not reinterpret a real HTTP status (callers assert 200/201/401).
+  local attempts=5
   local attempt out=""
   for ((attempt=1; attempt<=attempts; attempt++)); do
     out="$("${COMPOSE[@]}" exec -T \

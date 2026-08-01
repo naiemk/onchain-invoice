@@ -6,6 +6,8 @@
 # Creates (if missing):
 #   onchain-invoice-api.yaml
 #   start-onchain-invoice-api.sh
+#   .env.example
+#   .env  (from .env.example, only if .env is missing)
 set -euo pipefail
 
 RAW_BASE="${ONCHAIN_INVOICE_RAW:-https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install}"
@@ -40,6 +42,22 @@ write_if_missing() {
 
 write_if_missing "onchain-invoice-api.yaml"
 write_if_missing "start-onchain-invoice-api.sh"
+write_if_missing ".env.api.example"
+
+# Normalize name operators expect
+if [[ ! -f "$DEST/.env.example" ]]; then
+  if [[ -f "$DEST/.env.api.example" ]]; then
+    cp "$DEST/.env.api.example" "$DEST/.env.example"
+    echo "created: $DEST/.env.example"
+  fi
+fi
+
+if [[ ! -f "$DEST/.env" ]]; then
+  cp "$DEST/.env.example" "$DEST/.env"
+  echo "created: $DEST/.env  (edit secrets before starting)"
+else
+  echo "exists (unchanged): $DEST/.env"
+fi
 
 cat <<EOF
 
@@ -47,10 +65,10 @@ Trustless Commerce API install complete in:
   $DEST
 
 Next:
-  1. Edit $DEST/onchain-invoice-api.yaml  (image, keys, sweeperAddress, …)
-  2. Export secrets if you use \${ENV} placeholders, e.g.
-       export ADMIN_API_KEY=... SWEEPER_API_KEY=... SWEEPER_ADDRESS=0x...
-  3. Start:
+  1. Edit $DEST/.env  (ADMIN_API_KEY, SWEEPER_API_KEY, BASE_URL, Sepolia addresses)
+  2. Start:
        cd $DEST && ./start-onchain-invoice-api.sh
+  3. Health:
+       curl -s http://localhost:8080/api/health
 
 EOF

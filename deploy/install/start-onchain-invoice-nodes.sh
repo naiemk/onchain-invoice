@@ -6,6 +6,21 @@ CONFIG="${ONCHAIN_INVOICE_NODES_CONFIG:-onchain-invoice-nodes.yaml}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Load .env for unset vars only (existing exports win).
+if [[ -f .env ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "${line//[[:space:]]/}" || "$line" =~ ^[[:space:]]*# ]] && continue
+    key="${line%%=*}"
+    val="${line#*=}"
+    key="${key%%[[:space:]]*}"
+    key="${key##[[:space:]]*}"
+    [[ -z "$key" || "$key" == *[!A-Za-z0-9_]* ]] && continue
+    if [[ -z "${!key+x}" ]]; then
+      export "$key=$val"
+    fi
+  done < .env
+fi
+
 if [[ ! -f "$CONFIG" ]]; then
   echo "Missing $CONFIG — run install-nodes.sh first." >&2
   exit 1
@@ -57,6 +72,15 @@ else:
 PY
 }
 
+env_args=()
+add_env() {
+  local name="$1"
+  local value="${2-}"
+  if [[ -n "$value" ]]; then
+    env_args+=(-e "${name}=${value}")
+  fi
+}
+
 IMAGE="$(yaml_get docker.image)"
 NAME="$(yaml_get docker.name)"
 RESTART="$(yaml_get docker.restart)"
@@ -70,28 +94,47 @@ CONFIG_ABS="$(cd "$(dirname "$CONFIG")" && pwd)/$(basename "$CONFIG")"
 # Extra hosts so serverUrl: http://host.docker.internal:8080 works on Linux.
 EXTRA_HOSTS=(--add-host=host.docker.internal:host-gateway)
 
-echo "Pulling $IMAGE ..."
-docker pull "$IMAGE"
+if [[ "${ONCHAIN_INVOICE_SKIP_PULL:-}" == "1" || "${PULL:-1}" == "0" ]]; then
+  echo "Skipping docker pull ($IMAGE)"
+else
+  echo "Pulling $IMAGE ..."
+  docker pull "$IMAGE"
+fi
 
 if docker inspect "$NAME" >/dev/null 2>&1; then
   echo "Removing existing container $NAME ..."
   docker rm -f "$NAME" >/dev/null
 fi
 
-echo "Starting $NAME ..."
-docker run -d \
+# Prefer SERVER_URL; fall back to API_URL for operators who only set one.
+if [[ -z "${SERVER_URL:-}" && -n "${API_URL:-}" ]]; then
+  SERVER_URL="$API_URL"
+fi
+
+add_env SERVER_URL "${SERVER_URL:-}"
+add_env SWEEPER_WALLET_KEY "${SWEEPER_WALLET_KEY:-}"
+add_env SWEEPER_API_KEY "${SWEEPER_API_KEY:-}"
+add_env SWEEPER_ADDRESS "${SWEEPER_ADDRESS:-}"
+add_env SWEEPER_PRIVATE_KEY "${SWEEPER_PRIVATE_KEY:-}"
+add_env EVM_RPC_URL "${EVM_RPC_URL:-}"
+
+# Config lands in /tmp (image has no /config dir; docker cp avoids host bind-mounts).
+SWEEPER_CONFIG_IN_CONTAINER=/tmp/sweeper.yaml
+
+echo "Creating $NAME ..."
+docker create \
   --name "$NAME" \
   --restart "$RESTART" \
   "${EXTRA_HOSTS[@]}" \
-  -e SWEEPER_CONFIG=/config/sweeper.yaml \
-  -e SERVER_URL="${SERVER_URL:-}" \
-  -e SWEEPER_WALLET_KEY="${SWEEPER_WALLET_KEY:-}" \
-  -e SWEEPER_API_KEY="${SWEEPER_API_KEY:-}" \
-  -e SWEEPER_ADDRESS="${SWEEPER_ADDRESS:-}" \
-  -e SWEEPER_PRIVATE_KEY="${SWEEPER_PRIVATE_KEY:-}" \
-  -e EVM_RPC_URL="${EVM_RPC_URL:-}" \
-  -v "$CONFIG_ABS:/config/sweeper.yaml:ro" \
-  "$IMAGE"
+  -e SWEEPER_CONFIG="$SWEEPER_CONFIG_IN_CONTAINER" \
+  "${env_args[@]}" \
+  "$IMAGE" >/dev/null
+
+echo "Copying config into $NAME ..."
+docker cp "$CONFIG_ABS" "$NAME:$SWEEPER_CONFIG_IN_CONTAINER"
+
+echo "Starting $NAME ..."
+docker start "$NAME" >/dev/null
 
 echo "Sweeper node running as $NAME"
 echo "Logs: docker logs -f $NAME"

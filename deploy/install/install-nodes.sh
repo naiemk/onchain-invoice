@@ -6,6 +6,8 @@
 # Creates (if missing):
 #   onchain-invoice-nodes.yaml
 #   start-onchain-invoice-nodes.sh
+#   register-onchain-invoice-node.sh
+#   .env.example / .env
 set -euo pipefail
 
 RAW_BASE="${ONCHAIN_INVOICE_RAW:-https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install}"
@@ -40,6 +42,22 @@ write_if_missing() {
 
 write_if_missing "onchain-invoice-nodes.yaml"
 write_if_missing "start-onchain-invoice-nodes.sh"
+write_if_missing "register-onchain-invoice-node.sh"
+write_if_missing ".env.nodes.example"
+
+if [[ ! -f "$DEST/.env.example" ]]; then
+  if [[ -f "$DEST/.env.nodes.example" ]]; then
+    cp "$DEST/.env.nodes.example" "$DEST/.env.example"
+    echo "created: $DEST/.env.example"
+  fi
+fi
+
+if [[ ! -f "$DEST/.env" ]]; then
+  cp "$DEST/.env.example" "$DEST/.env"
+  echo "created: $DEST/.env  (edit secrets before starting)"
+else
+  echo "exists (unchanged): $DEST/.env"
+fi
 
 cat <<EOF
 
@@ -47,14 +65,12 @@ Trustless Commerce sweeper node install complete in:
   $DEST
 
 Next:
-  1. Edit $DEST/onchain-invoice-nodes.yaml  (image, serverUrl, wallet key, chains)
-  2. Register the sweeper wallet on the API:
-       curl -X POST \$API/api/admin/sweepers -H "x-api-key: \$ADMIN_API_KEY" \\
-         -H 'content-type: application/json' \\
-         -d '{"address":"0x…","label":"node-1","chains":["11155111"]}'
-  3. Export secrets used in the YAML, e.g.
-       export SWEEPER_WALLET_KEY=0x... EVM_RPC_URL=https://... SWEEPER_ADDRESS=0x...
-  4. Start:
+  1. Edit $DEST/.env  (API_URL, ADMIN_API_KEY, SWEEPER_WALLET_KEY, …)
+  2. Ensure API is up, then register this wallet:
+       cd $DEST && ./register-onchain-invoice-node.sh
+  3. Start the worker:
        cd $DEST && ./start-onchain-invoice-nodes.sh
+  4. Logs:
+       docker logs -f onchain-invoice-node
 
 EOF
