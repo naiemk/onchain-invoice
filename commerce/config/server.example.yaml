@@ -4,9 +4,15 @@ db:
   path: ${DB_PATH}
 adminApiKey: ${ADMIN_API_KEY}
 sweeperApiKey: ${SWEEPER_API_KEY}
+# Deployed CommerceInvoiceSweeper address (enables invoiceAddress on create).
+# Optional offline CREATE2 when set with FORWARDER_IMPLEMENTATION (no RPC).
+# EVM_RPC_URL=
+# SWEEPER_ADDRESS=
+# FORWARDER_IMPLEMENTATION=
 evm:
   rpcUrl: ${EVM_RPC_URL}
   sweeperAddress: ${SWEEPER_ADDRESS}
+  forwarderImplementation: ${FORWARDER_IMPLEMENTATION}
 cors:
   origins:
     - http://localhost:5173

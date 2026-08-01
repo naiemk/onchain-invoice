@@ -7,7 +7,9 @@ export {
 export {
   CommerceInvoiceSdk,
   commerceInvoiceSalt,
+  commerceMinimalProxyInitCodeHash,
   getCommerceInvoiceId,
+  predictCommerceInvoiceAddress,
   type CommerceInvoiceParams,
   type CommerceInvoiceSdkConfig,
   type CommerceSweepParams,

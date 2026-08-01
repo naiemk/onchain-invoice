@@ -16,6 +16,17 @@ Built on every push to `main` by `.github/workflows/docker.yml`:
 
 - `ghcr.io/<owner>/trustless-commerce-api`
 - `ghcr.io/<owner>/trustless-commerce-sweeper`
+- `ghcr.io/<owner>/trustless-commerce-ui`
+- `ghcr.io/<owner>/trustless-commerce-nginx`
+
+## Operator install (wget | bash)
+
+See [`install/README.md`](install/README.md):
+
+```bash
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-api.sh | bash
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
+```
 
 ## Prod checklist
 

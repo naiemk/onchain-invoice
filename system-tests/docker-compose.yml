@@ -1,0 +1,94 @@
+# System tests pull published GHCR images (no local product builds).
+# Override tags with IMAGE_TAG (default: main).
+name: trustless-commerce-system-tests
+
+services:
+  api:
+    image: ghcr.io/naiemk/trustless-commerce-api:${IMAGE_TAG:-main}
+    environment:
+      BASE_URL: ${BASE_URL:-https://localhost}
+      DB_PATH: /data/trustless-commerce.db
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-system-test-admin}
+      SWEEPER_API_KEY: ${SWEEPER_API_KEY:-system-test-sweeper}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      RATE_LIMIT_CREATE_PER_SECOND: ${RATE_LIMIT_CREATE_PER_SECOND:-10}
+      SWEEPER_ADDRESS: ${SWEEPER_ADDRESS:-0x1111111111111111111111111111111111111111}
+      FORWARDER_IMPLEMENTATION: ${FORWARDER_IMPLEMENTATION:-0x2222222222222222222222222222222222222222}
+      EVM_RPC_URL: ${EVM_RPC_URL:-}
+    volumes:
+      - api-data:/data
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks:
+      - internal
+
+  ui:
+    image: ghcr.io/naiemk/trustless-commerce-ui:${IMAGE_TAG:-main}
+    expose:
+      - "80"
+    networks:
+      - internal
+
+  sweeper:
+    image: ghcr.io/naiemk/trustless-commerce-sweeper:${IMAGE_TAG:-main}
+    environment:
+      SERVER_URL: http://api:8080
+      SWEEPER_CONFIG: /tmp/sweeper.yaml
+      SWEEPER_WALLET_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    entrypoint: ["/bin/sh", "-c"]
+    # Hardcoded throwaway Hardhat #0 key (public/well-known) for system tests only.
+    command:
+      - |
+        cat > /tmp/sweeper.yaml <<'YAML'
+        serverUrl: http://api:8080
+        sweeperWalletKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        apiKey: system-test-sweeper
+        intervalMs: 2000
+        maxRetries: 3
+        chains:
+          - chainId: "11155111"
+            rpcUrl: http://127.0.0.1:1
+            sweeperAddress: "0x1111111111111111111111111111111111111111"
+            privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+            tokens:
+              - symbol: USDC
+                address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+                decimals: 6
+        tron:
+          enabled: false
+        solana:
+          enabled: false
+        YAML
+        sed -i 's/^        //' /tmp/sweeper.yaml
+        exec node commerce-dist/sweeper/index.js
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+
+  nginx:
+    image: ghcr.io/naiemk/trustless-commerce-nginx:${IMAGE_TAG:-main}
+    depends_on:
+      api:
+        condition: service_healthy
+      ui:
+        condition: service_started
+    ports:
+      - "18080:80"
+      - "18443:443"
+    networks:
+      - internal
+
+volumes:
+  api-data:
+
+networks:
+  internal:
+    driver: bridge

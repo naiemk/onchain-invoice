@@ -1,0 +1,20 @@
+serverUrl: ${SERVER_URL}
+sweeperWalletKey: ${SWEEPER_WALLET_KEY}
+apiKey: ${SWEEPER_API_KEY}
+intervalMs: 2000
+maxRetries: 3
+chains:
+  - chainId: "11155111"
+    rpcUrl: ${EVM_RPC_URL}
+    sweeperAddress: ${SWEEPER_ADDRESS}
+    privateKey: ${SWEEPER_PRIVATE_KEY}
+    tokens:
+      - symbol: USDC
+        address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+        decimals: 6
+tron:
+  enabled: false
+  note: "Not in system-test scope"
+solana:
+  enabled: false
+  note: "Not in system-test scope"

@@ -1,0 +1,31 @@
+# Trustless Commerce API — operator config
+# Created by: wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-api.sh | bash
+# Start with: ./start-onchain-invoice-api.sh
+
+docker:
+  image: ghcr.io/naiemk/trustless-commerce-api:main
+  name: onchain-invoice-api
+  # Host port published to the container's 8080
+  port: 8080
+  dataDir: ./data/onchain-invoice-api
+  restart: unless-stopped
+
+# Application settings (mounted as CONFIG_PATH; ${ENV} expanded at runtime)
+port: 8080
+baseUrl: http://localhost:8080
+db:
+  path: /data/trustless-commerce.db
+adminApiKey: change-me-admin
+sweeperApiKey: change-me-sweeper
+evm:
+  rpcUrl: ${EVM_RPC_URL}
+  sweeperAddress: ${SWEEPER_ADDRESS}
+  forwarderImplementation: ${FORWARDER_IMPLEMENTATION}
+cors:
+  origins:
+    - "*"
+rateLimit:
+  createPerSecond: 1
+  publicPerIpPerSecond: 20
+  sweeperPerIpPerSecond: 50
+claimLeaseMs: 180000

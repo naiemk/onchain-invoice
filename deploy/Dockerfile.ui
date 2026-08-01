@@ -1,0 +1,16 @@
+# syntax=docker/dockerfile:1
+# Build from repo root: docker build -f deploy/Dockerfile.ui -t trustless-commerce-ui .
+FROM node:22-bookworm-slim AS build
+WORKDIR /app
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+COPY ui ./ui
+# Vite resolves the onchain-invoice browser alias inside ui/; no full package build needed.
+ENV VITE_API_BASE_URL=
+RUN npm ci && npm run ui:build
+
+FROM nginx:1.27-alpine
+RUN rm -f /etc/nginx/conf.d/default.conf
+COPY deploy/nginx/ui.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist-ui /usr/share/nginx/html
+EXPOSE 80

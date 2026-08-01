@@ -4,7 +4,7 @@
 
 This repo is the `onchain-invoice` payment-infrastructure library (Solidity contracts + TypeScript SDK + optional web server/client + sweep node) **and** the Trustless Commerce product (API under `commerce/`, UI under `ui/`, Docker under `deploy/`). Contract tests spin up Hardhat's in-process EVM network. The legacy `InvoiceWebServer` and the commerce API both use embedded SQLite (`better-sqlite3`) plus Node's built-in `http`.
 
-Standard commands live in `package.json` `scripts` (`compile`, `build`, `test`, `test:contracts`, `commerce:server`, `commerce:sweeper`, `ui`, `docker:test`, `sweep-node`) and the README `## Development` section. Prefer those instead of ad-hoc invocations.
+Standard commands live in `package.json` `scripts` (`compile`, `build`, `test`, `test:contracts`, `commerce:server`, `commerce:sweeper`, `ui`, `docker:test`, `system-test`, `sweep-node`) and the README `## Development` section. Prefer those instead of ad-hoc invocations.
 
 Non-obvious notes:
 - Node 22 and dependencies are already installed by the startup update script (`npm install`). `better-sqlite3` is a native module; if it ever fails to load, run `npm rebuild better-sqlite3`.
@@ -13,6 +13,6 @@ Non-obvious notes:
 - There is no lint or formatter npm script. Prettier + the Hardhat Solidity extension are only configured as recommended VS Code extensions.
 - `npm run sweep-node` (the generic `SweepNode` worker) is the only piece needing real config for the *library* path: a JSON config (see `node/example.config.json`) with live EVM/Tron RPC endpoints, keys, and a running web server. It is NOT exercised by the test suite and is optional for local development.
 - FastSwap product code lives in a separate sibling repo (`naiemk/fastswap`), not here. Do not add FastSwap app code to this repo.
-- **Trustless Commerce** lives entirely in this repo: API/sweeper under [`commerce/`](commerce/) (`npm run commerce:server` / `commerce:sweeper`), UI under [`ui/`](ui/) (`npm run ui`), Docker under [`deploy/`](deploy/) (`npm run docker:test`). Routes: `/` landing, `/create` invoice builder, `/pay` checkout, `/merchant` invoice list (admin is key-gated at `/admin`, not in nav).
+- **Trustless Commerce** lives entirely in this repo: API/sweeper under [`commerce/`](commerce/) (`npm run commerce:server` / `commerce:sweeper`), UI under [`ui/`](ui/) (`npm run ui`), Docker under [`deploy/`](deploy/) (`npm run docker:test`). Operator one-liner install: [`deploy/install/`](deploy/install/) (`install-api.sh` / `install-nodes.sh`). Product system tests against published GHCR images: [`system-tests/`](system-tests/) (`npm run system-test`). Routes: `/` landing, `/create` invoice builder, `/pay` checkout, `/merchant` invoice list (admin is key-gated at `/admin`, not in nav).
 - **AI agents creating invoices:** use Cursor skill [`.cursor/skills/trustless-commerce-invoice/SKILL.md`](.cursor/skills/trustless-commerce-invoice/SKILL.md) (`POST /api/invoices` one-shot). Product docs: `docs/` (MkDocs → GitHub Pages).
 - It uses the **Commerce** contracts (`contracts/commerce/`) and `CommerceInvoiceSdk`.

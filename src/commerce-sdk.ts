@@ -7,6 +7,7 @@ import {
   Provider,
   Signer,
   getAddress,
+  getCreate2Address,
   hexlify,
   id,
   keccak256,
@@ -71,6 +72,26 @@ export function getCommerceInvoiceId(params: CommerceInvoiceParams | BytesLike):
 
 export function commerceInvoiceSalt(to: string, invoiceId: BytesLike): string {
   return keccak256(solidityPacked(["address", "bytes32"], [getAddress(to), hexlify(invoiceId)]));
+}
+
+/** EIP-1167 init code hash used by OpenZeppelin `Clones.cloneDeterministic`. */
+export function commerceMinimalProxyInitCodeHash(implementation: string): string {
+  const impl = getAddress(implementation).slice(2).toLowerCase();
+  return keccak256(`0x3d602d80600a3d3981f3363d3d373d3d3d363d73${impl}5af43d82803e903d91602b57fd5bf3`);
+}
+
+/** Offline CREATE2 prediction (no RPC). Matches `CommerceInvoiceSweeper.getInvoiceAddress`. */
+export function predictCommerceInvoiceAddress(
+  sweeperAddress: string,
+  forwarderImplementation: string,
+  to: string,
+  invoiceId: BytesLike
+): string {
+  return getCreate2Address(
+    getAddress(sweeperAddress),
+    commerceInvoiceSalt(to, invoiceId),
+    commerceMinimalProxyInitCodeHash(forwarderImplementation)
+  );
 }
 
 export class CommerceInvoiceSdk {
