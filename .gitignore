@@ -175,3 +175,5 @@ data/commerce-deploy-*.json
 dist-ui/
 ui/public/.DS_Store
 .DS_Store
+deploy/certs/
+ui/screenshots/

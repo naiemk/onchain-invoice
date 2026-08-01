@@ -14,6 +14,8 @@ env:
   REGISTRY: ghcr.io
   IMAGE_API: ghcr.io/${{ github.repository_owner }}/trustless-commerce-api
   IMAGE_SWEEPER: ghcr.io/${{ github.repository_owner }}/trustless-commerce-sweeper
+  IMAGE_UI: ghcr.io/${{ github.repository_owner }}/trustless-commerce-ui
+  IMAGE_NGINX: ghcr.io/${{ github.repository_owner }}/trustless-commerce-nginx
 
 jobs:
   build-push:
@@ -75,6 +77,48 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
+      - name: Docker meta (ui)
+        id: meta_ui
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_UI }}
+          tags: |
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha,prefix=main-,format=short
+            type=semver,pattern={{version}}
+
+      - name: Build and push UI
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.ui
+          push: true
+          tags: ${{ steps.meta_ui.outputs.tags }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Docker meta (nginx)
+        id: meta_nginx
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NGINX }}
+          tags: |
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha,prefix=main-,format=short
+            type=semver,pattern={{version}}
+
+      - name: Build and push nginx
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy
+          file: deploy/Dockerfile.nginx
+          push: true
+          tags: ${{ steps.meta_nginx.outputs.tags }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
       - name: Local compose smoke
         run: |
           chmod +x deploy/gen-dev-certs.sh deploy/smoke-test.sh
@@ -84,3 +128,15 @@ jobs:
           sleep 8
           ./deploy/smoke-test.sh
           docker compose -f deploy/docker-compose.yml down -v
+
+      # Exercise the images that were just pushed (latest :main on default branch).
+      - name: System tests against published images
+        if: github.ref == 'refs/heads/main'
+        env:
+          IMAGE_TAG: main
+          PULL: "1"
+        run: |
+          chmod +x system-tests/scripts/*.sh system-tests/tests/*.sh deploy/gen-dev-certs.sh
+          cp system-tests/.env.example system-tests/.env
+          sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" system-tests/.env
+          npm run system-test

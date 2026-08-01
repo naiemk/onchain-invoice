@@ -1,0 +1,32 @@
+# Trustless Commerce sweeper node — operator config
+# Created by: wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
+# Start with: ./start-onchain-invoice-nodes.sh
+
+docker:
+  image: ghcr.io/naiemk/trustless-commerce-sweeper:main
+  name: onchain-invoice-node
+  restart: unless-stopped
+
+# Worker settings (this file is mounted as SWEEPER_CONFIG)
+serverUrl: http://host.docker.internal:8080
+# Wallet that signs sweeper API requests (register via POST /api/admin/sweepers)
+sweeperWalletKey: ${SWEEPER_WALLET_KEY}
+# Optional legacy shared key
+apiKey: ${SWEEPER_API_KEY}
+intervalMs: 15000
+maxRetries: 5
+chains:
+  - chainId: "11155111"
+    rpcUrl: ${EVM_RPC_URL}
+    sweeperAddress: ${SWEEPER_ADDRESS}
+    privateKey: ${SWEEPER_PRIVATE_KEY}
+    tokens:
+      - symbol: USDC
+        address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+        decimals: 6
+tron:
+  enabled: false
+  note: "Not implemented for commerce launch"
+solana:
+  enabled: false
+  note: "Not implemented for commerce launch"

@@ -18,6 +18,8 @@ export interface AppConfig {
   adminApiKey: string;
   evmRpcUrl?: string;
   sweeperAddress?: string;
+  /** Optional; enables offline CREATE2 invoice address prediction without RPC. */
+  forwarderImplementation?: string;
   sweeperPrivateKey?: string;
   captchaProvider?: string;
   turnstileSecret?: string;
@@ -33,7 +35,12 @@ interface YamlFile {
   db?: { path?: string };
   adminApiKey?: string;
   sweeperApiKey?: string;
-  evm?: { rpcUrl?: string; sweeperAddress?: string; sweeperPrivateKey?: string };
+  evm?: {
+    rpcUrl?: string;
+    sweeperAddress?: string;
+    forwarderImplementation?: string;
+    sweeperPrivateKey?: string;
+  };
   captcha?: { provider?: string; turnstileSecret?: string };
   cors?: { origins?: string[] };
   rateLimit?: Partial<RateLimitConfig>;
@@ -53,6 +60,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     adminApiKey: expand(env.ADMIN_API_KEY ?? file.adminApiKey ?? ""),
     evmRpcUrl: blankToUndefined(expand(env.EVM_RPC_URL ?? file.evm?.rpcUrl ?? "")),
     sweeperAddress: normalizeAddress(expand(env.SWEEPER_ADDRESS ?? file.evm?.sweeperAddress ?? "")),
+    forwarderImplementation: normalizeAddress(
+      expand(env.FORWARDER_IMPLEMENTATION ?? file.evm?.forwarderImplementation ?? "")
+    ),
     sweeperPrivateKey: blankToUndefined(expand(env.SWEEPER_PRIVATE_KEY ?? file.evm?.sweeperPrivateKey ?? "")),
     captchaProvider: blankToUndefined(expand(env.CAPTCHA_PROVIDER ?? file.captcha?.provider ?? "")),
     turnstileSecret: blankToUndefined(expand(env.TURNSTILE_SECRET ?? file.captcha?.turnstileSecret ?? "")),

@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { getAddress, JsonRpcProvider } from "ethers";
-import { CommerceInvoiceSdk } from "onchain-invoice";
+import { CommerceInvoiceSdk, predictCommerceInvoiceAddress } from "onchain-invoice";
 import { encodePayLink, invoiceIdFromPayLink, normalizePayLinkFields } from "../shared/invoice.js";
 import type { InvoiceStatus, PayLinkFields } from "../shared/types.js";
 import { requireApiKey, requireMerchant } from "./auth.js";
@@ -372,8 +372,19 @@ async function getInvoiceAddress(config: AppConfig, selectedTo: string, invoiceI
   if (!config.sweeperAddress) {
     return null;
   }
+  if (config.forwarderImplementation) {
+    return predictCommerceInvoiceAddress(
+      config.sweeperAddress,
+      config.forwarderImplementation,
+      selectedTo,
+      invoiceId
+    );
+  }
   if (!config.evmRpcUrl) {
-    throw Object.assign(new Error("EVM_RPC_URL is required when SWEEPER_ADDRESS is set"), { statusCode: 503 });
+    throw Object.assign(
+      new Error("EVM_RPC_URL or FORWARDER_IMPLEMENTATION is required when SWEEPER_ADDRESS is set"),
+      { statusCode: 503 }
+    );
   }
   const provider = new JsonRpcProvider(config.evmRpcUrl);
   const sdk = new CommerceInvoiceSdk({ provider, sweeperAddress: config.sweeperAddress });

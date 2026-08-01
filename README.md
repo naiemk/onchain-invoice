@@ -342,6 +342,7 @@ npm run commerce:sweeper  # after configuring commerce/config/sweeper.example.ya
 npm run ui                # http://localhost:5173 — proxies /api to :8080
 npm run ui:build          # → dist-ui/
 npm run docker:test       # local HTTPS compose smoke (ports 18080/18443)
+npm run system-test       # pull published GHCR images + configs (system-tests/)
 ```
 
-UI lives under [`ui/`](ui/); API/sweeper under [`commerce/`](commerce/); Docker under [`deploy/`](deploy/).
+UI lives under [`ui/`](ui/); API/sweeper under [`commerce/`](commerce/); Docker under [`deploy/`](deploy/); published-image system tests under [`system-tests/`](system-tests/).

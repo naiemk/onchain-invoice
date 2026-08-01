@@ -27,6 +27,16 @@ services:
     networks:
       - internal
 
+  ui:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.ui
+    image: ghcr.io/naiemk/trustless-commerce-ui:local
+    expose:
+      - "80"
+    networks:
+      - internal
+
   nginx:
     build:
       context: .
@@ -35,6 +45,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      ui:
+        condition: service_started
     ports:
       - "18080:80"
       - "18443:443"
