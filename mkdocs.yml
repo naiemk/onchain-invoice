@@ -1,0 +1,20 @@
+site_name: Trustless Commerce
+site_url: https://naiemk.github.io/onchain-invoice/
+repo_url: https://github.com/naiemk/onchain-invoice
+theme:
+  name: material
+  palette:
+    primary: indigo
+nav:
+  - Home: index.md
+  - Create invoice: create.md
+  - HTTP API: api.md
+  - Agents: agents.md
+  - Sweepers: sweepers.md
+  - Ops / Docker: ops.md
+  - Vercel UI: vercel.md
+  - Security: security.md
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - tables

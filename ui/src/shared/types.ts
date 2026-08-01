@@ -1,6 +1,6 @@
 export type InvoiceStatus = "created" | "awaiting_payment" | "paid" | "paid_partial" | "swept";
 
-export type InvoiceEventKind = "created" | "paid" | "swept" | "callback" | "error" | "force_sweep";
+export type InvoiceEventKind = "created" | "paid" | "swept" | "callback" | "error" | "force_sweep" | "claimed";
 
 export interface PayLinkFields {
   price: string;
@@ -34,6 +34,9 @@ export interface InvoiceRecord {
   gasSpentWei: string;
   sweepTx: string | null;
   paySessionId: string | null;
+  version?: number;
+  claimedBy?: string | null;
+  claimedUntil?: string | null;
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;
@@ -52,6 +55,13 @@ export interface InvoiceWithEvents extends InvoiceRecord {
   events: InvoiceEvent[];
 }
 
+export interface CreateInvoiceResponse {
+  invoice: InvoiceRecord;
+  created: boolean;
+  payLink: string;
+}
+
+/** @deprecated */
 export interface CreateSessionResponse {
   paySessionId: string;
   invoiceId: string;
@@ -60,6 +70,7 @@ export interface CreateSessionResponse {
   invoice: InvoiceRecord;
 }
 
+/** @deprecated */
 export interface ActivateInvoiceResponse {
   invoice: InvoiceRecord;
 }

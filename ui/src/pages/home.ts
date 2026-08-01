@@ -1,64 +1,213 @@
 import { encodePayLink } from "../shared/invoice.js";
+import { howCreateArt, howPayArt, howSettleArt } from "../shared/how-graphics.js";
+
+function chip(label: string, kind: "muted" | "warn" | "ok" | "accent" = "muted"): string {
+  return `<span class="cmp-chip cmp-chip-${kind}">${label}</span>`;
+}
 
 export function renderHome(root: HTMLElement): void {
-  const example = {
+  const demo = {
     price: "0.01",
     to: ["0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb"],
     chains: ["11155111"],
-    tokens: ["ETH", "USDC"],
+    tokens: ["USDC"],
     clientInvoiceId: `order-${Date.now()}`,
     callback: "",
-    title: "Sepolia test invoice",
-    description: "Pay with Sepolia ETH or USDC. Merchant to is salt-bound.",
+    title: "Demo invoice",
+    description: "Try a Sepolia USDC test payment.",
     allowPartial: false,
   };
-  const link = `/pay?${encodePayLink(example)}`;
-  const embed = `<a href="https://trustless.example${link}" class="tc-pay-button">Pay with crypto</a>`;
+  const demoLink = `/pay?${encodePayLink(demo)}`;
 
   root.innerHTML = `
-    <section class="hero">
+    <section class="landing-hero">
       <div>
-        <p class="eyebrow">0.5% platform fee · non-custodial invoice addresses</p>
-        <h1>Trustless crypto invoices for shops.</h1>
-        <p>
-          Accept EVM payments with deterministic CommerceInvoiceSweeper addresses where the CREATE2 salt
-          binds the merchant recipient. A sweep can collect the platform fee, but it cannot redirect funds
-          away from the merchant <span class="mono">to</span> address encoded into the invoice.
+        <p class="brand-hero">Trustless Commerce</p>
+        <h1>Crypto invoices your customers can pay today.</h1>
+        <p class="lede">
+          Create a payment link, share it, and get paid on-chain — without opening an account
+          or waiting on compliance review.
         </p>
-        <p>
-          Tron follows the typical sweep-later path. Solana support is deferred.
-        </p>
-        <a class="button" href="${link}" data-route>Try the pay link</a>
+        <div class="cta-row">
+          <a class="tc-btn" href="/create" data-route>Create an invoice</a>
+          <a class="tc-btn secondary" href="${demoLink}" target="_blank" rel="noopener noreferrer">See a live checkout</a>
+        </div>
       </div>
-      <aside class="panel">
-        <h2>Embed button</h2>
-        <p>Drop a normal link into any shop template. Query parameters become a deterministic invoice id.</p>
-        <pre>${escapeHtml(embed)}</pre>
+      <aside class="hero-shopify" aria-hidden="true">
+        <div class="shopify-shot">
+          <div class="shopify-shot-inner">
+            <p class="shopify-store">Northline Supply</p>
+            <p class="shopify-step">Checkout</p>
+            <div class="shopify-line">
+              <img
+                class="shopify-thumb"
+                src="/images/canvas-weekender.png"
+                alt=""
+                width="64"
+                height="64"
+                decoding="async"
+              />
+              <div class="shopify-line-copy">
+                <p class="shopify-product">Canvas weekender bag</p>
+                <p class="shopify-variant">Natural · Qty 1</p>
+              </div>
+              <p class="shopify-price">$128.00</p>
+            </div>
+            <div class="shopify-totals">
+              <div><span>Subtotal</span><span>$128.00</span></div>
+              <div><span>Shipping</span><span>Free</span></div>
+              <div class="shopify-total"><span>Total</span><span>$128.00</span></div>
+            </div>
+            <div class="shopify-pay">
+              <span class="shopify-crypto">Pay with crypto</span>
+            </div>
+          </div>
+        </div>
+        <p class="shopify-caption">Example Shopify checkout with Pay with crypto</p>
       </aside>
     </section>
-    <section class="grid" style="margin-top: 2rem">
-      <article class="card">
-        <h3>Bound recipient</h3>
-        <p>For EVM, the sweeper salt includes merchant <span class="mono">to</span>, so force sweeping cannot redirect settlement.</p>
-      </article>
-      <article class="card">
-        <h3>Simple API</h3>
-        <p>Create sessions, activate invoice addresses, track sweeps, and query merchant/admin views over HTTP.</p>
-      </article>
-      <article class="card">
-        <h3>Portable frontend</h3>
-        <p>The Vite SPA is ready for Vercel, with client-side routes for pay, merchant, and admin screens.</p>
-      </article>
-    </section>
-  `;
-}
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[char] ?? char);
+    <section class="section">
+      <p class="eyebrow">Why shops switch</p>
+      <h2>From idea to paid invoice before your coffee cools.</h2>
+      <p class="section-lede">
+        Fill in amount and wallet, copy a pay button into your site, and you’re live.
+        No developer ticket queue, no merchant dashboard signup wall.
+      </p>
+      <div class="feature-row">
+        <article>
+          <h3>About a minute to go live</h3>
+          <p>Generate a pay link with the fields you already know from your order system.</p>
+        </article>
+        <article>
+          <h3>Skip the paperwork</h3>
+          <p>No registration and no KYC. Your settlement address is part of the invoice itself.</p>
+        </article>
+        <article>
+          <h3>Drop in without an integration project</h3>
+          <p>Paste a link or HTML button. Wire the API later when you’re ready to automate.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <p class="eyebrow">Getting started</p>
+      <h2>What it takes elsewhere vs here</h2>
+      <p class="section-lede">
+        Most crypto payment products ask you to join their platform first. We ask for an invoice.
+      </p>
+      <p class="compare-callout">No signup wall. Settlement is on-chain to your address.</p>
+      <div class="compare-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th class="sticky-col">Step</th>
+              <th>BitPay</th>
+              <th>Coinbase Commerce</th>
+              <th>NOWPayments</th>
+              <th>BTCPay Server</th>
+              <th class="highlight-col">
+                <span class="ours-pill">Ours</span>
+                Trustless Commerce
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="sticky-col">Create an account</td>
+              <td>${chip("Account", "warn")}</td>
+              <td>${chip("Account", "warn")}</td>
+              <td>${chip("Account", "warn")}</td>
+              <td>${chip("Self-host", "muted")}</td>
+              <td class="highlight-col">${chip("None", "ok")}</td>
+            </tr>
+            <tr>
+              <td class="sticky-col">Identity / business checks</td>
+              <td>${chip("KYC", "warn")}</td>
+              <td>${chip("Verify", "warn")}</td>
+              <td>${chip("Often KYC", "warn")}</td>
+              <td>${chip("Varies", "muted")}</td>
+              <td class="highlight-col">${chip("None", "ok")}</td>
+            </tr>
+            <tr>
+              <td class="sticky-col">Time to first invoice</td>
+              <td>${chip("Days", "muted")}</td>
+              <td>${chip("Hours–days", "muted")}</td>
+              <td>${chip("Hours", "muted")}</td>
+              <td>${chip("Setup hours", "muted")}</td>
+              <td class="highlight-col">${chip("~1 min", "accent")}</td>
+            </tr>
+            <tr>
+              <td class="sticky-col">Who controls settlement</td>
+              <td>${chip("Processor", "muted")}</td>
+              <td>${chip("Processor", "muted")}</td>
+              <td>${chip("Processor", "muted")}</td>
+              <td>${chip("Your node", "muted")}</td>
+              <td class="highlight-col">${chip("Your wallet", "accent")}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <p class="eyebrow">How it works</p>
+      <h2>Trustless invoices that can only settle to you.</h2>
+      <p class="section-lede">
+        No custodian in the middle. The payment address is derived so your wallet is part of the invoice itself.
+      </p>
+      <div class="how-grid">
+        <article class="how-card how-card-1">
+          <div class="how-art-wrap">${howCreateArt()}</div>
+          <span class="how-step">1</span>
+          <h3>Create the invoice</h3>
+          <p>Set the amount and your wallet. The invoice id is hashed from those details — no account required.</p>
+        </article>
+        <article class="how-card how-card-2">
+          <div class="how-art-wrap">${howPayArt()}</div>
+          <span class="how-step">2</span>
+          <h3>Customer pays a unique address</h3>
+          <p>Checkout activates a deterministic payment address for that invoice on the network they choose.</p>
+        </article>
+        <article class="how-card how-card-3">
+          <div class="how-art-wrap">${howSettleArt()}</div>
+          <span class="how-step">3</span>
+          <h3>Only your wallet receives settlement</h3>
+          <p>CREATE2 salt binds merchant <span class="mono">to</span>. A sweep can take the fee — it cannot redirect your funds.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="security-band">
+        <p class="eyebrow">Security guarantee</p>
+        <h2>Paid only to you — enforced by the contract, not a promise.</h2>
+        <p>
+          Each invoice address is derived so the merchant recipient is baked into the CREATE2 salt.
+          A sweep can collect the platform fee, but it cannot redirect settlement away from the
+          wallet encoded in the invoice. You don’t need to trust a company ledger. Trust the chain.
+        </p>
+      </div>
+    </section>
+
+    <section class="section section-narrow" style="text-align:center">
+      <h2>Ready when your customer is.</h2>
+      <p class="section-lede" style="margin-left:auto;margin-right:auto">
+        Create your first invoice now, or embed a pay button and check status over HTTP when you automate.
+      </p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="tc-btn" href="/create" data-route>Create an invoice</a>
+        <a class="tc-btn secondary" href="/create#docs" data-route>View API docs</a>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <span>Trustless Commerce</span>
+      <span>
+        <a href="/create" data-route>Create</a>
+        ·
+        <a href="/merchant" data-route>Merchant</a>
+      </span>
+    </footer>
+  `;
 }

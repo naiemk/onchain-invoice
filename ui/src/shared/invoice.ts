@@ -1,5 +1,6 @@
 import { getAddress } from "ethers";
 import { getCommerceInvoiceId, type CommerceInvoiceParams } from "onchain-invoice";
+import { filterSupportedTokens } from "./networks.js";
 import type { PayLinkFields } from "./types.js";
 
 const DEFAULT_CHAIN = "11155111";
@@ -25,7 +26,7 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
     price: requiredParam(params, "price"),
     to,
     chains: splitList(params.get("chains") ?? DEFAULT_CHAIN),
-    tokens: splitList(params.get("tokens") ?? DEFAULT_TOKEN),
+    tokens: filterSupportedTokens(splitList(params.get("tokens") ?? DEFAULT_TOKEN)),
     clientInvoiceId: requiredParam(params, "client_invoice_id"),
     callback: optionalParam(params, "callback"),
     title: optionalParam(params, "title"),

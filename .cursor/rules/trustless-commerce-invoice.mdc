@@ -1,0 +1,8 @@
+---
+description: Trustless Commerce invoice creation uses the dedicated skill
+globs:
+  - ui/**/*
+  - .cursor/skills/trustless-commerce-invoice/**
+---
+
+When creating or verifying Trustless Commerce invoices, pay links, or `client_invoice_id` flows, read and follow `.cursor/skills/trustless-commerce-invoice/SKILL.md` (one-shot `POST /api/invoices`).
