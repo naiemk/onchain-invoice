@@ -42,6 +42,9 @@ write_if_missing() {
 
 write_if_missing "onchain-invoice-api.yaml"
 write_if_missing "start-onchain-invoice-api.sh"
+write_if_missing "lib-env.sh"
+write_if_missing "update-onchain-invoice-api.sh"
+write_if_missing "install-auto-update.sh"
 write_if_missing ".env.api.example"
 
 # Normalize name operators expect
@@ -59,6 +62,11 @@ else
   echo "exists (unchanged): $DEST/.env"
 fi
 
+(
+  cd "$DEST"
+  ROLE=api ./install-auto-update.sh || true
+)
+
 cat <<EOF
 
 Trustless Commerce API install complete in:
@@ -70,5 +78,6 @@ Next:
        cd $DEST && ./start-onchain-invoice-api.sh
   3. Health:
        curl -s http://localhost:8080/api/health
+  4. Auto-update (off by default): set AUTO_UPDATE=1 then ROLE=api ./install-auto-update.sh
 
 EOF

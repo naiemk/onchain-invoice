@@ -125,12 +125,27 @@ if [[ ! "$pk" =~ ^[0-9a-fA-F]{64}$ ]]; then
   exit 1
 fi
 
+ACTIVITY_LOG_PATH="${ACTIVITY_LOG_PATH:-/data/logs/activity.jsonl}"
+LOGS_DIR="${LOGS_DIR:-./logs}"
+mkdir -p "$LOGS_DIR"
+LOGS_ABS="$(cd "$LOGS_DIR" && pwd)"
+if [[ "$(id -u)" -eq 0 ]]; then
+  chown -R 1000:1000 "$LOGS_ABS" || true
+elif command -v sudo >/dev/null 2>&1; then
+  sudo chown -R 1000:1000 "$LOGS_ABS" 2>/dev/null || \
+    echo "warning: could not chown $LOGS_ABS to 1000:1000 — activity log may fail to write" >&2
+else
+  echo "warning: ensure $LOGS_ABS is writable by uid 1000 (container user node)" >&2
+fi
+chmod 755 "$LOGS_ABS" 2>/dev/null || true
+
 add_env SERVER_URL "${SERVER_URL:-}"
 add_env SWEEPER_WALLET_KEY "${SWEEPER_WALLET_KEY:-}"
 add_env SWEEPER_API_KEY "${SWEEPER_API_KEY:-}"
 add_env SWEEPER_ADDRESS "${SWEEPER_ADDRESS:-}"
 add_env SWEEPER_PRIVATE_KEY "${SWEEPER_PRIVATE_KEY:-}"
 add_env EVM_RPC_URL "${EVM_RPC_URL:-}"
+add_env ACTIVITY_LOG_PATH "$ACTIVITY_LOG_PATH"
 
 # Config lands in /tmp (image has no /config dir; docker cp avoids host bind-mounts).
 SWEEPER_CONFIG_IN_CONTAINER=/tmp/sweeper.yaml
@@ -140,6 +155,7 @@ docker create \
   --name "$NAME" \
   --restart "$RESTART" \
   "${EXTRA_HOSTS[@]}" \
+  -v "${LOGS_ABS}:/data/logs" \
   -e SWEEPER_CONFIG="$SWEEPER_CONFIG_IN_CONTAINER" \
   "${env_args[@]}" \
   "$IMAGE" >/dev/null
@@ -152,3 +168,4 @@ docker start "$NAME" >/dev/null
 
 echo "Sweeper node running as $NAME"
 echo "Logs: docker logs -f $NAME"
+echo "Activity: tail -f $LOGS_ABS/activity.jsonl"

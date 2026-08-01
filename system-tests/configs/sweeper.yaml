@@ -1,6 +1,7 @@
 serverUrl: "${SERVER_URL}"
 sweeperWalletKey: "${SWEEPER_WALLET_KEY}"
 apiKey: "${SWEEPER_API_KEY}"
+activityLogPath: "${ACTIVITY_LOG_PATH}"
 intervalMs: 2000
 maxRetries: 3
 chains:

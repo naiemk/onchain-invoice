@@ -38,6 +38,9 @@ write_if_missing() {
 }
 
 write_if_missing "start-onchain-invoice-gateway.sh"
+write_if_missing "lib-env.sh"
+write_if_missing "update-onchain-invoice-gateway.sh"
+write_if_missing "install-auto-update.sh"
 write_if_missing ".env.gateway.example"
 write_if_missing "gateway/nginx.conf"
 write_if_missing "gateway/conf.d/domains.conf"
@@ -52,6 +55,11 @@ if [[ ! -f "$DEST/.env" ]]; then
 else
   echo "exists (unchanged): $DEST/.env"
 fi
+
+(
+  cd "$DEST"
+  ROLE=gateway ./install-auto-update.sh || true
+)
 
 cat <<EOF
 
@@ -71,5 +79,6 @@ Next:
   1. Edit $DEST/.env
   2. cd $DEST && ./start-onchain-invoice-gateway.sh
   3. curl -fsS https://testnet.trustless-commerce.com/api/health
+  4. Auto-update (default ON every 5m): ROLE=gateway ./install-auto-update.sh
 
 EOF

@@ -40,6 +40,7 @@ services:
       SERVER_URL: http://api:8080
       SWEEPER_CONFIG: /tmp/sweeper.yaml
       SWEEPER_WALLET_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      ACTIVITY_LOG_PATH: /tmp/activity.jsonl
     entrypoint: ["/bin/sh", "-c"]
     # Hardcoded throwaway Hardhat #0 key (public/well-known) for system tests only.
     command:
