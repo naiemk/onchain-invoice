@@ -13,4 +13,6 @@ Non-obvious notes:
 - There is no lint or formatter npm script. Prettier + the Hardhat Solidity extension are only configured as recommended VS Code extensions.
 - `npm run sweep-node` (the `SweepNode` worker) is the only piece needing real config: a JSON config (see `node/example.config.json`) with live EVM/Tron RPC endpoints, keys, and a running web server. It is NOT exercised by the test suite and is optional for local development.
 - FastSwap product code lives in a separate sibling repo (`naiemk/fastswap`), not here. Do not add FastSwap app code to this repo.
-- Trustless Commerce API/sweeper lives in the sibling repo `trustless-commerce` (`/workspaces/trustless-commerce`). The **customer/merchant UI** for that product lives in this repo under [`ui/`](ui/) (`npm run ui`). It uses the **Commerce** contracts (`contracts/commerce/`) and `CommerceInvoiceSdk`.
+- Trustless Commerce API/sweeper lives in the sibling repo `trustless-commerce` (`/workspaces/trustless-commerce`). The **customer/merchant UI** for that product lives in this repo under [`ui/`](ui/) (`npm run ui`). Routes: `/` landing, `/create` invoice builder, `/pay` checkout, `/merchant` invoice list (admin is key-gated at `/admin`, not in nav).
+- **AI agents creating invoices:** use Cursor skill [`.cursor/skills/trustless-commerce-invoice/SKILL.md`](.cursor/skills/trustless-commerce-invoice/SKILL.md) (`POST /api/invoices` one-shot). Product docs: `docs/` (MkDocs → GitHub Pages).
+- It uses the **Commerce** contracts (`contracts/commerce/`) and `CommerceInvoiceSdk`.

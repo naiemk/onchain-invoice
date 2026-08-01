@@ -1,0 +1,10 @@
+# Trustless Commerce
+
+Crypto invoices with deterministic on-chain payment addresses. Merchants share a pay link; customers pay USDC (stablecoins only at launch); a sweeper settles to the merchant wallet.
+
+- **UI:** Vercel (`ui/` in this repo)
+- **API + sweeper:** sibling [`trustless-commerce`](https://github.com/naiemk/trustless-commerce)
+- **Docs source:** this MkDocs site
+
+!!! note "EVM launch"
+    Launch targets EVM (e.g. Sepolia / mainnet). Tron and Solana sweepers are not implemented yet.

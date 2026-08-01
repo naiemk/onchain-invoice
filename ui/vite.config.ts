@@ -3,7 +3,7 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
-  publicDir: false,
+  publicDir: fileURLToPath(new URL("./public", import.meta.url)),
   resolve: {
     alias: {
       // Browser-safe commerce helpers (avoids bundling Node SDK deps).
