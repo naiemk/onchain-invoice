@@ -13,15 +13,16 @@ docker:
 
 # Application settings (mounted as CONFIG_PATH; ${ENV} expanded at runtime from .env)
 port: 8080
-baseUrl: ${BASE_URL}
+baseUrl: "${BASE_URL}"
 db:
   path: /data/trustless-commerce.db
-adminApiKey: ${ADMIN_API_KEY}
-sweeperApiKey: ${SWEEPER_API_KEY}
+adminApiKey: "${ADMIN_API_KEY}"
+sweeperApiKey: "${SWEEPER_API_KEY}"
 evm:
-  rpcUrl: ${EVM_RPC_URL}
-  sweeperAddress: ${SWEEPER_ADDRESS}
-  forwarderImplementation: ${FORWARDER_IMPLEMENTATION}
+  rpcUrl: "${EVM_RPC_URL}"
+  # Quote 0x values — unquoted YAML 1.1 parses them as ints and corrupts addresses.
+  sweeperAddress: "${SWEEPER_ADDRESS}"
+  forwarderImplementation: "${FORWARDER_IMPLEMENTATION}"
 cors:
   origins:
     - "*"

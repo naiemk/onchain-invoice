@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { load as yamlLoad } from "js-yaml";
+import { JSON_SCHEMA, load as yamlLoad } from "js-yaml";
 
 export interface RateLimitConfig {
   /** Max invoice creates per IP per second (default 1). */
@@ -80,7 +80,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 function readYamlFile(path: string): YamlFile {
   const raw = readFileSync(path, "utf8");
   const expanded = expand(raw);
-  return (yamlLoad(expanded) as YamlFile) ?? {};
+  // JSON_SCHEMA keeps 0x… keys/addresses as strings (YAML 1.1 int parsing corrupts them).
+  return (yamlLoad(expanded, { schema: JSON_SCHEMA }) as YamlFile) ?? {};
 }
 
 /** Expand ${ENV} placeholders. */
