@@ -89,14 +89,19 @@ Prefer the wget installers on worker hosts ([`install/README.md`](install/README
 - Testnet node: `API_URL=https://testnet.trustless-commerce.com` then `./register-onchain-invoice-node.sh` + `./start-onchain-invoice-nodes.sh`
 - Mainnet node: same with `https://trustless-commerce.com` and mainnet keys/addresses
 
-## Operator install (API / nodes only)
+## Operator install (wget | bash, includes HTTPS gateway)
+
+Preferred path for a VPS: API(s) + **install-gateway** (nginx + UI + Let’s Encrypt mounts) + sweeper nodes.
 
 See [`install/README.md`](install/README.md):
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-api.sh | bash
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-gateway.sh | bash
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 ```
+
+`docker-compose.domains.yml` is an equivalent all-in-one compose alternative to the wget gateway.
 
 ## Checklist
 
