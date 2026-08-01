@@ -27,7 +27,7 @@ Tron uses a different `CREATE2` prediction prefix (`0x41`), so the Tron sweeper 
 
 ## Commerce (trustless merchant payout)
 
-For products that pay merchants directly (see sibling `trustless-commerce`), use the commerce contracts under `contracts/commerce/`:
+For products that pay merchants directly (Trustless Commerce under `commerce/` + `ui/`), use the commerce contracts under `contracts/commerce/`:
 
 - `CommerceForwarder`: invoice proxy; only the sweeper may move funds.
 - `CommerceInvoiceSweeper`: CREATE2 salt = `keccak256(abi.encodePacked(to, invoiceId))`. `sweep(token, amount, to, invoiceId)` sends `amount - fee` to `to` and the fee to the platform. A wrong `to` targets a different empty address, so the sweeper cannot redirect funds.
@@ -334,11 +334,14 @@ npm test
 npm run build
 ```
 
-Trustless Commerce UI (Vite):
+Trustless Commerce (API + UI):
 
 ```bash
-npm run ui        # http://localhost:5173 — proxies /api to :8080
-npm run ui:build  # → dist-ui/
+npm run commerce:server   # API on :8080 (see commerce/.env.example)
+npm run commerce:sweeper  # after configuring commerce/config/sweeper.example.yaml
+npm run ui                # http://localhost:5173 — proxies /api to :8080
+npm run ui:build          # → dist-ui/
+npm run docker:test       # local HTTPS compose smoke (ports 18080/18443)
 ```
 
-UI source lives under [`ui/`](ui/). The product API/sweeper remains in the sibling `trustless-commerce` repo.
+UI lives under [`ui/`](ui/); API/sweeper under [`commerce/`](commerce/); Docker under [`deploy/`](deploy/).

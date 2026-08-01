@@ -25,15 +25,23 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && npm run sweep-node:build",
+    "build": "tsc && npm run sweep-node:build && npm run commerce:build",
     "compile": "hardhat compile",
     "test": "hardhat test test/*.ts",
     "test:contracts": "hardhat test",
     "clean": "hardhat clean",
     "sweep-node:build": "tsc -p node/tsconfig.json",
     "sweep-node": "node node-dist/node/index.js",
+    "commerce:build": "tsc -p commerce/tsconfig.json",
+    "commerce:server": "node commerce-dist/server/index.js",
+    "commerce:sweeper": "node commerce-dist/sweeper/index.js",
     "ui": "vite --config ui/vite.config.ts",
-    "ui:build": "vite build --config ui/vite.config.ts"
+    "ui:build": "vite build --config ui/vite.config.ts",
+    "docker:certs": "bash deploy/gen-dev-certs.sh",
+    "docker:up": "bash deploy/gen-dev-certs.sh && docker compose -f deploy/docker-compose.yml up --build -d",
+    "docker:smoke": "bash deploy/smoke-test.sh",
+    "docker:down": "docker compose -f deploy/docker-compose.yml down -v",
+    "docker:test": "npm run docker:up && sleep 8 && npm run docker:smoke && npm run docker:down"
   },
   "repository": {
     "type": "git",
@@ -55,7 +63,7 @@
     "@types/node": "^25.6.0",
     "@types/qrcode": "^1.5.6",
     "chai": "^6.2.2",
-    "dotenv": "^17.4.2",
+    "@types/js-yaml": "^4.0.9",
     "hardhat": "^3.4.3",
     "playwright-core": "^1.52.0",
     "ts-node": "^10.9.2",
@@ -66,7 +74,10 @@
     "@openzeppelin/contracts": "^5.6.1",
     "@openzeppelin/contracts-upgradeable": "^5.6.1",
     "better-sqlite3": "^12.9.0",
+    "dotenv": "^17.4.2",
     "ethers": "^6.16.0",
+    "js-yaml": "^5.2.3",
+    "onchain-invoice": "file:.",
     "qrcode": "^1.5.4",
     "tronweb": "^6.3.0",
     "yaml": "^2.9.0"

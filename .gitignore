@@ -148,12 +148,15 @@ vite.config.ts.timestamp-*
 artifacts/
 cache/
 
-# Sweep node
+# Sweep node / commerce API
 node-dist/
+commerce-dist/
 app-dist/
 demo-dist/
 docker-dist/
 lm-dist/
+trustless-commerce.db
+commerce/sweeper/config.local.json
 
 # Docker runtime configs (copy from *.example.*)
 docker/config/api.yaml

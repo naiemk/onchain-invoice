@@ -1,6 +1,10 @@
+import "dotenv/config";
 import { defineConfig } from "hardhat/config";
 import hardhatEthers from "@nomicfoundation/hardhat-ethers";
 import hardhatMocha from "@nomicfoundation/hardhat-mocha";
+
+const sepoliaRpcUrl = process.env.SEPOLIA_RPC_URL?.trim();
+const evmPrivateKey = process.env.EVM_PRIVATE_KEY?.trim();
 
 export default defineConfig({
   plugins: [hardhatEthers, hardhatMocha],
@@ -16,6 +20,14 @@ export default defineConfig({
           viaIR: true,
         },
       },
+    },
+  },
+  networks: {
+    sepolia: {
+      type: "http",
+      chainType: "l1",
+      url: sepoliaRpcUrl || "https://rpc.sepolia.org",
+      accounts: evmPrivateKey ? [evmPrivateKey] : [],
     },
   },
 });

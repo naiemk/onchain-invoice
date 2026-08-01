@@ -1,0 +1,24 @@
+{
+  "serverUrl": "http://localhost:8080",
+  "apiKey": "change-me-sweeper",
+  "intervalMs": 15000,
+  "chains": [
+    {
+      "chainId": 11155111,
+      "rpcUrl": "https://sepolia.infura.io/v3/your-key",
+      "sweeperAddress": "0x0000000000000000000000000000000000000000",
+      "privateKey": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "tokens": [
+        {
+          "symbol": "USDC",
+          "address": "0x0000000000000000000000000000000000000000",
+          "decimals": 6
+        }
+      ]
+    }
+  ],
+  "tron": {
+    "enabled": false,
+    "note": "Tron sweeps are intentionally deferred for the typical sweep-later flow."
+  }
+}

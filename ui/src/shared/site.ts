@@ -2,7 +2,7 @@
 export const SITE = {
   docsUrl: "https://naiemk.github.io/onchain-invoice/",
   githubUrl: "https://github.com/naiemk/onchain-invoice",
-  githubCommerceUrl: "https://github.com/naiemk/trustless-commerce",
+  githubCommerceUrl: "https://github.com/naiemk/onchain-invoice/tree/main/commerce",
   telegramChannel: "https://t.me/trustlesscommerce",
   telegramSupport: "https://t.me/trustlesscommerce_support",
 } as const;

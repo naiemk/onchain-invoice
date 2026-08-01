@@ -1,7 +1,9 @@
 node_modules
 dist
+dist-ui
 docker-dist
 node-dist
+commerce-dist
 app-dist
 demo-dist
 lm-dist
@@ -12,6 +14,9 @@ cache
 *.sqlite
 *.sqlite-*
 liquidity-manager.db
+trustless-commerce.db
+deploy/certs
+commerce/sweeper/config.local.json
 fastSwapDemo/state
 LiquidityManager/bot/config/*.json
 !LiquidityManager/bot/config/example.config.json

@@ -11,6 +11,17 @@
 	"mounts": [
 		"source=${localWorkspaceFolder}/../fastswap,target=/workspaces/fastswap,type=bind"
 	],
+	"forwardPorts": [5173, 8080],
+	"portsAttributes": {
+		"5173": {
+			"label": "Trustless Commerce UI",
+			"onAutoForward": "notify"
+		},
+		"8080": {
+			"label": "Trustless Commerce API",
+			"onAutoForward": "silent"
+		}
+	},
 	"features": {
 		"ghcr.io/devcontainers/features/python:1": {},
 		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
