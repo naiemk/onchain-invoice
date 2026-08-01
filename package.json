@@ -42,7 +42,11 @@
     "docker:smoke": "bash deploy/smoke-test.sh",
     "docker:down": "docker compose -f deploy/docker-compose.yml down -v",
     "docker:test": "npm run docker:up && sleep 8 && npm run docker:smoke && npm run docker:down",
-    "system-test": "bash system-tests/scripts/run.sh"
+    "docker:domains:pull": "docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains pull",
+    "docker:domains:up": "docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains up -d",
+    "docker:domains:down": "docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains down",
+    "system-test": "bash system-tests/scripts/run.sh",
+    "system-test:install": "bash system-tests/scripts/run-install-e2e.sh"
   },
   "repository": {
     "type": "git",

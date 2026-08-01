@@ -7,9 +7,10 @@ docker:
   name: onchain-invoice-node
   restart: unless-stopped
 
-# Worker settings (this file is mounted as SWEEPER_CONFIG)
-serverUrl: http://host.docker.internal:8080
-# Wallet that signs sweeper API requests (register via POST /api/admin/sweepers)
+# Worker settings (this file is mounted as SWEEPER_CONFIG; ${ENV} from .env)
+# Prefer https://testnet.trustless-commerce.com (or your API). host.docker.internal:8080 only if API publishes 8080 on this host.
+serverUrl: ${SERVER_URL}
+# Wallet that signs sweeper API requests (./register-onchain-invoice-node.sh)
 sweeperWalletKey: ${SWEEPER_WALLET_KEY}
 # Optional legacy shared key
 apiKey: ${SWEEPER_API_KEY}

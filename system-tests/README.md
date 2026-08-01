@@ -17,6 +17,14 @@ cp system-tests/.env.example system-tests/.env   # first time
 npm run system-test
 ```
 
+`npm run system-test` runs the compose suite (API + sweeper + UI), tears it down, then the **wget installer e2e** (install-api / install-nodes → start scripts → health / invoice / sweeper auth).
+
+Installer e2e only:
+
+```bash
+npm run system-test:install
+```
+
 Override image tag:
 
 ```bash
@@ -38,8 +46,9 @@ PULL=0 IMAGE_TAG=system-test-local npm run system-test
 | `configs/*.yaml` | Example API/sweeper YAML (operator shape; suite is env-driven) |
 | `.env.example` | Keys + throwaway Hardhat #0 sweeper wallet |
 | `tests/*.sh` | Assertions via `docker compose exec` |
+| `scripts/run-install-e2e.sh` | wget\|bash installer path for API + sweeper |
 
-Host ports: **18080** / **18443**. Tests prefer in-network checks.
+Host ports: **18080** / **18443** (compose). Installer e2e publishes API on **8080**. Tests prefer in-container checks.
 
 ## Operator install (wget \| bash)
 
@@ -48,4 +57,4 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/i
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 ```
 
-Creates `onchain-invoice-api.yaml` / `onchain-invoice-nodes.yaml` (if missing) and `./start-onchain-invoice-*.sh`. See [`deploy/install/README.md`](../deploy/install/README.md).
+Creates YAML, start scripts, `.env` / `.env.example`, and (nodes) `register-onchain-invoice-node.sh`. See [`deploy/install/README.md`](../deploy/install/README.md). Covered by `npm run system-test:install`.

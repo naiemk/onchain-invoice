@@ -1,0 +1,19 @@
+# Shared API config shape for domain compose (secrets come from container env).
+port: 8080
+baseUrl: ${BASE_URL}
+db:
+  path: /data/trustless-commerce.db
+adminApiKey: ${ADMIN_API_KEY}
+sweeperApiKey: ${SWEEPER_API_KEY}
+evm:
+  rpcUrl: ${EVM_RPC_URL}
+  sweeperAddress: ${SWEEPER_ADDRESS}
+  forwarderImplementation: ${FORWARDER_IMPLEMENTATION}
+cors:
+  origins:
+    - "*"
+rateLimit:
+  createPerSecond: 1
+  publicPerIpPerSecond: 20
+  sweeperPerIpPerSecond: 50
+claimLeaseMs: 180000
