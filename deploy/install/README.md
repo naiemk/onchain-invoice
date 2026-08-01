@@ -97,16 +97,49 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/i
 ./start-onchain-invoice-gateway.sh
 ```
 
+## Auto-update (optional per role)
+
+Host cron pulls GHCR images and recreates containers only when the image digest changed. Sweeper updates use `docker stop -t` so an in-flight sweep can finish before recreate.
+
+| Role | Script | Default `AUTO_UPDATE` | Interval |
+|------|--------|------------------------|----------|
+| Gateway (UI + nginx) | `update-onchain-invoice-gateway.sh` | **on** | 5 min |
+| Sweeper nodes | `update-onchain-invoice-nodes.sh` | **on** in testnet `.env` example; use `0` for mainnet | 15 min |
+| API | `update-onchain-invoice-api.sh` | **off** | 15 min |
+
+```bash
+# After editing AUTO_UPDATE / AUTO_UPDATE_INTERVAL_MIN in .env:
+cd ~/tc/gateway && ROLE=gateway ./install-auto-update.sh
+cd ~/tc/sweeper && ROLE=nodes ./install-auto-update.sh
+cd ~/tc/api-testnet && ROLE=api ./install-auto-update.sh   # only if AUTO_UPDATE=1
+
+# Host log:
+tail -f ~/tc/gateway/logs/auto-update.log
+```
+
+Installers download the update scripts and refresh cron when `AUTO_UPDATE=1`.
+
+## Sweeper activity log
+
+Paid invoices, sweep txs, and failures are appended as JSONL on the host:
+
+```bash
+tail -f ~/tc/sweeper/logs/activity.jsonl
+```
+
+Stages: `invoice-paid`, `sweep-submitted`, `sweep-confirmed`, `sweep-failed`, `tick-failed`.
+
 ## Notes
 
 - Existing config/start/`.env` files are **not** overwritten.
-- Prefer editing **`.env`**. Start scripts load `.env` for unset variables only (shell exports win).
+- Prefer editing **`.env`**. Start scripts load `.env` when variables are unset **or empty** (non-empty shell exports win).
 - Empty env vars are **not** passed as `docker -e KEY=` (so they cannot wipe config).
+- Quote `0x…` values in YAML (installer templates already do) — unquoted YAML 1.1 corrupts private keys.
 - For HTTPS, API containers must be named `testnet-api` / `mainnet-api` on `DOCKER_NETWORK=trustless-commerce-edge` (set via `.env`).
 - Certs live on the host under `/etc/letsencrypt` (never committed). Gateway mounts them read-only.
 - Linux: start-nodes adds `host.docker.internal`. Prefer `SERVER_URL=https://testnet.trustless-commerce.com` once the gateway is up.
 - `INSTALL_DIR=/opt/tc bash install-api.sh` installs into another directory.
 - Branch/dev: `ONCHAIN_INVOICE_RAW=https://raw.githubusercontent.com/naiemk/onchain-invoice/<ref>/deploy/install`
 - Skip pull: `ONCHAIN_INVOICE_SKIP_PULL=1` or `PULL=0`
-- API data dir is chown'd to uid `1000` (`node` in the image).
+- API data dir and sweeper `./logs` are chown'd to uid `1000` (`node` in the image).
 - Alternative all-in-one compose (no wget): [`../docker-compose.domains.yml`](../docker-compose.domains.yml).

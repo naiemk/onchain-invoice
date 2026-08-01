@@ -4,6 +4,7 @@ serverUrl: "${SERVER_URL}"
 sweeperWalletKey: "${SWEEPER_WALLET_KEY}"
 # Optional legacy shared key during migration
 apiKey: "${SWEEPER_API_KEY}"
+activityLogPath: "${ACTIVITY_LOG_PATH}"
 intervalMs: 15000
 maxRetries: 5
 chains:

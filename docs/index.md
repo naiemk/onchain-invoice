@@ -8,3 +8,5 @@ Crypto invoices with deterministic on-chain payment addresses. Merchants share a
 
 !!! note "EVM launch"
     Launch targets EVM (e.g. Sepolia / mainnet). Tron and Solana sweepers are not implemented yet.
+
+Product sequence (Base/Tron/Solana testnets → mainnet → ops → agent docs → audit): [ROADMAP.md](https://github.com/naiemk/onchain-invoice/blob/main/ROADMAP.md).

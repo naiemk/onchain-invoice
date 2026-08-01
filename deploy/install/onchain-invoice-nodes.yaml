@@ -15,6 +15,8 @@ serverUrl: "${SERVER_URL}"
 sweeperWalletKey: "${SWEEPER_WALLET_KEY}"
 # Optional legacy shared key
 apiKey: "${SWEEPER_API_KEY}"
+# Host bind-mount ./logs → /data/logs (see start-onchain-invoice-nodes.sh)
+activityLogPath: "${ACTIVITY_LOG_PATH}"
 intervalMs: 15000
 maxRetries: 5
 chains:

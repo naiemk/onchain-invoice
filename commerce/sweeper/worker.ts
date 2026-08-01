@@ -3,6 +3,7 @@ import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import { CommerceInvoiceSdk, COMMERCE_ERC20_ABI, COMMERCE_NATIVE_TOKEN } from "onchain-invoice";
 import type { InvoiceRecord } from "../shared/types.js";
 import { signSweeperRequest } from "../server/sweeper-auth.js";
+import { ActivityLog } from "./activity-log.js";
 import { load as loadYaml } from "./config-loader.js";
 
 export interface SweeperConfig {
@@ -13,6 +14,8 @@ export interface SweeperConfig {
   /** Private key of the registered sweeper wallet (signs API requests). */
   sweeperWalletKey?: string;
   maxRetries?: number;
+  /** Host-persisted JSONL activity log path (bind-mount on VPS). */
+  activityLogPath?: string;
   chains: EvmChainConfig[];
   tron?: {
     enabled: boolean;
@@ -40,7 +43,9 @@ const ERC20_ABI = ["function balanceOf(address account) view returns (uint256)"]
 
 export class SweeperWorker {
   private stopped = false;
+  private tickInFlight: Promise<void> | null = null;
   private wallet: Wallet | null = null;
+  private readonly activity: ActivityLog | null;
 
   constructor(private readonly config: SweeperConfig) {
     if (config.sweeperWalletKey) {
@@ -48,6 +53,8 @@ export class SweeperWorker {
     } else if (config.chains[0]?.privateKey) {
       this.wallet = new Wallet(config.chains[0].privateKey);
     }
+    const logPath = config.activityLogPath?.trim();
+    this.activity = logPath ? new ActivityLog(logPath) : null;
   }
 
   async start(): Promise<void> {
@@ -58,13 +65,28 @@ export class SweeperWorker {
       console.warn(JSON.stringify({ level: "warn", msg: "Solana sweeper not implemented; skipping", note: this.config.solana.note }));
     }
     while (!this.stopped) {
-      await this.tick().catch((error) => {
+      this.tickInFlight = this.tick().catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
         console.error("sweeper tick failed", error);
+        this.activity?.append("tick-failed", { payload: { error: message } });
       });
+      await this.tickInFlight;
+      this.tickInFlight = null;
+      if (this.stopped) break;
       await sleep(this.config.intervalMs ?? 15_000);
     }
   }
 
+  /** Request stop and wait for the in-flight tick (claim/sweep) to finish. */
+  async stopAndWait(): Promise<void> {
+    this.stopped = true;
+    if (this.tickInFlight) {
+      await this.tickInFlight;
+      this.tickInFlight = null;
+    }
+  }
+
+  /** @deprecated Prefer stopAndWait for graceful Docker stop. */
   stop(): void {
     this.stopped = true;
   }
@@ -77,14 +99,31 @@ export class SweeperWorker {
       try {
         const prepared = await this.prepareInvoice(invoice);
         if (!prepared) continue;
+        this.activity?.append("invoice-paid", {
+          invoiceId: invoice.id,
+          chainId: String(invoice.chainId),
+          invoiceAddress: invoice.invoiceAddress ?? undefined,
+          payload: {
+            token: prepared.token ?? COMMERCE_NATIVE_TOKEN,
+            amount: prepared.balance.toString(),
+            status: invoice.status,
+          },
+        });
         const key = String(prepared.chain.chainId);
         const list = readyByChain.get(key) ?? [];
         list.push({ invoice, token: prepared.token, balance: prepared.balance });
         readyByChain.set(key, list);
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.activity?.append("sweep-failed", {
+          invoiceId: invoice.id,
+          chainId: invoice.chainId ? String(invoice.chainId) : undefined,
+          invoiceAddress: invoice.invoiceAddress ?? undefined,
+          payload: { error: message, stage: "prepare" },
+        });
         await this.trackWithRetry({
           invoiceId: invoice.id,
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
           expectedVersion: invoice.version,
         });
       }
@@ -95,23 +134,42 @@ export class SweeperWorker {
       if (!chain || batch.length === 0) continue;
 
       for (const item of batch) {
-        const claimed = await this.claimWithRetry(item.invoice);
-        if (!claimed) continue;
-        const afterPaid = await this.trackWithRetry({
-          invoiceId: item.invoice.id,
-          status: item.invoice.allowPartial ? "paid_partial" : "paid",
-          amountPaid: item.balance.toString(),
-          expectedVersion: claimed.version,
-          payload: { observedBalance: item.balance.toString(), token: item.token ?? COMMERCE_NATIVE_TOKEN },
-        });
-        const provider = new JsonRpcProvider(chain.rpcUrl);
-        const signer = new Wallet(chain.privateKey, provider);
-        const sdk = new CommerceInvoiceSdk({
-          provider,
-          signer,
-          sweeperAddress: chain.sweeperAddress,
-        });
-        await this.sweepOne(sdk, item.invoice, item.token, item.balance, afterPaid?.version ?? claimed.version + 1);
+        try {
+          const claimed = await this.claimWithRetry(item.invoice);
+          if (!claimed) continue;
+          const afterPaid = await this.trackWithRetry({
+            invoiceId: item.invoice.id,
+            status: item.invoice.allowPartial ? "paid_partial" : "paid",
+            amountPaid: item.balance.toString(),
+            expectedVersion: claimed.version,
+            payload: { observedBalance: item.balance.toString(), token: item.token ?? COMMERCE_NATIVE_TOKEN },
+          });
+          const provider = new JsonRpcProvider(chain.rpcUrl);
+          const signer = new Wallet(chain.privateKey, provider);
+          const sdk = new CommerceInvoiceSdk({
+            provider,
+            signer,
+            sweeperAddress: chain.sweeperAddress,
+          });
+          await this.sweepOne(sdk, item.invoice, item.token, item.balance, afterPaid?.version ?? claimed.version + 1);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.activity?.append("sweep-failed", {
+            invoiceId: item.invoice.id,
+            chainId,
+            invoiceAddress: item.invoice.invoiceAddress ?? undefined,
+            payload: {
+              error: message,
+              token: item.token ?? COMMERCE_NATIVE_TOKEN,
+              amount: item.balance.toString(),
+            },
+          });
+          await this.trackWithRetry({
+            invoiceId: item.invoice.id,
+            error: message,
+            expectedVersion: item.invoice.version,
+          }).catch(() => undefined);
+        }
       }
     }
   }
@@ -144,6 +202,18 @@ export class SweeperWorker {
       to: invoice.selectedTo!,
       invoiceId: invoice.id,
     });
+    this.activity?.append("sweep-submitted", {
+      invoiceId: invoice.id,
+      chainId: invoice.chainId ? String(invoice.chainId) : undefined,
+      invoiceAddress: invoice.invoiceAddress ?? undefined,
+      txHash: result.tx.hash,
+      payload: {
+        token: token ?? COMMERCE_NATIVE_TOKEN,
+        amount: balance.toString(),
+        to: invoice.selectedTo,
+      },
+    });
+
     const receipt = await result.tx.wait();
     const gasPrice = (receipt as { gasPrice?: bigint } | null)?.gasPrice ?? 0n;
     const gasSpentWei = receipt ? (receipt.gasUsed * gasPrice).toString() : "0";
@@ -158,6 +228,20 @@ export class SweeperWorker {
       sweepTx: result.tx.hash,
       expectedVersion,
       payload: { token: result.token, to: result.to },
+    });
+
+    this.activity?.append("sweep-confirmed", {
+      invoiceId: invoice.id,
+      chainId: invoice.chainId ? String(invoice.chainId) : undefined,
+      invoiceAddress: invoice.invoiceAddress ?? undefined,
+      txHash: result.tx.hash,
+      payload: {
+        token: result.token,
+        amountSwept: result.amount.toString(),
+        feeCollected: result.fee.toString(),
+        gasSpentWei,
+        to: result.to,
+      },
     });
   }
 
@@ -262,10 +346,19 @@ export class SweeperWorker {
 }
 
 export async function loadSweeperConfig(path: string): Promise<SweeperConfig> {
+  let config: SweeperConfig;
   if (path.endsWith(".yaml") || path.endsWith(".yml")) {
-    return (await loadYaml(path)) as unknown as SweeperConfig;
+    config = (await loadYaml(path)) as unknown as SweeperConfig;
+  } else {
+    config = JSON.parse(await readFile(path, "utf8")) as SweeperConfig;
   }
-  return JSON.parse(await readFile(path, "utf8")) as SweeperConfig;
+  const fromEnv = process.env.ACTIVITY_LOG_PATH?.trim();
+  if (fromEnv) {
+    config.activityLogPath = fromEnv;
+  } else if (!config.activityLogPath?.trim()) {
+    config.activityLogPath = "/data/logs/activity.jsonl";
+  }
+  return config;
 }
 
 function resolveToken(chain: EvmChainConfig, token: string | null): string | null {

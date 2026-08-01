@@ -43,6 +43,9 @@ write_if_missing() {
 write_if_missing "onchain-invoice-nodes.yaml"
 write_if_missing "start-onchain-invoice-nodes.sh"
 write_if_missing "register-onchain-invoice-node.sh"
+write_if_missing "lib-env.sh"
+write_if_missing "update-onchain-invoice-nodes.sh"
+write_if_missing "install-auto-update.sh"
 write_if_missing ".env.nodes.example"
 
 if [[ ! -f "$DEST/.env.example" ]]; then
@@ -59,6 +62,11 @@ else
   echo "exists (unchanged): $DEST/.env"
 fi
 
+(
+  cd "$DEST"
+  ROLE=nodes ./install-auto-update.sh || true
+)
+
 cat <<EOF
 
 Trustless Commerce sweeper node install complete in:
@@ -72,5 +80,7 @@ Next:
        cd $DEST && ./start-onchain-invoice-nodes.sh
   4. Logs:
        docker logs -f onchain-invoice-node
+       tail -f $DEST/logs/activity.jsonl
+  5. Auto-update (testnet default ON): ROLE=nodes ./install-auto-update.sh
 
 EOF
