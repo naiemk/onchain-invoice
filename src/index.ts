@@ -54,17 +54,23 @@ export {
   isTronAccountActivated,
 } from "./tron-eoa.js";
 export {
+  delegateBandwidthToInvoice,
   delegateEnergyToInvoice,
   ensureEnergyForBatch,
   ensureInvoiceTrxForSweep,
   isNativeTronToken,
+  prepareInvoiceResourcesForSweep,
   readTronAccountResources,
+  releaseInvoiceResourcesAfterSweep,
   sponsorBase58,
   sponsorTronWeb,
   sweepTrc20FromInvoice,
   sweepTrxFromInvoice,
   transferTrc20FromNodeWallet,
   transferTrxFromNodeWallet,
+  undelegateBandwidthFromInvoice,
+  undelegateEnergyFromInvoice,
+  type TronDelegatedResources,
   type TronEnergyMode,
   type TronSponsorConfig,
 } from "./tron-sponsor.js";

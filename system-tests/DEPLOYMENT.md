@@ -159,7 +159,7 @@ Important `.env` keys:
 | `TRON_FULL_HOST` | `https://nile.trongrid.io` |
 | `TRON_INVOICE_MASTER_SECRET` | Same secret as API (EOA derivation) |
 | `TRON_USDT_ADDRESS` | Nile USDT (default in template; verify on Tronscan if unsure) |
-| `TRON_SPONSOR_PRIVATE_KEY` | Sponsor for energy/TRX + sweeps (hex) |
+| `TRON_SPONSOR_PRIVATE_KEY` | Sponsor with **staked** TRX; delegates ENERGY + BANDWIDTH (no TRX sent to invoice EOAs) |
 | `ACTIVITY_LOG_PATH` | Single-container fallback; compose uses `activity-evm.jsonl` / `activity-tron.jsonl` |
 | `NODES_AUTO_UPDATE` | Default `1` on testnet template |
 

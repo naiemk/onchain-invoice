@@ -5,8 +5,9 @@ import {
   COMMERCE_ERC20_ABI,
   COMMERCE_NATIVE_TOKEN,
   deriveTronInvoiceAddress,
-  ensureInvoiceTrxForSweep,
+  prepareInvoiceResourcesForSweep,
   readTronTokenBalance,
+  releaseInvoiceResourcesAfterSweep,
   sweepTrc20FromInvoice,
   tronNumericChainId,
   type TronSponsorConfig,
@@ -61,13 +62,20 @@ export interface TronSweeperConfig {
   chainId?: string;
   fullHost?: string;
   invoiceMasterSecret?: string;
-  /** Sponsor / sweep key (energy + TRX top-up). Defaults to first EVM privateKey / sweeper wallet. */
+  /** Sponsor / sweep key (energy + bandwidth delegation). Defaults to first EVM privateKey / sweeper wallet. */
   privateKey?: string;
   sponsorPrivateKey?: string;
   usdtAddress?: string;
   feeLimit?: number;
+  /**
+   * `staked` (default): delegate ENERGY + BANDWIDTH — invoice keeps 0 TRX.
+   * `burn`: top up liquid TRX on the invoice (legacy).
+   */
   energyMode?: "staked" | "burn" | "rent";
+  /** Sun of staked TRX to delegate as ENERGY. */
   minDelegateEnergy?: number;
+  /** Sun of staked TRX to delegate as BANDWIDTH. */
+  minDelegateBandwidth?: number;
   tokens?: Array<{
     symbol: string;
     address: string;
@@ -404,21 +412,28 @@ export class SweeperWorker {
       fullHost,
       sponsorPrivateKey: sponsorKey,
       feeLimit: tron.feeLimit,
-      energyMode: tron.energyMode,
+      energyMode: tron.energyMode ?? "staked",
       minDelegateEnergy: tron.minDelegateEnergy,
+      minDelegateBandwidth: tron.minDelegateBandwidth,
     };
 
-    await ensureInvoiceTrxForSweep(sponsorConfig, invoice.invoiceAddress!);
+    // Default: delegate ENERGY + BANDWIDTH so the invoice EOA never receives liquid TRX.
+    const delegated = await prepareInvoiceResourcesForSweep(sponsorConfig, invoice.invoiceAddress!);
 
-    const result = await sweepTrc20FromInvoice(
-      sponsorConfig,
-      tron.invoiceMasterSecret!,
-      numericId,
-      invoice.id,
-      invoice.invoiceAddress!,
-      token,
-      merchant
-    );
+    let result: { txId: string; amount: bigint; token: string };
+    try {
+      result = await sweepTrc20FromInvoice(
+        sponsorConfig,
+        tron.invoiceMasterSecret!,
+        numericId,
+        invoice.id,
+        invoice.invoiceAddress!,
+        token,
+        merchant
+      );
+    } finally {
+      await releaseInvoiceResourcesAfterSweep(sponsorConfig, invoice.invoiceAddress!, delegated);
+    }
 
     this.activity?.append("sweep-submitted", {
       invoiceId: invoice.id,
@@ -429,6 +444,9 @@ export class SweeperWorker {
         token: result.token,
         amount: result.amount.toString(),
         to: merchant,
+        resourceMode: "mode" in delegated ? "burn" : "delegate",
+        energyTxId: "energyTxId" in delegated ? delegated.energyTxId : undefined,
+        bandwidthTxId: "bandwidthTxId" in delegated ? delegated.bandwidthTxId : undefined,
       },
     });
 

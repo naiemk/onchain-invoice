@@ -80,6 +80,8 @@ export type TronChainConfig = BaseChainConfig & {
   energyMode?: TronEnergyMode;
   energyRentProvider?: string;
   minDelegateEnergy?: number;
+  /** Sun of staked TRX to delegate as BANDWIDTH (Stake 2.0). */
+  minDelegateBandwidth?: number;
   tokens?: TronTokenHint[];
 };
 
