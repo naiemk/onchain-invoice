@@ -40,10 +40,14 @@ export function setTheme(theme: Theme): void {
 }
 
 export function toggleTheme(): Theme {
-  const next: Theme = (document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  const next: Theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   setTheme(next);
   return next;
 }
+
+const ICON_SUN = `<svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.75"/><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" d="M12 3v1.5M12 19.5V21M3 12h1.5M19.5 12H21M5.64 5.64l1.06 1.06M17.3 17.3l1.06 1.06M5.64 18.36l1.06-1.06M17.3 6.7l1.06-1.06"/></svg>`;
+
+const ICON_MOON = `<svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M20 14.5A7.5 7.5 0 0 1 9.5 4 7.5 7.5 0 1 0 20 14.5z"/></svg>`;
 
 export function initThemeToggle(button: HTMLButtonElement | null): void {
   if (!button) return;
@@ -51,8 +55,9 @@ export function initThemeToggle(button: HTMLButtonElement | null): void {
     const dark = document.documentElement.dataset.theme === "dark";
     button.setAttribute("aria-pressed", dark ? "true" : "false");
     button.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
-    button.title = dark ? "Light theme" : "Dark theme";
-    button.textContent = dark ? "Light" : "Dark";
+    button.title = dark ? "Switch to light theme" : "Switch to dark theme";
+    // Light mode → moon (go dark); dark mode → sun (go light)
+    button.innerHTML = dark ? ICON_SUN : ICON_MOON;
   };
   syncLabel();
   button.addEventListener("click", () => {

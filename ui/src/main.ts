@@ -95,7 +95,7 @@ function shell(pathname: string): string {
         ${link("/create", "Create invoice")}
         ${link("/merchant", "Merchant")}
         <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">Docs</a>
-        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false">Dark</button>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="Switch theme"></button>
       </nav>
     </header>
     <main id="outlet"></main>
