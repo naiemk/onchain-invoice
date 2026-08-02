@@ -44,6 +44,8 @@ const DEFAULT_MIN_DELEGATE_BANDWIDTH = 1_500_000; // 1.5 TRX stake → bandwidth
 const DEFAULT_FEE_LIMIT = 150_000_000;
 /** Liquid TRX on invoice EOA for burn-mode TRC20 sweeps (energy paid from invoice balance). */
 const MIN_INVOICE_TRX_SUN = 5_000_000;
+/** One-time account activation (TVM); not used as energy when `energyMode` is `staked`. */
+const ACCOUNT_ACTIVATION_TRX_SUN = 1_000_000n;
 
 export function sponsorTronWeb(config: TronSponsorConfig): TronWeb {
   return new TronWeb({
@@ -162,10 +164,13 @@ export async function undelegateBandwidthFromInvoice(
 }
 
 /**
- * Prefer delegation so the invoice EOA never needs liquid TRX.
- * - `staked` (default): delegate ENERGY + BANDWIDTH from sponsor stake
+ * Prefer delegation so the invoice EOA does not burn liquid TRX for energy/bandwidth.
+ * - `staked` (default): activate account if needed (1 TRX once), then delegate ENERGY + BANDWIDTH
  * - `burn`: send liquid TRX to the invoice for fee burn (legacy)
  * - `rent`: placeholder; falls through to delegation attempt
+ *
+ * Note: Tron cannot `delegateResource` to an account that does not exist yet. Activation TRX
+ * is a TVM requirement and is separate from paying for energy (which comes from stake).
  */
 export async function prepareInvoiceResourcesForSweep(
   config: TronSponsorConfig,
@@ -177,11 +182,35 @@ export async function prepareInvoiceResourcesForSweep(
     return { mode: "burn" };
   }
 
+  await ensureInvoiceAccountActivated(config, invoiceAddress);
+
   const energyAmount = config.minDelegateEnergy ?? DEFAULT_MIN_DELEGATE_ENERGY;
   const bandwidthAmount = config.minDelegateBandwidth ?? DEFAULT_MIN_DELEGATE_BANDWIDTH;
   const energyTxId = await delegateEnergyToInvoice(config, invoiceAddress, energyAmount);
   const bandwidthTxId = await delegateBandwidthToInvoice(config, invoiceAddress, bandwidthAmount);
   return { energyTxId, bandwidthTxId, energyAmount, bandwidthAmount };
+}
+
+/** Create the invoice account on-chain if missing (required before DelegateResource). */
+export async function ensureInvoiceAccountActivated(
+  config: TronSponsorConfig,
+  invoiceAddress: string
+): Promise<string | undefined> {
+  const tronWeb = sponsorTronWeb(config);
+  const sponsor = sponsorBase58(tronWeb);
+  if (invoiceAddress === sponsor) return undefined;
+
+  try {
+    const account = await tronWeb.trx.getAccount(invoiceAddress);
+    if (account?.address) return undefined;
+  } catch {
+    // treat as missing
+  }
+
+  const txId = await transferTrxFromNodeWallet(config, invoiceAddress, ACCOUNT_ACTIVATION_TRX_SUN);
+  // Account index can lag briefly after create.
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+  return txId;
 }
 
 /** Best-effort reclaim after a successful sweep (delegation mode only). */

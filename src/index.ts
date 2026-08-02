@@ -70,6 +70,7 @@ export {
   transferTrxFromNodeWallet,
   undelegateBandwidthFromInvoice,
   undelegateEnergyFromInvoice,
+  ensureInvoiceAccountActivated,
   type TronDelegatedResources,
   type TronEnergyMode,
   type TronSponsorConfig,
