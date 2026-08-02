@@ -5,6 +5,7 @@ import { renderHome } from "./pages/home.js";
 import { renderMerchant } from "./pages/merchant.js";
 import { renderPay } from "./pages/pay.js";
 import { SITE } from "./shared/site.js";
+import { applyTheme, initThemeToggle, preferredTheme } from "./shared/theme.js";
 
 export type PageRenderer = (root: HTMLElement) => void | Promise<void>;
 
@@ -39,6 +40,8 @@ const pageMeta: Record<string, { title: string; description: string }> = {
   },
 };
 
+applyTheme(preferredTheme());
+
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app");
 const appRoot = app;
@@ -64,6 +67,7 @@ async function render(): Promise<void> {
   appRoot.innerHTML = shell(pathname);
   const outlet = appRoot.querySelector<HTMLElement>("#outlet");
   if (!outlet) throw new Error("Missing outlet");
+  initThemeToggle(appRoot.querySelector<HTMLButtonElement>("#theme-toggle"));
   await route(outlet);
 }
 
@@ -91,6 +95,7 @@ function shell(pathname: string): string {
         ${link("/create", "Create invoice")}
         ${link("/merchant", "Merchant")}
         <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">Docs</a>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false">Dark</button>
       </nav>
     </header>
     <main id="outlet"></main>
