@@ -40,31 +40,69 @@ write_if_missing() {
   echo "created: $path"
 }
 
+write_template() {
+  local name="$1"
+  local path="$DEST/$name"
+  echo "refreshing $name ..."
+  fetch_or_fail "$RAW_BASE/$name" "$path"
+  echo "updated: $path"
+}
+
+append_missing_env_keys() {
+  local example="$1"
+  local envfile="$2"
+  shift 2
+  [[ -f "$example" && -f "$envfile" ]] || return 0
+  local key line added=0
+  local legacy_off=0
+  if grep -qiE "^[[:space:]]*AUTO_UPDATE=(0|false|off)\b" "$envfile"; then
+    legacy_off=1
+  fi
+  for key in "$@"; do
+    if grep -qE "^[[:space:]]*${key}=" "$envfile"; then
+      continue
+    fi
+    line="$(grep -E "^[[:space:]]*${key}=" "$example" | head -1 || true)"
+    [[ -n "$line" ]] || continue
+    # Preserve legacy AUTO_UPDATE=0 when introducing role-specific flags.
+    if [[ "$legacy_off" -eq 1 && "$key" == *_AUTO_UPDATE ]]; then
+      line="${key}=0"
+    fi
+    if [[ "$added" -eq 0 ]]; then
+      {
+        echo ""
+        echo "# --- Auto-update (added by install; see .env.example) ---"
+      } >>"$envfile"
+    fi
+    echo "$line" >>"$envfile"
+    echo "appended to .env: $key"
+    added=1
+  done
+}
+
 write_if_missing "onchain-invoice-nodes.yaml"
 write_if_missing "start-onchain-invoice-nodes.sh"
 write_if_missing "register-onchain-invoice-node.sh"
 write_if_missing "lib-env.sh"
 write_if_missing "update-onchain-invoice-nodes.sh"
 write_if_missing "install-auto-update.sh"
-write_if_missing ".env.nodes.example"
+write_template ".env.nodes.example"
 
-if [[ ! -f "$DEST/.env.example" ]]; then
-  if [[ -f "$DEST/.env.nodes.example" ]]; then
-    cp "$DEST/.env.nodes.example" "$DEST/.env.example"
-    echo "created: $DEST/.env.example"
-  fi
-fi
+cp "$DEST/.env.nodes.example" "$DEST/.env.example"
+echo "updated: $DEST/.env.example"
 
 if [[ ! -f "$DEST/.env" ]]; then
   cp "$DEST/.env.example" "$DEST/.env"
   echo "created: $DEST/.env  (edit secrets before starting)"
 else
-  echo "exists (unchanged): $DEST/.env"
+  echo "exists: $DEST/.env (secrets preserved)"
+  append_missing_env_keys "$DEST/.env.nodes.example" "$DEST/.env" \
+    ACTIVITY_LOG_PATH NODES_AUTO_UPDATE NODES_AUTO_UPDATE_INTERVAL_MIN NODES_STOP_TIMEOUT
 fi
 
 (
   cd "$DEST"
-  ROLE=nodes ./install-auto-update.sh || true
+  ./install-auto-update.sh || true
 )
 
 cat <<EOF
@@ -81,6 +119,6 @@ Next:
   4. Logs:
        docker logs -f onchain-invoice-node
        tail -f $DEST/logs/activity.jsonl
-  5. Auto-update (testnet default ON): ROLE=nodes ./install-auto-update.sh
+  5. Auto-update (testnet default ON via NODES_AUTO_UPDATE): ./install-auto-update.sh
 
 EOF

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Install or remove a cron entry for this install directory's auto-updater.
+# Install or remove cron for this directory's updater based on role-specific .env flags.
 #
-#   ROLE=gateway ./install-auto-update.sh
-#   ROLE=nodes ./install-auto-update.sh
-#   ROLE=api ./install-auto-update.sh
+#   ./install-auto-update.sh
 #
-# Reads AUTO_UPDATE and AUTO_UPDATE_INTERVAL_MIN from .env in this directory.
-# If AUTO_UPDATE is off, removes any matching cron line.
+# Detects api / gateway / nodes from files present. Enable flags:
+#   API_AUTO_UPDATE
+#   UI_TESTNET_AUTO_UPDATE / UI_MAINNET_AUTO_UPDATE / GATEWAY_AUTO_UPDATE
+#   NODES_AUTO_UPDATE
+# Legacy AUTO_UPDATE is still accepted if the role flag is unset.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,15 +25,39 @@ if [[ -z "$ROLE" ]]; then
   elif [[ -f start-onchain-invoice-api.sh && -f update-onchain-invoice-api.sh ]]; then
     ROLE=api
   else
-    echo "Set ROLE=api|gateway|nodes" >&2
+    echo "Could not detect install role (need start + update scripts for api|gateway|nodes)" >&2
     exit 1
   fi
 fi
 
+cron_enabled=0
+INTERVAL_MIN=""
+UPDATE_SCRIPT=""
+DEFAULT_INTERVAL=15
+
 case "$ROLE" in
-  api) UPDATE_SCRIPT="$SCRIPT_DIR/update-onchain-invoice-api.sh" ; DEFAULT_INTERVAL=15 ;;
-  gateway) UPDATE_SCRIPT="$SCRIPT_DIR/update-onchain-invoice-gateway.sh" ; DEFAULT_INTERVAL=5 ;;
-  nodes) UPDATE_SCRIPT="$SCRIPT_DIR/update-onchain-invoice-nodes.sh" ; DEFAULT_INTERVAL=15 ;;
+  api)
+    UPDATE_SCRIPT="$SCRIPT_DIR/update-onchain-invoice-api.sh"
+    DEFAULT_INTERVAL=15
+    if role_auto_update_on API_AUTO_UPDATE; then cron_enabled=1; fi
+    INTERVAL_MIN="${API_AUTO_UPDATE_INTERVAL_MIN:-${AUTO_UPDATE_INTERVAL_MIN:-$DEFAULT_INTERVAL}}"
+    ;;
+  gateway)
+    UPDATE_SCRIPT="$SCRIPT_DIR/update-onchain-invoice-gateway.sh"
+    DEFAULT_INTERVAL=5
+    if role_auto_update_on UI_TESTNET_AUTO_UPDATE \
+      || role_auto_update_on UI_MAINNET_AUTO_UPDATE \
+      || role_auto_update_on GATEWAY_AUTO_UPDATE; then
+      cron_enabled=1
+    fi
+    INTERVAL_MIN="${GATEWAY_AUTO_UPDATE_INTERVAL_MIN:-${UI_AUTO_UPDATE_INTERVAL_MIN:-${AUTO_UPDATE_INTERVAL_MIN:-$DEFAULT_INTERVAL}}}"
+    ;;
+  nodes)
+    UPDATE_SCRIPT="$SCRIPT_DIR/update-onchain-invoice-nodes.sh"
+    DEFAULT_INTERVAL=15
+    if role_auto_update_on NODES_AUTO_UPDATE; then cron_enabled=1; fi
+    INTERVAL_MIN="${NODES_AUTO_UPDATE_INTERVAL_MIN:-${AUTO_UPDATE_INTERVAL_MIN:-$DEFAULT_INTERVAL}}"
+    ;;
   *)
     echo "ROLE must be api, gateway, or nodes" >&2
     exit 1
@@ -46,12 +71,10 @@ fi
 chmod +x "$UPDATE_SCRIPT" "$SCRIPT_DIR/lib-env.sh" 2>/dev/null || true
 
 MARKER="# onchain-invoice-auto-update:${ROLE}:${SCRIPT_DIR}"
-INTERVAL_MIN="${AUTO_UPDATE_INTERVAL_MIN:-$DEFAULT_INTERVAL}"
 if ! [[ "$INTERVAL_MIN" =~ ^[0-9]+$ ]] || [[ "$INTERVAL_MIN" -lt 1 ]]; then
   INTERVAL_MIN="$DEFAULT_INTERVAL"
 fi
 
-# cron: every N minutes
 CRON_SCHED="*/${INTERVAL_MIN} * * * *"
 CRON_LINE="${CRON_SCHED} cd ${SCRIPT_DIR} && /bin/bash ${UPDATE_SCRIPT} >/dev/null 2>&1 ${MARKER}"
 
@@ -64,7 +87,7 @@ fi
 EXISTING="$(crontab -l 2>/dev/null || true)"
 FILTERED="$(printf '%s\n' "$EXISTING" | grep -vF "$MARKER" || true)"
 
-if auto_update_enabled; then
+if [[ "$cron_enabled" -eq 1 ]]; then
   {
     printf '%s\n' "$FILTERED"
     printf '%s\n' "$CRON_LINE"
@@ -73,5 +96,5 @@ if auto_update_enabled; then
   echo "  $CRON_LINE"
 else
   printf '%s\n' "$FILTERED" | sed '/^$/d' | crontab -
-  echo "AUTO_UPDATE disabled — removed cron for $ROLE ($SCRIPT_DIR)"
+  echo "Auto-update disabled for $ROLE — removed cron ($SCRIPT_DIR)"
 fi

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pull latest API image and recreate if the digest changed.
-# Honors AUTO_UPDATE=0|1 (default off).
+# Honors API_AUTO_UPDATE=0|1 (legacy AUTO_UPDATE fallback).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR"
 source "$SCRIPT_DIR/lib-env.sh"
 load_dotenv .env
 
-if ! auto_update_enabled; then
+if ! role_auto_update_on API_AUTO_UPDATE; then
   exit 0
 fi
 
@@ -55,7 +55,7 @@ PY
 fi
 NAME="${DOCKER_NAME:-${NAME:-onchain-invoice-api}}"
 IMAGE="${IMAGE:-ghcr.io/naiemk/trustless-commerce-api:main}"
-STOP_TIMEOUT="${STOP_TIMEOUT:-120}"
+STOP_TIMEOUT="${API_STOP_TIMEOUT:-${STOP_TIMEOUT:-120}}"
 
 log_update "$SCRIPT_DIR" "api: pulling $IMAGE"
 docker pull "$IMAGE" >/dev/null

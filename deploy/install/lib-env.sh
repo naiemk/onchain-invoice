@@ -21,11 +21,24 @@ load_dotenv() {
   done <"$env_file"
 }
 
-auto_update_enabled() {
-  case "${AUTO_UPDATE:-0}" in
+# Return 0 if the named env var is a truthy flag (1/true/yes/on).
+env_flag_on() {
+  local name="$1"
+  local val="${!name-}"
+  case "$val" in
     1|true|TRUE|yes|YES|on|ON) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# Primary role flag (set including to 0), with legacy AUTO_UPDATE if unset.
+role_auto_update_on() {
+  local primary="$1"
+  if [[ -n "${!primary+x}" ]]; then
+    env_flag_on "$primary"
+    return
+  fi
+  env_flag_on AUTO_UPDATE
 }
 
 log_update() {
