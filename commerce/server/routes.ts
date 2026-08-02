@@ -1,7 +1,16 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { getAddress, JsonRpcProvider } from "ethers";
-import { CommerceInvoiceSdk, predictCommerceInvoiceAddress } from "onchain-invoice";
+import {
+  addressesEqual,
+  chainKind,
+  CommerceInvoiceSdk,
+  deriveTronInvoiceAddress,
+  normalizeMerchantAddress,
+  predictCommerceInvoiceAddress,
+  tokenAllowedOnChain,
+  tronNumericChainId,
+} from "onchain-invoice";
 import { encodePayLink, invoiceIdFromPayLink, normalizePayLinkFields } from "../shared/invoice.js";
 import type { InvoiceStatus, PayLinkFields } from "../shared/types.js";
 import { requireApiKey, requireMerchant } from "./auth.js";
@@ -190,14 +199,12 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
   }
 
   const fields = normalizePayLinkFields(body);
-  const selectedTo = getAddress(String(body.selectedTo ?? body.selected_to ?? fields.to[0]));
-  if (!fields.to.map((value) => getAddress(value)).includes(selectedTo)) {
-    throw Object.assign(new Error("selectedTo is not in the pay-link merchant address list"), { statusCode: 400 });
-  }
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
+  assertTokenChainPair(chainId, token);
+  const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
-  const invoiceAddress = await getInvoiceAddress(config, selectedTo, invoiceId);
+  const invoiceAddress = await getInvoiceAddress(config, selectedTo, invoiceId, chainId);
   const idempotencyKey = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : null;
 
   const { invoice, created } = db.createInvoice({
@@ -233,12 +240,12 @@ async function createSessionDeprecated(
   const fields = normalizePayLinkFields(body);
   const paySessionId = randomUUID();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  // Session alias still creates a full invoice when chain/token available
-  const selectedTo = getAddress(String(body.selectedTo ?? body.selected_to ?? fields.to[0]));
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
+  assertTokenChainPair(chainId, token);
+  const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
-  const invoiceAddress = await getInvoiceAddress(context.config, selectedTo, invoiceId);
+  const invoiceAddress = await getInvoiceAddress(context.config, selectedTo, invoiceId, chainId);
   const { invoice } = context.db.createInvoice({
     invoiceId,
     fields,
@@ -269,12 +276,12 @@ function listMerchantInvoices(req: IncomingMessage, res: ServerResponse, { db }:
   let normalizedTo: string;
   if (hasMerchantHeaders) {
     const merchant = requireMerchant(req);
-    normalizedTo = toParam ? getAddress(toParam) : merchant;
-    if (normalizedTo !== merchant) {
+    normalizedTo = toParam ? normalizeLookupAddress(toParam) : merchant;
+    if (!addressesEqual(normalizedTo, merchant)) {
       throw Object.assign(new Error("Merchant auth address must match the requested to address"), { statusCode: 403 });
     }
   } else if (toParam) {
-    normalizedTo = getAddress(toParam);
+    normalizedTo = normalizeLookupAddress(toParam);
   } else {
     normalizedTo = requireMerchant(req);
   }
@@ -352,7 +359,7 @@ async function forceSweep(req: IncomingMessage, res: ServerResponse, { db }: Rou
   if (!invoice) {
     throw Object.assign(new Error("Invoice not found"), { statusCode: 404 });
   }
-  if (!invoice.toAddresses.map((value) => getAddress(value)).includes(merchant)) {
+  if (!invoice.toAddresses.some((value) => addressesEqual(value, merchant))) {
     throw Object.assign(new Error("Merchant auth address does not own this invoice"), { statusCode: 403 });
   }
   const body = await readJson(req);
@@ -368,7 +375,28 @@ function getInvoice(res: ServerResponse, { db }: RouteContext, invoiceId: string
   sendJson(res, 200, { ...invoice, events: db.getEvents(invoiceId) });
 }
 
-async function getInvoiceAddress(config: AppConfig, selectedTo: string, invoiceId: string): Promise<string | null> {
+async function getInvoiceAddress(
+  config: AppConfig,
+  selectedTo: string,
+  invoiceId: string,
+  chainId: string
+): Promise<string | null> {
+  if (chainKind(chainId) === "tron") {
+    if (!config.tronInvoiceMasterSecret) {
+      throw Object.assign(
+        new Error("TRON_INVOICE_MASTER_SECRET is required to create Tron invoices"),
+        { statusCode: 503 }
+      );
+    }
+    const fullHost = config.tronFullHost ?? "https://nile.trongrid.io";
+    return deriveTronInvoiceAddress(
+      config.tronInvoiceMasterSecret,
+      tronNumericChainId(chainId),
+      invoiceId,
+      fullHost
+    );
+  }
+
   if (!config.sweeperAddress) {
     return null;
   }
@@ -389,6 +417,54 @@ async function getInvoiceAddress(config: AppConfig, selectedTo: string, invoiceI
   const provider = new JsonRpcProvider(config.evmRpcUrl);
   const sdk = new CommerceInvoiceSdk({ provider, sweeperAddress: config.sweeperAddress });
   return sdk.getInvoiceAddress(selectedTo, invoiceId);
+}
+
+function resolveSelectedTo(
+  body: Record<string, unknown>,
+  fields: PayLinkFields,
+  chainId: string
+): string {
+  const raw = String(body.selectedTo ?? body.selected_to ?? pickDefaultTo(fields, chainId) ?? "");
+  let selectedTo: string;
+  try {
+    selectedTo = normalizeMerchantAddress(raw);
+  } catch {
+    throw Object.assign(new Error("selectedTo is not a valid merchant address"), { statusCode: 400 });
+  }
+  if (!fields.to.some((value) => addressesEqual(value, selectedTo))) {
+    throw Object.assign(new Error("selectedTo is not in the pay-link merchant address list"), { statusCode: 400 });
+  }
+  const kind = chainKind(chainId);
+  if (kind === "tron" && !selectedTo.startsWith("T")) {
+    throw Object.assign(new Error("selectedTo must be a Tron address for Nile/Tron chains"), { statusCode: 400 });
+  }
+  if (kind === "evm" && !selectedTo.startsWith("0x")) {
+    throw Object.assign(new Error("selectedTo must be an EVM address for this chain"), { statusCode: 400 });
+  }
+  return selectedTo;
+}
+
+function pickDefaultTo(fields: PayLinkFields, chainId: string): string | undefined {
+  const kind = chainKind(chainId);
+  const match = fields.to.find((value) => (kind === "tron" ? value.startsWith("T") : value.startsWith("0x")));
+  return match ?? fields.to[0];
+}
+
+function assertTokenChainPair(chainId: string, token: string): void {
+  if (!tokenAllowedOnChain(chainId, token)) {
+    throw Object.assign(
+      new Error(`Token ${token} is not allowed on chain ${chainId}`),
+      { statusCode: 400 }
+    );
+  }
+}
+
+function normalizeLookupAddress(value: string): string {
+  try {
+    return normalizeMerchantAddress(value);
+  } catch {
+    return getAddress(value);
+  }
 }
 
 async function postCallback(db: CommerceDb, callbackUrl: string, invoice: unknown): Promise<void> {

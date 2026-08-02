@@ -1,5 +1,10 @@
 import { getAddress } from "ethers";
-import { getCommerceInvoiceId, type CommerceInvoiceParams } from "onchain-invoice";
+import {
+  getCommerceInvoiceId,
+  looksLikeTronAddress,
+  normalizeMerchantAddress,
+  type CommerceInvoiceParams,
+} from "onchain-invoice";
 import type { PayLinkFields } from "./types.js";
 
 const DEFAULT_CHAIN = "11155111";
@@ -15,9 +20,13 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
 
   const to = splitList(params.get("to")).map((value) => {
     try {
-      return getAddress(value);
+      return normalizeMerchantAddress(value);
     } catch {
-      return value;
+      try {
+        return getAddress(value);
+      } catch {
+        return value;
+      }
     }
   });
 
@@ -25,7 +34,7 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
     price: requiredParam(params, "price"),
     to,
     chains: splitList(params.get("chains") ?? DEFAULT_CHAIN),
-    tokens: splitList(params.get("tokens") ?? DEFAULT_TOKEN),
+    tokens: splitList(params.get("tokens") ?? DEFAULT_TOKEN).map((t) => t.toUpperCase()),
     clientInvoiceId: requiredParam(params, "client_invoice_id"),
     callback: optionalParam(params, "callback"),
     title: optionalParam(params, "title"),
@@ -83,6 +92,8 @@ export function normalizePayLinkFields(input: Partial<PayLinkFields> & Record<st
     allow_partial: input.allowPartial ?? input.allow_partial,
   });
 }
+
+export { looksLikeTronAddress };
 
 function objectToSearchParams(input: Record<string, unknown>): URLSearchParams {
   const params = new URLSearchParams();

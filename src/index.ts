@@ -5,6 +5,21 @@ export {
   NATIVE_TOKEN as COMMERCE_NATIVE_TOKEN,
 } from "./commerce-abis.js";
 export {
+  addressesEqual,
+  chainKind,
+  defaultTokenForChain,
+  isEvmAddress,
+  isTronAddress,
+  looksLikeTronAddress,
+  normalizeMerchantAddress,
+  normalizeMerchantAddresses,
+  tokenAllowedOnChain,
+  tronNumericChainId,
+  TRON_NILE_NUMERIC_CHAIN_ID,
+  TRON_SHASTA_NUMERIC_CHAIN_ID,
+  type ChainKind,
+} from "./commerce-addresses.js";
+export {
   CommerceInvoiceSdk,
   commerceInvoiceSalt,
   commerceMinimalProxyInitCodeHash,
@@ -41,6 +56,7 @@ export {
 export {
   delegateEnergyToInvoice,
   ensureEnergyForBatch,
+  ensureInvoiceTrxForSweep,
   isNativeTronToken,
   readTronAccountResources,
   sponsorBase58,

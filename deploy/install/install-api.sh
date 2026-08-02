@@ -86,6 +86,7 @@ write_if_missing "lib-env.sh"
 write_if_missing "update-onchain-invoice-api.sh"
 write_if_missing "install-auto-update.sh"
 write_template ".env.api.example"
+write_template "onchain-invoice-api.yaml"
 
 cp "$DEST/.env.api.example" "$DEST/.env.example"
 echo "updated: $DEST/.env.example"
@@ -96,7 +97,8 @@ if [[ ! -f "$DEST/.env" ]]; then
 else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.api.example" "$DEST/.env" \
-    API_AUTO_UPDATE API_AUTO_UPDATE_INTERVAL_MIN API_STOP_TIMEOUT
+    API_AUTO_UPDATE API_AUTO_UPDATE_INTERVAL_MIN API_STOP_TIMEOUT \
+    TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS
 fi
 
 (

@@ -73,6 +73,7 @@ Edit `.env` (created from template):
 | `DOCKER_NETWORK` | `trustless-commerce-edge` |
 | `DOCKER_NAME` | `testnet-api` (nginx upstream name) |
 | `EVM_RPC_URL` / `SWEEPER_ADDRESS` / `FORWARDER_IMPLEMENTATION` | Sepolia (see `data/commerce-deploy-sepolia.json`) |
+| `TRON_FULL_HOST` / `TRON_INVOICE_MASTER_SECRET` | Nile EOA invoice prediction (must match sweeper) |
 | `API_AUTO_UPDATE` | Default `0` (opt-in) |
 
 ```bash
@@ -137,12 +138,14 @@ curl -fsS https://testnet.trustless-commerce.com/api/health
 
 ---
 
-## 5) Sweeper node (testnet)
+## 5) Sweeper node (testnet — Sepolia + Nile)
 
 ```bash
 mkdir -p ~/tc/sweeper && cd ~/tc/sweeper
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 ```
+
+Install refreshes `docker-compose.sweepers.yml` + shared `onchain-invoice-nodes.yaml`. Start runs **two** services (`sweeper-evm` + `sweeper-tron`) from the same `.env`.
 
 Important `.env` keys:
 
@@ -151,25 +154,33 @@ Important `.env` keys:
 | `API_URL` / `SERVER_URL` | `https://testnet.trustless-commerce.com` (prefer public HTTPS, not `host.docker.internal`) |
 | `ADMIN_API_KEY` | Same as testnet API |
 | `SWEEPER_WALLET_KEY` / `SWEEPER_REGISTER_ADDRESS` | Testnet example uses Hardhat #0 — throwaway only |
+| `SWEEPER_CHAINS` | `11155111,nile` so both workers receive invoices |
 | `SWEEPER_ADDRESS` / `EVM_RPC_URL` | Sepolia sweeper contract |
-| `ACTIVITY_LOG_PATH` | Default `/data/logs/activity.jsonl` (host: `./logs/`) |
+| `TRON_FULL_HOST` | `https://nile.trongrid.io` |
+| `TRON_INVOICE_MASTER_SECRET` | Same secret as API (EOA derivation) |
+| `TRON_USDT_ADDRESS` | Nile USDT (default in template; verify on Tronscan if unsure) |
+| `TRON_SPONSOR_PRIVATE_KEY` | Sponsor for energy/TRX + sweeps (hex) |
+| `ACTIVITY_LOG_PATH` | Single-container fallback; compose uses `activity-evm.jsonl` / `activity-tron.jsonl` |
 | `NODES_AUTO_UPDATE` | Default `1` on testnet template |
 
 ```bash
-./register-onchain-invoice-node.sh   # once per API DB / wallet
-./start-onchain-invoice-nodes.sh
+./register-onchain-invoice-node.sh   # once per API DB / wallet (chains include nile)
+./start-onchain-invoice-nodes.sh     # docker compose dual sweepers
 
-docker logs -f onchain-invoice-node
-tail -f ~/tc/sweeper/logs/activity.jsonl
+docker logs -f onchain-invoice-sweeper-evm
+docker logs -f onchain-invoice-sweeper-tron
+tail -f ~/tc/sweeper/logs/activity-evm.jsonl ~/tc/sweeper/logs/activity-tron.jsonl
 ```
+
+Legacy single container: `USE_COMPOSE=0 ./start-onchain-invoice-nodes.sh`.
 
 ### Registration vs image updates
 
-Registration is stored in the **API SQLite** (`sweepers` table), keyed by wallet address. Recreating the sweeper container keeps the same `.env` keys → **no re-register** unless you change the wallet or wipe the API data dir.
+Registration is stored in the **API SQLite** (`sweepers` table), keyed by wallet address. Recreating sweeper containers keeps the same `.env` keys → **no re-register** unless you change the wallet or wipe the API data dir.
 
 ### Activity log stages
 
-JSONL on the host (`./logs/activity.jsonl`):
+JSONL on the host (`./logs/activity-*.jsonl`):
 
 - `invoice-paid` — non-zero balance observed
 - `sweep-submitted` / `sweep-confirmed` — sweep tx hash + amounts
@@ -177,6 +188,7 @@ JSONL on the host (`./logs/activity.jsonl`):
 
 Quote `0x…` values in YAML (installer templates already do). Unquoted YAML 1.1 parses them as integers and corrupts private keys.
 
+API must also set matching `TRON_INVOICE_MASTER_SECRET` / `TRON_FULL_HOST` so create returns Nile invoice EOAs.
 ---
 
 ## 6) Auto-update (cron)
@@ -231,7 +243,7 @@ docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 ls -la ~/tc/api-testnet/data/
 
 # Sweeper activity
-tail -f ~/tc/sweeper/logs/activity.jsonl
+tail -f ~/tc/sweeper/logs/activity-evm.jsonl ~/tc/sweeper/logs/activity-tron.jsonl
 
 # Manual recreate (pull + replace)
 cd ~/tc/api-testnet && ./start-onchain-invoice-api.sh

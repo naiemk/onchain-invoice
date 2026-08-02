@@ -14,6 +14,7 @@ import {
   solidityPacked,
   toUtf8Bytes,
 } from "ethers";
+import { normalizeMerchantAddresses } from "./commerce-addresses.js";
 import { COMMERCE_INVOICE_SWEEPER_ABI, ERC20_ABI, NATIVE_TOKEN } from "./commerce-abis.js";
 
 export interface CommerceInvoiceSdkConfig {
@@ -50,16 +51,20 @@ export interface CommerceInvoiceParams {
   tokens?: string[];
 }
 
-/** Deterministic invoice id from merchant-facing invoice parameters. */
+/**
+ * Deterministic invoice id from merchant-facing invoice parameters.
+ * Merchant destinations are encoded as `string[]` so Tron `T…` addresses work
+ * (testnet-breaking vs older `address[]` encoding).
+ */
 export function getCommerceInvoiceId(params: CommerceInvoiceParams | BytesLike): string {
   if (typeof params === "string" || params instanceof Uint8Array) {
     return keccak256(params);
   }
   const encoded = AbiCoder.defaultAbiCoder().encode(
-    ["string", "address[]", "string", "string", "string", "string", "bool"],
+    ["string", "string[]", "string", "string", "string", "string", "bool"],
     [
       params.priceUsd,
-      params.toAddresses.map((a) => getAddress(a)),
+      normalizeMerchantAddresses(params.toAddresses),
       params.clientInvoiceId,
       params.callbackUrl ?? "",
       params.title ?? "",

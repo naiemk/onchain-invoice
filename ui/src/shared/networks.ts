@@ -1,7 +1,9 @@
+export type ChainKind = "evm" | "tron";
+
 export interface NetworkOption {
   id: string;
   label: string;
-  kind: "evm";
+  kind: ChainKind;
   short: string;
   testnet?: boolean;
 }
@@ -13,6 +15,7 @@ export interface TokenOption {
 
 export const NETWORKS: NetworkOption[] = [
   { id: "11155111", label: "Ethereum Sepolia", short: "Sepolia", kind: "evm", testnet: true },
+  { id: "nile", label: "TRON Nile", short: "Nile", kind: "tron", testnet: true },
   { id: "1", label: "Ethereum Mainnet", short: "Ethereum", kind: "evm" },
   { id: "8453", label: "Base", short: "Base", kind: "evm" },
   { id: "42161", label: "Arbitrum One", short: "Arbitrum", kind: "evm" },
@@ -20,10 +23,13 @@ export const NETWORKS: NetworkOption[] = [
 
 export const TOKENS: TokenOption[] = [
   { id: "USDC", label: "USDC" },
+  { id: "USDT", label: "USDT" },
 ];
 
 /** Stablecoins only until FX/conversion is implemented (USD price ≠ ETH amount). */
 export const SUPPORTED_TOKENS = new Set(TOKENS.map((t) => t.id.toUpperCase()));
+
+const TRON_BASE58_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 
 export function filterSupportedTokens(tokens: string[]): string[] {
   const allowed = tokens
@@ -32,6 +38,54 @@ export function filterSupportedTokens(tokens: string[]): string[] {
     .filter((t) => SUPPORTED_TOKENS.has(t.toUpperCase()))
     .map((t) => t.toUpperCase());
   return allowed.length > 0 ? [...new Set(allowed)] : ["USDC"];
+}
+
+export function networkById(chainId: string | null | undefined): NetworkOption | undefined {
+  return NETWORKS.find((n) => n.id === String(chainId ?? ""));
+}
+
+export function networkKind(chainId: string | null | undefined): ChainKind {
+  return networkById(chainId)?.kind ?? "evm";
+}
+
+export function tokenAllowedOnChain(chainId: string, token: string): boolean {
+  const symbol = token.trim().toUpperCase();
+  const kind = networkKind(chainId);
+  if (kind === "tron") return symbol === "USDT";
+  return symbol === "USDC";
+}
+
+export function tokensForChains(chainIds: string[]): TokenOption[] {
+  if (chainIds.length === 0) return [];
+  return TOKENS.filter((token) => chainIds.some((id) => tokenAllowedOnChain(id, token.id)));
+}
+
+export function looksLikeTronAddress(value: string): boolean {
+  return TRON_BASE58_RE.test(value.trim());
+}
+
+export function isValidAddress(value: string, kind: ChainKind): boolean {
+  const trimmed = value.trim();
+  if (kind === "tron") return looksLikeTronAddress(trimmed);
+  try {
+    // Lazy: avoid importing ethers in every call path; mirror 0x + 40 hex
+    return /^0x[0-9a-fA-F]{40}$/.test(trimmed);
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeAddress(value: string, kind: ChainKind): string {
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error("Address is required");
+  if (kind === "tron") {
+    if (!looksLikeTronAddress(trimmed)) throw new Error(`Invalid Tron address: ${value}`);
+    return trimmed;
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) throw new Error(`Invalid EVM address: ${value}`);
+  // Checksum-style lower/upper mix not required for invoice id encoding in browser —
+  // onchain-invoice-browser normalizes via getAddress when hashing.
+  return trimmed;
 }
 
 export function networkLabel(chainId: string): string {
@@ -46,8 +100,7 @@ export function isTestnet(chainId: string | null | undefined): boolean {
   if (!chainId) return false;
   const known = NETWORKS.find((n) => n.id === chainId);
   if (known) return Boolean(known.testnet);
-  // Unknown chain ids that look like common testnets
-  return ["11155111", "84532", "421614", "11155420", "5", "80001"].includes(String(chainId));
+  return ["11155111", "84532", "421614", "11155420", "5", "80001", "nile", "shasta"].includes(String(chainId));
 }
 
 export type DeploymentMode = "testnet" | "mainnet";
@@ -84,6 +137,9 @@ export function testnetPillHtml(chainId: string | null | undefined): string {
 export function chainLogoSvg(chainId: string | null | undefined, size = 20): string {
   const id = String(chainId ?? "");
   const s = String(size);
+  if (id === "nile" || id === "shasta" || id === "tron") {
+    return `<svg class="chain-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#FF060A"/><path d="M21.6 9.2 16 6.4l-5.6 2.8 1.7 5.4h7.8l1.7-5.4zm-9.2 6.8 3.6 9.6 5.6-5.4-1.6-4.2h-7.6zm8.4 0-1.6 4.2 5.6 5.4 3.6-9.6h-7.6z" fill="#fff"/></svg>`;
+  }
   if (id === "8453") {
     return `<svg class="chain-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#0052FF"/><path d="M16.1 6.4c-5.3 0-9.6 4.1-9.9 9.3h13.1c.4 0 .7.3.7.7s-.3.7-.7.7H6.2c.4 5.1 4.7 9.1 9.9 9.1 5.5 0 10-4.5 10-10s-4.5-9.8-10-9.8z" fill="#fff"/></svg>`;
   }
@@ -149,17 +205,32 @@ export function explorerBase(chainId: string | null | undefined): string | null 
       return "https://basescan.org";
     case "42161":
       return "https://arbiscan.io";
+    case "nile":
+      return "https://nile.tronscan.org";
+    case "shasta":
+      return "https://shasta.tronscan.org";
+    case "tron":
+    case "3448148188":
+      return "https://tronscan.org";
     default:
       return null;
   }
 }
 
+function isTronExplorer(chainId: string | null | undefined): boolean {
+  return networkKind(chainId) === "tron";
+}
+
 export function explorerAddressUrl(chainId: string | null | undefined, address: string): string | null {
   const base = explorerBase(chainId);
-  return base ? `${base}/address/${address}` : null;
+  if (!base) return null;
+  if (isTronExplorer(chainId)) return `${base}/#/address/${address}`;
+  return `${base}/address/${address}`;
 }
 
 export function explorerTxUrl(chainId: string | null | undefined, txHash: string): string | null {
   const base = explorerBase(chainId);
-  return base ? `${base}/tx/${txHash}` : null;
+  if (!base) return null;
+  if (isTronExplorer(chainId)) return `${base}/#/transaction/${txHash}`;
+  return `${base}/tx/${txHash}`;
 }

@@ -1,6 +1,7 @@
-# Trustless Commerce sweeper node — operator config
+# Trustless Commerce sweeper node — operator config (shared by evm + tron compose services)
 # Created by: wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
-# Start with: ./start-onchain-invoice-nodes.sh
+# Dual services: docker compose -f docker-compose.sweepers.yml up -d
+# Legacy single container: ./start-onchain-invoice-nodes.sh
 
 docker:
   image: ghcr.io/naiemk/trustless-commerce-sweeper:main
@@ -15,7 +16,7 @@ serverUrl: "${SERVER_URL}"
 sweeperWalletKey: "${SWEEPER_WALLET_KEY}"
 # Optional legacy shared key
 apiKey: "${SWEEPER_API_KEY}"
-# Host bind-mount ./logs → /data/logs (see start-onchain-invoice-nodes.sh)
+# Host bind-mount ./logs → /data/logs (see start / compose)
 activityLogPath: "${ACTIVITY_LOG_PATH}"
 intervalMs: 15000
 maxRetries: 5
@@ -29,8 +30,18 @@ chains:
         address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
         decimals: 6
 tron:
-  enabled: false
-  note: "Not implemented for commerce launch"
+  enabled: true
+  chainId: "nile"
+  fullHost: "${TRON_FULL_HOST}"
+  invoiceMasterSecret: "${TRON_INVOICE_MASTER_SECRET}"
+  usdtAddress: "${TRON_USDT_ADDRESS}"
+  privateKey: "${TRON_SPONSOR_PRIVATE_KEY}"
+  feeLimit: 150000000
+  energyMode: burn
+  tokens:
+    - symbol: USDT
+      address: "${TRON_USDT_ADDRESS}"
+      decimals: 6
 solana:
   enabled: false
   note: "Not implemented for commerce launch"

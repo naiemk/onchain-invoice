@@ -1,6 +1,14 @@
 import { encodePayLink, invoiceIdFromPayLink, payPath } from "../shared/invoice.js";
 import { copyText, escapeHtml } from "../shared/dom.js";
-import { TOKENS, chainLogoSvg, deploymentMode, networksForDeployment } from "../shared/networks.js";
+import {
+  chainLogoSvg,
+  deploymentMode,
+  isValidAddress,
+  networkKind,
+  networksForDeployment,
+  tokensForChains,
+  type NetworkOption,
+} from "../shared/networks.js";
 import type { PayLinkFields } from "../shared/types.js";
 
 export function renderCreate(root: HTMLElement): void {
@@ -15,7 +23,7 @@ export function renderCreate(root: HTMLElement): void {
       <p>Enter invoice details, copy a pay button for your site, and share the link. No wallet connection required.</p>
       <p class="callout info" role="status">
         This ${escapeHtml(modeLabel.toLowerCase())} UI only lists ${escapeHtml(modeLabel.toLowerCase())} networks.
-        ${mode === "testnet" ? "Use the mainnet site for production chains." : "Use the testnet site for Sepolia and other test networks."}
+        ${mode === "testnet" ? "Use the mainnet site for production chains." : "Use the testnet site for Sepolia, Nile, and other test networks."}
       </p>
     </header>
 
@@ -48,49 +56,42 @@ export function renderCreate(root: HTMLElement): void {
 
           <div class="field">
             <label>Accepted networks <span class="required">*</span></label>
-            <p class="field-hint">${escapeHtml(modeLabel)} chains the payer may choose at checkout. EVM networks share one merchant wallet below.</p>
-            <div class="field-row" id="chains">
+            <p class="field-hint">Tap a chain to enable it. EVM and Tron each need their own merchant wallet below.</p>
+            <div class="chain-pill-row" id="chains" role="group" aria-label="Accepted networks">
               ${
                 networks.length === 0
                   ? `<p class="danger">No ${escapeHtml(modeLabel.toLowerCase())} networks are configured.</p>`
-                  : networks
-                      .map(
-                        (n, i) => `
-                <label class="check check-chain">
-                  <input type="checkbox" name="chains" value="${escapeHtml(n.id)}" ${i === 0 ? "checked" : ""} />
-                  ${chainLogoSvg(n.id, 18)}
-                  <span>${escapeHtml(n.label)}</span>
-                </label>`
-                      )
-                      .join("")
+                  : networks.map((n, i) => chainPillHtml(n, i === 0)).join("")
               }
             </div>
           </div>
 
-          <div class="field">
-            <label for="to">EVM merchant wallet <span class="required">*</span></label>
-            <div class="callout danger wallet-settlement-note" role="note">
+          <div class="field" id="evm-wallet-field">
+            <label for="toEvm">EVM merchant wallet <span class="required">*</span></label>
+            <div class="callout info wallet-settlement-note" role="note">
               <strong>Funds are swept to this address.</strong>
               The full invoice value (minus protocol fee) is sent here after payment.
-              Make sure you can receive the selected tokens on this wallet on every network you enable —
+              Make sure you can receive the selected tokens on this wallet on every EVM network you enable —
               otherwise tokens may be lost permanently.
             </div>
-            <p class="field-hint">Settlement address for all selected EVM networks. Bound into the invoice salt — sweeps cannot redirect funds elsewhere.</p>
-            <input id="to" name="to" required class="mono" placeholder="0x…" autocomplete="off" spellcheck="false" />
+            <p class="field-hint">Settlement address for selected EVM networks. Bound into the invoice salt — sweeps cannot redirect funds elsewhere.</p>
+            <input id="toEvm" name="toEvm" class="mono" placeholder="0x…" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="field" id="tron-wallet-field" hidden>
+            <label for="toTron">Tron merchant wallet <span class="required">*</span></label>
+            <div class="callout info wallet-settlement-note" role="note">
+              <strong>Funds are swept to this address.</strong>
+              USDT on Nile is sent here after payment. Use a wallet that can receive TRC-20 on Nile.
+            </div>
+            <p class="field-hint">Base58 address starting with <span class="mono">T</span>. Bound into the invoice id with your EVM wallet when both are used.</p>
+            <input id="toTron" name="toTron" class="mono" placeholder="T…" autocomplete="off" spellcheck="false" />
           </div>
 
           <div class="field">
             <label>Accepted tokens <span class="required">*</span></label>
-            <p class="field-hint">Stablecoins only for now (USD price maps 1:1). Native tokens need conversion we have not shipped yet.</p>
-            <div class="field-row" id="tokens">
-              ${TOKENS.map(
-                (t, i) => `
-                <label class="check">
-                  <input type="checkbox" name="tokens" value="${escapeHtml(t.id)}" ${i < 2 ? "checked" : ""} />
-                  ${escapeHtml(t.label)}
-                </label>`
-              ).join("")}
-            </div>
+            <p class="field-hint">Paired to selected networks (Sepolia → USDC, Nile → USDT). Stablecoins only for now.</p>
+            <div class="field-row" id="tokens"></div>
           </div>
 
           <div class="field">
@@ -135,9 +136,9 @@ Content-Type: application/json
 
 {
   "price": "10.00",
-  "to": ["0x…"],
-  "chains": ["11155111"],
-  "tokens": ["USDC"],
+  "to": ["0x…", "T…"],
+  "chains": ["11155111", "nile"],
+  "tokens": ["USDC", "USDT"],
   "clientInvoiceId": "order-1042",
   "chainId": "11155111",
   "token": "USDC",
@@ -171,7 +172,23 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
   const previewBody = root.querySelector<HTMLElement>("#preview-body");
   const docsQuery = root.querySelector<HTMLElement>("#docs-query");
 
+  const syncKindFields = () => {
+    const chains = checked(root, "chains");
+    const needsEvm = chains.some((id) => networkKind(id) === "evm");
+    const needsTron = chains.some((id) => networkKind(id) === "tron");
+    const evmField = root.querySelector<HTMLElement>("#evm-wallet-field");
+    const tronField = root.querySelector<HTMLElement>("#tron-wallet-field");
+    if (evmField) evmField.hidden = !needsEvm;
+    if (tronField) tronField.hidden = !needsTron;
+    const toEvm = root.querySelector<HTMLInputElement>("#toEvm");
+    const toTron = root.querySelector<HTMLInputElement>("#toTron");
+    if (toEvm) toEvm.required = needsEvm;
+    if (toTron) toTron.required = needsTron;
+    renderTokenOptions(root, chains);
+  };
+
   const refresh = () => {
+    syncKindFields();
     try {
       const fields = readForm(root);
       const invoiceId = invoiceIdFromPayLink(fields);
@@ -236,27 +253,88 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
   }
 }
 
+function chainPillHtml(network: NetworkOption, checked: boolean): string {
+  return `
+    <label class="chain-pill">
+      <input type="checkbox" name="chains" value="${escapeHtml(network.id)}" ${checked ? "checked" : ""} />
+      <span class="chain-pill-face">
+        ${chainLogoSvg(network.id, 20)}
+        <span class="chain-pill-label">${escapeHtml(network.short)}</span>
+      </span>
+    </label>`;
+}
+
+function renderTokenOptions(root: HTMLElement, chains: string[]): void {
+  const host = root.querySelector<HTMLElement>("#tokens");
+  if (!host) return;
+  const previous = new Set(
+    [...root.querySelectorAll<HTMLInputElement>('input[name="tokens"]:checked')].map((el) => el.value)
+  );
+  const tokens = tokensForChains(chains);
+  if (tokens.length === 0) {
+    host.innerHTML = `<p class="field-hint">Select a network to see matching tokens.</p>`;
+    return;
+  }
+  host.innerHTML = tokens
+    .map((t, i) => {
+      const selected = previous.size > 0 ? previous.has(t.id) : true;
+      return `
+        <label class="check">
+          <input type="checkbox" name="tokens" value="${escapeHtml(t.id)}" ${selected || i === 0 ? "checked" : ""} />
+          ${escapeHtml(t.label)}
+        </label>`;
+    })
+    .join("");
+}
+
+function checked(root: HTMLElement, name: string): string[] {
+  return [...root.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)].map((el) => el.value);
+}
+
 function readForm(root: HTMLElement): PayLinkFields {
   const value = (id: string) =>
     root.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)?.value.trim() ?? "";
-  const checked = (name: string) =>
-    [...root.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)].map((el) => el.value);
 
   const price = value("price");
   const clientInvoiceId = value("clientInvoiceId");
-  const toRaw = value("to");
-  const chains = checked("chains");
-  const tokens = checked("tokens");
+  const chains = checked(root, "chains");
+  const tokens = checked(root, "tokens");
+  const needsEvm = chains.some((id) => networkKind(id) === "evm");
+  const needsTron = chains.some((id) => networkKind(id) === "tron");
+  const toEvm = value("toEvm");
+  const toTron = value("toTron");
 
   if (!clientInvoiceId) throw new Error("Invoice client id is required.");
   if (!price) throw new Error("Amount (USD) is required.");
-  if (!toRaw) throw new Error("EVM merchant wallet is required.");
   if (chains.length === 0) throw new Error("Select at least one network.");
   if (tokens.length === 0) throw new Error("Select at least one token.");
 
+  for (const chainId of chains) {
+    const allowed = tokens.some((token) => {
+      const kind = networkKind(chainId);
+      if (kind === "tron") return token === "USDT";
+      return token === "USDC";
+    });
+    if (!allowed) {
+      throw new Error(`No compatible token selected for ${chainId}.`);
+    }
+  }
+
+  const to: string[] = [];
+  if (needsEvm) {
+    if (!toEvm) throw new Error("EVM merchant wallet is required.");
+    if (!isValidAddress(toEvm, "evm")) throw new Error("EVM merchant wallet must be a 0x address.");
+    to.push(toEvm);
+  }
+  if (needsTron) {
+    if (!toTron) throw new Error("Tron merchant wallet is required.");
+    if (!isValidAddress(toTron, "tron")) throw new Error("Tron merchant wallet must be a T… address.");
+    to.push(toTron);
+  }
+
   return {
     price,
-    to: toRaw.split(",").map((s) => s.trim()).filter(Boolean),
+    to,
     chains,
     tokens,
     clientInvoiceId,

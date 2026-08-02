@@ -99,21 +99,10 @@ CONFIG_ABS="$(cd "$(dirname "$CONFIG")" && pwd)/$(basename "$CONFIG")"
 # Extra hosts so serverUrl: http://host.docker.internal:8080 works on Linux.
 EXTRA_HOSTS=(--add-host=host.docker.internal:host-gateway)
 
-if [[ "${ONCHAIN_INVOICE_SKIP_PULL:-}" == "1" || "${PULL:-1}" == "0" ]]; then
-  echo "Skipping docker pull ($IMAGE)"
-else
-  echo "Pulling $IMAGE ..."
-  docker pull "$IMAGE"
-fi
-
-if docker inspect "$NAME" >/dev/null 2>&1; then
-  echo "Removing existing container $NAME ..."
-  docker rm -f "$NAME" >/dev/null
-fi
-
 # Prefer SERVER_URL; fall back to API_URL for operators who only set one.
 if [[ -z "${SERVER_URL:-}" && -n "${API_URL:-}" ]]; then
   SERVER_URL="$API_URL"
+  export SERVER_URL
 fi
 
 # Fail fast: ethers crashes with a redacted "invalid private key" if these are empty/malformed.
@@ -139,12 +128,56 @@ else
 fi
 chmod 755 "$LOGS_ABS" 2>/dev/null || true
 
+COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.sweepers.yml"
+if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
+  IMAGE="$(yaml_get docker.image)"
+  IMAGE="${IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}"
+  export SWEEPER_IMAGE="$IMAGE"
+
+  if [[ "${ONCHAIN_INVOICE_SKIP_PULL:-}" == "1" || "${PULL:-1}" == "0" ]]; then
+    echo "Skipping docker pull ($IMAGE)"
+  else
+    echo "Pulling $IMAGE ..."
+    docker pull "$IMAGE"
+  fi
+
+  # Stop legacy single container if present
+  if docker inspect onchain-invoice-node >/dev/null 2>&1; then
+    echo "Removing legacy container onchain-invoice-node ..."
+    docker rm -f onchain-invoice-node >/dev/null || true
+  fi
+
+  echo "Starting dual sweepers via $COMPOSE_FILE ..."
+  docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+  echo "Sweepers running: onchain-invoice-sweeper-evm + onchain-invoice-sweeper-tron"
+  echo "Logs: docker logs -f onchain-invoice-sweeper-evm"
+  echo "      docker logs -f onchain-invoice-sweeper-tron"
+  echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl"
+  exit 0
+fi
+
+if [[ "${ONCHAIN_INVOICE_SKIP_PULL:-}" == "1" || "${PULL:-1}" == "0" ]]; then
+  echo "Skipping docker pull ($IMAGE)"
+else
+  echo "Pulling $IMAGE ..."
+  docker pull "$IMAGE"
+fi
+
+if docker inspect "$NAME" >/dev/null 2>&1; then
+  echo "Removing existing container $NAME ..."
+  docker rm -f "$NAME" >/dev/null
+fi
+
 add_env SERVER_URL "${SERVER_URL:-}"
 add_env SWEEPER_WALLET_KEY "${SWEEPER_WALLET_KEY:-}"
 add_env SWEEPER_API_KEY "${SWEEPER_API_KEY:-}"
 add_env SWEEPER_ADDRESS "${SWEEPER_ADDRESS:-}"
 add_env SWEEPER_PRIVATE_KEY "${SWEEPER_PRIVATE_KEY:-}"
 add_env EVM_RPC_URL "${EVM_RPC_URL:-}"
+add_env TRON_FULL_HOST "${TRON_FULL_HOST:-}"
+add_env TRON_INVOICE_MASTER_SECRET "${TRON_INVOICE_MASTER_SECRET:-}"
+add_env TRON_USDT_ADDRESS "${TRON_USDT_ADDRESS:-}"
+add_env TRON_SPONSOR_PRIVATE_KEY "${TRON_SPONSOR_PRIVATE_KEY:-}"
 add_env ACTIVITY_LOG_PATH "$ACTIVITY_LOG_PATH"
 
 # Config lands in /tmp (image has no /config dir; docker cp avoids host bind-mounts).

@@ -21,6 +21,12 @@ export interface AppConfig {
   /** Optional; enables offline CREATE2 invoice address prediction without RPC. */
   forwarderImplementation?: string;
   sweeperPrivateKey?: string;
+  /** Nile (or other) Tron full node host for EOA address derivation. */
+  tronFullHost?: string;
+  /** Master secret for deterministic Tron invoice EOAs. */
+  tronInvoiceMasterSecret?: string;
+  /** Optional Nile USDT TRC-20 contract (documented for operators; sweeper uses its own YAML). */
+  tronUsdtAddress?: string;
   captchaProvider?: string;
   turnstileSecret?: string;
   corsOrigins: string[];
@@ -40,6 +46,11 @@ interface YamlFile {
     sweeperAddress?: string;
     forwarderImplementation?: string;
     sweeperPrivateKey?: string;
+  };
+  tron?: {
+    fullHost?: string;
+    invoiceMasterSecret?: string;
+    usdtAddress?: string;
   };
   captcha?: { provider?: string; turnstileSecret?: string };
   cors?: { origins?: string[] };
@@ -64,6 +75,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       expand(env.FORWARDER_IMPLEMENTATION ?? file.evm?.forwarderImplementation ?? "")
     ),
     sweeperPrivateKey: blankToUndefined(expand(env.SWEEPER_PRIVATE_KEY ?? file.evm?.sweeperPrivateKey ?? "")),
+    tronFullHost: blankToUndefined(expand(env.TRON_FULL_HOST ?? file.tron?.fullHost ?? "")),
+    tronInvoiceMasterSecret: blankToUndefined(
+      expand(env.TRON_INVOICE_MASTER_SECRET ?? file.tron?.invoiceMasterSecret ?? "")
+    ),
+    tronUsdtAddress: blankToUndefined(expand(env.TRON_USDT_ADDRESS ?? file.tron?.usdtAddress ?? "")),
     captchaProvider: blankToUndefined(expand(env.CAPTCHA_PROVIDER ?? file.captcha?.provider ?? "")),
     turnstileSecret: blankToUndefined(expand(env.TURNSTILE_SECRET ?? file.captcha?.turnstileSecret ?? "")),
     corsOrigins: parseOrigins(env.CORS_ORIGINS, file.cors?.origins),

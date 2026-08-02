@@ -1,10 +1,23 @@
 import { readFile } from "node:fs/promises";
 import { Contract, JsonRpcProvider, Wallet } from "ethers";
-import { CommerceInvoiceSdk, COMMERCE_ERC20_ABI, COMMERCE_NATIVE_TOKEN } from "onchain-invoice";
+import {
+  CommerceInvoiceSdk,
+  COMMERCE_ERC20_ABI,
+  COMMERCE_NATIVE_TOKEN,
+  deriveTronInvoiceAddress,
+  ensureInvoiceTrxForSweep,
+  readTronTokenBalance,
+  sweepTrc20FromInvoice,
+  tronNumericChainId,
+  type TronSponsorConfig,
+} from "onchain-invoice";
+import { TronWeb } from "tronweb";
 import type { InvoiceRecord } from "../shared/types.js";
 import { signSweeperRequest } from "../server/sweeper-auth.js";
 import { ActivityLog } from "./activity-log.js";
 import { load as loadYaml } from "./config-loader.js";
+
+export type SweeperRole = "evm" | "tron" | "all";
 
 export interface SweeperConfig {
   serverUrl: string;
@@ -16,11 +29,13 @@ export interface SweeperConfig {
   maxRetries?: number;
   /** Host-persisted JSONL activity log path (bind-mount on VPS). */
   activityLogPath?: string;
+  /**
+   * Which half of a shared YAML this process should handle.
+   * Prefer env `SWEEPER_ROLE=evm|tron|all` (compose dual services).
+   */
+  role?: SweeperRole;
   chains: EvmChainConfig[];
-  tron?: {
-    enabled: boolean;
-    note?: string;
-  };
+  tron?: TronSweeperConfig;
   solana?: {
     enabled: boolean;
     note?: string;
@@ -39,6 +54,27 @@ export interface EvmChainConfig {
   }>;
 }
 
+export interface TronSweeperConfig {
+  enabled: boolean;
+  note?: string;
+  /** Product chain id (`nile`) stored on invoices. */
+  chainId?: string;
+  fullHost?: string;
+  invoiceMasterSecret?: string;
+  /** Sponsor / sweep key (energy + TRX top-up). Defaults to first EVM privateKey / sweeper wallet. */
+  privateKey?: string;
+  sponsorPrivateKey?: string;
+  usdtAddress?: string;
+  feeLimit?: number;
+  energyMode?: "staked" | "burn" | "rent";
+  minDelegateEnergy?: number;
+  tokens?: Array<{
+    symbol: string;
+    address: string;
+    decimals?: number;
+  }>;
+}
+
 const ERC20_ABI = ["function balanceOf(address account) view returns (uint256)"] as const;
 
 export class SweeperWorker {
@@ -46,23 +82,58 @@ export class SweeperWorker {
   private tickInFlight: Promise<void> | null = null;
   private wallet: Wallet | null = null;
   private readonly activity: ActivityLog | null;
+  private readonly role: SweeperRole;
+  private readonly chains: EvmChainConfig[];
+  private tron: TronSweeperConfig | undefined;
 
   constructor(private readonly config: SweeperConfig) {
+    this.role = resolveRole(config);
+    this.chains = this.role === "tron" ? [] : config.chains ?? [];
+    this.tron =
+      this.role === "evm"
+        ? undefined
+        : config.tron?.enabled
+          ? config.tron
+          : undefined;
+
     if (config.sweeperWalletKey) {
       this.wallet = new Wallet(config.sweeperWalletKey);
-    } else if (config.chains[0]?.privateKey) {
-      this.wallet = new Wallet(config.chains[0].privateKey);
+    } else if (this.chains[0]?.privateKey) {
+      this.wallet = new Wallet(this.chains[0].privateKey);
     }
     const logPath = config.activityLogPath?.trim();
     this.activity = logPath ? new ActivityLog(logPath) : null;
   }
 
   async start(): Promise<void> {
-    if (this.config.tron?.enabled) {
-      console.warn(JSON.stringify({ level: "warn", msg: "Tron sweeper not implemented; skipping", note: this.config.tron.note }));
+    console.log(
+      JSON.stringify({
+        level: "info",
+        msg: "sweeper role",
+        role: this.role,
+        evmChains: this.chains.map((c) => String(c.chainId)),
+        tronEnabled: Boolean(this.tron?.enabled),
+      })
+    );
+    if (this.config.tron?.enabled && this.role === "evm") {
+      console.log(JSON.stringify({ level: "info", msg: "Tron config present but role=evm; skipping Tron" }));
     }
     if (this.config.solana?.enabled) {
-      console.warn(JSON.stringify({ level: "warn", msg: "Solana sweeper not implemented; skipping", note: this.config.solana.note }));
+      console.warn(
+        JSON.stringify({ level: "warn", msg: "Solana sweeper not implemented; skipping", note: this.config.solana.note })
+      );
+    }
+    if (this.tron?.enabled) {
+      try {
+        assertTronConfig(this.tron);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (this.role === "tron") {
+          throw new Error(`Tron sweeper misconfigured: ${message}`);
+        }
+        console.warn(JSON.stringify({ level: "warn", msg: "Tron enabled but incomplete; skipping", error: message }));
+        this.tron = undefined;
+      }
     }
     while (!this.stopped) {
       this.tickInFlight = this.tick().catch((error) => {
@@ -94,9 +165,28 @@ export class SweeperWorker {
   async tick(): Promise<void> {
     const invoices = await this.fetchInvoices();
     const readyByChain = new Map<string, Array<{ invoice: InvoiceRecord; token: string | null; balance: bigint }>>();
+    const readyTron: Array<{ invoice: InvoiceRecord; token: string; balance: bigint }> = [];
 
     for (const invoice of invoices) {
       try {
+        if (isTronInvoice(invoice)) {
+          if (!this.tron?.enabled) continue;
+          const prepared = await this.prepareTronInvoice(invoice);
+          if (!prepared) continue;
+          this.activity?.append("invoice-paid", {
+            invoiceId: invoice.id,
+            chainId: String(invoice.chainId),
+            invoiceAddress: invoice.invoiceAddress ?? undefined,
+            payload: {
+              token: prepared.token,
+              amount: prepared.balance.toString(),
+              status: invoice.status,
+            },
+          });
+          readyTron.push(prepared);
+          continue;
+        }
+
         const prepared = await this.prepareInvoice(invoice);
         if (!prepared) continue;
         this.activity?.append("invoice-paid", {
@@ -130,7 +220,7 @@ export class SweeperWorker {
     }
 
     for (const [chainId, batch] of readyByChain) {
-      const chain = this.config.chains.find((entry) => String(entry.chainId) === chainId);
+      const chain = this.chains.find((entry) => String(entry.chainId) === chainId);
       if (!chain || batch.length === 0) continue;
 
       for (const item of batch) {
@@ -172,6 +262,34 @@ export class SweeperWorker {
         }
       }
     }
+
+    for (const item of readyTron) {
+      try {
+        const claimed = await this.claimWithRetry(item.invoice);
+        if (!claimed) continue;
+        const afterPaid = await this.trackWithRetry({
+          invoiceId: item.invoice.id,
+          status: item.invoice.allowPartial ? "paid_partial" : "paid",
+          amountPaid: item.balance.toString(),
+          expectedVersion: claimed.version,
+          payload: { observedBalance: item.balance.toString(), token: item.token },
+        });
+        await this.sweepTronOne(item.invoice, item.token, item.balance, afterPaid?.version ?? claimed.version + 1);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.activity?.append("sweep-failed", {
+          invoiceId: item.invoice.id,
+          chainId: item.invoice.chainId ? String(item.invoice.chainId) : undefined,
+          invoiceAddress: item.invoice.invoiceAddress ?? undefined,
+          payload: { error: message, token: item.token, amount: item.balance.toString() },
+        });
+        await this.trackWithRetry({
+          invoiceId: item.invoice.id,
+          error: message,
+          expectedVersion: item.invoice.version,
+        }).catch(() => undefined);
+      }
+    }
   }
 
   private async prepareInvoice(
@@ -179,7 +297,7 @@ export class SweeperWorker {
   ): Promise<{ chain: EvmChainConfig; token: string | null; balance: bigint } | null> {
     if (!invoice.chainId || !invoice.invoiceAddress || !invoice.selectedTo) return null;
     if (invoice.status === "swept") return null;
-    const chain = this.config.chains.find((entry) => String(entry.chainId) === String(invoice.chainId));
+    const chain = this.chains.find((entry) => String(entry.chainId) === String(invoice.chainId));
     if (!chain) return null;
 
     const provider = new JsonRpcProvider(chain.rpcUrl);
@@ -187,6 +305,22 @@ export class SweeperWorker {
     const balance = await readBalance(provider, invoice.invoiceAddress, token);
     if (balance === 0n) return null;
     return { chain, token, balance };
+  }
+
+  private async prepareTronInvoice(
+    invoice: InvoiceRecord
+  ): Promise<{ invoice: InvoiceRecord; token: string; balance: bigint } | null> {
+    if (!this.tron?.enabled) return null;
+    if (!invoice.chainId || !invoice.invoiceAddress || !invoice.selectedTo) return null;
+    if (invoice.status === "swept") return null;
+    const expectedChain = this.tron.chainId ?? "nile";
+    if (String(invoice.chainId) !== expectedChain) return null;
+
+    const token = resolveTronToken(this.tron, invoice.token);
+    const tronWeb = new TronWeb({ fullHost: this.tron.fullHost ?? "https://nile.trongrid.io" });
+    const balance = await readTronTokenBalance(tronWeb, invoice.invoiceAddress, token);
+    if (balance === 0n) return null;
+    return { invoice, token, balance };
   }
 
   private async sweepOne(
@@ -241,6 +375,85 @@ export class SweeperWorker {
         feeCollected: result.fee.toString(),
         gasSpentWei,
         to: result.to,
+      },
+    });
+  }
+
+  private async sweepTronOne(
+    invoice: InvoiceRecord,
+    token: string,
+    balance: bigint,
+    expectedVersion: number
+  ): Promise<void> {
+    const tron = this.tron!;
+    assertTronConfig(tron);
+    const sponsorKey = tron.sponsorPrivateKey ?? tron.privateKey ?? this.config.sweeperWalletKey;
+    if (!sponsorKey) throw new Error("Tron sponsor private key is required");
+    const merchant = invoice.selectedTo!;
+    const chainId = String(invoice.chainId ?? tron.chainId ?? "nile");
+    const numericId = tronNumericChainId(chainId);
+    const fullHost = tron.fullHost ?? "https://nile.trongrid.io";
+
+    // Sanity: invoice address must match EOA derivation
+    const expected = deriveTronInvoiceAddress(tron.invoiceMasterSecret!, numericId, invoice.id, fullHost);
+    if (expected !== invoice.invoiceAddress) {
+      throw new Error(`Tron invoice address mismatch: expected ${expected}, got ${invoice.invoiceAddress}`);
+    }
+
+    const sponsorConfig: TronSponsorConfig = {
+      fullHost,
+      sponsorPrivateKey: sponsorKey,
+      feeLimit: tron.feeLimit,
+      energyMode: tron.energyMode,
+      minDelegateEnergy: tron.minDelegateEnergy,
+    };
+
+    await ensureInvoiceTrxForSweep(sponsorConfig, invoice.invoiceAddress!);
+
+    const result = await sweepTrc20FromInvoice(
+      sponsorConfig,
+      tron.invoiceMasterSecret!,
+      numericId,
+      invoice.id,
+      invoice.invoiceAddress!,
+      token,
+      merchant
+    );
+
+    this.activity?.append("sweep-submitted", {
+      invoiceId: invoice.id,
+      chainId,
+      invoiceAddress: invoice.invoiceAddress ?? undefined,
+      txHash: result.txId,
+      payload: {
+        token: result.token,
+        amount: result.amount.toString(),
+        to: merchant,
+      },
+    });
+
+    await this.trackWithRetry({
+      invoiceId: invoice.id,
+      status: "swept",
+      amountPaid: balance.toString(),
+      amountSwept: result.amount.toString(),
+      feeCollected: "0",
+      gasSpentWei: "0",
+      sweepTx: result.txId,
+      expectedVersion,
+      payload: { token: result.token, to: merchant },
+    });
+
+    this.activity?.append("sweep-confirmed", {
+      invoiceId: invoice.id,
+      chainId,
+      invoiceAddress: invoice.invoiceAddress ?? undefined,
+      txHash: result.txId,
+      payload: {
+        token: result.token,
+        amountSwept: result.amount.toString(),
+        feeCollected: "0",
+        to: merchant,
       },
     });
   }
@@ -335,7 +548,9 @@ export class SweeperWorker {
     } else if (this.config.apiKey) {
       headers["x-api-key"] = this.config.apiKey;
       // Legacy internal paths
-      const legacyPath = path.replace("/api/sweeper/invoices", "/api/internal/invoices").replace("/api/sweeper/track", "/api/internal/track");
+      const legacyPath = path
+        .replace("/api/sweeper/invoices", "/api/internal/invoices")
+        .replace("/api/sweeper/track", "/api/internal/track");
       if (legacyPath !== path && (path.includes("invoices") || path.includes("track"))) {
         return fetch(`${base}${legacyPath}`, { method: init.method, headers, body: init.body });
       }
@@ -358,7 +573,28 @@ export async function loadSweeperConfig(path: string): Promise<SweeperConfig> {
   } else if (!config.activityLogPath?.trim()) {
     config.activityLogPath = "/data/logs/activity.jsonl";
   }
+  const roleEnv = process.env.SWEEPER_ROLE?.trim().toLowerCase();
+  if (roleEnv === "evm" || roleEnv === "tron" || roleEnv === "all") {
+    config.role = roleEnv;
+  }
   return config;
+}
+
+function resolveRole(config: SweeperConfig): SweeperRole {
+  if (config.role === "evm" || config.role === "tron" || config.role === "all") return config.role;
+  return "all";
+}
+
+function isTronInvoice(invoice: InvoiceRecord): boolean {
+  const id = String(invoice.chainId ?? "");
+  return id === "nile" || id === "shasta" || id === "tron" || id === "3448148188";
+}
+
+function assertTronConfig(tron: TronSweeperConfig): void {
+  if (!tron.invoiceMasterSecret) throw new Error("tron.invoiceMasterSecret is required");
+  if (!tron.fullHost) throw new Error("tron.fullHost is required");
+  const token = tron.usdtAddress ?? tron.tokens?.find((t) => t.symbol.toUpperCase() === "USDT")?.address;
+  if (!token) throw new Error("tron.usdtAddress (or tokens USDT) is required");
 }
 
 function resolveToken(chain: EvmChainConfig, token: string | null): string | null {
@@ -372,6 +608,18 @@ function resolveToken(chain: EvmChainConfig, token: string | null): string | nul
   if (!found) {
     throw new Error(`Token ${token} is not configured for chain ${chain.chainId}`);
   }
+  return found.address;
+}
+
+function resolveTronToken(tron: TronSweeperConfig, token: string | null): string {
+  if (token && token.startsWith("T")) return token;
+  if (!token || token.toUpperCase() === "USDT") {
+    const addr = tron.usdtAddress ?? tron.tokens?.find((t) => t.symbol.toUpperCase() === "USDT")?.address;
+    if (!addr) throw new Error("USDT address is not configured for Tron");
+    return addr;
+  }
+  const found = tron.tokens?.find((entry) => entry.symbol.toLowerCase() === token.toLowerCase());
+  if (!found?.address) throw new Error(`Token ${token} is not configured for Tron`);
   return found.address;
 }
 
