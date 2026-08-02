@@ -1,20 +1,25 @@
 import { encodePayLink } from "../shared/invoice.js";
 import { howCreateArt, howPayArt, howSettleArt } from "../shared/how-graphics.js";
+import { deploymentMode, networksForDeployment } from "../shared/networks.js";
+import { SITE } from "../shared/site.js";
 
 function chip(label: string, kind: "muted" | "warn" | "ok" | "accent" = "muted"): string {
   return `<span class="cmp-chip cmp-chip-${kind}">${label}</span>`;
 }
 
 export function renderHome(root: HTMLElement): void {
+  const mode = deploymentMode();
+  const networks = networksForDeployment(mode);
+  const demoChain = networks[0]?.id ?? (mode === "testnet" ? "11155111" : "1");
   const demo = {
     price: "0.01",
     to: ["0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb"],
-    chains: ["11155111"],
+    chains: [demoChain],
     tokens: ["USDC"],
     clientInvoiceId: `order-${Date.now()}`,
     callback: "",
     title: "Demo invoice",
-    description: "Try a Sepolia USDC test payment.",
+    description: mode === "testnet" ? "Try a Sepolia USDC test payment." : "Try a USDC payment.",
     allowPartial: false,
   };
   const demoLink = `/pay?${encodePayLink(demo)}`;
@@ -65,6 +70,28 @@ export function renderHome(root: HTMLElement): void {
         </div>
         <p class="shopify-caption">Example Shopify checkout with Pay with crypto</p>
       </aside>
+    </section>
+
+    <section class="section" id="agents">
+      <p class="eyebrow">AI agents</p>
+      <h2>Invoice skill for coding agents</h2>
+      <p class="section-lede">
+        Bots and assistants can create pay links and poll status from the published Cursor skill —
+        no merchant dashboard required.
+      </p>
+      <p>
+        <a
+          id="agent-skill"
+          class="agent-skill-link"
+          href="${SITE.agentSkillUrl}"
+          rel="alternate noopener noreferrer"
+          target="_blank"
+          data-agent-skill="trustless-commerce-invoice"
+        >AI agent skill (SKILL.md)</a>
+        ·
+        <a href="${SITE.agentsDocsUrl}" target="_blank" rel="noopener noreferrer">Agent docs</a>
+      </p>
+      <p class="field-hint mono">${SITE.agentSkillPath}</p>
     </section>
 
     <section class="section">
@@ -207,6 +234,8 @@ export function renderHome(root: HTMLElement): void {
         <a href="/create" data-route>Create</a>
         ·
         <a href="/merchant" data-route>Merchant</a>
+        ·
+        <a href="${SITE.agentSkillUrl}" rel="alternate noopener noreferrer" target="_blank" data-agent-skill="trustless-commerce-invoice">AI skill</a>
       </span>
     </footer>
   `;
