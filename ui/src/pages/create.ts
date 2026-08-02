@@ -1,14 +1,22 @@
 import { encodePayLink, invoiceIdFromPayLink, payPath } from "../shared/invoice.js";
 import { copyText, escapeHtml } from "../shared/dom.js";
-import { NETWORKS, TOKENS, chainLogoSvg } from "../shared/networks.js";
+import { TOKENS, chainLogoSvg, deploymentMode, networksForDeployment } from "../shared/networks.js";
 import type { PayLinkFields } from "../shared/types.js";
 
 export function renderCreate(root: HTMLElement): void {
+  const mode = deploymentMode();
+  const networks = networksForDeployment(mode);
+  const modeLabel = mode === "testnet" ? "Testnet" : "Mainnet";
+
   root.innerHTML = `
     <header class="page-header">
-      <p class="eyebrow">Create invoice</p>
+      <p class="eyebrow">Create invoice · ${escapeHtml(modeLabel)}</p>
       <h1>Build a payment link</h1>
       <p>Enter invoice details, copy a pay button for your site, and share the link. No wallet connection required.</p>
+      <p class="callout info" role="status">
+        This ${escapeHtml(modeLabel.toLowerCase())} UI only lists ${escapeHtml(modeLabel.toLowerCase())} networks.
+        ${mode === "testnet" ? "Use the mainnet site for production chains." : "Use the testnet site for Sepolia and other test networks."}
+      </p>
     </header>
 
     <div class="create-layout">
@@ -40,23 +48,35 @@ export function renderCreate(root: HTMLElement): void {
 
           <div class="field">
             <label>Accepted networks <span class="required">*</span></label>
-            <p class="field-hint">Chains the payer may choose at checkout. EVM networks share one merchant wallet below.</p>
+            <p class="field-hint">${escapeHtml(modeLabel)} chains the payer may choose at checkout. EVM networks share one merchant wallet below.</p>
             <div class="field-row" id="chains">
-              ${NETWORKS.map(
-                (n, i) => `
+              ${
+                networks.length === 0
+                  ? `<p class="danger">No ${escapeHtml(modeLabel.toLowerCase())} networks are configured.</p>`
+                  : networks
+                      .map(
+                        (n, i) => `
                 <label class="check check-chain">
                   <input type="checkbox" name="chains" value="${escapeHtml(n.id)}" ${i === 0 ? "checked" : ""} />
                   ${chainLogoSvg(n.id, 18)}
                   <span>${escapeHtml(n.label)}</span>
                 </label>`
-              ).join("")}
+                      )
+                      .join("")
+              }
             </div>
           </div>
 
           <div class="field">
             <label for="to">EVM merchant wallet <span class="required">*</span></label>
+            <div class="callout danger wallet-settlement-note" role="note">
+              <strong>Funds are swept to this address.</strong>
+              The full invoice value (minus protocol fee) is sent here after payment.
+              Make sure you can receive the selected tokens on this wallet on every network you enable —
+              otherwise tokens may be lost permanently.
+            </div>
             <p class="field-hint">Settlement address for all selected EVM networks. Bound into the invoice salt — sweeps cannot redirect funds elsewhere.</p>
-            <input id="to" name="to" required class="mono" placeholder="0x…" value="0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb" />
+            <input id="to" name="to" required class="mono" placeholder="0x…" autocomplete="off" spellcheck="false" />
           </div>
 
           <div class="field">
@@ -91,7 +111,7 @@ export function renderCreate(root: HTMLElement): void {
 
       <aside class="panel create-output" id="preview">
         <p class="eyebrow">Output</p>
-        <h2>Pay link & embed</h2>
+        <h2>Pay link &amp; embed</h2>
         <p class="field-hint">Updates as you edit. Copy into your storefront or share the URL.</p>
         <div id="preview-body"></div>
       </aside>
@@ -137,7 +157,9 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
         <h3 style="margin-top:1.5rem">For AI agents</h3>
         <p>
           Use the project Cursor skill
-          <span class="mono">.cursor/skills/trustless-commerce-invoice/SKILL.md</span>
+          <a href="https://raw.githubusercontent.com/naiemk/onchain-invoice/main/.cursor/skills/trustless-commerce-invoice/SKILL.md"
+             rel="alternate noopener noreferrer"
+             target="_blank"><span class="mono">.cursor/skills/trustless-commerce-invoice/SKILL.md</span></a>
           to create invoices and poll status without a merchant dashboard. Full docs:
           <a href="https://naiemk.github.io/onchain-invoice/" target="_blank" rel="noopener noreferrer">GitHub Pages</a>.
         </p>
@@ -185,8 +207,7 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
         previewBody.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
           btn.addEventListener("click", async () => {
             const kind = btn.dataset.copy;
-            const value =
-              kind === "url" ? absolute : kind === "embed" ? embed : statusUrl;
+            const value = kind === "url" ? absolute : kind === "embed" ? embed : statusUrl;
             await copyText(value);
             const note = previewBody.querySelector<HTMLElement>("#copy-status");
             if (note) note.textContent = "Copied to clipboard.";
@@ -216,7 +237,8 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
 }
 
 function readForm(root: HTMLElement): PayLinkFields {
-  const value = (id: string) => root.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)?.value.trim() ?? "";
+  const value = (id: string) =>
+    root.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)?.value.trim() ?? "";
   const checked = (name: string) =>
     [...root.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)].map((el) => el.value);
 

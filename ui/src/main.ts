@@ -104,6 +104,8 @@ function shell(pathname: string): string {
       <span>
         <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">Docs</a>
         ·
+        <a href="${SITE.agentSkillUrl}" rel="alternate noopener noreferrer" target="_blank" data-agent-skill="trustless-commerce-invoice">AI skill</a>
+        ·
         <a href="${SITE.githubUrl}" target="_blank" rel="noopener noreferrer">GitHub</a>
         ·
         <a href="${SITE.telegramChannel}" target="_blank" rel="noopener noreferrer">Telegram</a>

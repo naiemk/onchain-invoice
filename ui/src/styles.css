@@ -1193,6 +1193,38 @@ button:disabled {
   color: var(--danger);
 }
 
+.wallet-settlement-note {
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 0.65rem 0 0.85rem;
+  padding: 1.1rem 1.15rem;
+}
+
+.wallet-settlement-note strong {
+  display: block;
+  font-size: 1.12rem;
+  margin-bottom: 0.35rem;
+}
+
+html[data-theme="dark"] .callout.warn {
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fcd34d;
+}
+
+html[data-theme="dark"] .callout.info {
+  border-color: rgba(77, 141, 255, 0.35);
+  color: #bfdbfe;
+}
+
+html[data-theme="dark"] .callout.danger,
+html[data-theme="dark"] .wallet-settlement-note {
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.agent-skill-link {
+  font-weight: 600;
+}
+
 /* Create page */
 .create-layout {
   display: grid;

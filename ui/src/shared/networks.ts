@@ -50,6 +50,31 @@ export function isTestnet(chainId: string | null | undefined): boolean {
   return ["11155111", "84532", "421614", "11155420", "5", "80001"].includes(String(chainId));
 }
 
+export type DeploymentMode = "testnet" | "mainnet";
+
+/** Which product surface this UI build is serving (hostname or VITE_DEPLOYMENT_MODE). */
+export function deploymentMode(): DeploymentMode {
+  const fromEnv = (import.meta.env.VITE_DEPLOYMENT_MODE as string | undefined)?.toLowerCase();
+  if (fromEnv === "testnet" || fromEnv === "mainnet") return fromEnv;
+  if (typeof location === "undefined") return "testnet";
+  const host = location.hostname.toLowerCase();
+  if (
+    host.startsWith("testnet.") ||
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host.endsWith(".local")
+  ) {
+    return "testnet";
+  }
+  return "mainnet";
+}
+
+/** Networks allowed on the create form for this deployment. */
+export function networksForDeployment(mode: DeploymentMode = deploymentMode()): NetworkOption[] {
+  const wantTestnet = mode === "testnet";
+  return NETWORKS.filter((n) => Boolean(n.testnet) === wantTestnet);
+}
+
 export function testnetPillHtml(chainId: string | null | undefined): string {
   if (!isTestnet(chainId)) return "";
   return `<span class="testnet-pill" role="status">Testnet invoice — no real value</span>`;
