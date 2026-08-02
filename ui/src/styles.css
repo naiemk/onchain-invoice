@@ -94,17 +94,24 @@ a:hover {
 }
 
 .theme-toggle {
+  align-items: center;
   appearance: none;
   background: var(--bg-elevated);
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  color: var(--ink);
+  color: var(--ink-muted);
   cursor: pointer;
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 500;
-  line-height: 1;
-  padding: 0.45rem 0.85rem;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 2.15rem;
+  justify-content: center;
+  line-height: 0;
+  padding: 0;
+  width: 2.15rem;
+}
+
+.theme-toggle-icon {
+  display: block;
 }
 
 .theme-toggle:hover {
