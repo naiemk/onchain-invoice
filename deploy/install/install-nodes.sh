@@ -40,26 +40,56 @@ write_if_missing() {
   echo "created: $path"
 }
 
+write_template() {
+  local name="$1"
+  local path="$DEST/$name"
+  echo "refreshing $name ..."
+  fetch_or_fail "$RAW_BASE/$name" "$path"
+  echo "updated: $path"
+}
+
+append_missing_env_keys() {
+  local example="$1"
+  local envfile="$2"
+  shift 2
+  [[ -f "$example" && -f "$envfile" ]] || return 0
+  local key line added=0
+  for key in "$@"; do
+    if grep -qE "^[[:space:]]*${key}=" "$envfile"; then
+      continue
+    fi
+    line="$(grep -E "^[[:space:]]*${key}=" "$example" | head -1 || true)"
+    [[ -n "$line" ]] || continue
+    if [[ "$added" -eq 0 ]]; then
+      {
+        echo ""
+        echo "# --- Auto-update (added by install; see .env.example) ---"
+      } >>"$envfile"
+    fi
+    echo "$line" >>"$envfile"
+    echo "appended to .env: $key"
+    added=1
+  done
+}
+
 write_if_missing "onchain-invoice-nodes.yaml"
 write_if_missing "start-onchain-invoice-nodes.sh"
 write_if_missing "register-onchain-invoice-node.sh"
 write_if_missing "lib-env.sh"
 write_if_missing "update-onchain-invoice-nodes.sh"
 write_if_missing "install-auto-update.sh"
-write_if_missing ".env.nodes.example"
+write_template ".env.nodes.example"
 
-if [[ ! -f "$DEST/.env.example" ]]; then
-  if [[ -f "$DEST/.env.nodes.example" ]]; then
-    cp "$DEST/.env.nodes.example" "$DEST/.env.example"
-    echo "created: $DEST/.env.example"
-  fi
-fi
+cp "$DEST/.env.nodes.example" "$DEST/.env.example"
+echo "updated: $DEST/.env.example"
 
 if [[ ! -f "$DEST/.env" ]]; then
   cp "$DEST/.env.example" "$DEST/.env"
   echo "created: $DEST/.env  (edit secrets before starting)"
 else
-  echo "exists (unchanged): $DEST/.env"
+  echo "exists: $DEST/.env (secrets preserved)"
+  append_missing_env_keys "$DEST/.env.nodes.example" "$DEST/.env" \
+    ACTIVITY_LOG_PATH AUTO_UPDATE AUTO_UPDATE_INTERVAL_MIN STOP_TIMEOUT
 fi
 
 (

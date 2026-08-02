@@ -37,23 +37,58 @@ write_if_missing() {
   echo "created: $path"
 }
 
+# Templates are safe to overwrite (no secrets). Keeps AUTO_UPDATE docs current on re-install.
+write_template() {
+  local name="$1"
+  local path="$DEST/$name"
+  echo "refreshing $name ..."
+  fetch_or_fail "$RAW_BASE/$name" "$path"
+  echo "updated: $path"
+}
+
+# Append KEY=… from example into .env when the key is absent (never overwrites).
+append_missing_env_keys() {
+  local example="$1"
+  local envfile="$2"
+  shift 2
+  [[ -f "$example" && -f "$envfile" ]] || return 0
+  local key line added=0
+  for key in "$@"; do
+    if grep -qE "^[[:space:]]*${key}=" "$envfile"; then
+      continue
+    fi
+    line="$(grep -E "^[[:space:]]*${key}=" "$example" | head -1 || true)"
+    [[ -n "$line" ]] || continue
+    if [[ "$added" -eq 0 ]]; then
+      {
+        echo ""
+        echo "# --- Auto-update (added by install; see .env.example) ---"
+      } >>"$envfile"
+    fi
+    echo "$line" >>"$envfile"
+    echo "appended to .env: $key"
+    added=1
+  done
+}
+
 write_if_missing "start-onchain-invoice-gateway.sh"
 write_if_missing "lib-env.sh"
 write_if_missing "update-onchain-invoice-gateway.sh"
 write_if_missing "install-auto-update.sh"
-write_if_missing ".env.gateway.example"
 write_if_missing "gateway/nginx.conf"
 write_if_missing "gateway/conf.d/domains.conf"
+write_template ".env.gateway.example"
 
-if [[ ! -f "$DEST/.env.example" ]]; then
-  cp "$DEST/.env.gateway.example" "$DEST/.env.example"
-  echo "created: $DEST/.env.example"
-fi
+cp "$DEST/.env.gateway.example" "$DEST/.env.example"
+echo "updated: $DEST/.env.example"
+
 if [[ ! -f "$DEST/.env" ]]; then
   cp "$DEST/.env.example" "$DEST/.env"
   echo "created: $DEST/.env  (edit TLS paths if needed)"
 else
-  echo "exists (unchanged): $DEST/.env"
+  echo "exists: $DEST/.env (secrets preserved)"
+  append_missing_env_keys "$DEST/.env.gateway.example" "$DEST/.env" \
+    AUTO_UPDATE AUTO_UPDATE_INTERVAL_MIN STOP_TIMEOUT
 fi
 
 (

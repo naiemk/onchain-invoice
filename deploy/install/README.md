@@ -133,6 +133,7 @@ Stages: `invoice-paid`, `sweep-submitted`, `sweep-confirmed`, `sweep-failed`, `t
 
 - Existing config/start/`.env` files are **not** overwritten.
 - Prefer editing **`.env`**. Start scripts load `.env` when variables are unset **or empty** (non-empty shell exports win).
+- Installers **refresh** `.env.*.example` / `.env.example` on every run and **append** missing `AUTO_UPDATE*` keys into an existing `.env` (secrets are never overwritten).
 - Empty env vars are **not** passed as `docker -e KEY=` (so they cannot wipe config).
 - Quote `0x…` values in YAML (installer templates already do) — unquoted YAML 1.1 corrupts private keys.
 - For HTTPS, API containers must be named `testnet-api` / `mainnet-api` on `DOCKER_NETWORK=trustless-commerce-edge` (set via `.env`).
