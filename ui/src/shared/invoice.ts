@@ -1,6 +1,6 @@
 import { getAddress } from "ethers";
 import { getCommerceInvoiceId, type CommerceInvoiceParams } from "onchain-invoice";
-import { filterSupportedTokens } from "./networks.js";
+import { filterSupportedTokens, looksLikeTronAddress } from "./networks.js";
 import type { PayLinkFields } from "./types.js";
 
 const DEFAULT_CHAIN = "11155111";
@@ -15,6 +15,7 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
         : objectToSearchParams(input);
 
   const to = splitList(params.get("to")).map((value) => {
+    if (looksLikeTronAddress(value)) return value.trim();
     try {
       return getAddress(value);
     } catch {

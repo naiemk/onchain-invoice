@@ -11,15 +11,17 @@ export function renderHome(root: HTMLElement): void {
   const mode = deploymentMode();
   const networks = networksForDeployment(mode);
   const demoChain = networks[0]?.id ?? (mode === "testnet" ? "11155111" : "1");
+  const demoToken = demoChain === "nile" ? "USDT" : "USDC";
   const demo = {
     price: "0.01",
     to: ["0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb"],
     chains: [demoChain],
-    tokens: ["USDC"],
+    tokens: [demoToken],
     clientInvoiceId: `order-${Date.now()}`,
     callback: "",
     title: "Demo invoice",
-    description: mode === "testnet" ? "Try a Sepolia USDC test payment." : "Try a USDC payment.",
+    description:
+      mode === "testnet" ? "Try a Sepolia USDC or Nile USDT test payment." : "Try a USDC payment.",
     allowPartial: false,
   };
   const demoLink = `/pay?${encodePayLink(demo)}`;

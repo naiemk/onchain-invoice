@@ -32,7 +32,7 @@ fi
 
 ADDRESS="${SWEEPER_REGISTER_ADDRESS:-}"
 LABEL="${SWEEPER_LABEL:-node-1}"
-CHAINS="${SWEEPER_CHAINS:-11155111}"
+CHAINS="${SWEEPER_CHAINS:-11155111,nile}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -57,7 +57,7 @@ Environment (.env):
   ADMIN_API_KEY           Admin key configured on the API
   SWEEPER_REGISTER_ADDRESS  Wallet address to register
   SWEEPER_LABEL           Label (default node-1)
-  SWEEPER_CHAINS          Comma-separated chain ids (default 11155111)
+  SWEEPER_CHAINS          Comma-separated chain ids (default 11155111,nile)
 EOF
       exit 0
       ;;

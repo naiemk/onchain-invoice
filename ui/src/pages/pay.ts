@@ -6,8 +6,11 @@ import {
   chainLogoSvg,
   explorerAddressUrl,
   formatTokenAmount,
+  looksLikeTronAddress,
+  networkKind,
   networkLabel,
   testnetPillHtml,
+  tokenAllowedOnChain,
   tokenChipHtml,
 } from "../shared/networks.js";
 import type {
@@ -62,17 +65,26 @@ export function renderPay(root: HTMLElement): void {
 }
 
 function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId: string): void {
-  const merchantHint = maskMerchant(fields.to[0] ?? "");
+  const initialChain = fields.chains[0];
+  const recipientsForChain = (chainId: string) =>
+    fields.to.filter((addr) =>
+      networkKind(chainId) === "tron" ? looksLikeTronAddress(addr) : !looksLikeTronAddress(addr)
+    );
+  const initialRecipients = recipientsForChain(initialChain);
   const toField =
     fields.to.length > 1
       ? `<div class="field">
           <label for="to">Recipient</label>
           <p class="field-hint">Choose which merchant wallet this payment settles to.</p>
-          <select id="to">${fields.to
+          <select id="to">${initialRecipients
             .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(maskMerchant(value))}</option>`)
             .join("")}</select>
         </div>`
-      : `<input type="hidden" id="to" value="${escapeHtml(fields.to[0] ?? "")}" />`;
+      : `<input type="hidden" id="to" value="${escapeHtml(initialRecipients[0] ?? fields.to[0] ?? "")}" />`;
+
+  const tokensFor = (chainId: string) => fields.tokens.filter((t) => tokenAllowedOnChain(chainId, t));
+  const initialTokens = tokensFor(initialChain);
+  const merchantHint = maskMerchant(initialRecipients[0] ?? fields.to[0] ?? "");
 
   root.innerHTML = `
     <section class="checkout">
@@ -85,7 +97,7 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId
       </aside>
       <div class="checkout-panel">
         <p class="eyebrow">Payment method</p>
-        <div id="testnet-banner">${testnetPillHtml(fields.chains[0])}</div>
+        <div id="testnet-banner">${testnetPillHtml(initialChain)}</div>
         <h2>Choose network & token</h2>
         <p>Select where you’ll send funds. You’ll get a dedicated invoice address on the next step.</p>
         ${toField}
@@ -98,13 +110,13 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId
                 `<option value="${escapeHtml(value)}">${escapeHtml(networkLabel(value))}</option>`
             )
             .join("")}</select>
-          <div class="chain-select-preview" id="chain-preview">${chainChipHtml(fields.chains[0], { size: "md" })}</div>
+          <div class="chain-select-preview" id="chain-preview">${chainChipHtml(initialChain, { size: "md" })}</div>
         </div>
         <div class="field">
           <label for="token">Token</label>
           <p class="field-hint">Use the same asset your wallet will transfer.</p>
-          <select id="token">${fields.tokens.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}</select>
-          <div class="chain-select-preview" id="token-preview">${tokenChipHtml(fields.tokens[0], { size: "md" })}</div>
+          <select id="token">${initialTokens.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}</select>
+          <div class="chain-select-preview" id="token-preview">${tokenChipHtml(initialTokens[0] ?? fields.tokens[0], { size: "md" })}</div>
         </div>
         <button id="activate">Continue to payment</button>
         <button id="copy-link" type="button" class="secondary" style="margin-left:.5rem">Copy pay link</button>
@@ -119,17 +131,31 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId
   const chainSelect = root.querySelector<HTMLSelectElement>("#chain");
   const chainPreview = root.querySelector<HTMLElement>("#chain-preview");
   const testnetBanner = root.querySelector<HTMLElement>("#testnet-banner");
-  chainSelect?.addEventListener("change", () => {
-    if (chainPreview && chainSelect.value) {
-      chainPreview.innerHTML = chainChipHtml(chainSelect.value, { size: "md" });
-    }
-    if (testnetBanner) {
-      testnetBanner.innerHTML = testnetPillHtml(chainSelect.value);
-    }
-  });
-
   const tokenSelect = root.querySelector<HTMLSelectElement>("#token");
   const tokenPreview = root.querySelector<HTMLElement>("#token-preview");
+  const toSelect = root.querySelector<HTMLSelectElement>("#to");
+
+  const syncChainExtras = () => {
+    const chainId = chainSelect?.value ?? initialChain;
+    if (chainPreview) chainPreview.innerHTML = chainChipHtml(chainId, { size: "md" });
+    if (testnetBanner) testnetBanner.innerHTML = testnetPillHtml(chainId);
+    const nextTokens = tokensFor(chainId);
+    if (tokenSelect) {
+      tokenSelect.innerHTML = nextTokens
+        .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+        .join("");
+      if (tokenPreview) tokenPreview.innerHTML = tokenChipHtml(nextTokens[0] ?? "", { size: "md" });
+    }
+    if (toSelect && toSelect.tagName === "SELECT") {
+      const recipients = recipientsForChain(chainId);
+      toSelect.innerHTML = recipients
+        .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(maskMerchant(value))}</option>`)
+        .join("");
+    }
+  };
+
+  chainSelect?.addEventListener("change", syncChainExtras);
+
   tokenSelect?.addEventListener("change", () => {
     if (tokenPreview && tokenSelect.value) {
       tokenPreview.innerHTML = tokenChipHtml(tokenSelect.value, { size: "md" });
@@ -145,7 +171,7 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId
     const chainId = root.querySelector<HTMLSelectElement>("#chain")?.value ?? fields.chains[0];
     const token = root.querySelector<HTMLSelectElement>("#token")?.value ?? fields.tokens[0];
     const toEl = root.querySelector<HTMLSelectElement | HTMLInputElement>("#to");
-    const selectedTo = toEl?.value ?? fields.to[0];
+    const selectedTo = toEl?.value ?? recipientsForChain(chainId)[0] ?? fields.to[0];
     if (status) status.textContent = "Creating invoice address…";
     try {
       const response = await fetch(apiUrl("/api/invoices"), {
@@ -224,6 +250,11 @@ async function renderInvoiceStage(
         <div class="callout warn">
           <strong class="callout-chain">${chainLogoSvg(chainId, 22)}${escapeHtml(networkLabel(chainId))} only</strong>
           Sending from another chain can result in lost funds. Confirm your wallet network matches before you send.
+          ${
+            networkKind(chainId) === "tron"
+              ? " Use Nile Tronscan to verify the address when paying on Nile."
+              : ""
+          }
         </div>
         <div class="callout info">
           Pay with <strong class="pay-token-emphasis">${escapeHtml(token ?? "token")}</strong> to the address above.

@@ -81,12 +81,16 @@ append_missing_env_keys() {
 }
 
 write_if_missing "onchain-invoice-nodes.yaml"
+write_if_missing "docker-compose.sweepers.yml"
 write_if_missing "start-onchain-invoice-nodes.sh"
 write_if_missing "register-onchain-invoice-node.sh"
 write_if_missing "lib-env.sh"
 write_if_missing "update-onchain-invoice-nodes.sh"
 write_if_missing "install-auto-update.sh"
 write_template ".env.nodes.example"
+# Refresh compose + yaml templates so operators pick up Tron dual-sweeper layout
+write_template "docker-compose.sweepers.yml"
+write_template "onchain-invoice-nodes.yaml"
 
 cp "$DEST/.env.nodes.example" "$DEST/.env.example"
 echo "updated: $DEST/.env.example"
@@ -97,7 +101,8 @@ if [[ ! -f "$DEST/.env" ]]; then
 else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.nodes.example" "$DEST/.env" \
-    ACTIVITY_LOG_PATH NODES_AUTO_UPDATE NODES_AUTO_UPDATE_INTERVAL_MIN NODES_STOP_TIMEOUT
+    ACTIVITY_LOG_PATH NODES_AUTO_UPDATE NODES_AUTO_UPDATE_INTERVAL_MIN NODES_STOP_TIMEOUT \
+    TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS TRON_SPONSOR_PRIVATE_KEY
 fi
 
 (
@@ -111,14 +116,16 @@ Trustless Commerce sweeper node install complete in:
   $DEST
 
 Next:
-  1. Edit $DEST/.env  (API_URL, ADMIN_API_KEY, SWEEPER_WALLET_KEY, …)
-  2. Ensure API is up, then register this wallet:
+  1. Edit $DEST/.env  (API_URL, ADMIN_API_KEY, SWEEPER_WALLET_KEY, TRON_*, …)
+  2. Ensure API is up, then register this wallet (include nile):
        cd $DEST && ./register-onchain-invoice-node.sh
-  3. Start the worker:
+  3. Start dual sweepers (Sepolia + Nile):
        cd $DEST && ./start-onchain-invoice-nodes.sh
+       # or: docker compose -f docker-compose.sweepers.yml up -d
   4. Logs:
-       docker logs -f onchain-invoice-node
-       tail -f $DEST/logs/activity.jsonl
+       docker logs -f onchain-invoice-sweeper-evm
+       docker logs -f onchain-invoice-sweeper-tron
+       tail -f $DEST/logs/activity-evm.jsonl $DEST/logs/activity-tron.jsonl
   5. Auto-update (testnet default ON via NODES_AUTO_UPDATE): ./install-auto-update.sh
 
 EOF

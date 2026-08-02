@@ -23,13 +23,13 @@ Goal: create → pay → sweep works on each chain’s public testnet, behind `t
 - [ ] UI: add Base Sepolia to networks; keep create/pay paths honest (no fake mainnet Base)
 - [ ] System-test or smoke script for Base Sepolia USDC
 
-### Tron (Nile or Shasta)
-- [ ] Commerce address / invoice model (reuse library Tron patterns where possible: `contracts/tron/`, `src/tron*.ts`)
-- [ ] API create + sweeper claim/track for Tron invoices
-- [ ] Replace `tron.enabled` stub skip in [`commerce/sweeper/worker.ts`](commerce/sweeper/worker.ts) with a real tick path
-- [ ] UI network + pay instructions (TRC-20 USDT/USDC as chosen for launch)
-- [ ] Activity-log stages for Tron pay/sweep
-
+### Tron (Nile)
+- [x] Commerce address / invoice model (library EOA: `deriveTronInvoiceAddress` + sponsor sweep)
+- [x] API create + sweeper claim/track for Tron invoices (`string[]` merchant ids; chain id `nile`)
+- [x] Replace `tron.enabled` stub skip in [`commerce/sweeper/worker.ts`](commerce/sweeper/worker.ts) with a real tick path
+- [x] UI network + pay instructions (Nile TRC-20 USDT; Sepolia USDC)
+- [x] Activity-log stages for Tron pay/sweep (+ dual compose `sweeper-evm` / `sweeper-tron`)
+- [ ] Live Nile smoke: fund test USDT → paid → swept (operator checklist)
 ### Solana (devnet)
 - [ ] Greenfield: program or PDA scheme for invoice addresses + settle/sweep authority
 - [ ] TypeScript SDK helpers + API persistence

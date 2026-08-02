@@ -1050,6 +1050,63 @@ button:disabled {
   flex-shrink: 0;
 }
 
+.chain-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.chain-pill {
+  cursor: pointer;
+  display: inline-flex;
+  margin: 0;
+  position: relative;
+  user-select: none;
+}
+
+.chain-pill input {
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.chain-pill-face {
+  align-items: center;
+  background: color-mix(in srgb, var(--ink-muted) 10%, var(--bg-elevated));
+  border: 1.5px solid color-mix(in srgb, var(--ink-muted) 35%, transparent);
+  border-radius: 999px;
+  color: var(--ink-muted);
+  display: inline-flex;
+  font-size: 0.95rem;
+  font-weight: 600;
+  gap: 0.45rem;
+  min-height: 2.6rem;
+  padding: 0.45rem 0.95rem 0.45rem 0.65rem;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chain-pill:hover .chain-pill-face {
+  border-color: color-mix(in srgb, var(--ink-muted) 55%, transparent);
+  color: var(--ink);
+}
+
+.chain-pill input:focus-visible + .chain-pill-face {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.chain-pill input:checked + .chain-pill-face {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.chain-pill-label {
+  letter-spacing: 0.01em;
+}
+
 .testnet-pill {
   background: #dc2626;
   border-radius: 999px;
@@ -1216,9 +1273,13 @@ html[data-theme="dark"] .callout.info {
   color: #bfdbfe;
 }
 
-html[data-theme="dark"] .callout.danger,
-html[data-theme="dark"] .wallet-settlement-note {
+html[data-theme="dark"] .callout.danger {
   border-color: rgba(248, 113, 113, 0.4);
+}
+
+html[data-theme="dark"] .wallet-settlement-note.callout.info {
+  border-color: rgba(77, 141, 255, 0.35);
+  color: #bfdbfe;
 }
 
 .agent-skill-link {

@@ -84,12 +84,14 @@ Creates (if missing): `onchain-invoice-api.yaml`, `start-onchain-invoice-api.sh`
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
+# edit .env: TRON_* + SWEEPER_CHAINS=11155111,nile
 ./register-onchain-invoice-node.sh
-./start-onchain-invoice-nodes.sh
+./start-onchain-invoice-nodes.sh   # dual compose: sweeper-evm + sweeper-tron
 ```
 
-Optional: `./register-onchain-invoice-node.sh --address 0x… --label dtn-node --chains 11155111`
+Optional: `./register-onchain-invoice-node.sh --address 0x… --label dtn-node --chains 11155111,nile`
 
+Activity logs: `./logs/activity-evm.jsonl` and `./logs/activity-tron.jsonl`.
 ## Gateway only
 
 ```bash
@@ -126,7 +128,7 @@ Installers refresh cron from these flags (no `ROLE=` required). Legacy `AUTO_UPD
 Paid invoices, sweep txs, and failures are appended as JSONL on the host:
 
 ```bash
-tail -f ~/tc/sweeper/logs/activity.jsonl
+tail -f ~/tc/sweeper/logs/activity-evm.jsonl ~/tc/sweeper/logs/activity-tron.jsonl
 ```
 
 Stages: `invoice-paid`, `sweep-submitted`, `sweep-confirmed`, `sweep-failed`, `tick-failed`.
