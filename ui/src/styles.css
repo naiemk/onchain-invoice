@@ -18,6 +18,9 @@
   --danger: #b42318;
   --danger-bg: #fef3f2;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 32px rgba(16, 24, 40, 0.06);
+  --topbar-bg: rgba(255, 255, 255, 0.86);
+  --hero-glow-a: rgba(10, 108, 255, 0.12);
+  --hero-glow-b: rgba(13, 148, 136, 0.06);
   --radius: 12px;
   --radius-lg: 16px;
   --font: "Instrument Sans", system-ui, sans-serif;
@@ -31,6 +34,29 @@
   -webkit-font-smoothing: antialiased;
 }
 
+html[data-theme="dark"] {
+  --bg: #0b1220;
+  --bg-elevated: #121a2b;
+  --ink: #e8eef7;
+  --ink-muted: #a8b3c7;
+  --ink-faint: #7d8aa3;
+  --line: #243049;
+  --line-strong: #31405c;
+  --accent: #4d8dff;
+  --accent-hover: #6aa0ff;
+  --accent-soft: rgba(77, 141, 255, 0.14);
+  --ok: #2dd4bf;
+  --ok-bg: rgba(45, 212, 191, 0.12);
+  --warn: #fbbf24;
+  --warn-bg: rgba(251, 191, 36, 0.12);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.12);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.35);
+  --topbar-bg: rgba(11, 18, 32, 0.88);
+  --hero-glow-a: rgba(77, 141, 255, 0.16);
+  --hero-glow-b: rgba(45, 212, 191, 0.08);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -39,8 +65,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(10, 108, 255, 0.12), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(13, 148, 136, 0.06), transparent),
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--hero-glow-a), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, var(--hero-glow-b), transparent),
     var(--bg);
   color: var(--ink);
 }
@@ -56,7 +82,7 @@ a:hover {
 
 .topbar {
   align-items: center;
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--topbar-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -65,6 +91,30 @@ a:hover {
   position: sticky;
   top: 0;
   z-index: 20;
+}
+
+.theme-toggle {
+  appearance: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0.45rem 0.85rem;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .brand,
