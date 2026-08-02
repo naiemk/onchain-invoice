@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pull latest sweeper image and recreate the node if the digest changed.
-# Honors AUTO_UPDATE=0|1 (default off). Used by cron via install-auto-update.sh.
+# Honors NODES_AUTO_UPDATE=0|1 (legacy AUTO_UPDATE fallback).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR"
 source "$SCRIPT_DIR/lib-env.sh"
 load_dotenv .env
 
-if ! auto_update_enabled; then
+if ! role_auto_update_on NODES_AUTO_UPDATE; then
   exit 0
 fi
 
@@ -55,7 +55,7 @@ PY
 fi
 IMAGE="${IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}"
 NAME="${NAME:-onchain-invoice-node}"
-STOP_TIMEOUT="${STOP_TIMEOUT:-180}"
+STOP_TIMEOUT="${NODES_STOP_TIMEOUT:-${STOP_TIMEOUT:-180}}"
 
 log_update "$SCRIPT_DIR" "nodes: pulling $IMAGE"
 docker pull "$IMAGE" >/dev/null

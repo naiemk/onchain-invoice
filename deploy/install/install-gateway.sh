@@ -37,7 +37,7 @@ write_if_missing() {
   echo "created: $path"
 }
 
-# Templates are safe to overwrite (no secrets). Keeps AUTO_UPDATE docs current on re-install.
+# Templates are safe to overwrite (no secrets). Keeps auto-update docs current on re-install.
 write_template() {
   local name="$1"
   local path="$DEST/$name"
@@ -53,12 +53,20 @@ append_missing_env_keys() {
   shift 2
   [[ -f "$example" && -f "$envfile" ]] || return 0
   local key line added=0
+  local legacy_off=0
+  if grep -qiE "^[[:space:]]*AUTO_UPDATE=(0|false|off)\b" "$envfile"; then
+    legacy_off=1
+  fi
   for key in "$@"; do
     if grep -qE "^[[:space:]]*${key}=" "$envfile"; then
       continue
     fi
     line="$(grep -E "^[[:space:]]*${key}=" "$example" | head -1 || true)"
     [[ -n "$line" ]] || continue
+    # Preserve legacy AUTO_UPDATE=0 when introducing role-specific flags.
+    if [[ "$legacy_off" -eq 1 && "$key" == *_AUTO_UPDATE ]]; then
+      line="${key}=0"
+    fi
     if [[ "$added" -eq 0 ]]; then
       {
         echo ""
@@ -88,12 +96,13 @@ if [[ ! -f "$DEST/.env" ]]; then
 else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.gateway.example" "$DEST/.env" \
-    AUTO_UPDATE AUTO_UPDATE_INTERVAL_MIN STOP_TIMEOUT
+    UI_TESTNET_AUTO_UPDATE UI_MAINNET_AUTO_UPDATE GATEWAY_AUTO_UPDATE \
+    GATEWAY_AUTO_UPDATE_INTERVAL_MIN GATEWAY_STOP_TIMEOUT
 fi
 
 (
   cd "$DEST"
-  ROLE=gateway ./install-auto-update.sh || true
+  ./install-auto-update.sh || true
 )
 
 cat <<EOF
@@ -114,6 +123,6 @@ Next:
   1. Edit $DEST/.env
   2. cd $DEST && ./start-onchain-invoice-gateway.sh
   3. curl -fsS https://testnet.trustless-commerce.com/api/health
-  4. Auto-update (default ON every 5m): ROLE=gateway ./install-auto-update.sh
+  4. Auto-update (UI/nginx flags in .env): ./install-auto-update.sh
 
 EOF

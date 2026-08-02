@@ -54,12 +54,20 @@ append_missing_env_keys() {
   shift 2
   [[ -f "$example" && -f "$envfile" ]] || return 0
   local key line added=0
+  local legacy_off=0
+  if grep -qiE "^[[:space:]]*AUTO_UPDATE=(0|false|off)\b" "$envfile"; then
+    legacy_off=1
+  fi
   for key in "$@"; do
     if grep -qE "^[[:space:]]*${key}=" "$envfile"; then
       continue
     fi
     line="$(grep -E "^[[:space:]]*${key}=" "$example" | head -1 || true)"
     [[ -n "$line" ]] || continue
+    # Preserve legacy AUTO_UPDATE=0 when introducing role-specific flags.
+    if [[ "$legacy_off" -eq 1 && "$key" == *_AUTO_UPDATE ]]; then
+      line="${key}=0"
+    fi
     if [[ "$added" -eq 0 ]]; then
       {
         echo ""
@@ -88,12 +96,12 @@ if [[ ! -f "$DEST/.env" ]]; then
 else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.api.example" "$DEST/.env" \
-    AUTO_UPDATE AUTO_UPDATE_INTERVAL_MIN STOP_TIMEOUT
+    API_AUTO_UPDATE API_AUTO_UPDATE_INTERVAL_MIN API_STOP_TIMEOUT
 fi
 
 (
   cd "$DEST"
-  ROLE=api ./install-auto-update.sh || true
+  ./install-auto-update.sh || true
 )
 
 cat <<EOF
@@ -107,6 +115,6 @@ Next:
        cd $DEST && ./start-onchain-invoice-api.sh
   3. Health:
        curl -s http://localhost:8080/api/health
-  4. Auto-update (off by default): set AUTO_UPDATE=1 then ROLE=api ./install-auto-update.sh
+  4. Auto-update (off by default): set API_AUTO_UPDATE=1 then ./install-auto-update.sh
 
 EOF

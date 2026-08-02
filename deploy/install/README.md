@@ -101,23 +101,25 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/i
 
 Host cron pulls GHCR images and recreates containers only when the image digest changed. Sweeper updates use `docker stop -t` so an in-flight sweep can finish before recreate.
 
-| Role | Script | Default `AUTO_UPDATE` | Interval |
-|------|--------|------------------------|----------|
-| Gateway (UI + nginx) | `update-onchain-invoice-gateway.sh` | **on** | 5 min |
-| Sweeper nodes | `update-onchain-invoice-nodes.sh` | **on** in testnet `.env` example; use `0` for mainnet | 15 min |
-| API | `update-onchain-invoice-api.sh` | **off** | 15 min |
+| Flag | Container | Default | Interval env |
+|------|-----------|---------|--------------|
+| `UI_TESTNET_AUTO_UPDATE` | `testnet-ui` | on | `GATEWAY_AUTO_UPDATE_INTERVAL_MIN` (5m) |
+| `UI_MAINNET_AUTO_UPDATE` | `mainnet-ui` | on | same cron |
+| `GATEWAY_AUTO_UPDATE` | nginx gateway | on | same cron |
+| `NODES_AUTO_UPDATE` | sweeper node | on (testnet example) | `NODES_AUTO_UPDATE_INTERVAL_MIN` (15m) |
+| `API_AUTO_UPDATE` | API | **off** | `API_AUTO_UPDATE_INTERVAL_MIN` (15m) |
 
 ```bash
-# After editing AUTO_UPDATE / AUTO_UPDATE_INTERVAL_MIN in .env:
-cd ~/tc/gateway && ROLE=gateway ./install-auto-update.sh
-cd ~/tc/sweeper && ROLE=nodes ./install-auto-update.sh
-cd ~/tc/api-testnet && ROLE=api ./install-auto-update.sh   # only if AUTO_UPDATE=1
+# After editing flags in .env:
+cd ~/tc/gateway && ./install-auto-update.sh
+cd ~/tc/sweeper && ./install-auto-update.sh
+cd ~/tc/api-testnet && ./install-auto-update.sh   # only schedules if API_AUTO_UPDATE=1
 
 # Host log:
 tail -f ~/tc/gateway/logs/auto-update.log
 ```
 
-Installers download the update scripts and refresh cron when `AUTO_UPDATE=1`.
+Installers refresh cron from these flags (no `ROLE=` required). Legacy `AUTO_UPDATE` is still accepted if the role flag is unset.
 
 ## Sweeper activity log
 
@@ -131,9 +133,9 @@ Stages: `invoice-paid`, `sweep-submitted`, `sweep-confirmed`, `sweep-failed`, `t
 
 ## Notes
 
-- Existing config/start/`.env` files are **not** overwritten.
+- Existing config/start/`.env` files are **not** overwritten (secrets stay).
 - Prefer editing **`.env`**. Start scripts load `.env` when variables are unset **or empty** (non-empty shell exports win).
-- Installers **refresh** `.env.*.example` / `.env.example` on every run and **append** missing `AUTO_UPDATE*` keys into an existing `.env` (secrets are never overwritten).
+- Installers **refresh** `.env.*.example` / `.env.example` on every run and **append** missing auto-update keys into an existing `.env`.
 - Empty env vars are **not** passed as `docker -e KEY=` (so they cannot wipe config).
 - Quote `0x…` values in YAML (installer templates already do) — unquoted YAML 1.1 corrupts private keys.
 - For HTTPS, API containers must be named `testnet-api` / `mainnet-api` on `DOCKER_NETWORK=trustless-commerce-edge` (set via `.env`).
