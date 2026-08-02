@@ -9,7 +9,10 @@ export type TronSponsorConfig = {
   fullHost: string;
   sponsorPrivateKey: string;
   feeLimit?: number;
+  /** Sun of staked TRX to delegate as ENERGY (Stake 2.0). */
   minDelegateEnergy?: number;
+  /** Sun of staked TRX to delegate as BANDWIDTH (Stake 2.0). */
+  minDelegateBandwidth?: number;
   energyMode?: TronEnergyMode;
   energyRentProvider?: string;
 };
@@ -29,7 +32,15 @@ export type TronSweepTransferResult = {
   token: string;
 };
 
-const DEFAULT_MIN_DELEGATE_ENERGY = 65_000;
+export type TronDelegatedResources = {
+  energyTxId?: string;
+  bandwidthTxId?: string;
+  energyAmount: number;
+  bandwidthAmount: number;
+};
+
+const DEFAULT_MIN_DELEGATE_ENERGY = 65_000_000; // 65 TRX stake → energy (sun)
+const DEFAULT_MIN_DELEGATE_BANDWIDTH = 1_500_000; // 1.5 TRX stake → bandwidth (sun)
 const DEFAULT_FEE_LIMIT = 150_000_000;
 /** Liquid TRX on invoice EOA for burn-mode TRC20 sweeps (energy paid from invoice balance). */
 const MIN_INVOICE_TRX_SUN = 5_000_000;
@@ -61,30 +72,75 @@ export async function readTronAccountResources(tronWeb: TronWeb, address: string
   };
 }
 
-/** Delegate ENERGY from sponsor to invoice EOA (sun-equivalent balance units for delegation). */
-export async function delegateEnergyToInvoice(
+async function delegateResourceToInvoice(
   config: TronSponsorConfig,
   invoiceAddress: string,
-  energyAmount?: number
+  resource: "ENERGY" | "BANDWIDTH",
+  amountSun: number
 ): Promise<string | undefined> {
+  if (amountSun <= 0) return undefined;
   const tronWeb = sponsorTronWeb(config);
-  const amount = energyAmount ?? config.minDelegateEnergy ?? DEFAULT_MIN_DELEGATE_ENERGY;
   const sponsor = sponsorBase58(tronWeb);
   if (invoiceAddress === sponsor) return undefined;
 
   const tx = await tronWeb.transactionBuilder.delegateResource(
-    amount,
+    amountSun,
     invoiceAddress,
-    "ENERGY",
+    resource,
     sponsor,
     false
   );
   const signed = await tronWeb.trx.sign(tx);
   const result = await tronWeb.trx.sendRawTransaction(signed);
   if (!result.result) {
-    throw new Error(`delegateResource failed: ${JSON.stringify(result)}`);
+    throw new Error(`delegateResource(${resource}) failed: ${JSON.stringify(result)}`);
   }
   return result.txid ?? result.transaction?.txID;
+}
+
+async function undelegateResourceFromInvoice(
+  config: TronSponsorConfig,
+  invoiceAddress: string,
+  resource: "ENERGY" | "BANDWIDTH",
+  amountSun: number
+): Promise<string | undefined> {
+  if (amountSun <= 0) return undefined;
+  const tronWeb = sponsorTronWeb(config);
+  const sponsor = sponsorBase58(tronWeb);
+  if (invoiceAddress === sponsor) return undefined;
+
+  const tx = await tronWeb.transactionBuilder.undelegateResource(
+    amountSun,
+    invoiceAddress,
+    resource,
+    sponsor
+  );
+  const signed = await tronWeb.trx.sign(tx);
+  const result = await tronWeb.trx.sendRawTransaction(signed);
+  if (!result.result) {
+    throw new Error(`undelegateResource(${resource}) failed: ${JSON.stringify(result)}`);
+  }
+  return result.txid ?? result.transaction?.txID;
+}
+
+/** Delegate ENERGY from sponsor to invoice EOA (Stake 2.0 amount in sun). */
+export async function delegateEnergyToInvoice(
+  config: TronSponsorConfig,
+  invoiceAddress: string,
+  energyAmount?: number
+): Promise<string | undefined> {
+  const amount = energyAmount ?? config.minDelegateEnergy ?? DEFAULT_MIN_DELEGATE_ENERGY;
+  return delegateResourceToInvoice(config, invoiceAddress, "ENERGY", amount);
+}
+
+/** Delegate BANDWIDTH from sponsor to invoice EOA (Stake 2.0 amount in sun). */
+export async function delegateBandwidthToInvoice(
+  config: TronSponsorConfig,
+  invoiceAddress: string,
+  bandwidthAmount?: number
+): Promise<string | undefined> {
+  const amount = bandwidthAmount ?? config.minDelegateBandwidth ?? DEFAULT_MIN_DELEGATE_BANDWIDTH;
+  return delegateResourceToInvoice(config, invoiceAddress, "BANDWIDTH", amount);
 }
 
 export async function undelegateEnergyFromInvoice(
@@ -92,18 +148,59 @@ export async function undelegateEnergyFromInvoice(
   invoiceAddress: string,
   energyAmount?: number
 ): Promise<string | undefined> {
-  const tronWeb = sponsorTronWeb(config);
   const amount = energyAmount ?? config.minDelegateEnergy ?? DEFAULT_MIN_DELEGATE_ENERGY;
-  const sponsor = sponsorBase58(tronWeb);
-  if (invoiceAddress === sponsor) return undefined;
+  return undelegateResourceFromInvoice(config, invoiceAddress, "ENERGY", amount);
+}
 
-  const tx = await tronWeb.transactionBuilder.undelegateResource(amount, invoiceAddress, "ENERGY", sponsor);
-  const signed = await tronWeb.trx.sign(tx);
-  const result = await tronWeb.trx.sendRawTransaction(signed);
-  if (!result.result) {
-    throw new Error(`undelegateResource failed: ${JSON.stringify(result)}`);
+export async function undelegateBandwidthFromInvoice(
+  config: TronSponsorConfig,
+  invoiceAddress: string,
+  bandwidthAmount?: number
+): Promise<string | undefined> {
+  const amount = bandwidthAmount ?? config.minDelegateBandwidth ?? DEFAULT_MIN_DELEGATE_BANDWIDTH;
+  return undelegateResourceFromInvoice(config, invoiceAddress, "BANDWIDTH", amount);
+}
+
+/**
+ * Prefer delegation so the invoice EOA never needs liquid TRX.
+ * - `staked` (default): delegate ENERGY + BANDWIDTH from sponsor stake
+ * - `burn`: send liquid TRX to the invoice for fee burn (legacy)
+ * - `rent`: placeholder; falls through to delegation attempt
+ */
+export async function prepareInvoiceResourcesForSweep(
+  config: TronSponsorConfig,
+  invoiceAddress: string
+): Promise<TronDelegatedResources | { mode: "burn" }> {
+  const mode = config.energyMode ?? "staked";
+  if (mode === "burn") {
+    await ensureInvoiceTrxForSweep(config, invoiceAddress);
+    return { mode: "burn" };
   }
-  return result.txid ?? result.transaction?.txID;
+
+  const energyAmount = config.minDelegateEnergy ?? DEFAULT_MIN_DELEGATE_ENERGY;
+  const bandwidthAmount = config.minDelegateBandwidth ?? DEFAULT_MIN_DELEGATE_BANDWIDTH;
+  const energyTxId = await delegateEnergyToInvoice(config, invoiceAddress, energyAmount);
+  const bandwidthTxId = await delegateBandwidthToInvoice(config, invoiceAddress, bandwidthAmount);
+  return { energyTxId, bandwidthTxId, energyAmount, bandwidthAmount };
+}
+
+/** Best-effort reclaim after a successful sweep (delegation mode only). */
+export async function releaseInvoiceResourcesAfterSweep(
+  config: TronSponsorConfig,
+  invoiceAddress: string,
+  delegated?: TronDelegatedResources | { mode: "burn" }
+): Promise<void> {
+  if (!delegated || "mode" in delegated) return;
+  try {
+    await undelegateEnergyFromInvoice(config, invoiceAddress, delegated.energyAmount);
+  } catch (error) {
+    console.warn("[tron-sponsor] undelegate ENERGY failed:", error);
+  }
+  try {
+    await undelegateBandwidthFromInvoice(config, invoiceAddress, delegated.bandwidthAmount);
+  } catch (error) {
+    console.warn("[tron-sponsor] undelegate BANDWIDTH failed:", error);
+  }
 }
 
 /**
@@ -118,14 +215,13 @@ export async function ensureEnergyForBatch(config: TronSponsorConfig, requiredEn
 
   const mode = config.energyMode ?? "staked";
   if (mode === "rent" && config.energyRentProvider) {
-    // External rent APIs vary; operators integrate via env. Fail open so sweep can still burn TRX.
     console.warn(
       `[tron-sponsor] energy rent provider configured but not integrated; need ~${requiredEnergy}, have ${resources.energyAvailable}`
     );
     return;
   }
   if (mode === "burn") return;
-  // staked: operator must freeze TRX on sponsor wallet ahead of time.
+  // staked: operator must freeze/stake TRX on sponsor wallet ahead of time for delegation.
 }
 
 /** In burn mode, invoice EOAs need liquid TRX to pay energy for TRC20 transfers. */

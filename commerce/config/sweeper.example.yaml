@@ -26,7 +26,10 @@ tron:
   usdtAddress: "${TRON_USDT_ADDRESS}"
   privateKey: "${TRON_SPONSOR_PRIVATE_KEY}"
   feeLimit: 150000000
-  energyMode: burn
+  # Delegate ENERGY + BANDWIDTH (no liquid TRX sent to invoice EOAs). Sponsor must stake TRX.
+  energyMode: staked
+  minDelegateEnergy: 65000000
+  minDelegateBandwidth: 1500000
   tokens:
     - symbol: USDT
       address: "${TRON_USDT_ADDRESS}"
