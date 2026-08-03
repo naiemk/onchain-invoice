@@ -52,3 +52,5 @@ solana:
 Sweeper: [`config/sweeper.example.yaml`](config/sweeper.example.yaml) with `SWEEPER_ROLE=solana`.
 
 Compose: [`deploy/docker-compose.sweeper.yml`](deploy/docker-compose.sweeper.yml) — do not mix into `/deploy/install/docker-compose.sweepers.yml`.
+
+Env template: [`deploy/env.devnet.example`](deploy/env.devnet.example).
