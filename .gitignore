@@ -182,3 +182,7 @@ ui/public/.DS_Store
 .DS_Store
 deploy/certs/
 ui/screenshots/
+
+# Solana SBF build (program keypair for local tests is under solana/deploy/)
+solana/target/
+test-ledger/

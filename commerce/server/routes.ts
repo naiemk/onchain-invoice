@@ -6,8 +6,12 @@ import {
   chainKind,
   CommerceInvoiceSdk,
   deriveTronInvoiceAddress,
+  looksLikeSolanaAddress,
   normalizeMerchantAddress,
   predictCommerceInvoiceAddress,
+  predictCommerceSolanaInvoiceAta,
+  resolveSolanaChain,
+  resolveSolanaToken,
   tokenAllowedOnChain,
   tronNumericChainId,
 } from "onchain-invoice";
@@ -204,7 +208,7 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
   assertTokenChainPair(chainId, token);
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
-  const invoiceAddress = await getInvoiceAddress(config, selectedTo, invoiceId, chainId);
+  const invoiceAddress = await getInvoiceAddress(config, selectedTo, invoiceId, chainId, token);
   const idempotencyKey = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : null;
 
   const { invoice, created } = db.createInvoice({
@@ -245,7 +249,7 @@ async function createSessionDeprecated(
   assertTokenChainPair(chainId, token);
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
-  const invoiceAddress = await getInvoiceAddress(context.config, selectedTo, invoiceId, chainId);
+  const invoiceAddress = await getInvoiceAddress(context.config, selectedTo, invoiceId, chainId, token);
   const { invoice } = context.db.createInvoice({
     invoiceId,
     fields,
@@ -379,9 +383,11 @@ async function getInvoiceAddress(
   config: AppConfig,
   selectedTo: string,
   invoiceId: string,
-  chainId: string
+  chainId: string,
+  token: string
 ): Promise<string | null> {
-  if (chainKind(chainId) === "tron") {
+  const kind = chainKind(chainId);
+  if (kind === "tron") {
     if (!config.tronInvoiceMasterSecret) {
       throw Object.assign(
         new Error("TRON_INVOICE_MASTER_SECRET is required to create Tron invoices"),
@@ -395,6 +401,24 @@ async function getInvoiceAddress(
       invoiceId,
       fullHost
     );
+  }
+
+  if (kind === "solana") {
+    const chain = resolveSolanaChain(config.solanaChains, chainId);
+    if (!chain) {
+      throw Object.assign(
+        new Error(`Solana chain ${chainId} is not configured or not enabled`),
+        { statusCode: 503 }
+      );
+    }
+    const tokenCfg = resolveSolanaToken(chain, token);
+    if (!tokenCfg) {
+      throw Object.assign(
+        new Error(`Token ${token} is not configured for Solana chain ${chainId}`),
+        { statusCode: 400 }
+      );
+    }
+    return predictCommerceSolanaInvoiceAta(chain.programId, selectedTo, invoiceId, tokenCfg.mint);
   }
 
   if (!config.sweeperAddress) {
@@ -441,12 +465,19 @@ function resolveSelectedTo(
   if (kind === "evm" && !selectedTo.startsWith("0x")) {
     throw Object.assign(new Error("selectedTo must be an EVM address for this chain"), { statusCode: 400 });
   }
+  if (kind === "solana" && !looksLikeSolanaAddress(selectedTo)) {
+    throw Object.assign(new Error("selectedTo must be a Solana address for this chain"), { statusCode: 400 });
+  }
   return selectedTo;
 }
 
 function pickDefaultTo(fields: PayLinkFields, chainId: string): string | undefined {
   const kind = chainKind(chainId);
-  const match = fields.to.find((value) => (kind === "tron" ? value.startsWith("T") : value.startsWith("0x")));
+  const match = fields.to.find((value) => {
+    if (kind === "tron") return value.startsWith("T");
+    if (kind === "solana") return looksLikeSolanaAddress(value);
+    return value.startsWith("0x");
+  });
   return match ?? fields.to[0];
 }
 

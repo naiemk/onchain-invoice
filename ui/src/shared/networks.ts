@@ -1,4 +1,4 @@
-export type ChainKind = "evm" | "tron";
+export type ChainKind = "evm" | "tron" | "solana";
 
 export interface NetworkOption {
   id: string;
@@ -16,9 +16,11 @@ export interface TokenOption {
 export const NETWORKS: NetworkOption[] = [
   { id: "11155111", label: "Ethereum Sepolia", short: "Sepolia", kind: "evm", testnet: true },
   { id: "nile", label: "TRON Nile", short: "Nile", kind: "tron", testnet: true },
+  { id: "devnet", label: "Solana Devnet", short: "Sol Devnet", kind: "solana", testnet: true },
   { id: "1", label: "Ethereum Mainnet", short: "Ethereum", kind: "evm" },
   { id: "8453", label: "Base", short: "Base", kind: "evm" },
   { id: "42161", label: "Arbitrum One", short: "Arbitrum", kind: "evm" },
+  { id: "mainnet-beta", label: "Solana", short: "Solana", kind: "solana" },
 ];
 
 export const TOKENS: TokenOption[] = [
@@ -30,6 +32,7 @@ export const TOKENS: TokenOption[] = [
 export const SUPPORTED_TOKENS = new Set(TOKENS.map((t) => t.id.toUpperCase()));
 
 const TRON_BASE58_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
+const SOLANA_BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 export function filterSupportedTokens(tokens: string[]): string[] {
   const allowed = tokens
@@ -52,6 +55,7 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   const symbol = token.trim().toUpperCase();
   const kind = networkKind(chainId);
   if (kind === "tron") return symbol === "USDT";
+  if (kind === "solana") return symbol === "USDC" || symbol === "USDT";
   return symbol === "USDC";
 }
 
@@ -64,15 +68,18 @@ export function looksLikeTronAddress(value: string): boolean {
   return TRON_BASE58_RE.test(value.trim());
 }
 
+export function looksLikeSolanaAddress(value: string): boolean {
+  const trimmed = value.trim();
+  if (!SOLANA_BASE58_RE.test(trimmed)) return false;
+  if (trimmed.startsWith("T") && trimmed.length === 34) return false;
+  return true;
+}
+
 export function isValidAddress(value: string, kind: ChainKind): boolean {
   const trimmed = value.trim();
   if (kind === "tron") return looksLikeTronAddress(trimmed);
-  try {
-    // Lazy: avoid importing ethers in every call path; mirror 0x + 40 hex
-    return /^0x[0-9a-fA-F]{40}$/.test(trimmed);
-  } catch {
-    return false;
-  }
+  if (kind === "solana") return looksLikeSolanaAddress(trimmed);
+  return /^0x[0-9a-fA-F]{40}$/.test(trimmed);
 }
 
 export function normalizeAddress(value: string, kind: ChainKind): string {
@@ -82,9 +89,11 @@ export function normalizeAddress(value: string, kind: ChainKind): string {
     if (!looksLikeTronAddress(trimmed)) throw new Error(`Invalid Tron address: ${value}`);
     return trimmed;
   }
+  if (kind === "solana") {
+    if (!looksLikeSolanaAddress(trimmed)) throw new Error(`Invalid Solana address: ${value}`);
+    return trimmed;
+  }
   if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) throw new Error(`Invalid EVM address: ${value}`);
-  // Checksum-style lower/upper mix not required for invoice id encoding in browser —
-  // onchain-invoice-browser normalizes via getAddress when hashing.
   return trimmed;
 }
 
@@ -100,7 +109,14 @@ export function isTestnet(chainId: string | null | undefined): boolean {
   if (!chainId) return false;
   const known = NETWORKS.find((n) => n.id === chainId);
   if (known) return Boolean(known.testnet);
-  return ["11155111", "84532", "421614", "11155420", "5", "80001", "nile", "shasta"].includes(String(chainId));
+  return ["11155111", "84532", "421614", "11155420", "5", "80001", "nile", "shasta", "devnet"].includes(
+    String(chainId)
+  );
+}
+
+/** Solana explorer cluster query — derived from testnet flag, not hardcoded chain names in callers. */
+export function solanaExplorerCluster(chainId: string | null | undefined): string {
+  return isTestnet(chainId) ? "?cluster=devnet" : "";
 }
 
 export type DeploymentMode = "testnet" | "mainnet";
@@ -139,6 +155,10 @@ export function chainLogoSvg(chainId: string | null | undefined, size = 20): str
   const s = String(size);
   if (id === "nile" || id === "shasta" || id === "tron") {
     return `<svg class="chain-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#FF060A"/><path d="M21.6 9.2 16 6.4l-5.6 2.8 1.7 5.4h7.8l1.7-5.4zm-9.2 6.8 3.6 9.6 5.6-5.4-1.6-4.2h-7.6zm8.4 0-1.6 4.2 5.6 5.4 3.6-9.6h-7.6z" fill="#fff"/></svg>`;
+  }
+  if (id === "devnet" || id === "mainnet-beta" || id === "solana") {
+    const gid = `solGrad-${s}-${Math.random().toString(36).slice(2, 8)}`;
+    return `<svg class="chain-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#000"/><path d="M9.5 20.2c.2-.2.4-.3.7-.3h12.1c.4 0 .6.5.3.8l-2.1 2.1c-.2.2-.4.3-.7.3H7.7c-.4 0-.6-.5-.3-.8l2.1-2.1zm0-10.9c.2-.2.4-.3.7-.3h12.1c.4 0 .6.5.3.8l-2.1 2.1c-.2.2-.4.3-.7.3H7.7c-.4 0-.6-.5-.3-.8l2.1-2.1zm13.1 5.1c-.2-.2-.4-.3-.7-.3H9.8c-.4 0-.6.5-.3.8l2.1 2.1c.2.2.4.3.7.3h12.1c.4 0 .6-.5.3-.8l-2.1-2.1z" fill="url(#${gid})"/><defs><linearGradient id="${gid}" x1="8" y1="8" x2="24" y2="24"><stop stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient></defs></svg>`;
   }
   if (id === "8453") {
     return `<svg class="chain-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#0052FF"/><path d="M16.1 6.4c-5.3 0-9.6 4.1-9.9 9.3h13.1c.4 0 .7.3.7.7s-.3.7-.7.7H6.2c.4 5.1 4.7 9.1 9.9 9.1 5.5 0 10-4.5 10-10s-4.5-9.8-10-9.8z" fill="#fff"/></svg>`;
@@ -212,6 +232,11 @@ export function explorerBase(chainId: string | null | undefined): string | null 
     case "tron":
     case "3448148188":
       return "https://tronscan.org";
+    case "devnet":
+      return "https://explorer.solana.com";
+    case "mainnet-beta":
+    case "solana":
+      return "https://explorer.solana.com";
     default:
       return null;
   }
@@ -221,10 +246,17 @@ function isTronExplorer(chainId: string | null | undefined): boolean {
   return networkKind(chainId) === "tron";
 }
 
+function isSolanaExplorer(chainId: string | null | undefined): boolean {
+  return networkKind(chainId) === "solana";
+}
+
 export function explorerAddressUrl(chainId: string | null | undefined, address: string): string | null {
   const base = explorerBase(chainId);
   if (!base) return null;
   if (isTronExplorer(chainId)) return `${base}/#/address/${address}`;
+  if (isSolanaExplorer(chainId)) {
+    return `${base}/address/${address}${solanaExplorerCluster(chainId)}`;
+  }
   return `${base}/address/${address}`;
 }
 
@@ -232,5 +264,8 @@ export function explorerTxUrl(chainId: string | null | undefined, txHash: string
   const base = explorerBase(chainId);
   if (!base) return null;
   if (isTronExplorer(chainId)) return `${base}/#/transaction/${txHash}`;
+  if (isSolanaExplorer(chainId)) {
+    return `${base}/tx/${txHash}${solanaExplorerCluster(chainId)}`;
+  }
   return `${base}/tx/${txHash}`;
 }

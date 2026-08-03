@@ -36,4 +36,4 @@ tron:
       decimals: 6
 solana:
   enabled: false
-  note: "Not implemented for commerce launch"
+  note: "Use solana/config/sweeper.example.yaml + SWEEPER_ROLE=solana"

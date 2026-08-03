@@ -1,0 +1,5 @@
+{
+  "network": "local-validator",
+  "programId": "DTpy1o32ap655U2FPUX4ZgLAwDtxrLLu4d8TGhzap3FF",
+  "note": "Program id from solana/target/deploy/commerce_invoice-keypair.json. Replace after deploy-devnet."
+}
