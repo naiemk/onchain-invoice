@@ -27,6 +27,12 @@ export interface AppConfig {
   tronInvoiceMasterSecret?: string;
   /** Optional Nile USDT TRC-20 contract (documented for operators; sweeper uses its own YAML). */
   tronUsdtAddress?: string;
+  /** Solana RPC (optional; address prediction is offline from programId + mint). */
+  solanaRpcUrl?: string;
+  /** Deployed commerce-invoice program id (base58). */
+  solanaProgramId?: string;
+  /** USDC mint for Solana invoices (devnet/mainnet). */
+  solanaUsdcMint?: string;
   captchaProvider?: string;
   turnstileSecret?: string;
   corsOrigins: string[];
@@ -51,6 +57,11 @@ interface YamlFile {
     fullHost?: string;
     invoiceMasterSecret?: string;
     usdtAddress?: string;
+  };
+  solana?: {
+    rpcUrl?: string;
+    programId?: string;
+    usdcMint?: string;
   };
   captcha?: { provider?: string; turnstileSecret?: string };
   cors?: { origins?: string[] };
@@ -80,6 +91,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       expand(env.TRON_INVOICE_MASTER_SECRET ?? file.tron?.invoiceMasterSecret ?? "")
     ),
     tronUsdtAddress: blankToUndefined(expand(env.TRON_USDT_ADDRESS ?? file.tron?.usdtAddress ?? "")),
+    solanaRpcUrl: blankToUndefined(expand(env.SOLANA_RPC_URL ?? file.solana?.rpcUrl ?? "")),
+    solanaProgramId: blankToUndefined(expand(env.SOLANA_PROGRAM_ID ?? file.solana?.programId ?? "")),
+    solanaUsdcMint: blankToUndefined(expand(env.SOLANA_USDC_MINT ?? file.solana?.usdcMint ?? "")),
     captchaProvider: blankToUndefined(expand(env.CAPTCHA_PROVIDER ?? file.captcha?.provider ?? "")),
     turnstileSecret: blankToUndefined(expand(env.TURNSTILE_SECRET ?? file.captcha?.turnstileSecret ?? "")),
     corsOrigins: parseOrigins(env.CORS_ORIGINS, file.cors?.origins),

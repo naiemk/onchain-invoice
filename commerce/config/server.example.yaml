@@ -17,6 +17,10 @@ tron:
   fullHost: ${TRON_FULL_HOST}
   invoiceMasterSecret: ${TRON_INVOICE_MASTER_SECRET}
   usdtAddress: ${TRON_USDT_ADDRESS}
+solana:
+  rpcUrl: ${SOLANA_RPC_URL}
+  programId: ${SOLANA_PROGRAM_ID}
+  usdcMint: ${SOLANA_USDC_MINT}
 cors:
   origins:
     - http://localhost:5173

@@ -9,7 +9,9 @@ export {
   chainKind,
   defaultTokenForChain,
   isEvmAddress,
+  isSolanaAddress,
   isTronAddress,
+  looksLikeSolanaAddress,
   looksLikeTronAddress,
   normalizeMerchantAddress,
   normalizeMerchantAddresses,
@@ -19,6 +21,15 @@ export {
   TRON_SHASTA_NUMERIC_CHAIN_ID,
   type ChainKind,
 } from "./commerce-addresses.js";
+export {
+  CommerceSolanaSdk,
+  fundSolanaInvoiceAta,
+  predictCommerceSolanaInvoiceAta,
+  predictCommerceSolanaInvoicePda,
+  solanaConfigPda,
+  solanaInvoicePda,
+  type CommerceSolanaSdkConfig,
+} from "./solana-sdk.js";
 export {
   CommerceInvoiceSdk,
   commerceInvoiceSalt,

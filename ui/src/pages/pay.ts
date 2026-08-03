@@ -6,6 +6,7 @@ import {
   chainLogoSvg,
   explorerAddressUrl,
   formatTokenAmount,
+  looksLikeSolanaAddress,
   looksLikeTronAddress,
   networkKind,
   networkLabel,
@@ -67,9 +68,12 @@ export function renderPay(root: HTMLElement): void {
 function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId: string): void {
   const initialChain = fields.chains[0];
   const recipientsForChain = (chainId: string) =>
-    fields.to.filter((addr) =>
-      networkKind(chainId) === "tron" ? looksLikeTronAddress(addr) : !looksLikeTronAddress(addr)
-    );
+    fields.to.filter((addr) => {
+      const kind = networkKind(chainId);
+      if (kind === "tron") return looksLikeTronAddress(addr);
+      if (kind === "solana") return looksLikeSolanaAddress(addr);
+      return !looksLikeTronAddress(addr) && !looksLikeSolanaAddress(addr);
+    });
   const initialRecipients = recipientsForChain(initialChain);
   const toField =
     fields.to.length > 1
@@ -253,7 +257,9 @@ async function renderInvoiceStage(
           ${
             networkKind(chainId) === "tron"
               ? " Use Nile Tronscan to verify the address when paying on Nile."
-              : ""
+              : networkKind(chainId) === "solana"
+                ? " Send SPL USDC to this token account (ATA). Use Solana Explorer (devnet) to verify."
+                : ""
           }
         </div>
         <div class="callout info">

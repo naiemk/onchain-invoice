@@ -1,0 +1,16 @@
+# Solana-only sweeper (separate from /deploy/install/docker-compose.sweepers.yml)
+services:
+  sweeper-solana:
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: onchain-invoice-sweeper-solana
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SWEEPER_ROLE: solana
+      SWEEPER_CONFIG: /tmp/sweeper.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-solana.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./solana-nodes.yaml:/tmp/sweeper.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

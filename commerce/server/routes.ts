@@ -6,8 +6,10 @@ import {
   chainKind,
   CommerceInvoiceSdk,
   deriveTronInvoiceAddress,
+  looksLikeSolanaAddress,
   normalizeMerchantAddress,
   predictCommerceInvoiceAddress,
+  predictCommerceSolanaInvoiceAta,
   tokenAllowedOnChain,
   tronNumericChainId,
 } from "onchain-invoice";
@@ -381,7 +383,8 @@ async function getInvoiceAddress(
   invoiceId: string,
   chainId: string
 ): Promise<string | null> {
-  if (chainKind(chainId) === "tron") {
+  const kind = chainKind(chainId);
+  if (kind === "tron") {
     if (!config.tronInvoiceMasterSecret) {
       throw Object.assign(
         new Error("TRON_INVOICE_MASTER_SECRET is required to create Tron invoices"),
@@ -394,6 +397,21 @@ async function getInvoiceAddress(
       tronNumericChainId(chainId),
       invoiceId,
       fullHost
+    );
+  }
+
+  if (kind === "solana") {
+    if (!config.solanaProgramId || !config.solanaUsdcMint) {
+      throw Object.assign(
+        new Error("SOLANA_PROGRAM_ID and SOLANA_USDC_MINT are required to create Solana invoices"),
+        { statusCode: 503 }
+      );
+    }
+    return predictCommerceSolanaInvoiceAta(
+      config.solanaProgramId,
+      selectedTo,
+      invoiceId,
+      config.solanaUsdcMint
     );
   }
 
@@ -441,12 +459,19 @@ function resolveSelectedTo(
   if (kind === "evm" && !selectedTo.startsWith("0x")) {
     throw Object.assign(new Error("selectedTo must be an EVM address for this chain"), { statusCode: 400 });
   }
+  if (kind === "solana" && !looksLikeSolanaAddress(selectedTo)) {
+    throw Object.assign(new Error("selectedTo must be a Solana address for this chain"), { statusCode: 400 });
+  }
   return selectedTo;
 }
 
 function pickDefaultTo(fields: PayLinkFields, chainId: string): string | undefined {
   const kind = chainKind(chainId);
-  const match = fields.to.find((value) => (kind === "tron" ? value.startsWith("T") : value.startsWith("0x")));
+  const match = fields.to.find((value) => {
+    if (kind === "tron") return value.startsWith("T");
+    if (kind === "solana") return looksLikeSolanaAddress(value);
+    return value.startsWith("0x");
+  });
   return match ?? fields.to[0];
 }
 

@@ -1,0 +1,23 @@
+serverUrl: "${SERVER_URL}"
+sweeperWalletKey: "${SWEEPER_WALLET_KEY}"
+apiKey: "${SWEEPER_API_KEY}"
+activityLogPath: "${ACTIVITY_LOG_PATH}"
+intervalMs: 15000
+maxRetries: 5
+# Prefer SWEEPER_ROLE=solana via compose
+chains: []
+tron:
+  enabled: false
+solana:
+  enabled: true
+  chainId: "devnet"
+  rpcUrl: "${SOLANA_RPC_URL}"
+  programId: "${SOLANA_PROGRAM_ID}"
+  usdcMint: "${SOLANA_USDC_MINT}"
+  privateKey: "${SOLANA_SWEEPER_KEY}"
+  feeRecipient: "${SOLANA_FEE_RECIPIENT}"
+  feeBps: 50
+  tokens:
+    - symbol: USDC
+      address: "${SOLANA_USDC_MINT}"
+      decimals: 6

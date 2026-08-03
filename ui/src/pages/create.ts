@@ -56,7 +56,7 @@ export function renderCreate(root: HTMLElement): void {
 
           <div class="field">
             <label>Accepted networks <span class="required">*</span></label>
-            <p class="field-hint">Tap a chain to enable it. EVM and Tron each need their own merchant wallet below.</p>
+            <p class="field-hint">Tap a chain to enable it. Each network kind needs its own merchant wallet below.</p>
             <div class="chain-pill-row" id="chains" role="group" aria-label="Accepted networks">
               ${
                 networks.length === 0
@@ -88,9 +88,19 @@ export function renderCreate(root: HTMLElement): void {
             <input id="toTron" name="toTron" class="mono" placeholder="T…" autocomplete="off" spellcheck="false" />
           </div>
 
+          <div class="field" id="solana-wallet-field" hidden>
+            <label for="toSolana">Solana merchant wallet <span class="required">*</span></label>
+            <div class="callout info wallet-settlement-note" role="note">
+              <strong>Funds are swept to this address.</strong>
+              Devnet USDC is settled here by the program — the sweeper cannot redirect to another wallet.
+            </div>
+            <p class="field-hint">Base58 Solana pubkey. Bound into the invoice PDA seeds with the invoice id.</p>
+            <input id="toSolana" name="toSolana" class="mono" placeholder="So…" autocomplete="off" spellcheck="false" />
+          </div>
+
           <div class="field">
             <label>Accepted tokens <span class="required">*</span></label>
-            <p class="field-hint">Paired to selected networks (Sepolia → USDC, Nile → USDT). Stablecoins only for now.</p>
+            <p class="field-hint">Paired to selected networks (Sepolia/Solana → USDC, Nile → USDT). Stablecoins only for now.</p>
             <div class="field-row" id="tokens"></div>
           </div>
 
@@ -176,14 +186,19 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
     const chains = checked(root, "chains");
     const needsEvm = chains.some((id) => networkKind(id) === "evm");
     const needsTron = chains.some((id) => networkKind(id) === "tron");
+    const needsSolana = chains.some((id) => networkKind(id) === "solana");
     const evmField = root.querySelector<HTMLElement>("#evm-wallet-field");
     const tronField = root.querySelector<HTMLElement>("#tron-wallet-field");
+    const solanaField = root.querySelector<HTMLElement>("#solana-wallet-field");
     if (evmField) evmField.hidden = !needsEvm;
     if (tronField) tronField.hidden = !needsTron;
+    if (solanaField) solanaField.hidden = !needsSolana;
     const toEvm = root.querySelector<HTMLInputElement>("#toEvm");
     const toTron = root.querySelector<HTMLInputElement>("#toTron");
+    const toSolana = root.querySelector<HTMLInputElement>("#toSolana");
     if (toEvm) toEvm.required = needsEvm;
     if (toTron) toTron.required = needsTron;
+    if (toSolana) toSolana.required = needsSolana;
     renderTokenOptions(root, chains);
   };
 
@@ -301,8 +316,10 @@ function readForm(root: HTMLElement): PayLinkFields {
   const tokens = checked(root, "tokens");
   const needsEvm = chains.some((id) => networkKind(id) === "evm");
   const needsTron = chains.some((id) => networkKind(id) === "tron");
+  const needsSolana = chains.some((id) => networkKind(id) === "solana");
   const toEvm = value("toEvm");
   const toTron = value("toTron");
+  const toSolana = value("toSolana");
 
   if (!clientInvoiceId) throw new Error("Invoice client id is required.");
   if (!price) throw new Error("Amount (USD) is required.");
@@ -330,6 +347,11 @@ function readForm(root: HTMLElement): PayLinkFields {
     if (!toTron) throw new Error("Tron merchant wallet is required.");
     if (!isValidAddress(toTron, "tron")) throw new Error("Tron merchant wallet must be a T… address.");
     to.push(toTron);
+  }
+  if (needsSolana) {
+    if (!toSolana) throw new Error("Solana merchant wallet is required.");
+    if (!isValidAddress(toSolana, "solana")) throw new Error("Solana merchant wallet must be a base58 address.");
+    to.push(toSolana);
   }
 
   return {

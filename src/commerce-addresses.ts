@@ -1,7 +1,8 @@
 import { getAddress } from "ethers";
+import { PublicKey } from "@solana/web3.js";
 import { utils as tronUtils } from "tronweb";
 
-export type ChainKind = "evm" | "tron";
+export type ChainKind = "evm" | "tron" | "solana";
 
 /** Nile full-node chain id used in EOA key derivation (`BigInt`-safe). */
 export const TRON_NILE_NUMERIC_CHAIN_ID = "3448148188";
@@ -9,6 +10,8 @@ export const TRON_NILE_NUMERIC_CHAIN_ID = "3448148188";
 export const TRON_SHASTA_NUMERIC_CHAIN_ID = "2494104990";
 
 const TRON_BASE58_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
+/** Solana base58 pubkeys are typically 32–44 chars; exclude Tron `T…` and EVM `0x`. */
+const SOLANA_BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 export function chainKind(chainId: string | null | undefined): ChainKind {
   const id = String(chainId ?? "");
@@ -20,6 +23,9 @@ export function chainKind(chainId: string | null | undefined): ChainKind {
     id === TRON_SHASTA_NUMERIC_CHAIN_ID
   ) {
     return "tron";
+  }
+  if (id === "devnet" || id === "mainnet-beta" || id === "solana" || id === "solana-devnet") {
+    return "solana";
   }
   return "evm";
 }
@@ -37,6 +43,18 @@ export function looksLikeTronAddress(value: string): boolean {
   return TRON_BASE58_RE.test(value.trim());
 }
 
+export function looksLikeSolanaAddress(value: string): boolean {
+  const trimmed = value.trim();
+  if (!SOLANA_BASE58_RE.test(trimmed)) return false;
+  if (trimmed.startsWith("T") && trimmed.length === 34) return false;
+  try {
+    new PublicKey(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function isTronAddress(value: string): boolean {
   const trimmed = value.trim();
   if (!looksLikeTronAddress(trimmed)) return false;
@@ -45,6 +63,10 @@ export function isTronAddress(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function isSolanaAddress(value: string): boolean {
+  return looksLikeSolanaAddress(value);
 }
 
 export function isEvmAddress(value: string): boolean {
@@ -68,6 +90,9 @@ export function normalizeMerchantAddress(value: string): string {
     }
     return trimmed;
   }
+  if (looksLikeSolanaAddress(trimmed)) {
+    return new PublicKey(trimmed).toBase58();
+  }
   throw new Error(`Invalid merchant address: ${value}`);
 }
 
@@ -83,6 +108,13 @@ export function addressesEqual(a: string, b: string): boolean {
   } catch {
     /* fall through */
   }
+  try {
+    if (looksLikeSolanaAddress(a) && looksLikeSolanaAddress(b)) {
+      return new PublicKey(a).equals(new PublicKey(b));
+    }
+  } catch {
+    /* fall through */
+  }
   return a.trim() === b.trim();
 }
 
@@ -92,7 +124,7 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   if (kind === "tron") {
     return symbol === "USDT";
   }
-  // EVM commerce launch: USDC only
+  // EVM + Solana commerce: USDC only
   return symbol === "USDC";
 }
 

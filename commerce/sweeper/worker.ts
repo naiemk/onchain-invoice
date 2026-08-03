@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import {
   CommerceInvoiceSdk,
+  CommerceSolanaSdk,
   COMMERCE_ERC20_ABI,
   COMMERCE_NATIVE_TOKEN,
   deriveTronInvoiceAddress,
@@ -12,13 +13,15 @@ import {
   tronNumericChainId,
   type TronSponsorConfig,
 } from "onchain-invoice";
+import { Connection, Keypair } from "@solana/web3.js";
+import bs58 from "bs58";
 import { TronWeb } from "tronweb";
 import type { InvoiceRecord } from "../shared/types.js";
 import { signSweeperRequest } from "../server/sweeper-auth.js";
 import { ActivityLog } from "./activity-log.js";
 import { load as loadYaml } from "./config-loader.js";
 
-export type SweeperRole = "evm" | "tron" | "all";
+export type SweeperRole = "evm" | "tron" | "solana" | "all";
 
 export interface SweeperConfig {
   serverUrl: string;
@@ -32,15 +35,12 @@ export interface SweeperConfig {
   activityLogPath?: string;
   /**
    * Which half of a shared YAML this process should handle.
-   * Prefer env `SWEEPER_ROLE=evm|tron|all` (compose dual services).
+   * Prefer env `SWEEPER_ROLE=evm|tron|solana|all` (compose dual/triple services).
    */
   role?: SweeperRole;
   chains: EvmChainConfig[];
   tron?: TronSweeperConfig;
-  solana?: {
-    enabled: boolean;
-    note?: string;
-  };
+  solana?: SolanaSweeperConfig;
 }
 
 export interface EvmChainConfig {
@@ -83,6 +83,26 @@ export interface TronSweeperConfig {
   }>;
 }
 
+export interface SolanaSweeperConfig {
+  enabled: boolean;
+  note?: string;
+  /** Product chain id (`devnet`). */
+  chainId?: string;
+  rpcUrl?: string;
+  programId?: string;
+  usdcMint?: string;
+  /** Settle authority secret: JSON byte array or base58. */
+  privateKey?: string;
+  feeRecipient?: string;
+  feeBps?: number;
+  tokens?: Array<{
+    symbol: string;
+    address: string;
+    decimals?: number;
+  }>;
+}
+
+
 const ERC20_ABI = ["function balanceOf(address account) view returns (uint256)"] as const;
 
 export class SweeperWorker {
@@ -93,15 +113,23 @@ export class SweeperWorker {
   private readonly role: SweeperRole;
   private readonly chains: EvmChainConfig[];
   private tron: TronSweeperConfig | undefined;
+  private solana: SolanaSweeperConfig | undefined;
+  private solanaAuthority: Keypair | null = null;
 
   constructor(private readonly config: SweeperConfig) {
     this.role = resolveRole(config);
-    this.chains = this.role === "tron" ? [] : config.chains ?? [];
+    this.chains = this.role === "tron" || this.role === "solana" ? [] : config.chains ?? [];
     this.tron =
-      this.role === "evm"
+      this.role === "evm" || this.role === "solana"
         ? undefined
         : config.tron?.enabled
           ? config.tron
+          : undefined;
+    this.solana =
+      this.role === "evm" || this.role === "tron"
+        ? undefined
+        : config.solana?.enabled
+          ? config.solana
           : undefined;
 
     if (config.sweeperWalletKey) {
@@ -121,15 +149,24 @@ export class SweeperWorker {
         role: this.role,
         evmChains: this.chains.map((c) => String(c.chainId)),
         tronEnabled: Boolean(this.tron?.enabled),
+        solanaEnabled: Boolean(this.solana?.enabled),
       })
     );
-    if (this.config.tron?.enabled && this.role === "evm") {
-      console.log(JSON.stringify({ level: "info", msg: "Tron config present but role=evm; skipping Tron" }));
+    if (this.config.tron?.enabled && (this.role === "evm" || this.role === "solana")) {
+      console.log(JSON.stringify({ level: "info", msg: "Tron config present but role skips Tron" }));
     }
-    if (this.config.solana?.enabled) {
-      console.warn(
-        JSON.stringify({ level: "warn", msg: "Solana sweeper not implemented; skipping", note: this.config.solana.note })
-      );
+    if (this.solana?.enabled) {
+      try {
+        assertSolanaConfig(this.solana);
+        this.solanaAuthority = loadSolanaKeypair(this.solana.privateKey!);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (this.role === "solana") {
+          throw new Error(`Solana sweeper misconfigured: ${message}`);
+        }
+        console.warn(JSON.stringify({ level: "warn", msg: "Solana enabled but incomplete; skipping", error: message }));
+        this.solana = undefined;
+      }
     }
     if (this.tron?.enabled) {
       try {
@@ -174,6 +211,7 @@ export class SweeperWorker {
     const invoices = await this.fetchInvoices();
     const readyByChain = new Map<string, Array<{ invoice: InvoiceRecord; token: string | null; balance: bigint }>>();
     const readyTron: Array<{ invoice: InvoiceRecord; token: string; balance: bigint }> = [];
+    const readySolana: Array<{ invoice: InvoiceRecord; balance: bigint }> = [];
 
     for (const invoice of invoices) {
       try {
@@ -192,6 +230,24 @@ export class SweeperWorker {
             },
           });
           readyTron.push(prepared);
+          continue;
+        }
+
+        if (isSolanaInvoice(invoice)) {
+          if (!this.solana?.enabled) continue;
+          const prepared = await this.prepareSolanaInvoice(invoice);
+          if (!prepared) continue;
+          this.activity?.append("invoice-paid", {
+            invoiceId: invoice.id,
+            chainId: String(invoice.chainId),
+            invoiceAddress: invoice.invoiceAddress ?? undefined,
+            payload: {
+              token: "USDC",
+              amount: prepared.balance.toString(),
+              status: invoice.status,
+            },
+          });
+          readySolana.push(prepared);
           continue;
         }
 
@@ -298,6 +354,34 @@ export class SweeperWorker {
         }).catch(() => undefined);
       }
     }
+
+    for (const item of readySolana) {
+      try {
+        const claimed = await this.claimWithRetry(item.invoice);
+        if (!claimed) continue;
+        const afterPaid = await this.trackWithRetry({
+          invoiceId: item.invoice.id,
+          status: item.invoice.allowPartial ? "paid_partial" : "paid",
+          amountPaid: item.balance.toString(),
+          expectedVersion: claimed.version,
+          payload: { observedBalance: item.balance.toString(), token: "USDC" },
+        });
+        await this.sweepSolanaOne(item.invoice, item.balance, afterPaid?.version ?? claimed.version + 1);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.activity?.append("sweep-failed", {
+          invoiceId: item.invoice.id,
+          chainId: item.invoice.chainId ? String(item.invoice.chainId) : undefined,
+          invoiceAddress: item.invoice.invoiceAddress ?? undefined,
+          payload: { error: message, token: "USDC", amount: item.balance.toString() },
+        });
+        await this.trackWithRetry({
+          invoiceId: item.invoice.id,
+          error: message,
+          expectedVersion: item.invoice.version,
+        }).catch(() => undefined);
+      }
+    }
   }
 
   private async prepareInvoice(
@@ -329,6 +413,75 @@ export class SweeperWorker {
     const balance = await readTronTokenBalance(tronWeb, invoice.invoiceAddress, token);
     if (balance === 0n) return null;
     return { invoice, token, balance };
+  }
+
+  private async prepareSolanaInvoice(
+    invoice: InvoiceRecord
+  ): Promise<{ invoice: InvoiceRecord; balance: bigint } | null> {
+    if (!this.solana?.enabled || !this.solanaAuthority) return null;
+    if (!invoice.chainId || !invoice.invoiceAddress || !invoice.selectedTo) return null;
+    if (invoice.status === "swept") return null;
+    const expectedChain = this.solana.chainId ?? "devnet";
+    if (String(invoice.chainId) !== expectedChain) return null;
+
+    const sdk = this.buildSolanaSdk();
+    const balance = await sdk.readInvoiceBalance(invoice.selectedTo, invoice.id);
+    if (balance === 0n) return null;
+    return { invoice, balance };
+  }
+
+  private async sweepSolanaOne(invoice: InvoiceRecord, balance: bigint, expectedVersion: number): Promise<void> {
+    const sdk = this.buildSolanaSdk();
+    const feeBps = BigInt(this.solana!.feeBps ?? 50);
+    const fee = (balance * feeBps) / 10_000n;
+    const amountSwept = balance - fee;
+
+    const sig = await sdk.settle({
+      merchant: invoice.selectedTo!,
+      invoiceId: invoice.id,
+    });
+
+    this.activity?.append("sweep-submitted", {
+      invoiceId: invoice.id,
+      chainId: invoice.chainId ? String(invoice.chainId) : undefined,
+      invoiceAddress: invoice.invoiceAddress ?? undefined,
+      txHash: sig,
+      payload: { token: "USDC", amount: balance.toString(), to: invoice.selectedTo },
+    });
+
+    await this.trackWithRetry({
+      invoiceId: invoice.id,
+      status: "swept",
+      amountPaid: balance.toString(),
+      amountSwept: amountSwept.toString(),
+      feeCollected: fee.toString(),
+      gasSpentWei: "0",
+      sweepTx: sig,
+      expectedVersion,
+      payload: { token: "USDC", to: invoice.selectedTo },
+    });
+
+    this.activity?.append("sweep-confirmed", {
+      invoiceId: invoice.id,
+      chainId: invoice.chainId ? String(invoice.chainId) : undefined,
+      invoiceAddress: invoice.invoiceAddress ?? undefined,
+      txHash: sig,
+      payload: { token: "USDC", amount: balance.toString(), to: invoice.selectedTo },
+    });
+  }
+
+  private buildSolanaSdk(): CommerceSolanaSdk {
+    assertSolanaConfig(this.solana!);
+    if (!this.solanaAuthority) throw new Error("Solana authority keypair not loaded");
+    const feeRecipient = this.solana!.feeRecipient ?? this.solanaAuthority.publicKey.toBase58();
+    return new CommerceSolanaSdk({
+      connection: new Connection(this.solana!.rpcUrl!, "confirmed"),
+      programId: this.solana!.programId!,
+      usdcMint: this.solana!.usdcMint!,
+      authority: this.solanaAuthority,
+      feeRecipient,
+      feeBps: this.solana!.feeBps ?? 50,
+    });
   }
 
   private async sweepOne(
@@ -592,14 +745,16 @@ export async function loadSweeperConfig(path: string): Promise<SweeperConfig> {
     config.activityLogPath = "/data/logs/activity.jsonl";
   }
   const roleEnv = process.env.SWEEPER_ROLE?.trim().toLowerCase();
-  if (roleEnv === "evm" || roleEnv === "tron" || roleEnv === "all") {
+  if (roleEnv === "evm" || roleEnv === "tron" || roleEnv === "solana" || roleEnv === "all") {
     config.role = roleEnv;
   }
   return config;
 }
 
 function resolveRole(config: SweeperConfig): SweeperRole {
-  if (config.role === "evm" || config.role === "tron" || config.role === "all") return config.role;
+  if (config.role === "evm" || config.role === "tron" || config.role === "solana" || config.role === "all") {
+    return config.role;
+  }
   return "all";
 }
 
@@ -608,11 +763,36 @@ function isTronInvoice(invoice: InvoiceRecord): boolean {
   return id === "nile" || id === "shasta" || id === "tron" || id === "3448148188";
 }
 
+function isSolanaInvoice(invoice: InvoiceRecord): boolean {
+  const id = String(invoice.chainId ?? "");
+  return id === "devnet" || id === "mainnet-beta" || id === "solana" || id === "solana-devnet";
+}
+
 function assertTronConfig(tron: TronSweeperConfig): void {
   if (!tron.invoiceMasterSecret) throw new Error("tron.invoiceMasterSecret is required");
   if (!tron.fullHost) throw new Error("tron.fullHost is required");
   const token = tron.usdtAddress ?? tron.tokens?.find((t) => t.symbol.toUpperCase() === "USDT")?.address;
   if (!token) throw new Error("tron.usdtAddress (or tokens USDT) is required");
+}
+
+function assertSolanaConfig(solana: SolanaSweeperConfig): void {
+  if (!solana.rpcUrl) throw new Error("solana.rpcUrl is required");
+  if (!solana.programId) throw new Error("solana.programId is required");
+  if (!solana.usdcMint) throw new Error("solana.usdcMint is required");
+  if (!solana.privateKey) throw new Error("solana.privateKey is required");
+}
+
+function loadSolanaKeypair(secret: string): Keypair {
+  const trimmed = secret.trim();
+  if (trimmed.startsWith("[")) {
+    const bytes = JSON.parse(trimmed) as number[];
+    return Keypair.fromSecretKey(Uint8Array.from(bytes));
+  }
+  try {
+    return Keypair.fromSecretKey(bs58.decode(trimmed));
+  } catch {
+    throw new Error("solana.privateKey must be a JSON byte array or base58 secret key");
+  }
 }
 
 function resolveToken(chain: EvmChainConfig, token: string | null): string | null {

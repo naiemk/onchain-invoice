@@ -13,6 +13,7 @@ export interface CommerceInvoiceParams {
 }
 
 const TRON_BASE58_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
+const SOLANA_BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 function normalizeMerchantAddress(value: string): string {
   const trimmed = value.trim();
@@ -21,6 +22,9 @@ function normalizeMerchantAddress(value: string): string {
     return getAddress(trimmed);
   }
   if (TRON_BASE58_RE.test(trimmed)) return trimmed;
+  if (SOLANA_BASE58_RE.test(trimmed) && !(trimmed.startsWith("T") && trimmed.length === 34)) {
+    return trimmed;
+  }
   throw new Error(`Invalid merchant address: ${value}`);
 }
 
