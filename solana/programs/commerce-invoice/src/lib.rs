@@ -1,7 +1,8 @@
 //! Commerce invoice settle program for Solana.
 //!
-//! Invoice PDA seeds: `["invoice", invoice_id (32), merchant]`.
-//! USDC lives in the PDA's ATA. `settle` pays only the bound merchant (+ fee).
+//! Invoice PDA seeds: `["invoice", invoice_id (32), merchant, mint]`.
+//! SPL tokens live in the PDA's ATA. `settle` pays only the bound merchant (+ fee).
+//! Mint is part of the PDA — USDC and USDT (any configured mint) use the same path.
 //! Sweeper is an authority that can trigger settle — it cannot redirect funds.
 
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -30,7 +31,6 @@ entrypoint!(process_instruction);
 pub struct Config {
     pub authority: Pubkey,
     pub fee_recipient: Pubkey,
-    pub usdc_mint: Pubkey,
     pub fee_bps: u16,
     pub bump: u8,
 }
@@ -42,7 +42,6 @@ pub enum CommerceInstruction {
         fee_bps: u16,
         authority: Pubkey,
         fee_recipient: Pubkey,
-        usdc_mint: Pubkey,
     },
     /// Sweep invoice ATA → merchant (+ fee). Accounts listed in `settle`.
     Settle { invoice_id: [u8; 32] },
@@ -52,8 +51,21 @@ pub fn config_pda(program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[CONFIG_SEED], program_id)
 }
 
-pub fn invoice_pda(program_id: &Pubkey, invoice_id: &[u8; 32], merchant: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[INVOICE_SEED, invoice_id.as_ref(), merchant.as_ref()], program_id)
+pub fn invoice_pda(
+    program_id: &Pubkey,
+    invoice_id: &[u8; 32],
+    merchant: &Pubkey,
+    mint: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            INVOICE_SEED,
+            invoice_id.as_ref(),
+            merchant.as_ref(),
+            mint.as_ref(),
+        ],
+        program_id,
+    )
 }
 
 pub fn process_instruction(
@@ -68,8 +80,7 @@ pub fn process_instruction(
             fee_bps,
             authority,
             fee_recipient,
-            usdc_mint,
-        } => initialize(program_id, accounts, fee_bps, authority, fee_recipient, usdc_mint),
+        } => initialize(program_id, accounts, fee_bps, authority, fee_recipient),
         CommerceInstruction::Settle { invoice_id } => settle(program_id, accounts, invoice_id),
     }
 }
@@ -80,7 +91,6 @@ fn initialize(
     fee_bps: u16,
     authority: Pubkey,
     fee_recipient: Pubkey,
-    usdc_mint: Pubkey,
 ) -> ProgramResult {
     if fee_bps > 10_000 {
         return Err(ProgramError::InvalidArgument);
@@ -120,7 +130,6 @@ fn initialize(
     let config = Config {
         authority,
         fee_recipient,
-        usdc_mint,
         fee_bps,
         bump,
     };
@@ -134,9 +143,9 @@ fn initialize(
 /// 2. merchant pubkey (owner of destination ATA)
 /// 3. invoice PDA
 /// 4. invoice ATA (owned by invoice PDA)
-/// 5. merchant USDC ATA
-/// 6. fee recipient USDC ATA
-/// 7. USDC mint
+/// 5. merchant token ATA
+/// 6. fee recipient token ATA
+/// 7. SPL mint (bound into PDA seeds)
 /// 8. token program
 /// 9. rent reclaim destination (writable; receives closed ATA lamports)
 fn settle(program_id: &Pubkey, accounts: &[AccountInfo], invoice_id: [u8; 32]) -> ProgramResult {
@@ -166,30 +175,28 @@ fn settle(program_id: &Pubkey, accounts: &[AccountInfo], invoice_id: [u8; 32]) -
         msg!("unauthorized sweeper");
         return Err(ProgramError::Custom(1));
     }
-    if mint.key != &config.usdc_mint {
-        return Err(ProgramError::InvalidAccountData);
-    }
 
-    let (expected_invoice, invoice_bump) = invoice_pda(program_id, &invoice_id, merchant.key);
+    let (expected_invoice, invoice_bump) =
+        invoice_pda(program_id, &invoice_id, merchant.key, mint.key);
     if invoice_info.key != &expected_invoice {
         return Err(ProgramError::InvalidSeeds);
     }
 
-    let expected_invoice_ata = get_associated_token_address(&expected_invoice, &config.usdc_mint);
+    let expected_invoice_ata = get_associated_token_address(&expected_invoice, mint.key);
     if invoice_ata.key != &expected_invoice_ata {
         return Err(ProgramError::InvalidAccountData);
     }
-    let expected_merchant_ata = get_associated_token_address(merchant.key, &config.usdc_mint);
+    let expected_merchant_ata = get_associated_token_address(merchant.key, mint.key);
     if merchant_ata.key != &expected_merchant_ata {
         return Err(ProgramError::InvalidAccountData);
     }
-    let expected_fee_ata = get_associated_token_address(&config.fee_recipient, &config.usdc_mint);
+    let expected_fee_ata = get_associated_token_address(&config.fee_recipient, mint.key);
     if fee_ata.key != &expected_fee_ata {
         return Err(ProgramError::InvalidAccountData);
     }
 
     let ata = TokenAccount::unpack(&invoice_ata.try_borrow_data()?)?;
-    if ata.mint != config.usdc_mint || ata.owner != expected_invoice {
+    if ata.mint != *mint.key || ata.owner != expected_invoice {
         return Err(ProgramError::InvalidAccountData);
     }
     let amount = ata.amount;
@@ -208,6 +215,7 @@ fn settle(program_id: &Pubkey, accounts: &[AccountInfo], invoice_id: [u8; 32]) -
         INVOICE_SEED,
         invoice_id.as_ref(),
         merchant.key.as_ref(),
+        mint.key.as_ref(),
         &[invoice_bump],
     ];
 
@@ -250,7 +258,6 @@ fn settle(program_id: &Pubkey, accounts: &[AccountInfo], invoice_id: [u8; 32]) -
         )?;
     }
 
-    // Close empty ATA; reclaim rent.
     invoke_signed(
         &spl_token::instruction::close_account(
             token_program.key,

@@ -124,10 +124,15 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   if (kind === "tron") {
     return symbol === "USDT";
   }
-  // EVM + Solana commerce: USDC only
+  if (kind === "solana") {
+    return symbol === "USDC" || symbol === "USDT";
+  }
+  // EVM commerce launch: USDC only
   return symbol === "USDC";
 }
 
 export function defaultTokenForChain(chainId: string): string {
-  return chainKind(chainId) === "tron" ? "USDT" : "USDC";
+  const kind = chainKind(chainId);
+  if (kind === "tron") return "USDT";
+  return "USDC";
 }

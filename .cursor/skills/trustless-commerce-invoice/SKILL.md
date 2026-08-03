@@ -67,7 +67,7 @@ Idempotent: same deterministic invoice id returns the same invoice (`200` if alr
 
 **Do not** use deprecated `POST /api/sessions` + `POST /api/invoices/activate`.
 
-### Solana Devnet USDC
+### Solana Devnet (USDC or USDT)
 
 ```http
 POST /api/invoices
@@ -77,7 +77,7 @@ Content-Type: application/json
   "price": "10.00",
   "to": ["So111…"],
   "chains": ["devnet"],
-  "tokens": ["USDC"],
+  "tokens": ["USDC", "USDT"],
   "clientInvoiceId": "order-1",
   "chainId": "devnet",
   "token": "USDC",
@@ -87,9 +87,9 @@ Content-Type: application/json
 }
 ```
 
-`invoiceAddress` is the invoice PDA's USDC ATA. Settlement is destination-bound on-chain (sweeper cannot redirect).
+`invoiceAddress` is the invoice PDA's ATA for the selected mint (mint is bound into PDA seeds). Settlement is destination-bound on-chain (sweeper cannot redirect). Mainnet (`mainnet-beta`) uses the same API once enabled in config.
 
-Stablecoins only for now (`USDC` on EVM/Solana, `USDT` on Nile). Token–chain pairs are enforced. Rate limit: ~1 create/s per IP (429 if exceeded).
+Stablecoins only for now (`USDC`/`USDT` on Solana, `USDC` on EVM, `USDT` on Nile). Token–chain pairs are enforced. Rate limit: ~1 create/s per IP (429 if exceeded).
 
 ## Pay link (browser)
 

@@ -31,6 +31,15 @@ export {
   type CommerceSolanaSdkConfig,
 } from "./solana-sdk.js";
 export {
+  resolveSolanaChain,
+  resolveSolanaToken,
+  solanaTokenSymbols,
+  SOLANA_KNOWN_MINTS,
+  type SolanaChainConfig,
+  type SolanaNetworksConfig,
+  type SolanaTokenConfig,
+} from "./solana-config.js";
+export {
   CommerceInvoiceSdk,
   commerceInvoiceSalt,
   commerceMinimalProxyInitCodeHash,

@@ -56,7 +56,7 @@ async function airdrop(connection: Connection, pubkey: PublicKey, sol = 10): Pro
   await connection.confirmTransaction(sig, "confirmed");
 }
 
-async function createUsdcMint(connection: Connection, payer: Keypair): Promise<Keypair> {
+async function createMint(connection: Connection, payer: Keypair): Promise<Keypair> {
   const mint = Keypair.generate();
   const lamports = await getMinimumBalanceForRentExemptMint(connection);
   const tx = new Transaction().add(
@@ -83,7 +83,8 @@ describe("Solana commerce invoice (success e2e)", function () {
   let feeRecipient: Keypair;
   let merchant: Keypair;
   let attacker: Keypair;
-  let mint: Keypair;
+  let usdcMint: Keypair;
+  let usdtMint: Keypair;
   let sdk: CommerceSolanaSdk;
   let ownedValidator = false;
 
@@ -106,14 +107,11 @@ describe("Solana commerce invoice (success e2e)", function () {
       await waitForRpc(connection);
     }
 
-    // Ensure program is deployed when attaching to an existing validator
     const info = await connection.getAccountInfo(programId);
-    if (!info) {
-      if (!ownedValidator) {
-        throw new Error(
-          `Program ${programId.toBase58()} not deployed on ${RPC}. Restart validator with --bpf-program or leave RPC down so the suite starts one.`
-        );
-      }
+    if (!info && !ownedValidator) {
+      throw new Error(
+        `Program ${programId.toBase58()} not deployed on ${RPC}. Restart validator with --bpf-program or leave RPC down so the suite starts one.`
+      );
     }
 
     authority = Keypair.generate();
@@ -124,11 +122,11 @@ describe("Solana commerce invoice (success e2e)", function () {
     await airdrop(connection, feeRecipient.publicKey, 2);
     await airdrop(connection, merchant.publicKey, 2);
 
-    mint = await createUsdcMint(connection, authority);
+    usdcMint = await createMint(connection, authority);
+    usdtMint = await createMint(connection, authority);
     sdk = new CommerceSolanaSdk({
       connection,
       programId,
-      usdcMint: mint.publicKey,
       authority,
       feeRecipient: feeRecipient.publicKey,
       feeBps: FEE_BPS,
@@ -147,56 +145,75 @@ describe("Solana commerce invoice (success e2e)", function () {
       validator.kill("SIGKILL");
       validator = null;
     }
-    // web3.js keeps the event loop alive via websocket reconnect; force clean exit for this suite.
     setTimeout(() => process.exit(0), 50);
   });
 
-  it("predicts stable PDA and ATA from merchant + invoiceId", function () {
+  it("predicts distinct ATAs per merchant and per mint", function () {
     const invoiceId = keccakId("sol-inv-1");
-    const a = predictCommerceSolanaInvoiceAta(programId, merchant.publicKey, invoiceId, mint.publicKey);
-    const b = predictCommerceSolanaInvoiceAta(programId, merchant.publicKey, invoiceId, mint.publicKey);
+    const a = predictCommerceSolanaInvoiceAta(programId, merchant.publicKey, invoiceId, usdcMint.publicKey);
+    const b = predictCommerceSolanaInvoiceAta(programId, merchant.publicKey, invoiceId, usdcMint.publicKey);
     expect(a).to.equal(b);
-    const other = predictCommerceSolanaInvoiceAta(programId, attacker.publicKey, invoiceId, mint.publicKey);
-    expect(other).to.not.equal(a);
-    const pda = predictCommerceSolanaInvoicePda(programId, merchant.publicKey, invoiceId);
+    const otherMerchant = predictCommerceSolanaInvoiceAta(
+      programId,
+      attacker.publicKey,
+      invoiceId,
+      usdcMint.publicKey
+    );
+    expect(otherMerchant).to.not.equal(a);
+    const usdtAta = predictCommerceSolanaInvoiceAta(programId, merchant.publicKey, invoiceId, usdtMint.publicKey);
+    expect(usdtAta).to.not.equal(a);
+    const pda = predictCommerceSolanaInvoicePda(programId, merchant.publicKey, invoiceId, usdcMint.publicKey);
     expect(pda).to.match(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
   });
 
-  it("pay → settle success: merchant gets amount minus fee, ATA closed", async function () {
-    const invoiceId = keccakId("sol-pay-settle");
-    const amount = 1_000_000n; // 1 USDC
+  async function payAndSettle(mint: Keypair, label: string): Promise<void> {
+    const invoiceId = keccakId(`sol-pay-${label}`);
+    const amount = 1_000_000n;
     const fee = (amount * BigInt(FEE_BPS)) / 10_000n;
 
     await fundSolanaInvoiceAta({
       connection,
       payer: authority,
       programId,
-      usdcMint: mint.publicKey,
+      mint: mint.publicKey,
       mintAuthority: authority,
       merchant: merchant.publicKey,
       invoiceId,
       amount,
     });
 
-    expect(await sdk.readInvoiceBalance(merchant.publicKey, invoiceId)).to.equal(amount);
+    expect(await sdk.readInvoiceBalance(merchant.publicKey, invoiceId, mint.publicKey)).to.equal(amount);
 
     const merchantAta = getAssociatedTokenAddressSync(mint.publicKey, merchant.publicKey);
     const feeAta = getAssociatedTokenAddressSync(mint.publicKey, feeRecipient.publicKey);
+    const merchantBefore = await getAccount(connection, merchantAta).then(
+      (a) => a.amount,
+      () => 0n
+    );
+    const feeBefore = await getAccount(connection, feeAta).then(
+      (a) => a.amount,
+      () => 0n
+    );
 
-    const sig = await sdk.settle({ merchant: merchant.publicKey, invoiceId });
+    const sig = await sdk.settle({ merchant: merchant.publicKey, invoiceId, mint: mint.publicKey });
     expect(sig).to.be.a("string").with.length.greaterThan(40);
 
-    const merchantBal = (await getAccount(connection, merchantAta)).amount;
-    const feeBal = (await getAccount(connection, feeAta)).amount;
-    expect(merchantBal).to.equal(amount - fee);
-    expect(feeBal).to.equal(fee);
-    expect(await sdk.readInvoiceBalance(merchant.publicKey, invoiceId)).to.equal(0n);
+    expect((await getAccount(connection, merchantAta)).amount).to.equal(merchantBefore + amount - fee);
+    expect((await getAccount(connection, feeAta)).amount).to.equal(feeBefore + fee);
+    expect(await sdk.readInvoiceBalance(merchant.publicKey, invoiceId, mint.publicKey)).to.equal(0n);
 
     const invoiceAta = new PublicKey(
       predictCommerceSolanaInvoiceAta(programId, merchant.publicKey, invoiceId, mint.publicKey)
     );
-    const closed = await connection.getAccountInfo(invoiceAta);
-    expect(closed).to.equal(null);
+    expect(await connection.getAccountInfo(invoiceAta)).to.equal(null);
+  }
+
+  it("pay → settle success for USDC mint", async function () {
+    await payAndSettle(usdcMint, "usdc");
+  });
+
+  it("pay → settle success for USDT mint (same program path)", async function () {
+    await payAndSettle(usdtMint, "usdt");
   });
 
   it("rejects redirect: wrong merchant cannot drain a funded invoice", async function () {
@@ -206,7 +223,7 @@ describe("Solana commerce invoice (success e2e)", function () {
       connection,
       payer: authority,
       programId,
-      usdcMint: mint.publicKey,
+      mint: usdcMint.publicKey,
       mintAuthority: authority,
       merchant: merchant.publicKey,
       invoiceId,
@@ -215,12 +232,12 @@ describe("Solana commerce invoice (success e2e)", function () {
 
     let failed = false;
     try {
-      await sdk.settle({ merchant: attacker.publicKey, invoiceId });
+      await sdk.settle({ merchant: attacker.publicKey, invoiceId, mint: usdcMint.publicKey });
     } catch {
       failed = true;
     }
     expect(failed).to.equal(true);
-    expect(await sdk.readInvoiceBalance(merchant.publicKey, invoiceId)).to.equal(amount);
+    expect(await sdk.readInvoiceBalance(merchant.publicKey, invoiceId, usdcMint.publicKey)).to.equal(amount);
   });
 
   it("rejects unauthorized sweeper", async function () {
@@ -230,7 +247,7 @@ describe("Solana commerce invoice (success e2e)", function () {
       connection,
       payer: authority,
       programId,
-      usdcMint: mint.publicKey,
+      mint: usdcMint.publicKey,
       mintAuthority: authority,
       merchant: merchant.publicKey,
       invoiceId,
@@ -242,7 +259,6 @@ describe("Solana commerce invoice (success e2e)", function () {
     const rogueSdk = new CommerceSolanaSdk({
       connection,
       programId,
-      usdcMint: mint.publicKey,
       authority: rogue,
       feeRecipient: feeRecipient.publicKey,
       feeBps: FEE_BPS,
@@ -250,11 +266,11 @@ describe("Solana commerce invoice (success e2e)", function () {
 
     let failed = false;
     try {
-      await rogueSdk.settle({ merchant: merchant.publicKey, invoiceId });
+      await rogueSdk.settle({ merchant: merchant.publicKey, invoiceId, mint: usdcMint.publicKey });
     } catch {
       failed = true;
     }
     expect(failed).to.equal(true);
-    expect(await sdk.readInvoiceBalance(merchant.publicKey, invoiceId)).to.equal(amount);
+    expect(await sdk.readInvoiceBalance(merchant.publicKey, invoiceId, usdcMint.publicKey)).to.equal(amount);
   });
 });

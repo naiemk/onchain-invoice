@@ -7,9 +7,8 @@ export const BorshInstructionCoder = {
     feeBps: number;
     authority: PublicKey;
     feeRecipient: PublicKey;
-    usdcMint: PublicKey;
   }): Buffer {
-    const buf = Buffer.alloc(1 + 2 + 32 + 32 + 32);
+    const buf = Buffer.alloc(1 + 2 + 32 + 32);
     let o = 0;
     buf.writeUInt8(0, o); // Initialize
     o += 1;
@@ -18,8 +17,6 @@ export const BorshInstructionCoder = {
     params.authority.toBuffer().copy(buf, o);
     o += 32;
     params.feeRecipient.toBuffer().copy(buf, o);
-    o += 32;
-    params.usdcMint.toBuffer().copy(buf, o);
     return buf;
   },
 

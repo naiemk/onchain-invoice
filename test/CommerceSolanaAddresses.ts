@@ -11,13 +11,16 @@ import {
 
 describe("Solana commerce addresses (offline)", function () {
   const programId = "DTpy1o32ap655U2FPUX4ZgLAwDtxrLLu4d8TGhzap3FF";
-  const mint = Keypair.generate().publicKey.toBase58();
+  const usdc = Keypair.generate().publicKey.toBase58();
+  const usdt = Keypair.generate().publicKey.toBase58();
   const merchant = Keypair.generate().publicKey.toBase58();
 
-  it("classifies devnet as solana and allows USDC", function () {
+  it("classifies solana chain ids and allows USDC + USDT", function () {
     expect(chainKind("devnet")).to.equal("solana");
+    expect(chainKind("mainnet-beta")).to.equal("solana");
     expect(tokenAllowedOnChain("devnet", "USDC")).to.equal(true);
-    expect(tokenAllowedOnChain("devnet", "USDT")).to.equal(false);
+    expect(tokenAllowedOnChain("devnet", "USDT")).to.equal(true);
+    expect(tokenAllowedOnChain("mainnet-beta", "USDT")).to.equal(true);
   });
 
   it("normalizes Solana merchant addresses", function () {
@@ -26,12 +29,19 @@ describe("Solana commerce addresses (offline)", function () {
     expect(() => normalizeMerchantAddress(Wallet.createRandom().address)).to.not.throw();
   });
 
-  it("predicts distinct ATAs per merchant (anti-redirect bind)", function () {
+  it("predicts distinct ATAs per merchant and per mint", function () {
     const invoiceId = keccakId("offline-1");
-    const a = predictCommerceSolanaInvoiceAta(programId, merchant, invoiceId, mint);
-    const b = predictCommerceSolanaInvoiceAta(programId, merchant, invoiceId, mint);
+    const a = predictCommerceSolanaInvoiceAta(programId, merchant, invoiceId, usdc);
+    const b = predictCommerceSolanaInvoiceAta(programId, merchant, invoiceId, usdc);
     expect(a).to.equal(b);
-    const other = predictCommerceSolanaInvoiceAta(programId, Keypair.generate().publicKey, invoiceId, mint);
-    expect(other).to.not.equal(a);
+    const otherMerchant = predictCommerceSolanaInvoiceAta(
+      programId,
+      Keypair.generate().publicKey,
+      invoiceId,
+      usdc
+    );
+    expect(otherMerchant).to.not.equal(a);
+    const otherMint = predictCommerceSolanaInvoiceAta(programId, merchant, invoiceId, usdt);
+    expect(otherMint).to.not.equal(a);
   });
 });

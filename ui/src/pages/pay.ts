@@ -258,7 +258,7 @@ async function renderInvoiceStage(
             networkKind(chainId) === "tron"
               ? " Use Nile Tronscan to verify the address when paying on Nile."
               : networkKind(chainId) === "solana"
-                ? " Send SPL USDC to this token account (ATA). Use Solana Explorer (devnet) to verify."
+                ? " Send SPL tokens to this token account (ATA). Verify on Solana Explorer."
                 : ""
           }
         </div>

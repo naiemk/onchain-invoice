@@ -17,10 +17,11 @@ solana/
 
 ## Program model
 
-- Invoice PDA seeds: `["invoice", invoice_id_32, merchant_pubkey]`
-- Payers send USDC to the PDA's associated token account (stored as `invoiceAddress`)
+- Invoice PDA seeds: `["invoice", invoice_id_32, merchant_pubkey, mint]`
+- Payers send SPL tokens (USDC/USDT) to the PDA's associated token account (stored as `invoiceAddress`)
 - `settle` (authority-signed) pays **only** the bound merchant (+ fee) and closes the ATA
-- Sweeper cannot redirect funds (wrong merchant ⇒ different empty PDA)
+- Sweeper cannot redirect funds (wrong merchant or mint ⇒ different empty PDA)
+- Config is keyed by `chainId` (`devnet` / `mainnet-beta`) with a `tokens` map — same code path for every network
 
 ## Build
 

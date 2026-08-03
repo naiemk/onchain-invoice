@@ -27,38 +27,39 @@ export function solanaConfigPda(programId: PublicKey | string): [PublicKey, numb
 export function solanaInvoicePda(
   programId: PublicKey | string,
   invoiceId: Uint8Array | string,
-  merchant: PublicKey | string
+  merchant: PublicKey | string,
+  mint: PublicKey | string
 ): [PublicKey, number] {
   const id = normalizeInvoiceId32(invoiceId);
   return PublicKey.findProgramAddressSync(
-    [SOLANA_INVOICE_SEED, id, toPubkey(merchant).toBuffer()],
+    [SOLANA_INVOICE_SEED, id, toPubkey(merchant).toBuffer(), toPubkey(mint).toBuffer()],
     toPubkey(programId)
   );
 }
 
-/** Deterministic USDC ATA for an invoice (payment destination shown to payers). */
+/** Deterministic token ATA for an invoice (payment destination shown to payers). */
 export function predictCommerceSolanaInvoiceAta(
   programId: PublicKey | string,
   merchant: PublicKey | string,
   invoiceId: Uint8Array | string,
-  usdcMint: PublicKey | string
+  mint: PublicKey | string
 ): string {
-  const [invoice] = solanaInvoicePda(programId, invoiceId, merchant);
-  return getAssociatedTokenAddressSync(toPubkey(usdcMint), invoice, true).toBase58();
+  const [invoice] = solanaInvoicePda(programId, invoiceId, merchant, mint);
+  return getAssociatedTokenAddressSync(toPubkey(mint), invoice, true).toBase58();
 }
 
 export function predictCommerceSolanaInvoicePda(
   programId: PublicKey | string,
   merchant: PublicKey | string,
-  invoiceId: Uint8Array | string
+  invoiceId: Uint8Array | string,
+  mint: PublicKey | string
 ): string {
-  return solanaInvoicePda(programId, invoiceId, merchant)[0].toBase58();
+  return solanaInvoicePda(programId, invoiceId, merchant, mint)[0].toBase58();
 }
 
 export type CommerceSolanaSdkConfig = {
   connection: Connection;
   programId: PublicKey | string;
-  usdcMint: PublicKey | string;
   /** Settle authority (sweeper). */
   authority: Signer;
   feeRecipient: PublicKey | string;
@@ -68,7 +69,6 @@ export type CommerceSolanaSdkConfig = {
 export class CommerceSolanaSdk {
   readonly connection: Connection;
   readonly programId: PublicKey;
-  readonly usdcMint: PublicKey;
   readonly authority: Signer;
   readonly feeRecipient: PublicKey;
   readonly feeBps: number;
@@ -76,16 +76,17 @@ export class CommerceSolanaSdk {
   constructor(config: CommerceSolanaSdkConfig) {
     this.connection = config.connection;
     this.programId = toPubkey(config.programId);
-    this.usdcMint = toPubkey(config.usdcMint);
     this.authority = config.authority;
     this.feeRecipient = toPubkey(config.feeRecipient);
     this.feeBps = config.feeBps ?? 50;
   }
 
-  invoiceAta(merchant: PublicKey | string, invoiceId: Uint8Array | string): PublicKey {
-    return new PublicKey(
-      predictCommerceSolanaInvoiceAta(this.programId, merchant, invoiceId, this.usdcMint)
-    );
+  invoiceAta(
+    merchant: PublicKey | string,
+    invoiceId: Uint8Array | string,
+    mint: PublicKey | string
+  ): PublicKey {
+    return new PublicKey(predictCommerceSolanaInvoiceAta(this.programId, merchant, invoiceId, mint));
   }
 
   async initialize(payer: Signer = this.authority): Promise<string> {
@@ -94,7 +95,6 @@ export class CommerceSolanaSdk {
       feeBps: this.feeBps,
       authority: this.authority.publicKey,
       feeRecipient: this.feeRecipient,
-      usdcMint: this.usdcMint,
     });
     const ix = new TransactionInstruction({
       programId: this.programId,
@@ -108,8 +108,12 @@ export class CommerceSolanaSdk {
     return sendTx(this.connection, [payer], [ix]);
   }
 
-  async readInvoiceBalance(merchant: PublicKey | string, invoiceId: Uint8Array | string): Promise<bigint> {
-    const ata = this.invoiceAta(merchant, invoiceId);
+  async readInvoiceBalance(
+    merchant: PublicKey | string,
+    invoiceId: Uint8Array | string,
+    mint: PublicKey | string
+  ): Promise<bigint> {
+    const ata = this.invoiceAta(merchant, invoiceId, mint);
     try {
       const account = await getAccount(this.connection, ata, undefined, TOKEN_PROGRAM_ID);
       return account.amount;
@@ -120,33 +124,35 @@ export class CommerceSolanaSdk {
 
   /**
    * Settle invoice ATA to bound merchant (+ fee), then close ATA.
-   * Destination is enforced on-chain via PDA seeds — sweeper cannot redirect.
+   * Destination and mint are enforced on-chain via PDA seeds — sweeper cannot redirect.
    */
   async settle(params: {
     merchant: PublicKey | string;
     invoiceId: Uint8Array | string;
+    mint: PublicKey | string;
     rentDestination?: PublicKey | string;
   }): Promise<string> {
     const merchant = toPubkey(params.merchant);
+    const mint = toPubkey(params.mint);
     const invoiceId = normalizeInvoiceId32(params.invoiceId);
-    const [invoicePda] = solanaInvoicePda(this.programId, invoiceId, merchant);
+    const [invoicePda] = solanaInvoicePda(this.programId, invoiceId, merchant, mint);
     const [configPda] = solanaConfigPda(this.programId);
-    const invoiceAta = getAssociatedTokenAddressSync(this.usdcMint, invoicePda, true);
-    const merchantAta = getAssociatedTokenAddressSync(this.usdcMint, merchant, false);
-    const feeAta = getAssociatedTokenAddressSync(this.usdcMint, this.feeRecipient, false);
+    const invoiceAta = getAssociatedTokenAddressSync(mint, invoicePda, true);
+    const merchantAta = getAssociatedTokenAddressSync(mint, merchant, false);
+    const feeAta = getAssociatedTokenAddressSync(mint, this.feeRecipient, false);
     const rentDestination = toPubkey(params.rentDestination ?? this.authority.publicKey);
 
     const ensureMerchant = createAssociatedTokenAccountIdempotentInstruction(
       this.authority.publicKey,
       merchantAta,
       merchant,
-      this.usdcMint
+      mint
     );
     const ensureFee = createAssociatedTokenAccountIdempotentInstruction(
       this.authority.publicKey,
       feeAta,
       this.feeRecipient,
-      this.usdcMint
+      mint
     );
 
     const data = BorshInstructionCoder.encodeSettle({ invoiceId });
@@ -160,7 +166,7 @@ export class CommerceSolanaSdk {
         { pubkey: invoiceAta, isSigner: false, isWritable: true },
         { pubkey: merchantAta, isSigner: false, isWritable: true },
         { pubkey: feeAta, isSigner: false, isWritable: true },
-        { pubkey: this.usdcMint, isSigner: false, isWritable: false },
+        { pubkey: mint, isSigner: false, isWritable: false },
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: rentDestination, isSigner: false, isWritable: true },
       ],
@@ -176,18 +182,17 @@ export async function fundSolanaInvoiceAta(params: {
   connection: Connection;
   payer: Signer;
   programId: PublicKey | string;
-  usdcMint: PublicKey | string;
+  mint: PublicKey | string;
   mintAuthority: Signer;
   merchant: PublicKey | string;
   invoiceId: Uint8Array | string;
   amount: bigint;
-  decimals?: number;
 }): Promise<string> {
-  const mint = toPubkey(params.usdcMint);
+  const mint = toPubkey(params.mint);
   const invoiceAta = new PublicKey(
     predictCommerceSolanaInvoiceAta(params.programId, params.merchant, params.invoiceId, mint)
   );
-  const [invoicePda] = solanaInvoicePda(params.programId, params.invoiceId, params.merchant);
+  const [invoicePda] = solanaInvoicePda(params.programId, params.invoiceId, params.merchant, mint);
   const createIx = createAssociatedTokenAccountIdempotentInstruction(
     params.payer.publicKey,
     invoiceAta,

@@ -86,11 +86,27 @@ export interface TronSweeperConfig {
 export interface SolanaSweeperConfig {
   enabled: boolean;
   note?: string;
-  /** Product chain id (`devnet`). */
+  /**
+   * Per product chainId (`devnet`, `mainnet-beta`). Prefer this over flat fields.
+   * Same code path for every chain — only config entries differ.
+   */
+  chains?: Record<
+    string,
+    {
+      enabled?: boolean;
+      rpcUrl?: string;
+      programId?: string;
+      feeRecipient?: string;
+      feeBps?: number;
+      tokens?: Record<string, { mint?: string; address?: string; decimals?: number }>;
+    }
+  >;
+  /** @deprecated Use `chains.devnet` */
   chainId?: string;
   rpcUrl?: string;
   programId?: string;
   usdcMint?: string;
+  usdtMint?: string;
   /** Settle authority secret: JSON byte array or base58. */
   privateKey?: string;
   feeRecipient?: string;
@@ -211,7 +227,13 @@ export class SweeperWorker {
     const invoices = await this.fetchInvoices();
     const readyByChain = new Map<string, Array<{ invoice: InvoiceRecord; token: string | null; balance: bigint }>>();
     const readyTron: Array<{ invoice: InvoiceRecord; token: string; balance: bigint }> = [];
-    const readySolana: Array<{ invoice: InvoiceRecord; balance: bigint }> = [];
+    const readySolana: Array<{
+      invoice: InvoiceRecord;
+      balance: bigint;
+      mint: string;
+      symbol: string;
+      chainId: string;
+    }> = [];
 
     for (const invoice of invoices) {
       try {
@@ -242,7 +264,7 @@ export class SweeperWorker {
             chainId: String(invoice.chainId),
             invoiceAddress: invoice.invoiceAddress ?? undefined,
             payload: {
-              token: "USDC",
+              token: prepared.symbol,
               amount: prepared.balance.toString(),
               status: invoice.status,
             },
@@ -364,16 +386,23 @@ export class SweeperWorker {
           status: item.invoice.allowPartial ? "paid_partial" : "paid",
           amountPaid: item.balance.toString(),
           expectedVersion: claimed.version,
-          payload: { observedBalance: item.balance.toString(), token: "USDC" },
+          payload: { observedBalance: item.balance.toString(), token: item.symbol },
         });
-        await this.sweepSolanaOne(item.invoice, item.balance, afterPaid?.version ?? claimed.version + 1);
+        await this.sweepSolanaOne(
+          item.invoice,
+          item.balance,
+          item.mint,
+          item.symbol,
+          item.chainId,
+          afterPaid?.version ?? claimed.version + 1
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.activity?.append("sweep-failed", {
           invoiceId: item.invoice.id,
-          chainId: item.invoice.chainId ? String(item.invoice.chainId) : undefined,
+          chainId: item.chainId,
           invoiceAddress: item.invoice.invoiceAddress ?? undefined,
-          payload: { error: message, token: "USDC", amount: item.balance.toString() },
+          payload: { error: message, token: item.symbol, amount: item.balance.toString() },
         });
         await this.trackWithRetry({
           invoiceId: item.invoice.id,
@@ -417,36 +446,49 @@ export class SweeperWorker {
 
   private async prepareSolanaInvoice(
     invoice: InvoiceRecord
-  ): Promise<{ invoice: InvoiceRecord; balance: bigint } | null> {
+  ): Promise<{ invoice: InvoiceRecord; balance: bigint; mint: string; symbol: string; chainId: string } | null> {
     if (!this.solana?.enabled || !this.solanaAuthority) return null;
     if (!invoice.chainId || !invoice.invoiceAddress || !invoice.selectedTo) return null;
     if (invoice.status === "swept") return null;
-    const expectedChain = this.solana.chainId ?? "devnet";
-    if (String(invoice.chainId) !== expectedChain) return null;
 
-    const sdk = this.buildSolanaSdk();
-    const balance = await sdk.readInvoiceBalance(invoice.selectedTo, invoice.id);
+    const chain = resolveSweeperSolanaChain(this.solana, String(invoice.chainId));
+    if (!chain) return null;
+    const token = resolveSweeperSolanaToken(chain, invoice.token);
+    if (!token) return null;
+
+    const sdk = this.buildSolanaSdk(chain);
+    const balance = await sdk.readInvoiceBalance(invoice.selectedTo, invoice.id, token.mint);
     if (balance === 0n) return null;
-    return { invoice, balance };
+    return { invoice, balance, mint: token.mint, symbol: token.symbol, chainId: String(invoice.chainId) };
   }
 
-  private async sweepSolanaOne(invoice: InvoiceRecord, balance: bigint, expectedVersion: number): Promise<void> {
-    const sdk = this.buildSolanaSdk();
-    const feeBps = BigInt(this.solana!.feeBps ?? 50);
+  private async sweepSolanaOne(
+    invoice: InvoiceRecord,
+    balance: bigint,
+    mint: string,
+    symbol: string,
+    chainId: string,
+    expectedVersion: number
+  ): Promise<void> {
+    const chain = resolveSweeperSolanaChain(this.solana!, chainId);
+    if (!chain) throw new Error(`Solana chain ${chainId} not configured`);
+    const sdk = this.buildSolanaSdk(chain);
+    const feeBps = BigInt(chain.feeBps ?? this.solana!.feeBps ?? 50);
     const fee = (balance * feeBps) / 10_000n;
     const amountSwept = balance - fee;
 
     const sig = await sdk.settle({
       merchant: invoice.selectedTo!,
       invoiceId: invoice.id,
+      mint,
     });
 
     this.activity?.append("sweep-submitted", {
       invoiceId: invoice.id,
-      chainId: invoice.chainId ? String(invoice.chainId) : undefined,
+      chainId,
       invoiceAddress: invoice.invoiceAddress ?? undefined,
       txHash: sig,
-      payload: { token: "USDC", amount: balance.toString(), to: invoice.selectedTo },
+      payload: { token: symbol, amount: balance.toString(), to: invoice.selectedTo },
     });
 
     await this.trackWithRetry({
@@ -458,29 +500,27 @@ export class SweeperWorker {
       gasSpentWei: "0",
       sweepTx: sig,
       expectedVersion,
-      payload: { token: "USDC", to: invoice.selectedTo },
+      payload: { token: symbol, to: invoice.selectedTo, mint },
     });
 
     this.activity?.append("sweep-confirmed", {
       invoiceId: invoice.id,
-      chainId: invoice.chainId ? String(invoice.chainId) : undefined,
+      chainId,
       invoiceAddress: invoice.invoiceAddress ?? undefined,
       txHash: sig,
-      payload: { token: "USDC", amount: balance.toString(), to: invoice.selectedTo },
+      payload: { token: symbol, amount: balance.toString(), to: invoice.selectedTo },
     });
   }
 
-  private buildSolanaSdk(): CommerceSolanaSdk {
-    assertSolanaConfig(this.solana!);
+  private buildSolanaSdk(chain: ResolvedSweeperSolanaChain): CommerceSolanaSdk {
     if (!this.solanaAuthority) throw new Error("Solana authority keypair not loaded");
-    const feeRecipient = this.solana!.feeRecipient ?? this.solanaAuthority.publicKey.toBase58();
+    const feeRecipient = chain.feeRecipient ?? this.solana?.feeRecipient ?? this.solanaAuthority.publicKey.toBase58();
     return new CommerceSolanaSdk({
-      connection: new Connection(this.solana!.rpcUrl!, "confirmed"),
-      programId: this.solana!.programId!,
-      usdcMint: this.solana!.usdcMint!,
+      connection: new Connection(chain.rpcUrl, "confirmed"),
+      programId: chain.programId,
       authority: this.solanaAuthority,
       feeRecipient,
-      feeBps: this.solana!.feeBps ?? 50,
+      feeBps: chain.feeBps ?? 50,
     });
   }
 
@@ -776,10 +816,100 @@ function assertTronConfig(tron: TronSweeperConfig): void {
 }
 
 function assertSolanaConfig(solana: SolanaSweeperConfig): void {
-  if (!solana.rpcUrl) throw new Error("solana.rpcUrl is required");
-  if (!solana.programId) throw new Error("solana.programId is required");
-  if (!solana.usdcMint) throw new Error("solana.usdcMint is required");
   if (!solana.privateKey) throw new Error("solana.privateKey is required");
+  const chains = listSweeperSolanaChains(solana);
+  if (chains.length === 0) {
+    throw new Error("solana.chains (or legacy rpcUrl/programId/usdcMint) must define at least one enabled chain");
+  }
+}
+
+type ResolvedSweeperSolanaChain = {
+  chainId: string;
+  rpcUrl: string;
+  programId: string;
+  feeRecipient?: string;
+  feeBps?: number;
+  tokens: Record<string, { mint: string; decimals: number }>;
+};
+
+function listSweeperSolanaChains(solana: SolanaSweeperConfig): ResolvedSweeperSolanaChain[] {
+  if (solana.chains && Object.keys(solana.chains).length > 0) {
+    return Object.entries(solana.chains)
+      .map(([chainId, raw]) => normalizeSweeperSolanaChain(chainId, raw, solana))
+      .filter((c): c is ResolvedSweeperSolanaChain => c != null);
+  }
+  // Legacy flat config → single chain (default product id `devnet`)
+  const chainId = solana.chainId ?? "devnet";
+  return [
+    normalizeSweeperSolanaChain(
+      chainId,
+      {
+        enabled: true,
+        rpcUrl: solana.rpcUrl,
+        programId: solana.programId,
+        feeRecipient: solana.feeRecipient,
+        feeBps: solana.feeBps,
+        tokens: {
+          USDC: { mint: solana.usdcMint, decimals: 6 },
+          USDT: { mint: solana.usdtMint, decimals: 6 },
+        },
+      },
+      solana
+    ),
+  ].filter((c): c is ResolvedSweeperSolanaChain => c != null);
+}
+
+function normalizeSweeperSolanaChain(
+  chainId: string,
+  raw: NonNullable<SolanaSweeperConfig["chains"]>[string],
+  root: SolanaSweeperConfig
+): ResolvedSweeperSolanaChain | null {
+  if (raw.enabled === false) return null;
+  const programId = raw.programId ?? root.programId;
+  const rpcUrl = raw.rpcUrl ?? root.rpcUrl;
+  if (!programId || programId.startsWith("PLACEHOLDER") || !rpcUrl) return null;
+
+  const tokens: Record<string, { mint: string; decimals: number }> = {};
+  if (raw.tokens) {
+    for (const [symbol, t] of Object.entries(raw.tokens)) {
+      const mint = t.mint ?? t.address;
+      if (!mint || mint.startsWith("PLACEHOLDER")) continue;
+      tokens[symbol.toUpperCase()] = { mint, decimals: t.decimals ?? 6 };
+    }
+  }
+  if (Object.keys(tokens).length === 0 && root.tokens) {
+    for (const t of root.tokens) {
+      if (!t.address || t.address.startsWith("PLACEHOLDER")) continue;
+      tokens[t.symbol.toUpperCase()] = { mint: t.address, decimals: t.decimals ?? 6 };
+    }
+  }
+  if (Object.keys(tokens).length === 0) return null;
+
+  return {
+    chainId,
+    rpcUrl,
+    programId,
+    feeRecipient: raw.feeRecipient ?? root.feeRecipient,
+    feeBps: raw.feeBps ?? root.feeBps,
+    tokens,
+  };
+}
+
+function resolveSweeperSolanaChain(
+  solana: SolanaSweeperConfig,
+  chainId: string
+): ResolvedSweeperSolanaChain | null {
+  return listSweeperSolanaChains(solana).find((c) => c.chainId === chainId) ?? null;
+}
+
+function resolveSweeperSolanaToken(
+  chain: ResolvedSweeperSolanaChain,
+  token: string | null
+): { symbol: string; mint: string; decimals: number } | null {
+  const symbol = (token ?? "USDC").toUpperCase();
+  const found = chain.tokens[symbol];
+  if (!found) return null;
+  return { symbol, mint: found.mint, decimals: found.decimals };
 }
 
 function loadSolanaKeypair(secret: string): Keypair {

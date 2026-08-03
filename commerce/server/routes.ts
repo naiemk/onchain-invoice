@@ -10,6 +10,8 @@ import {
   normalizeMerchantAddress,
   predictCommerceInvoiceAddress,
   predictCommerceSolanaInvoiceAta,
+  resolveSolanaChain,
+  resolveSolanaToken,
   tokenAllowedOnChain,
   tronNumericChainId,
 } from "onchain-invoice";
@@ -206,7 +208,7 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
   assertTokenChainPair(chainId, token);
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
-  const invoiceAddress = await getInvoiceAddress(config, selectedTo, invoiceId, chainId);
+  const invoiceAddress = await getInvoiceAddress(config, selectedTo, invoiceId, chainId, token);
   const idempotencyKey = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : null;
 
   const { invoice, created } = db.createInvoice({
@@ -247,7 +249,7 @@ async function createSessionDeprecated(
   assertTokenChainPair(chainId, token);
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
-  const invoiceAddress = await getInvoiceAddress(context.config, selectedTo, invoiceId, chainId);
+  const invoiceAddress = await getInvoiceAddress(context.config, selectedTo, invoiceId, chainId, token);
   const { invoice } = context.db.createInvoice({
     invoiceId,
     fields,
@@ -381,7 +383,8 @@ async function getInvoiceAddress(
   config: AppConfig,
   selectedTo: string,
   invoiceId: string,
-  chainId: string
+  chainId: string,
+  token: string
 ): Promise<string | null> {
   const kind = chainKind(chainId);
   if (kind === "tron") {
@@ -401,18 +404,21 @@ async function getInvoiceAddress(
   }
 
   if (kind === "solana") {
-    if (!config.solanaProgramId || !config.solanaUsdcMint) {
+    const chain = resolveSolanaChain(config.solanaChains, chainId);
+    if (!chain) {
       throw Object.assign(
-        new Error("SOLANA_PROGRAM_ID and SOLANA_USDC_MINT are required to create Solana invoices"),
+        new Error(`Solana chain ${chainId} is not configured or not enabled`),
         { statusCode: 503 }
       );
     }
-    return predictCommerceSolanaInvoiceAta(
-      config.solanaProgramId,
-      selectedTo,
-      invoiceId,
-      config.solanaUsdcMint
-    );
+    const tokenCfg = resolveSolanaToken(chain, token);
+    if (!tokenCfg) {
+      throw Object.assign(
+        new Error(`Token ${token} is not configured for Solana chain ${chainId}`),
+        { statusCode: 400 }
+      );
+    }
+    return predictCommerceSolanaInvoiceAta(chain.programId, selectedTo, invoiceId, tokenCfg.mint);
   }
 
   if (!config.sweeperAddress) {

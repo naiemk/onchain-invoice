@@ -16,10 +16,11 @@ export interface TokenOption {
 export const NETWORKS: NetworkOption[] = [
   { id: "11155111", label: "Ethereum Sepolia", short: "Sepolia", kind: "evm", testnet: true },
   { id: "nile", label: "TRON Nile", short: "Nile", kind: "tron", testnet: true },
-  { id: "devnet", label: "Solana Devnet", short: "Solana", kind: "solana", testnet: true },
+  { id: "devnet", label: "Solana Devnet", short: "Sol Devnet", kind: "solana", testnet: true },
   { id: "1", label: "Ethereum Mainnet", short: "Ethereum", kind: "evm" },
   { id: "8453", label: "Base", short: "Base", kind: "evm" },
   { id: "42161", label: "Arbitrum One", short: "Arbitrum", kind: "evm" },
+  { id: "mainnet-beta", label: "Solana", short: "Solana", kind: "solana" },
 ];
 
 export const TOKENS: TokenOption[] = [
@@ -54,6 +55,7 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   const symbol = token.trim().toUpperCase();
   const kind = networkKind(chainId);
   if (kind === "tron") return symbol === "USDT";
+  if (kind === "solana") return symbol === "USDC" || symbol === "USDT";
   return symbol === "USDC";
 }
 
@@ -110,6 +112,11 @@ export function isTestnet(chainId: string | null | undefined): boolean {
   return ["11155111", "84532", "421614", "11155420", "5", "80001", "nile", "shasta", "devnet"].includes(
     String(chainId)
   );
+}
+
+/** Solana explorer cluster query — derived from testnet flag, not hardcoded chain names in callers. */
+export function solanaExplorerCluster(chainId: string | null | undefined): string {
+  return isTestnet(chainId) ? "?cluster=devnet" : "";
 }
 
 export type DeploymentMode = "testnet" | "mainnet";
@@ -248,8 +255,7 @@ export function explorerAddressUrl(chainId: string | null | undefined, address: 
   if (!base) return null;
   if (isTronExplorer(chainId)) return `${base}/#/address/${address}`;
   if (isSolanaExplorer(chainId)) {
-    const cluster = String(chainId) === "devnet" || String(chainId) === "solana-devnet" ? "?cluster=devnet" : "";
-    return `${base}/address/${address}${cluster}`;
+    return `${base}/address/${address}${solanaExplorerCluster(chainId)}`;
   }
   return `${base}/address/${address}`;
 }
@@ -259,8 +265,7 @@ export function explorerTxUrl(chainId: string | null | undefined, txHash: string
   if (!base) return null;
   if (isTronExplorer(chainId)) return `${base}/#/transaction/${txHash}`;
   if (isSolanaExplorer(chainId)) {
-    const cluster = String(chainId) === "devnet" || String(chainId) === "solana-devnet" ? "?cluster=devnet" : "";
-    return `${base}/tx/${txHash}${cluster}`;
+    return `${base}/tx/${txHash}${solanaExplorerCluster(chainId)}`;
   }
   return `${base}/tx/${txHash}`;
 }
