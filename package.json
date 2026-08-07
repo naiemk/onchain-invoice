@@ -48,7 +48,9 @@
     "system-test": "bash system-tests/scripts/run.sh",
     "system-test:install": "bash system-tests/scripts/run-install-e2e.sh",
     "solana:build": "cd solana/programs/commerce-invoice && cargo-build-sbf",
-    "solana:test": "bash solana/e2e/scripts/run-success.sh"
+    "solana:test": "bash solana/e2e/scripts/run-success.sh",
+    "solana:deploy:devnet": "bash solana/scripts/deploy-devnet.sh",
+    "solana:smoke:devnet": "bash solana/e2e/scripts/run-devnet-smoke.sh"
   },
   "repository": {
     "type": "git",

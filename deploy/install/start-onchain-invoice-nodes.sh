@@ -147,12 +147,13 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
     docker rm -f onchain-invoice-node >/dev/null || true
   fi
 
-  echo "Starting dual sweepers via $COMPOSE_FILE ..."
+  echo "Starting triple sweepers via $COMPOSE_FILE ..."
   docker compose -f "$COMPOSE_FILE" up -d --force-recreate
-  echo "Sweepers running: onchain-invoice-sweeper-evm + onchain-invoice-sweeper-tron"
+  echo "Sweepers running: onchain-invoice-sweeper-evm + onchain-invoice-sweeper-tron + onchain-invoice-sweeper-solana"
   echo "Logs: docker logs -f onchain-invoice-sweeper-evm"
   echo "      docker logs -f onchain-invoice-sweeper-tron"
-  echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl"
+  echo "      docker logs -f onchain-invoice-sweeper-solana"
+  echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-solana.jsonl"
   exit 0
 fi
 
@@ -178,6 +179,14 @@ add_env TRON_FULL_HOST "${TRON_FULL_HOST:-}"
 add_env TRON_INVOICE_MASTER_SECRET "${TRON_INVOICE_MASTER_SECRET:-}"
 add_env TRON_USDT_ADDRESS "${TRON_USDT_ADDRESS:-}"
 add_env TRON_SPONSOR_PRIVATE_KEY "${TRON_SPONSOR_PRIVATE_KEY:-}"
+add_env SOLANA_RPC_URL "${SOLANA_RPC_URL:-}"
+add_env SOLANA_PROGRAM_ID "${SOLANA_PROGRAM_ID:-}"
+add_env SOLANA_USDC_MINT "${SOLANA_USDC_MINT:-}"
+add_env SOLANA_USDT_MINT "${SOLANA_USDT_MINT:-}"
+add_env SOLANA_SWEEPER_KEY "${SOLANA_SWEEPER_KEY:-}"
+add_env SOLANA_FEE_RECIPIENT "${SOLANA_FEE_RECIPIENT:-}"
+add_env SOLANA_MAINNET_RPC_URL "${SOLANA_MAINNET_RPC_URL:-}"
+add_env SOLANA_MAINNET_PROGRAM_ID "${SOLANA_MAINNET_PROGRAM_ID:-}"
 add_env ACTIVITY_LOG_PATH "$ACTIVITY_LOG_PATH"
 
 # Config lands in /tmp (image has no /config dir; docker cp avoids host bind-mounts).

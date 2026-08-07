@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pull latest sweeper image and recreate node(s) if the digest changed.
 # Honors NODES_AUTO_UPDATE=0|1 (legacy AUTO_UPDATE fallback).
-# Prefers docker-compose.sweepers.yml (evm + tron) when present.
+# Prefers docker-compose.sweepers.yml (evm + tron + solana) when present.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,7 +65,7 @@ export SWEEPER_IMAGE="$IMAGE"
 
 if [[ -f "$COMPOSE_FILE" ]]; then
   needs=0
-  for cname in onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron; do
+  for cname in onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana; do
     if container_needs_image "$cname" "$IMAGE"; then
       needs=1
       break
@@ -81,7 +81,7 @@ if [[ -f "$COMPOSE_FILE" ]]; then
     exit 0
   fi
   log_update "$SCRIPT_DIR" "nodes: updating compose sweepers (stop -t $STOP_TIMEOUT, recreate)"
-  for cname in onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron; do
+  for cname in onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana; do
     if docker inspect "$cname" >/dev/null 2>&1; then
       graceful_stop "$cname" "$STOP_TIMEOUT"
     fi

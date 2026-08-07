@@ -177,10 +177,15 @@ export class SweeperWorker {
         this.solanaAuthority = loadSolanaKeypair(this.solana.privateKey!);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (this.role === "solana") {
-          throw new Error(`Solana sweeper misconfigured: ${message}`);
-        }
-        console.warn(JSON.stringify({ level: "warn", msg: "Solana enabled but incomplete; skipping", error: message }));
+        // Keep the container up so triple-compose installs work before SOLANA_* is filled in.
+        console.warn(
+          JSON.stringify({
+            level: "warn",
+            msg: "Solana enabled but incomplete; skipping until SOLANA_PROGRAM_ID / SOLANA_SWEEPER_KEY are set",
+            role: this.role,
+            error: message,
+          })
+        );
         this.solana = undefined;
       }
     }

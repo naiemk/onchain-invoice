@@ -40,7 +40,9 @@ cleanup_install() {
     kill "$HTTP_PID" >/dev/null 2>&1 || true
     wait "$HTTP_PID" 2>/dev/null || true
   fi
-  docker rm -f "$API_CONTAINER" "$NODE_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -f "$API_CONTAINER" "$NODE_CONTAINER" \
+    onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana \
+    >/dev/null 2>&1 || true
   docker volume rm -f "${API_CONTAINER}-data" >/dev/null 2>&1 || true
   rm -rf "$INSTALL_DIR"
 }
@@ -64,7 +66,9 @@ for _ in $(seq 1 20); do
   sleep 0.2
 done
 
-docker rm -f "$API_CONTAINER" "$NODE_CONTAINER" >/dev/null 2>&1 || true
+docker rm -f "$API_CONTAINER" "$NODE_CONTAINER" \
+  onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana \
+  >/dev/null 2>&1 || true
 
 echo "== wget|bash install-api.sh =="
 wget -qO- "${RAW_BASE}/install-api.sh" | \
