@@ -88,9 +88,18 @@ write_if_missing "lib-env.sh"
 write_if_missing "update-onchain-invoice-nodes.sh"
 write_if_missing "install-auto-update.sh"
 write_template ".env.nodes.example"
-# Refresh compose + yaml templates so operators pick up Tron dual-sweeper layout
+# Refresh templates so operators pick up triple-sweeper layout + Solana env wiring
 write_template "docker-compose.sweepers.yml"
 write_template "onchain-invoice-nodes.yaml"
+write_template "start-onchain-invoice-nodes.sh"
+write_template "update-onchain-invoice-nodes.sh"
+write_template "register-onchain-invoice-node.sh"
+write_template "lib-env.sh"
+for f in start-onchain-invoice-nodes.sh update-onchain-invoice-nodes.sh register-onchain-invoice-node.sh; do
+  if [[ -f "$DEST/$f" ]]; then
+    chmod +x "$DEST/$f"
+  fi
+done
 
 cp "$DEST/.env.nodes.example" "$DEST/.env.example"
 echo "updated: $DEST/.env.example"
@@ -102,7 +111,10 @@ else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.nodes.example" "$DEST/.env" \
     ACTIVITY_LOG_PATH NODES_AUTO_UPDATE NODES_AUTO_UPDATE_INTERVAL_MIN NODES_STOP_TIMEOUT \
-    TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS TRON_SPONSOR_PRIVATE_KEY
+    TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS TRON_SPONSOR_PRIVATE_KEY \
+    SOLANA_RPC_URL SOLANA_PROGRAM_ID SOLANA_USDC_MINT SOLANA_USDT_MINT \
+    SOLANA_SWEEPER_KEY SOLANA_FEE_RECIPIENT \
+    SOLANA_MAINNET_ENABLED SOLANA_MAINNET_RPC_URL SOLANA_MAINNET_PROGRAM_ID
 fi
 
 (
@@ -116,16 +128,21 @@ Trustless Commerce sweeper node install complete in:
   $DEST
 
 Next:
-  1. Edit $DEST/.env  (API_URL, ADMIN_API_KEY, SWEEPER_WALLET_KEY, TRON_*, …)
-  2. Ensure API is up, then register this wallet (include nile):
+  1. Edit $DEST/.env  (API_URL, ADMIN_API_KEY, SWEEPER_WALLET_KEY, TRON_*, SOLANA_*, …)
+  2. Ensure API is up, then register this wallet (include nile + devnet):
        cd $DEST && ./register-onchain-invoice-node.sh
-  3. Start dual sweepers (Sepolia + Nile):
+  3. Start triple sweepers (Sepolia + Nile + Solana Devnet):
+       # Optional: remove old single/dual containers first
+       docker rm -f onchain-invoice-node onchain-invoice-sweeper-evm \\
+         onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana 2>/dev/null || true
        cd $DEST && ./start-onchain-invoice-nodes.sh
        # or: docker compose -f docker-compose.sweepers.yml up -d
   4. Logs:
        docker logs -f onchain-invoice-sweeper-evm
        docker logs -f onchain-invoice-sweeper-tron
-       tail -f $DEST/logs/activity-evm.jsonl $DEST/logs/activity-tron.jsonl
+       docker logs -f onchain-invoice-sweeper-solana
+       tail -f $DEST/logs/activity-evm.jsonl $DEST/logs/activity-tron.jsonl \\
+         $DEST/logs/activity-solana.jsonl
   5. Auto-update (testnet default ON via NODES_AUTO_UPDATE): ./install-auto-update.sh
 
 EOF

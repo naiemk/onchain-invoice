@@ -56,7 +56,7 @@ export function renderCreate(root: HTMLElement): void {
 
           <div class="field">
             <label>Accepted networks <span class="required">*</span></label>
-            <p class="field-hint">Tap a chain to enable it. Each network kind needs its own merchant wallet below.</p>
+            <p class="field-hint">Tap a chain to enable it (at least one required). Each selected network kind needs its own merchant wallet below.</p>
             <div class="chain-pill-row" id="chains" role="group" aria-label="Accepted networks">
               ${
                 networks.length === 0
@@ -100,7 +100,7 @@ export function renderCreate(root: HTMLElement): void {
 
           <div class="field">
             <label>Accepted tokens <span class="required">*</span></label>
-            <p class="field-hint">Paired to selected networks (EVM/Solana → USDC or USDT, Nile → USDT). Stablecoins only for now.</p>
+            <p class="field-hint">Paired to selected networks (EVM/Solana → USDC, Nile → USDT). Stablecoins only for now.</p>
             <div class="field-row" id="tokens"></div>
           </div>
 
@@ -190,15 +190,14 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
     const evmField = root.querySelector<HTMLElement>("#evm-wallet-field");
     const tronField = root.querySelector<HTMLElement>("#tron-wallet-field");
     const solanaField = root.querySelector<HTMLElement>("#solana-wallet-field");
-    if (evmField) evmField.hidden = !needsEvm;
-    if (tronField) tronField.hidden = !needsTron;
-    if (solanaField) solanaField.hidden = !needsSolana;
     const toEvm = root.querySelector<HTMLInputElement>("#toEvm");
     const toTron = root.querySelector<HTMLInputElement>("#toTron");
     const toSolana = root.querySelector<HTMLInputElement>("#toSolana");
-    if (toEvm) toEvm.required = needsEvm;
-    if (toTron) toTron.required = needsTron;
-    if (toSolana) toSolana.required = needsSolana;
+
+    setWalletField(evmField, toEvm, needsEvm);
+    setWalletField(tronField, toTron, needsTron);
+    setWalletField(solanaField, toSolana, needsSolana);
+
     renderTokenOptions(root, chains);
   };
 
@@ -259,6 +258,17 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
     }
   };
 
+  /** Keep at least one network selected. */
+  const ensureMinOneChain = (event: Event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.name !== "chains") return;
+    if (target.checked) return;
+    if (checked(root, "chains").length === 0) {
+      target.checked = true;
+    }
+  };
+
+  form?.addEventListener("change", ensureMinOneChain);
   form?.addEventListener("input", refresh);
   form?.addEventListener("change", refresh);
   refresh();
@@ -277,6 +287,23 @@ function chainPillHtml(network: NetworkOption, checked: boolean): string {
         <span class="chain-pill-label">${escapeHtml(network.short)}</span>
       </span>
     </label>`;
+}
+
+/** Show merchant wallet only while that network kind is selected; clear when hidden. */
+function setWalletField(
+  field: HTMLElement | null,
+  input: HTMLInputElement | null,
+  enabled: boolean
+): void {
+  if (field) field.hidden = !enabled;
+  if (input) {
+    input.required = enabled;
+    input.disabled = !enabled;
+    if (!enabled) {
+      input.value = "";
+      input.removeAttribute("aria-invalid");
+    }
+  }
 }
 
 function renderTokenOptions(root: HTMLElement, chains: string[]): void {
@@ -330,7 +357,7 @@ function readForm(root: HTMLElement): PayLinkFields {
     const allowed = tokens.some((token) => {
       const kind = networkKind(chainId);
       if (kind === "tron") return token === "USDT";
-      if (kind === "solana") return token === "USDC" || token === "USDT";
+      if (kind === "solana") return token === "USDC";
       return token === "USDC";
     });
     if (!allowed) {

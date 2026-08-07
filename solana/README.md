@@ -1,6 +1,6 @@
 # Solana (Trustless Commerce)
 
-Separated Solana infra for destination-bound invoice settle. EVM/Tron stay under `/contracts`, `/deploy`, and `/commerce` as before.
+Solana program + SDK live under `solana/`. **Operator node install** (Sepolia + Nile + Solana) is the unified wget path under [`deploy/install/`](../deploy/install/) — one `docker-compose.sweepers.yml` with three services.
 
 ## Layout
 
@@ -8,10 +8,11 @@ Separated Solana infra for destination-bound invoice settle. EVM/Tron stay under
 solana/
   programs/commerce-invoice/   # native SBF program (PDA settle)
   target/deploy/               # .so + program keypair (build artifact)
-  config/                      # sweeper YAML example
-  deploy/                      # Solana-only compose / env (not /deploy)
+  config/                      # Solana-focused sweeper YAML example
+  deploy/                      # optional Solana-only compose / env
+  scripts/                     # deploy-devnet.sh
   data/                        # deploy artifacts JSON
-  e2e/                         # success-test runner scripts
+  e2e/                         # local success tests + Devnet smoke
   README.md
 ```
 
@@ -27,31 +28,45 @@ solana/
 
 ```bash
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
-cd solana/programs/commerce-invoice && cargo-build-sbf
+npm run solana:build
 ```
 
-## Success tests (required)
+## Success tests (local validator)
 
 ```bash
-# from repo root — starts solana-test-validator if RPC is down
 npm run solana:test
 ```
 
 Covers: stable ATA prediction, pay→settle balances, wrong-merchant no-drain, unauthorized sweeper rejected.
 
-## Config
+## Devnet deploy + smoke
 
-API (`commerce/config/server.example.yaml`):
-
-```yaml
-solana:
-  rpcUrl: ${SOLANA_RPC_URL}
-  programId: ${SOLANA_PROGRAM_ID}
-  usdcMint: ${SOLANA_USDC_MINT}
+```bash
+export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+# Optional: SOLANA_SWEEPER_KEY='[…]' JSON byte array for a known authority
+npm run solana:deploy:devnet
+npm run solana:smoke:devnet
 ```
 
-Sweeper: [`config/sweeper.example.yaml`](config/sweeper.example.yaml) with `SWEEPER_ROLE=solana`.
+Writes `solana/data/commerce-deploy-devnet.json`. Put `SOLANA_PROGRAM_ID` / `SOLANA_SWEEPER_KEY` / `SOLANA_FEE_RECIPIENT` on both the API and nodes `.env`.
 
-Compose: [`deploy/docker-compose.sweeper.yml`](deploy/docker-compose.sweeper.yml) — do not mix into `/deploy/install/docker-compose.sweepers.yml`.
+## VPS nodes (wget — all chains)
 
-Env template: [`deploy/env.devnet.example`](deploy/env.devnet.example).
+```bash
+docker rm -f onchain-invoice-node \
+  onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana 2>/dev/null || true
+
+mkdir -p ~/tc/sweeper && cd ~/tc/sweeper
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
+# edit .env (see .env.example) then:
+./register-onchain-invoice-node.sh
+./start-onchain-invoice-nodes.sh
+```
+
+## Config
+
+API: `commerce/config/server.example.yaml` (`solana.chains.devnet` / `mainnet-beta`).
+
+Sweeper (unified install): `deploy/install/onchain-invoice-nodes.yaml` with `SWEEPER_ROLE=solana` on the Solana compose service.
+
+Optional Solana-only compose remains under [`deploy/docker-compose.sweeper.yml`](deploy/docker-compose.sweeper.yml).

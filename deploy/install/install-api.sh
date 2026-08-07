@@ -87,6 +87,16 @@ write_if_missing "update-onchain-invoice-api.sh"
 write_if_missing "install-auto-update.sh"
 write_template ".env.api.example"
 write_template "onchain-invoice-api.yaml"
+# Refresh start/update so SOLANA_* injection and flags land on existing installs
+write_template "start-onchain-invoice-api.sh"
+write_template "update-onchain-invoice-api.sh"
+write_template "lib-env.sh"
+if [[ -f "$DEST/start-onchain-invoice-api.sh" ]]; then
+  chmod +x "$DEST/start-onchain-invoice-api.sh"
+fi
+if [[ -f "$DEST/update-onchain-invoice-api.sh" ]]; then
+  chmod +x "$DEST/update-onchain-invoice-api.sh"
+fi
 
 cp "$DEST/.env.api.example" "$DEST/.env.example"
 echo "updated: $DEST/.env.example"
@@ -98,7 +108,9 @@ else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.api.example" "$DEST/.env" \
     API_AUTO_UPDATE API_AUTO_UPDATE_INTERVAL_MIN API_STOP_TIMEOUT \
-    TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS
+    TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS \
+    SOLANA_RPC_URL SOLANA_PROGRAM_ID SOLANA_USDC_MINT SOLANA_USDT_MINT \
+    SOLANA_MAINNET_ENABLED SOLANA_MAINNET_RPC_URL SOLANA_MAINNET_PROGRAM_ID
 fi
 
 (

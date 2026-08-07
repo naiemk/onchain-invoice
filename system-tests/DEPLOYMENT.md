@@ -138,14 +138,18 @@ curl -fsS https://testnet.trustless-commerce.com/api/health
 
 ---
 
-## 5) Sweeper node (testnet — Sepolia + Nile)
+## 5) Sweeper nodes (testnet — Sepolia + Nile + Solana Devnet)
 
 ```bash
+# Tear down any previous single/dual sweeper containers, then reinstall:
+docker rm -f onchain-invoice-node \
+  onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana 2>/dev/null || true
+
 mkdir -p ~/tc/sweeper && cd ~/tc/sweeper
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 ```
 
-Install refreshes `docker-compose.sweepers.yml` + shared `onchain-invoice-nodes.yaml`. Start runs **two** services (`sweeper-evm` + `sweeper-tron`) from the same `.env`.
+Install refreshes `docker-compose.sweepers.yml` + shared `onchain-invoice-nodes.yaml`. Start runs **three** services (`sweeper-evm` + `sweeper-tron` + `sweeper-solana`) from the same `.env`.
 
 Important `.env` keys:
 
@@ -154,22 +158,30 @@ Important `.env` keys:
 | `API_URL` / `SERVER_URL` | `https://testnet.trustless-commerce.com` (prefer public HTTPS, not `host.docker.internal`) |
 | `ADMIN_API_KEY` | Same as testnet API |
 | `SWEEPER_WALLET_KEY` / `SWEEPER_REGISTER_ADDRESS` | Testnet example uses Hardhat #0 — throwaway only |
-| `SWEEPER_CHAINS` | `11155111,nile` so both workers receive invoices |
+| `SWEEPER_CHAINS` | `11155111,nile,devnet` so all workers receive invoices |
 | `SWEEPER_ADDRESS` / `EVM_RPC_URL` | Sepolia sweeper contract |
 | `TRON_FULL_HOST` | `https://nile.trongrid.io` |
 | `TRON_INVOICE_MASTER_SECRET` | Same secret as API (EOA derivation) |
 | `TRON_USDT_ADDRESS` | Nile USDT (default in template; verify on Tronscan if unsure) |
 | `TRON_SPONSOR_PRIVATE_KEY` | Sponsor with **staked** TRX; delegates ENERGY + BANDWIDTH (no TRX sent to invoice EOAs) |
-| `ACTIVITY_LOG_PATH` | Single-container fallback; compose uses `activity-evm.jsonl` / `activity-tron.jsonl` |
+| `SOLANA_RPC_URL` | Default `https://api.devnet.solana.com` |
+| `SOLANA_PROGRAM_ID` | From `npm run solana:deploy:devnet` / `solana/data/commerce-deploy-devnet.json` |
+| `SOLANA_SWEEPER_KEY` | Authority keypair JSON byte array (same key that ran `initialize`) |
+| `SOLANA_FEE_RECIPIENT` | Fee destination pubkey (base58); empty → authority pubkey |
+| `SOLANA_USDC_MINT` | Circle Devnet USDC (template default) |
+| `ACTIVITY_LOG_PATH` | Single-container fallback; compose uses `activity-{evm,tron,solana}.jsonl` |
 | `NODES_AUTO_UPDATE` | Default `1` on testnet template |
 
 ```bash
-./register-onchain-invoice-node.sh   # once per API DB / wallet (chains include nile)
-./start-onchain-invoice-nodes.sh     # docker compose dual sweepers
+./register-onchain-invoice-node.sh   # once per API DB / wallet (chains include nile + devnet)
+./start-onchain-invoice-nodes.sh     # docker compose triple sweepers
 
 docker logs -f onchain-invoice-sweeper-evm
 docker logs -f onchain-invoice-sweeper-tron
-tail -f ~/tc/sweeper/logs/activity-evm.jsonl ~/tc/sweeper/logs/activity-tron.jsonl
+docker logs -f onchain-invoice-sweeper-solana
+tail -f ~/tc/sweeper/logs/activity-evm.jsonl \
+  ~/tc/sweeper/logs/activity-tron.jsonl \
+  ~/tc/sweeper/logs/activity-solana.jsonl
 ```
 
 Legacy single container: `USE_COMPOSE=0 ./start-onchain-invoice-nodes.sh`.
