@@ -100,7 +100,7 @@ export function renderCreate(root: HTMLElement): void {
 
           <div class="field">
             <label>Accepted tokens <span class="required">*</span></label>
-            <p class="field-hint">Paired to selected networks (EVM/Solana → USDC or USDT, Nile → USDT). Stablecoins only for now.</p>
+            <p class="field-hint">Paired to selected networks (EVM/Solana → USDC, Nile → USDT). Stablecoins only for now.</p>
             <div class="field-row" id="tokens"></div>
           </div>
 
@@ -357,7 +357,7 @@ function readForm(root: HTMLElement): PayLinkFields {
     const allowed = tokens.some((token) => {
       const kind = networkKind(chainId);
       if (kind === "tron") return token === "USDT";
-      if (kind === "solana") return token === "USDC" || token === "USDT";
+      if (kind === "solana") return token === "USDC";
       return token === "USDC";
     });
     if (!allowed) {

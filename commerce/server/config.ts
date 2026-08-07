@@ -196,6 +196,26 @@ function expandSolanaChains(chains: SolanaNetworksConfig | undefined): SolanaNet
 
 function mergeEnvSolanaOverrides(chains: SolanaNetworksConfig, env: NodeJS.ProcessEnv): SolanaNetworksConfig {
   const out = { ...chains };
+  // Prefer live env over YAML-expanded blanks (covers docker -e after config mount).
+  if (out.devnet) {
+    const programId =
+      blankToUndefined(expand(env.SOLANA_PROGRAM_ID ?? "")) ?? blankToUndefined(out.devnet.programId);
+    const rpcUrl =
+      blankToUndefined(expand(env.SOLANA_RPC_URL ?? "")) ?? out.devnet.rpcUrl ?? "https://api.devnet.solana.com";
+    const tokens = { ...out.devnet.tokens };
+    const usdc = blankToUndefined(expand(env.SOLANA_USDC_MINT ?? ""));
+    const usdt = blankToUndefined(expand(env.SOLANA_USDT_MINT ?? ""));
+    if (usdc) tokens.USDC = { mint: usdc, decimals: tokens.USDC?.decimals ?? 6 };
+    if (usdt) tokens.USDT = { mint: usdt, decimals: tokens.USDT?.decimals ?? 6 };
+    if (!tokens.USDC) tokens.USDC = { ...SOLANA_KNOWN_MINTS.devnet.USDC };
+    out.devnet = {
+      ...out.devnet,
+      enabled: out.devnet.enabled !== false && Boolean(programId),
+      programId: programId ?? out.devnet.programId,
+      rpcUrl,
+      tokens,
+    };
+  }
   const enableMainnet = env.SOLANA_MAINNET_ENABLED === "1" || env.SOLANA_MAINNET_ENABLED === "true";
   const mainnetProgram = blankToUndefined(expand(env.SOLANA_MAINNET_PROGRAM_ID ?? ""));
   if (out["mainnet-beta"]) {

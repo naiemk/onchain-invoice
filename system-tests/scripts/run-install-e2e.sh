@@ -112,15 +112,23 @@ import sys
 path, image, wallet_key, private_key, sweeper_addr = sys.argv[1:6]
 text = open(path, encoding="utf-8").read().splitlines()
 out = []
+section = ""
 for line in text:
     stripped = line.strip()
     indent = line[: len(line) - len(line.lstrip(" "))]
+    # Track top-level YAML section so we do not stuff an EVM hex key into solana.privateKey.
+    if line and not line[0].isspace() and ":" in line:
+        section = line.split(":", 1)[0].strip()
     if stripped.startswith("image:"):
         out.append(f"{indent}image: {image}")
     elif stripped.startswith("sweeperWalletKey:"):
         out.append(f'{indent}sweeperWalletKey: "{wallet_key}"')
     elif stripped.startswith("privateKey:"):
-        out.append(f'{indent}privateKey: "{private_key}"')
+        if section == "solana":
+            # Leave ${SOLANA_SWEEPER_KEY}; soft-skip keeps the solana service up without a key.
+            out.append(line)
+        else:
+            out.append(f'{indent}privateKey: "{private_key}"')
     elif stripped.startswith("sweeperAddress:") and "${" in stripped:
         out.append(f'{indent}sweeperAddress: "{sweeper_addr}"')
     elif stripped.startswith("apiKey:"):

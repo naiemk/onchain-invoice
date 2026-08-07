@@ -88,9 +88,18 @@ write_if_missing "lib-env.sh"
 write_if_missing "update-onchain-invoice-nodes.sh"
 write_if_missing "install-auto-update.sh"
 write_template ".env.nodes.example"
-# Refresh compose + yaml templates so operators pick up triple-sweeper layout
+# Refresh templates so operators pick up triple-sweeper layout + Solana env wiring
 write_template "docker-compose.sweepers.yml"
 write_template "onchain-invoice-nodes.yaml"
+write_template "start-onchain-invoice-nodes.sh"
+write_template "update-onchain-invoice-nodes.sh"
+write_template "register-onchain-invoice-node.sh"
+write_template "lib-env.sh"
+for f in start-onchain-invoice-nodes.sh update-onchain-invoice-nodes.sh register-onchain-invoice-node.sh; do
+  if [[ -f "$DEST/$f" ]]; then
+    chmod +x "$DEST/$f"
+  fi
+done
 
 cp "$DEST/.env.nodes.example" "$DEST/.env.example"
 echo "updated: $DEST/.env.example"

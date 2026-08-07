@@ -71,10 +71,13 @@ mkdir -p ~/tc/sweeper && cd ~/tc/sweeper
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 # .env: API_URL=https://testnet.trustless-commerce.com
 #       SWEEPER_CHAINS=11155111,nile,devnet
-#       TRON_* + SOLANA_PROGRAM_ID / SOLANA_SWEEPER_KEY / SOLANA_FEE_RECIPIENT
+#       TRON_* + SOLANA_PROGRAM_ID / SOLANA_SWEEPER_KEY (base58 preferred)
+# Also set SOLANA_PROGRAM_ID on the API .env (install-api refreshes start script).
 ./register-onchain-invoice-node.sh
 ./start-onchain-invoice-nodes.sh
 # → onchain-invoice-sweeper-evm + -tron + -solana
+# Solana service soft-skips until SOLANA_PROGRAM_ID + SOLANA_SWEEPER_KEY are set
+# (activity log stage: solana-disabled). Requires GHCR sweeper image built from this PR.
 ```
 
 ## API only (no gateway)

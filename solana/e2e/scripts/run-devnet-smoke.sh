@@ -15,7 +15,26 @@ if [[ -z "${SOLANA_PROGRAM_ID:-}" && -f solana/data/commerce-deploy-devnet.json 
   export SOLANA_PROGRAM_ID
 fi
 
-if [[ -z "${SOLANA_PROGRAM_ID:-}" || "${SOLANA_DEPLOY:-1}" == "1" ]]; then
+need_deploy=0
+if [[ "${SOLANA_DEPLOY:-0}" == "1" ]]; then
+  need_deploy=1
+elif [[ -z "${SOLANA_PROGRAM_ID:-}" ]]; then
+  need_deploy=1
+elif [[ -f solana/data/commerce-deploy-devnet.json ]]; then
+  status="$(python3 -c 'import json; print(json.load(open("solana/data/commerce-deploy-devnet.json")).get("status",""))' 2>/dev/null || true)"
+  if [[ "$status" == "pending_deploy" ]]; then
+    need_deploy=1
+  fi
+fi
+
+# Also deploy if the program account is missing on-chain.
+if [[ "$need_deploy" -eq 0 && -n "${SOLANA_PROGRAM_ID:-}" ]]; then
+  if ! solana program show "$SOLANA_PROGRAM_ID" --url "$SOLANA_RPC_URL" >/dev/null 2>&1; then
+    need_deploy=1
+  fi
+fi
+
+if [[ "$need_deploy" -eq 1 ]]; then
   echo "== ensure Devnet program deploy =="
   bash solana/scripts/deploy-devnet.sh
   SOLANA_PROGRAM_ID="$(python3 -c 'import json; print(json.load(open("solana/data/commerce-deploy-devnet.json"))["programId"])')"

@@ -167,7 +167,7 @@ Important `.env` keys:
 | `SOLANA_RPC_URL` | Default `https://api.devnet.solana.com` |
 | `SOLANA_PROGRAM_ID` | From `npm run solana:deploy:devnet` / `solana/data/commerce-deploy-devnet.json` |
 | `SOLANA_SWEEPER_KEY` | Authority keypair JSON byte array (same key that ran `initialize`) |
-| `SOLANA_FEE_RECIPIENT` | Fee destination pubkey (base58) |
+| `SOLANA_FEE_RECIPIENT` | Fee destination pubkey (base58); empty → authority pubkey |
 | `SOLANA_USDC_MINT` | Circle Devnet USDC (template default) |
 | `ACTIVITY_LOG_PATH` | Single-container fallback; compose uses `activity-{evm,tron,solana}.jsonl` |
 | `NODES_AUTO_UPDATE` | Default `1` on testnet template |

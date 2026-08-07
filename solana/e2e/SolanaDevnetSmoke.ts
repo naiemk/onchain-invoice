@@ -128,7 +128,14 @@ describe("Solana Devnet smoke", function () {
     });
     expect(sig).to.be.a("string").with.length.greaterThan(40);
 
-    await expect(getAccount(connection, new PublicKey(ata))).to.be.rejected;
+    // ATA should be closed after settle (plain Chai — no chai-as-promised).
+    let ataGone = false;
+    try {
+      await getAccount(connection, new PublicKey(ata));
+    } catch {
+      ataGone = true;
+    }
+    expect(ataGone).to.equal(true);
     console.log(
       JSON.stringify({
         network: "devnet",

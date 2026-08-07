@@ -177,15 +177,26 @@ export class SweeperWorker {
         this.solanaAuthority = loadSolanaKeypair(this.solana.privateKey!);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        // Keep the container up so triple-compose installs work before SOLANA_* is filled in.
+        const incomplete =
+          !this.solana.privateKey?.trim() || listSweeperSolanaChains(this.solana).length === 0;
+        // Soft-skip empty defaults so triple-compose stays up before SOLANA_* is filled in.
+        // Hard-fail when role=solana and keys look present but invalid.
+        if (this.role === "solana" && !incomplete) {
+          throw new Error(`Solana sweeper misconfigured: ${message}`);
+        }
         console.warn(
           JSON.stringify({
             level: "warn",
-            msg: "Solana enabled but incomplete; skipping until SOLANA_PROGRAM_ID / SOLANA_SWEEPER_KEY are set",
+            msg: "solana-disabled",
+            detail:
+              "Solana enabled but incomplete; skipping until SOLANA_PROGRAM_ID / SOLANA_SWEEPER_KEY are set",
             role: this.role,
             error: message,
           })
         );
+        this.activity?.append("solana-disabled", {
+          payload: { role: this.role, error: message },
+        });
         this.solana = undefined;
       }
     }
@@ -519,7 +530,10 @@ export class SweeperWorker {
 
   private buildSolanaSdk(chain: ResolvedSweeperSolanaChain): CommerceSolanaSdk {
     if (!this.solanaAuthority) throw new Error("Solana authority keypair not loaded");
-    const feeRecipient = chain.feeRecipient ?? this.solana?.feeRecipient ?? this.solanaAuthority.publicKey.toBase58();
+    const feeRecipient =
+      nonempty(chain.feeRecipient) ??
+      nonempty(this.solana?.feeRecipient) ??
+      this.solanaAuthority.publicKey.toBase58();
     return new CommerceSolanaSdk({
       connection: new Connection(chain.rpcUrl, "confirmed"),
       programId: chain.programId,
@@ -894,10 +908,15 @@ function normalizeSweeperSolanaChain(
     chainId,
     rpcUrl,
     programId,
-    feeRecipient: raw.feeRecipient ?? root.feeRecipient,
+    feeRecipient: nonempty(raw.feeRecipient) ?? nonempty(root.feeRecipient),
     feeBps: raw.feeBps ?? root.feeBps,
     tokens,
   };
+}
+
+function nonempty(value: string | undefined | null): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function resolveSweeperSolanaChain(

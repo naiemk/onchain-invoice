@@ -28,7 +28,7 @@ Goal: create → pay → sweep works on each chain’s public testnet, behind `t
 - [x] API create + sweeper claim/track for Tron invoices (`string[]` merchant ids; chain id `nile`)
 - [x] Replace `tron.enabled` stub skip in [`commerce/sweeper/worker.ts`](commerce/sweeper/worker.ts) with a real tick path
 - [x] UI network + pay instructions (Nile TRC-20 USDT; Sepolia USDC)
-- [x] Activity-log stages for Tron pay/sweep (+ dual compose `sweeper-evm` / `sweeper-tron`)
+- [x] Activity-log stages for Tron pay/sweep (+ triple compose `sweeper-evm` / `sweeper-tron` / `sweeper-solana`)
 - [ ] Live Nile smoke: fund test USDT → paid → swept (operator checklist)
 ### Solana (devnet)
 - [x] Greenfield: program PDA scheme for invoice addresses + settle/sweep authority

@@ -87,6 +87,16 @@ write_if_missing "update-onchain-invoice-api.sh"
 write_if_missing "install-auto-update.sh"
 write_template ".env.api.example"
 write_template "onchain-invoice-api.yaml"
+# Refresh start/update so SOLANA_* injection and flags land on existing installs
+write_template "start-onchain-invoice-api.sh"
+write_template "update-onchain-invoice-api.sh"
+write_template "lib-env.sh"
+if [[ -f "$DEST/start-onchain-invoice-api.sh" ]]; then
+  chmod +x "$DEST/start-onchain-invoice-api.sh"
+fi
+if [[ -f "$DEST/update-onchain-invoice-api.sh" ]]; then
+  chmod +x "$DEST/update-onchain-invoice-api.sh"
+fi
 
 cp "$DEST/.env.api.example" "$DEST/.env.example"
 echo "updated: $DEST/.env.example"
