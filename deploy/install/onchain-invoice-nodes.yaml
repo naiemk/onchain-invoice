@@ -1,7 +1,7 @@
-# Trustless Commerce sweeper node — operator config (shared by evm + tron compose services)
+# Trustless Commerce sweeper node — operator config (shared by compose services)
 # Created by: wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
-# Dual services: docker compose -f docker-compose.sweepers.yml up -d
-# Legacy single container: ./start-onchain-invoice-nodes.sh
+# Triple services: docker compose -f docker-compose.sweepers.yml up -d
+# Legacy single container: USE_COMPOSE=0 ./start-onchain-invoice-nodes.sh
 
 docker:
   image: ghcr.io/naiemk/trustless-commerce-sweeper:main
@@ -47,5 +47,30 @@ tron:
       address: "${TRON_USDT_ADDRESS}"
       decimals: 6
 solana:
-  enabled: false
-  note: "Not implemented for commerce launch"
+  enabled: true
+  privateKey: "${SOLANA_SWEEPER_KEY}"
+  feeRecipient: "${SOLANA_FEE_RECIPIENT}"
+  feeBps: 50
+  chains:
+    devnet:
+      enabled: true
+      rpcUrl: "${SOLANA_RPC_URL}"
+      programId: "${SOLANA_PROGRAM_ID}"
+      tokens:
+        USDC:
+          mint: "${SOLANA_USDC_MINT}"
+          decimals: 6
+        USDT:
+          mint: "${SOLANA_USDT_MINT}"
+          decimals: 6
+    mainnet-beta:
+      enabled: false
+      rpcUrl: "${SOLANA_MAINNET_RPC_URL}"
+      programId: "${SOLANA_MAINNET_PROGRAM_ID}"
+      tokens:
+        USDC:
+          mint: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+          decimals: 6
+        USDT:
+          mint: Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB
+          decimals: 6

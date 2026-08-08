@@ -1,6 +1,6 @@
 # Trustless Commerce roadmap
 
-Status today: **Ethereum Sepolia** end-to-end (contracts, API, sweeper, UI, HTTPS gateway). Tron/Solana are commerce stubs; Base is UI labels only; mainnet contracts are not deployed.
+Status today: **Ethereum Sepolia** end-to-end (contracts, API, sweeper, UI, HTTPS gateway). **Tron Nile** and **Solana Devnet** commerce paths are implemented (unified triple sweeper compose via wget install). Base is UI labels only; mainnet contracts are not deployed.
 
 ```mermaid
 flowchart LR
@@ -28,7 +28,7 @@ Goal: create → pay → sweep works on each chain’s public testnet, behind `t
 - [x] API create + sweeper claim/track for Tron invoices (`string[]` merchant ids; chain id `nile`)
 - [x] Replace `tron.enabled` stub skip in [`commerce/sweeper/worker.ts`](commerce/sweeper/worker.ts) with a real tick path
 - [x] UI network + pay instructions (Nile TRC-20 USDT; Sepolia USDC)
-- [x] Activity-log stages for Tron pay/sweep (+ dual compose `sweeper-evm` / `sweeper-tron`)
+- [x] Activity-log stages for Tron pay/sweep (+ triple compose `sweeper-evm` / `sweeper-tron` / `sweeper-solana`)
 - [ ] Live Nile smoke: fund test USDT → paid → swept (operator checklist)
 ### Solana (devnet)
 - [x] Greenfield: program PDA scheme for invoice addresses + settle/sweep authority
@@ -36,7 +36,8 @@ Goal: create → pay → sweep works on each chain’s public testnet, behind `t
 - [x] Sweeper worker path (replace `solana.enabled` stub)
 - [x] UI network + pay instructions
 - [x] Success tests: pay → settle → balances + anti-redirect (`npm run solana:test`)
-- [ ] Devnet faucet/smoke docs (live)
+- [x] Unified wget nodes install (evm + tron + solana compose) + Devnet deploy/smoke scripts
+- [ ] Operator live Circle-USDC faucet checklist (optional; smoke uses throwaway mint)
 
 **Exit:** agent or merchant can create a testnet invoice on Base, Tron, and Solana; sweeper settles; activity log shows paid + sweep tx.
 

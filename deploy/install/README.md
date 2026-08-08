@@ -60,14 +60,24 @@ curl -fsS https://testnet.trustless-commerce.com/api/health
 curl -fsS https://trustless-commerce.com/api/health
 ```
 
-### 4) Sweeper node (testnet example)
+### 4) Sweeper nodes (testnet — Sepolia + Nile + Solana Devnet)
 
 ```bash
+# Replace any old single/dual sweeper layout first:
+docker rm -f onchain-invoice-node \
+  onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana 2>/dev/null || true
+
 mkdir -p ~/tc/sweeper && cd ~/tc/sweeper
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
-# .env: API_URL=https://testnet.trustless-commerce.com  (same ADMIN_API_KEY as testnet API)
+# .env: API_URL=https://testnet.trustless-commerce.com
+#       SWEEPER_CHAINS=11155111,nile,devnet
+#       TRON_* + SOLANA_PROGRAM_ID / SOLANA_SWEEPER_KEY (base58 preferred)
+# Also set SOLANA_PROGRAM_ID on the API .env (install-api refreshes start script).
 ./register-onchain-invoice-node.sh
 ./start-onchain-invoice-nodes.sh
+# → onchain-invoice-sweeper-evm + -tron + -solana
+# Solana service soft-skips until SOLANA_PROGRAM_ID + SOLANA_SWEEPER_KEY are set
+# (activity log stage: solana-disabled). Requires GHCR sweeper image built from this PR.
 ```
 
 ## API only (no gateway)
@@ -84,14 +94,15 @@ Creates (if missing): `onchain-invoice-api.yaml`, `start-onchain-invoice-api.sh`
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
-# edit .env: TRON_* + SWEEPER_CHAINS=11155111,nile
+# edit .env: TRON_* + SOLANA_* + SWEEPER_CHAINS=11155111,nile,devnet
 ./register-onchain-invoice-node.sh
-./start-onchain-invoice-nodes.sh   # dual compose: sweeper-evm + sweeper-tron
+./start-onchain-invoice-nodes.sh   # triple compose: sweeper-evm + sweeper-tron + sweeper-solana
 ```
 
-Optional: `./register-onchain-invoice-node.sh --address 0x… --label dtn-node --chains 11155111,nile`
+Optional: `./register-onchain-invoice-node.sh --address 0x… --label dtn-node --chains 11155111,nile,devnet`
 
-Activity logs: `./logs/activity-evm.jsonl` and `./logs/activity-tron.jsonl`.
+Activity logs: `./logs/activity-evm.jsonl`, `activity-tron.jsonl`, `activity-solana.jsonl`.
+
 ## Gateway only
 
 ```bash

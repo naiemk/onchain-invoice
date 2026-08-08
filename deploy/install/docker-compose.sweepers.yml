@@ -1,8 +1,14 @@
-# Dual sweeper processes sharing one YAML + .env.
+# Triple sweeper processes sharing one YAML + .env.
 # From the nodes install directory:
 #   docker compose -f docker-compose.sweepers.yml up -d
 #
 # SWEEPER_ROLE filters which half of onchain-invoice-nodes.yaml each service uses.
+# VPS refresh (replace old single/dual layout):
+#   docker rm -f onchain-invoice-node onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana 2>/dev/null || true
+#   wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
+#   # edit .env then:
+#   ./register-onchain-invoice-node.sh
+#   ./start-onchain-invoice-nodes.sh
 
 services:
   sweeper-evm:
@@ -29,6 +35,21 @@ services:
       SWEEPER_ROLE: tron
       SWEEPER_CONFIG: /tmp/sweeper.yaml
       ACTIVITY_LOG_PATH: /data/logs/activity-tron.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./onchain-invoice-nodes.yaml:/tmp/sweeper.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  sweeper-solana:
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: onchain-invoice-sweeper-solana
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SWEEPER_ROLE: solana
+      SWEEPER_CONFIG: /tmp/sweeper.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-solana.jsonl
     volumes:
       - ./logs:/data/logs
       - ./onchain-invoice-nodes.yaml:/tmp/sweeper.yaml:ro

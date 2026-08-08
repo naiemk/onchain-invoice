@@ -55,7 +55,8 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   const symbol = token.trim().toUpperCase();
   const kind = networkKind(chainId);
   if (kind === "tron") return symbol === "USDT";
-  if (kind === "solana") return symbol === "USDC" || symbol === "USDT";
+  // Devnet USDT mint is still a PLACEHOLDER in operator templates — offer USDC only in UI.
+  if (kind === "solana") return symbol === "USDC";
   return symbol === "USDC";
 }
 

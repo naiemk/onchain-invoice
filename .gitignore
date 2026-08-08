@@ -185,4 +185,5 @@ ui/screenshots/
 
 # Solana SBF build (program keypair for local tests is under solana/deploy/)
 solana/target/
+solana/data/devnet-authority.json
 test-ledger/

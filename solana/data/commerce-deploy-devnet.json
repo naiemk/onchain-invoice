@@ -1,0 +1,10 @@
+{
+  "network": "devnet",
+  "rpcUrl": "https://api.devnet.solana.com",
+  "programId": "DTpy1o32ap655U2FPUX4ZgLAwDtxrLLu4d8TGhzap3FF",
+  "authority": "EPhsdcDu8PnTKY7XZizoznAd3kVhmX2boHtU9tBMbuFv",
+  "feeRecipient": "EPhsdcDu8PnTKY7XZizoznAd3kVhmX2boHtU9tBMbuFv",
+  "feeBps": 50,
+  "status": "pending_deploy",
+  "note": "Program id is fixed by solana/deploy/commerce_invoice-keypair.json. Run npm run solana:deploy:devnet after funding the authority with ~2 SOL (faucet.solana.com or solana airdrop)."
+}
