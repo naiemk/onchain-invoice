@@ -50,7 +50,10 @@
     "solana:build": "cd solana/programs/commerce-invoice && cargo-build-sbf",
     "solana:test": "bash solana/e2e/scripts/run-success.sh",
     "solana:deploy:devnet": "bash solana/scripts/deploy-devnet.sh",
-    "solana:smoke:devnet": "bash solana/e2e/scripts/run-devnet-smoke.sh"
+    "solana:smoke:devnet": "bash solana/e2e/scripts/run-devnet-smoke.sh",
+    "deploy:console:api": "node --experimental-strip-types --experimental-transform-types deploy/operator/server.ts",
+    "deploy:console:ui": "vite --config deploy/operator/ui/vite.config.ts",
+    "deploy:console": "node --experimental-strip-types --experimental-transform-types deploy/operator/scripts/dev.mts"
   },
   "repository": {
     "type": "git",

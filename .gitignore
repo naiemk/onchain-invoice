@@ -183,6 +183,10 @@ ui/public/.DS_Store
 deploy/certs/
 ui/screenshots/
 
+# Local deploy console (operator secrets never belong here — config may hold seed)
+deploy/operator/config.yaml
+deploy/operator/dist-ui/
+
 # Solana SBF build (program keypair for local tests is under solana/deploy/)
 solana/target/
 solana/data/devnet-authority.json
