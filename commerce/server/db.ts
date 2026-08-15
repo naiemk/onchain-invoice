@@ -11,6 +11,7 @@ import type {
 
 interface InvoiceRow {
   id: string;
+  invoice_seed: string | null;
   client_invoice_id: string;
   price_usd: string;
   to_addresses: string;
@@ -103,7 +104,7 @@ export class CommerceDb {
         (existing.token ?? "").toUpperCase() === input.token.toUpperCase() &&
         (existing.selectedTo ?? "").toLowerCase() === input.selectedTo.toLowerCase() &&
         existing.priceUsd === input.fields.price &&
-        existing.clientInvoiceId === input.fields.clientInvoiceId;
+        existing.invoiceSeed === input.fields.invoiceSeed;
       if (same && existing.invoiceAddress) {
         return { invoice: existing, created: false };
       }
@@ -126,19 +127,20 @@ export class CommerceDb {
       this.db
         .prepare(
           `INSERT INTO invoices (
-            id, client_invoice_id, price_usd, to_addresses, selected_to, chain_id, token,
+            id, invoice_seed, client_invoice_id, price_usd, to_addresses, selected_to, chain_id, token,
             invoice_address, title, description, callback_url, allow_partial, status,
             amount_paid, amount_swept, fee_collected, gas_spent_wei, sweep_tx,
             pay_session_id, version, claimed_by, claimed_until,
             created_at, updated_at, paid_at, swept_at
           ) VALUES (
-            @id, @clientInvoiceId, @priceUsd, @toAddresses, @selectedTo, @chainId, @token,
+            @id, @invoiceSeed, @clientInvoiceId, @priceUsd, @toAddresses, @selectedTo, @chainId, @token,
             @invoiceAddress, @title, @description, @callbackUrl, @allowPartial, 'awaiting_payment',
             '0', '0', '0', '0', NULL,
             @paySessionId, 1, NULL, NULL,
             @now, @now, NULL, NULL
           )
           ON CONFLICT(id) DO UPDATE SET
+            invoice_seed = COALESCE(excluded.invoice_seed, invoices.invoice_seed),
             selected_to = excluded.selected_to,
             chain_id = excluded.chain_id,
             token = excluded.token,
@@ -155,7 +157,8 @@ export class CommerceDb {
         )
         .run({
           id: input.invoiceId,
-          clientInvoiceId: input.fields.clientInvoiceId,
+          invoiceSeed: input.fields.invoiceSeed,
+          clientInvoiceId: input.fields.clientInvoiceId ?? "",
           priceUsd: input.fields.price,
           toAddresses: JSON.stringify(input.fields.to),
           selectedTo: input.selectedTo,
@@ -534,6 +537,7 @@ export class CommerceDb {
 
       CREATE TABLE IF NOT EXISTS invoices (
         id TEXT PRIMARY KEY,
+        invoice_seed TEXT NOT NULL DEFAULT '',
         client_invoice_id TEXT NOT NULL,
         price_usd TEXT NOT NULL,
         to_addresses TEXT NOT NULL,
@@ -600,6 +604,7 @@ export class CommerceDb {
     this.ensureColumn("invoices", "version", "INTEGER NOT NULL DEFAULT 1");
     this.ensureColumn("invoices", "claimed_by", "TEXT");
     this.ensureColumn("invoices", "claimed_until", "TEXT");
+    this.ensureColumn("invoices", "invoice_seed", "TEXT NOT NULL DEFAULT ''");
   }
 
   private ensureColumn(table: string, column: string, definition: string): void {
@@ -613,6 +618,7 @@ export class CommerceDb {
 function mapInvoice(row: InvoiceRow): InvoiceRecord {
   return {
     id: row.id,
+    invoiceSeed: row.invoice_seed ?? "",
     clientInvoiceId: row.client_invoice_id,
     priceUsd: row.price_usd,
     toAddresses: JSON.parse(row.to_addresses) as string[],

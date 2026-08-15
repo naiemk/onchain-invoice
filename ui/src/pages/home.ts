@@ -1,6 +1,7 @@
 import { encodePayLink } from "../shared/invoice.js";
 import { howCreateArt, howPayArt, howSettleArt } from "../shared/how-graphics.js";
 import { deploymentMode, networksForDeployment } from "../shared/networks.js";
+import { randomInvoiceSeed } from "../onchain-invoice-browser.js";
 import { SITE } from "../shared/site.js";
 
 function chip(label: string, kind: "muted" | "warn" | "ok" | "accent" = "muted"): string {
@@ -12,12 +13,14 @@ export function renderHome(root: HTMLElement): void {
   const networks = networksForDeployment(mode);
   const demoChain = networks[0]?.id ?? (mode === "testnet" ? "11155111" : "1");
   const demoToken = demoChain === "nile" ? "USDT" : "USDC";
+  const invoiceSeed = randomInvoiceSeed();
   const demo = {
     price: "0.01",
     to: ["0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb"],
     chains: [demoChain],
     tokens: [demoToken],
-    clientInvoiceId: `order-${Date.now()}`,
+    invoiceSeed,
+    clientInvoiceId: `order-${invoiceSeed.slice(2, 14).toLowerCase()}`,
     callback: "",
     title: "Demo invoice",
     description:
@@ -190,7 +193,7 @@ export function renderHome(root: HTMLElement): void {
           <div class="how-art-wrap">${howCreateArt()}</div>
           <span class="how-step">1</span>
           <h3>Create the invoice</h3>
-          <p>Set the amount and your wallet. The invoice id is hashed from those details — no account required.</p>
+          <p>Set the amount and your wallet. Share a pay link — we create the invoice id when payment starts. No account required.</p>
         </article>
         <article class="how-card how-card-2">
           <div class="how-art-wrap">${howPayArt()}</div>

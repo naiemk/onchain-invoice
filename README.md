@@ -35,13 +35,13 @@ For products that pay merchants directly (Trustless Commerce under `commerce/` +
 - Supports partial sweeps and `bulkSweep`.
 
 ```ts
-import { CommerceInvoiceSdk, getCommerceInvoiceId } from "onchain-invoice";
+import { CommerceInvoiceSdk, getCommerceInvoiceId, randomInvoiceSeed } from "onchain-invoice";
 
 const sdk = new CommerceInvoiceSdk({ provider, signer, sweeperAddress });
+const invoiceSeed = randomInvoiceSeed();
 const invoiceId = getCommerceInvoiceId({
-  priceUsd: "10",
+  invoiceSeed,
   toAddresses: [merchant],
-  clientInvoiceId: "order-1",
 });
 const invoiceAddress = await sdk.getInvoiceAddress(merchant, invoiceId);
 await sdk.sweep({ token: usdc, amount, to: merchant, invoiceId });

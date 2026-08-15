@@ -7,10 +7,12 @@ import {
   Provider,
   Signer,
   getAddress,
+  getBytes,
   getCreate2Address,
   hexlify,
   id,
   keccak256,
+  randomBytes,
   solidityPacked,
   toUtf8Bytes,
 } from "ethers";
@@ -40,9 +42,12 @@ export interface CommerceSweepResult {
 }
 
 export interface CommerceInvoiceParams {
-  priceUsd: string;
+  /** Random bytes32 — primary uniqueness source for the invoice id. */
+  invoiceSeed: BytesLike;
   toAddresses: string[];
-  clientInvoiceId: string;
+  /** Optional merchant reference (not part of the invoice id). */
+  clientInvoiceId?: string;
+  priceUsd?: string;
   callbackUrl?: string;
   title?: string;
   description?: string;
@@ -51,26 +56,32 @@ export interface CommerceInvoiceParams {
   tokens?: string[];
 }
 
+/** Cryptographically random bytes32 seed for a new invoice. */
+export function randomInvoiceSeed(): string {
+  return hexlify(randomBytes(32));
+}
+
+export function normalizeInvoiceSeed(seed: BytesLike): string {
+  const bytes = getBytes(hexlify(seed));
+  if (bytes.length !== 32) {
+    throw new Error(`invoiceSeed must be 32 bytes, got ${bytes.length}`);
+  }
+  return hexlify(bytes);
+}
+
 /**
- * Deterministic invoice id from merchant-facing invoice parameters.
- * Merchant destinations are encoded as `string[]` so Tron `T…` addresses work
- * (testnet-breaking vs older `address[]` encoding).
+ * Invoice id = keccak256(abi.encode(bytes32 invoiceSeed, string[] toAddresses)).
+ * Uniqueness comes from a random seed; `toAddresses` bind payout destinations into the id.
  */
-export function getCommerceInvoiceId(params: CommerceInvoiceParams | BytesLike): string {
+export function getCommerceInvoiceId(
+  params: Pick<CommerceInvoiceParams, "invoiceSeed" | "toAddresses"> | BytesLike
+): string {
   if (typeof params === "string" || params instanceof Uint8Array) {
     return keccak256(params);
   }
   const encoded = AbiCoder.defaultAbiCoder().encode(
-    ["string", "string[]", "string", "string", "string", "string", "bool"],
-    [
-      params.priceUsd,
-      normalizeMerchantAddresses(params.toAddresses),
-      params.clientInvoiceId,
-      params.callbackUrl ?? "",
-      params.title ?? "",
-      params.description ?? "",
-      params.allowPartial ?? false,
-    ]
+    ["bytes32", "string[]"],
+    [normalizeInvoiceSeed(params.invoiceSeed), normalizeMerchantAddresses(params.toAddresses)]
   );
   return keccak256(encoded);
 }

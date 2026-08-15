@@ -1,0 +1,69 @@
+# Trustless Commerce sweeper node — operator config (shared by compose services)
+# Created by: wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
+# Triple services: docker compose -f docker-compose.sweepers.yml up -d
+# Legacy single container: USE_COMPOSE=0 ./start-onchain-invoice-nodes.sh
+
+serverUrl: "${SERVER_URL}"
+# Wallet that signs sweeper API requests (./register-onchain-invoice-node.sh)
+# Quote 0x values — unquoted YAML 1.1 treats them as integers and corrupts keys.
+sweeperWalletKey: "${SWEEPER_WALLET_KEY}"
+# Optional legacy shared key
+apiKey: "${SWEEPER_API_KEY}"
+# Host bind-mount ./logs → /data/logs (see start / compose)
+activityLogPath: "${ACTIVITY_LOG_PATH}"
+intervalMs: 15000
+maxRetries: 5
+chains:
+  - chainId: "11155111"
+    rpcUrl: "${EVM_RPC_URL}"
+    sweeperAddress: "${SWEEPER_ADDRESS}"
+    privateKey: "${SWEEPER_PRIVATE_KEY}"
+    tokens:
+      - symbol: USDC
+        address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+        decimals: 6
+tron:
+  enabled: true
+  chainId: "nile"
+  fullHost: "${TRON_FULL_HOST}"
+  invoiceMasterSecret: "${TRON_INVOICE_MASTER_SECRET}"
+  usdtAddress: "${TRON_USDT_ADDRESS}"
+  privateKey: "${TRON_SPONSOR_PRIVATE_KEY}"
+  feeLimit: 150000000
+  # Delegate ENERGY + BANDWIDTH (no liquid TRX sent to invoice EOAs). Sponsor must stake TRX.
+  energyMode: staked
+  # Sun of staked TRX to delegate (Stake 2.0)
+  minDelegateEnergy: 65000000
+  minDelegateBandwidth: 1500000
+  tokens:
+    - symbol: USDT
+      address: "${TRON_USDT_ADDRESS}"
+      decimals: 6
+solana:
+  enabled: false
+  privateKey: "${SOLANA_SWEEPER_KEY}"
+  feeRecipient: "${SOLANA_FEE_RECIPIENT}"
+  feeBps: 50
+  chains:
+    devnet:
+      enabled: true
+      rpcUrl: "${SOLANA_RPC_URL}"
+      programId: "${SOLANA_PROGRAM_ID}"
+      tokens:
+        USDC:
+          mint: "${SOLANA_USDC_MINT}"
+          decimals: 6
+        USDT:
+          mint: "${SOLANA_USDT_MINT}"
+          decimals: 6
+    mainnet-beta:
+      enabled: false
+      rpcUrl: "${SOLANA_MAINNET_RPC_URL}"
+      programId: "${SOLANA_MAINNET_PROGRAM_ID}"
+      tokens:
+        USDC:
+          mint: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+          decimals: 6
+        USDT:
+          mint: Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB
+          decimals: 6

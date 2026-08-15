@@ -1,3 +1,5 @@
+import { getAddress, sha256, getBytes } from "ethers";
+
 export type ChainKind = "evm" | "tron" | "solana";
 
 export interface NetworkOption {
@@ -6,6 +8,8 @@ export interface NetworkOption {
   kind: ChainKind;
   short: string;
   testnet?: boolean;
+  /** When false, keep the entry for explorers/labels but hide from create/home pickers. */
+  enabled?: boolean;
 }
 
 export interface TokenOption {
@@ -16,11 +20,12 @@ export interface TokenOption {
 export const NETWORKS: NetworkOption[] = [
   { id: "11155111", label: "Ethereum Sepolia", short: "Sepolia", kind: "evm", testnet: true },
   { id: "nile", label: "TRON Nile", short: "Nile", kind: "tron", testnet: true },
-  { id: "devnet", label: "Solana Devnet", short: "Sol Devnet", kind: "solana", testnet: true },
+  // Kept for explorer/label helpers; re-enable when Solana settle ships in the UI.
+  { id: "devnet", label: "Solana Devnet", short: "Sol Devnet", kind: "solana", testnet: true, enabled: false },
   { id: "1", label: "Ethereum Mainnet", short: "Ethereum", kind: "evm" },
   { id: "8453", label: "Base", short: "Base", kind: "evm" },
   { id: "42161", label: "Arbitrum One", short: "Arbitrum", kind: "evm" },
-  { id: "mainnet-beta", label: "Solana", short: "Solana", kind: "solana" },
+  { id: "mainnet-beta", label: "Solana", short: "Solana", kind: "solana", enabled: false },
 ];
 
 export const TOKENS: TokenOption[] = [
@@ -33,6 +38,114 @@ export const SUPPORTED_TOKENS = new Set(TOKENS.map((t) => t.id.toUpperCase()));
 
 const TRON_BASE58_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 const SOLANA_BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+function decodeBase58(input: string): Uint8Array {
+  const bytes = [0];
+  for (const char of input) {
+    const value = BASE58_ALPHABET.indexOf(char);
+    if (value < 0) throw new Error("Invalid base58 character");
+    let carry = value;
+    for (let i = 0; i < bytes.length; i++) {
+      carry += bytes[i]! * 58;
+      bytes[i] = carry & 0xff;
+      carry >>= 8;
+    }
+    while (carry > 0) {
+      bytes.push(carry & 0xff);
+      carry >>= 8;
+    }
+  }
+  for (const char of input) {
+    if (char !== "1") break;
+    bytes.push(0);
+  }
+  return Uint8Array.from(bytes.reverse());
+}
+
+/** EIP-55 checksummed EVM address only (rejects all-lowercase / all-uppercase). */
+export function isChecksummedEvmAddress(value: string): boolean {
+  const trimmed = value.trim();
+  if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) return false;
+  try {
+    return getAddress(trimmed) === trimmed;
+  } catch {
+    return false;
+  }
+}
+
+/** Tron base58check (version 0x41) — rejects lookalike strings with a bad checksum. */
+export function isChecksummedTronAddress(value: string): boolean {
+  const trimmed = value.trim();
+  if (!TRON_BASE58_RE.test(trimmed)) return false;
+  try {
+    const decoded = decodeBase58(trimmed);
+    if (decoded.length !== 25 || decoded[0] !== 0x41) return false;
+    const payload = decoded.slice(0, 21);
+    const checksum = decoded.slice(21);
+    const hash = getBytes(sha256(sha256(payload)));
+    return (
+      checksum[0] === hash[0] &&
+      checksum[1] === hash[1] &&
+      checksum[2] === hash[2] &&
+      checksum[3] === hash[3]
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function looksLikeTronAddress(value: string): boolean {
+  return TRON_BASE58_RE.test(value.trim());
+}
+
+export function looksLikeSolanaAddress(value: string): boolean {
+  const trimmed = value.trim();
+  if (!SOLANA_BASE58_RE.test(trimmed)) return false;
+  if (trimmed.startsWith("T") && trimmed.length === 34) return false;
+  try {
+    const decoded = decodeBase58(trimmed);
+    return decoded.length === 32;
+  } catch {
+    return false;
+  }
+}
+
+export function isValidAddress(value: string, kind: ChainKind): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (kind === "tron") return isChecksummedTronAddress(trimmed);
+  if (kind === "solana") return looksLikeSolanaAddress(trimmed);
+  return isChecksummedEvmAddress(trimmed);
+}
+
+export function normalizeAddress(value: string, kind: ChainKind): string {
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error("Address is required");
+  if (kind === "tron") {
+    if (!isChecksummedTronAddress(trimmed)) {
+      throw new Error("Tron address must be a valid base58check T… address");
+    }
+    return trimmed;
+  }
+  if (kind === "solana") {
+    if (!looksLikeSolanaAddress(trimmed)) throw new Error(`Invalid Solana address: ${value}`);
+    return trimmed;
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) {
+    throw new Error("EVM address must be a 0x-prefixed 40-hex-character address");
+  }
+  try {
+    const checksummed = getAddress(trimmed);
+    if (checksummed !== trimmed) {
+      throw new Error(`EVM address must be EIP-55 checksummed (expected ${checksummed})`);
+    }
+    return checksummed;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("EIP-55")) throw error;
+    throw new Error("Invalid EVM address checksum");
+  }
+}
 
 export function filterSupportedTokens(tokens: string[]): string[] {
   const allowed = tokens
@@ -57,45 +170,13 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   if (kind === "tron") return symbol === "USDT";
   // Devnet USDT mint is still a PLACEHOLDER in operator templates — offer USDC only in UI.
   if (kind === "solana") return symbol === "USDC";
-  return symbol === "USDC";
+  // EVM: USDC and USDT (mainnets + any testnet that lists a USDT contract for the sweeper).
+  return symbol === "USDC" || symbol === "USDT";
 }
 
 export function tokensForChains(chainIds: string[]): TokenOption[] {
   if (chainIds.length === 0) return [];
   return TOKENS.filter((token) => chainIds.some((id) => tokenAllowedOnChain(id, token.id)));
-}
-
-export function looksLikeTronAddress(value: string): boolean {
-  return TRON_BASE58_RE.test(value.trim());
-}
-
-export function looksLikeSolanaAddress(value: string): boolean {
-  const trimmed = value.trim();
-  if (!SOLANA_BASE58_RE.test(trimmed)) return false;
-  if (trimmed.startsWith("T") && trimmed.length === 34) return false;
-  return true;
-}
-
-export function isValidAddress(value: string, kind: ChainKind): boolean {
-  const trimmed = value.trim();
-  if (kind === "tron") return looksLikeTronAddress(trimmed);
-  if (kind === "solana") return looksLikeSolanaAddress(trimmed);
-  return /^0x[0-9a-fA-F]{40}$/.test(trimmed);
-}
-
-export function normalizeAddress(value: string, kind: ChainKind): string {
-  const trimmed = value.trim();
-  if (!trimmed) throw new Error("Address is required");
-  if (kind === "tron") {
-    if (!looksLikeTronAddress(trimmed)) throw new Error(`Invalid Tron address: ${value}`);
-    return trimmed;
-  }
-  if (kind === "solana") {
-    if (!looksLikeSolanaAddress(trimmed)) throw new Error(`Invalid Solana address: ${value}`);
-    return trimmed;
-  }
-  if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) throw new Error(`Invalid EVM address: ${value}`);
-  return trimmed;
 }
 
 export function networkLabel(chainId: string): string {
@@ -142,7 +223,7 @@ export function deploymentMode(): DeploymentMode {
 /** Networks allowed on the create form for this deployment. */
 export function networksForDeployment(mode: DeploymentMode = deploymentMode()): NetworkOption[] {
   const wantTestnet = mode === "testnet";
-  return NETWORKS.filter((n) => Boolean(n.testnet) === wantTestnet);
+  return NETWORKS.filter((n) => Boolean(n.testnet) === wantTestnet && n.enabled !== false);
 }
 
 export function testnetPillHtml(chainId: string | null | undefined): string {
