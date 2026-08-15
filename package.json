@@ -69,6 +69,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.10",
     "@nomicfoundation/hardhat-mocha": "^3.0.18",
+    "@nomicfoundation/hardhat-verify": "^3.0.10",
     "@types/better-sqlite3": "^7.6.13",
     "@types/chai": "^5.2.3",
     "@types/js-yaml": "^4.0.9",

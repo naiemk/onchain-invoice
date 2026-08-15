@@ -5,8 +5,8 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { readFileSync, existsSync, mkdirSync, rmSync, readdirSync } from "node:fs";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createReadStream } from "node:fs";
 import { ensureConfig, loadConfig, saveConfig, CONFIG_PATH, OPERATOR_ROOT } from "./lib/config.ts";
@@ -16,6 +16,29 @@ import type { LogEvent, OperatorConfig } from "./lib/types.ts";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../..");
 const PORT = Number(process.env.DEPLOY_CONSOLE_PORT ?? 8790);
+const HARDHAT_BIN = resolve(REPO_ROOT, "node_modules/.bin/hardhat");
+const DEFAULT_SEPOLIA_RPC = "https://ethereum-sepolia-rpc.publicnode.com";
+
+/** Serialize Hardhat CLI — concurrent compile/verify races on cache/compile-cache.json.tmp. */
+let hardhatQueue: Promise<unknown> = Promise.resolve();
+function withHardhatLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = hardhatQueue.then(fn, fn);
+  hardhatQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
+function prepareHardhatCache(): void {
+  const cacheDir = resolve(REPO_ROOT, "cache");
+  mkdirSync(cacheDir, { recursive: true });
+  for (const name of readdirSync(cacheDir)) {
+    if (name.endsWith(".tmp")) {
+      rmSync(join(cacheDir, name), { force: true });
+    }
+  }
+}
 
 type SseClient = ServerResponse;
 const logClients = new Set<SseClient>();
@@ -92,6 +115,32 @@ function cors(req: IncomingMessage, res: ServerResponse): boolean {
   return false;
 }
 
+/** eth_call sweeper.forwarderImplementation() via JSON-RPC (server-side — avoids browser RPC CORS/403). */
+async function readForwarderImplementation(rpcUrl: string, sweeper: string): Promise<string> {
+  // selector(forwarderImplementation()) = 0xe38d60a1
+  const data = "0xe38d60a1";
+  const rpcRes = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_call",
+      params: [{ to: sweeper, data }, "latest"],
+    }),
+  });
+  if (!rpcRes.ok) {
+    throw new Error(`RPC HTTP ${rpcRes.status} from ${rpcUrl}`);
+  }
+  const body = (await rpcRes.json()) as { result?: string; error?: { message?: string } };
+  if (body.error?.message) throw new Error(body.error.message);
+  const result = body.result ?? "";
+  if (!result || result === "0x" || result.length < 66) {
+    throw new Error(`empty eth_call result for forwarderImplementation`);
+  }
+  return `0x${result.slice(-40)}`;
+}
+
 async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (cors(req, res)) return;
   const url = new URL(req.url ?? "/", `http://127.0.0.1:${PORT}`);
@@ -160,8 +209,8 @@ async function handler(req: IncomingMessage, res: ServerResponse): Promise<void>
       const body = JSON.parse(await readBody(req)) as {
         chainKey: string;
         sweeper: string;
-        forwarderImplementation: string;
-        deployTx: string;
+        forwarderImplementation?: string;
+        deployTx?: string;
       };
       const config = loadConfig();
       const chain = config.chains[body.chainKey];
@@ -169,13 +218,35 @@ async function handler(req: IncomingMessage, res: ServerResponse): Promise<void>
         sendJson(res, 400, { error: "unknown chain" });
         return;
       }
+      if (!body.sweeper || !/^0x[0-9a-fA-F]{40}$/.test(body.sweeper)) {
+        sendJson(res, 400, { error: "sweeper address required" });
+        return;
+      }
+
+      let forwarderImplementation = body.forwarderImplementation?.trim() ?? "";
+      if (!forwarderImplementation || /^0x0{40}$/i.test(forwarderImplementation)) {
+        try {
+          forwarderImplementation = await readForwarderImplementation(chain.rpcUrl, body.sweeper);
+          logLine("info", `forwarderImplementation ${forwarderImplementation}`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          logLine("warn", `Could not read forwarderImplementation (${message}); saving sweeper only`);
+          forwarderImplementation = chain.forwarderImplementation ?? "";
+        }
+      }
+
       chain.sweeper = body.sweeper;
-      chain.forwarderImplementation = body.forwarderImplementation;
-      chain.deployTx = body.deployTx;
+      if (forwarderImplementation) {
+        chain.forwarderImplementation = forwarderImplementation;
+      }
+      if (body.deployTx) {
+        chain.deployTx = body.deployTx;
+      }
       chain.deployedAt = new Date().toISOString();
       saveConfig(config);
+      logLine("success", `Wrote ${CONFIG_PATH}`);
       logLine("success", `Saved ${body.chainKey} sweeper=${body.sweeper}`);
-      sendJson(res, 200, { ok: true, config });
+      sendJson(res, 200, { ok: true, config, path: CONFIG_PATH });
       return;
     }
 
@@ -246,7 +317,10 @@ async function handler(req: IncomingMessage, res: ServerResponse): Promise<void>
 
     if (req.method === "POST" && path === "/api/run/compile") {
       sendJson(res, 202, { ok: true });
-      void runCommand(resolve(REPO_ROOT, "node_modules/.bin/hardhat"), ["compile"]);
+      void withHardhatLock(async () => {
+        prepareHardhatCache();
+        await runCommand(HARDHAT_BIN, ["compile"]);
+      });
       return;
     }
 
@@ -272,16 +346,42 @@ async function handler(req: IncomingMessage, res: ServerResponse): Promise<void>
         constructorArgs: [string, number, string];
       };
       sendJson(res, 202, { ok: true });
+      const config = loadConfig();
+      const chain = config.chains[body.chainKey];
       const network = body.chainKey === "sepolia" ? "sepolia" : body.chainKey;
-      void runCommand(resolve(REPO_ROOT, "node_modules/.bin/hardhat"), [
-        "verify",
-        "--network",
-        network,
-        body.address,
-        body.constructorArgs[0],
-        String(body.constructorArgs[1]),
-        body.constructorArgs[2],
-      ]);
+      if (!process.env.ETHERSCAN_API_KEY?.trim()) {
+        logLine(
+          "warn",
+          "ETHERSCAN_API_KEY not set in environment — Etherscan may fail; Sourcify/Blockscout still attempted"
+        );
+      }
+      const rpcUrl = chain?.rpcUrl?.trim() || DEFAULT_SEPOLIA_RPC;
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        // Always override — root .env may still point at a 403'd provider (e.g. drpc).
+        SEPOLIA_RPC_URL: rpcUrl,
+      };
+      logLine("info", `verify using SEPOLIA_RPC_URL=${rpcUrl}`);
+      void withHardhatLock(async () => {
+        prepareHardhatCache();
+        // Warm production artifacts (verify defaults to that profile) under the same lock.
+        await runCommand(HARDHAT_BIN, ["compile", "--build-profile", "production"], { env });
+        await runCommand(
+          HARDHAT_BIN,
+          [
+            "verify",
+            "--network",
+            network,
+            "--contract",
+            "contracts/commerce/CommerceInvoiceSweeper.sol:CommerceInvoiceSweeper",
+            body.address,
+            body.constructorArgs[0],
+            String(body.constructorArgs[1]),
+            body.constructorArgs[2],
+          ],
+          { env }
+        );
+      });
       return;
     }
 

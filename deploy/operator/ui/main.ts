@@ -152,8 +152,14 @@ function deployBody(evmChains: [string, EvChainConfig][]): string {
     </div>`;
 }
 
+function resolvedSweeper(): string {
+  // config.yaml uses sweeper: "" as a placeholder — empty string must not block the CREATE2 plan.
+  const fromConfig = state.config?.chains[state.selectedChain]?.sweeper?.trim() ?? "";
+  return fromConfig || state.plan?.plan.predictedSweeper || "";
+}
+
 function verifyBody(): string {
-  const sweeper = state.config?.chains[state.selectedChain]?.sweeper ?? state.plan?.plan.predictedSweeper ?? "";
+  const sweeper = resolvedSweeper();
   const sol = state.config?.solana;
   return `
     <div class="row">
@@ -274,6 +280,7 @@ async function deployEvm(): Promise<void> {
   if (code && code !== "0x") {
     appendLocal("warn", "Predicted address already has code — skipping deploy, reading forwarder");
     await persistAfterDeploy(state.plan.plan.predictedSweeper, "");
+    render();
     return;
   }
   appendLocal("info", `sending CREATE2 deploy via ${state.plan.plan.factory}`);
@@ -285,28 +292,35 @@ async function deployEvm(): Promise<void> {
   const receipt = await tx.wait();
   appendLocal("success", `confirmed block ${receipt?.blockNumber}`);
   await persistAfterDeploy(state.plan.plan.predictedSweeper, tx.hash);
-  state.steps.deploy = true;
   render();
 }
 
 async function persistAfterDeploy(sweeper: string, deployTx: string): Promise<void> {
-  const chain = state.config?.chains[state.selectedChain];
-  if (!chain) return;
-  const rpc = new JsonRpcProvider(chain.rpcUrl);
-  const abi = [
-    "function forwarderImplementation() view returns (address)",
-  ];
-  const c = new Contract(sweeper, abi, rpc);
-  const forwarderImplementation = (await c.forwarderImplementation()) as string;
-  appendLocal("info", `forwarderImplementation ${forwarderImplementation}`);
+  if (!state.config?.chains[state.selectedChain]) return;
+
+  // Prefer MetaMask provider (already on the target chain). Fall back to server-side RPC write.
+  let forwarderImplementation = "";
+  try {
+    const provider =
+      window.ethereum && state.wallet
+        ? new BrowserProvider(window.ethereum)
+        : new JsonRpcProvider(state.config.chains[state.selectedChain]!.rpcUrl);
+    const c = new Contract(sweeper, ["function forwarderImplementation() view returns (address)"], provider);
+    forwarderImplementation = (await c.forwarderImplementation()) as string;
+    appendLocal("info", `forwarderImplementation ${forwarderImplementation}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    appendLocal("warn", `Browser RPC could not read forwarder (${message}); server will retry`);
+  }
+
   const res = await fetch(`${API}/api/config/evm-result`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       chainKey: state.selectedChain,
       sweeper,
-      forwarderImplementation,
-      deployTx,
+      forwarderImplementation: forwarderImplementation || undefined,
+      deployTx: deployTx || undefined,
     }),
   });
   const body = await res.json();
@@ -316,12 +330,18 @@ async function persistAfterDeploy(sweeper: string, deployTx: string): Promise<vo
   }
   state.config = body.config;
   state.steps.deploy = true;
+  appendLocal("success", `config.yaml updated → ${body.path ?? "deploy/operator/config.yaml"}`);
+  if (body.config?.chains?.[state.selectedChain]?.forwarderImplementation) {
+    appendLocal(
+      "info",
+      `saved forwarderImplementation ${body.config.chains[state.selectedChain].forwarderImplementation}`
+    );
+  }
 }
 
 async function verifyEvm(): Promise<void> {
   if (!state.plan && !state.config) return;
-  const address =
-    state.config?.chains[state.selectedChain]?.sweeper || state.plan?.plan.predictedSweeper;
+  const address = resolvedSweeper();
   const args = state.plan?.plan.constructorArgs ?? [
     state.config!.feeRecipient,
     state.config!.feeBps,
@@ -338,7 +358,7 @@ async function verifyEvm(): Promise<void> {
 }
 
 async function readForwarder(): Promise<void> {
-  const sweeper = state.config?.chains[state.selectedChain]?.sweeper;
+  const sweeper = resolvedSweeper();
   const chain = state.config?.chains[state.selectedChain];
   if (!sweeper || !chain) return;
   const rpc = new JsonRpcProvider(chain.rpcUrl);

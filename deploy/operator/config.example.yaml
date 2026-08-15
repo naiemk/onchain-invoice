@@ -19,7 +19,7 @@ chains:
   sepolia:
     kind: evm
     chainId: 11155111
-    rpcUrl: https://sepolia.drpc.org
+    rpcUrl: https://ethereum-sepolia-rpc.publicnode.com
     explorer: https://sepolia.etherscan.io
     enabled: true
     # Filled after deploy

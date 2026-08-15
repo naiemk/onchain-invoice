@@ -42,5 +42,5 @@ Copy addresses into API / nodes env:
 ## Notes
 
 - CREATE2 factory must exist on the target chain (it does on Sepolia / Ethereum / most L2s).
-- Hardhat verify needs the usual explorer API key in the environment when you press Verify.
+- Hardhat verify needs `@nomicfoundation/hardhat-verify` (installed) and ideally `ETHERSCAN_API_KEY` in the repo-root `.env` for Etherscan. Sourcify/Blockscout still attempt without a key.
 - Solana **program** deploy still uses the in-repo program keypair for the fixed program id; set authority pubkey in config and run `npm run solana:deploy:devnet` (or extend this console) with a funded authority — never put that secret in `config.yaml`.
