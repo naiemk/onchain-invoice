@@ -187,3 +187,10 @@ ui/screenshots/
 solana/target/
 solana/data/devnet-authority.json
 test-ledger/
+
+# Local testnet stack runtime
+local-testnet/.env
+local-testnet/*.db
+local-testnet/*.db-*
+local-testnet/logs/
+local-testnet/pids/

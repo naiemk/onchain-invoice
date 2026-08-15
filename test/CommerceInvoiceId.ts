@@ -4,29 +4,57 @@ import {
   getCommerceInvoiceId,
   looksLikeTronAddress,
   normalizeMerchantAddress,
+  randomInvoiceSeed,
   tokenAllowedOnChain,
   tronNumericChainId,
 } from "../src/index.js";
 
-describe("Commerce invoice id (string[] merchants)", function () {
-  it("encodes EVM + Tron merchant addresses as string[]", function () {
+describe("Commerce invoice id (seed + toAddresses)", function () {
+  it("hashes invoiceSeed + toAddresses[]", function () {
     const evm = getAddress(Wallet.createRandom().address);
     const tron = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf";
     expect(looksLikeTronAddress(tron)).to.equal(true);
+    const seed = randomInvoiceSeed();
 
     const id = getCommerceInvoiceId({
-      priceUsd: "10.00",
+      invoiceSeed: seed,
       toAddresses: [evm, tron],
-      clientInvoiceId: "order-tron-1",
     });
     expect(id).to.match(/^0x[0-9a-f]{64}$/);
 
     const again = getCommerceInvoiceId({
-      priceUsd: "10.00",
+      invoiceSeed: seed,
       toAddresses: [evm, tron],
-      clientInvoiceId: "order-tron-1",
     });
     expect(again).to.equal(id);
+
+    const otherSeed = getCommerceInvoiceId({
+      invoiceSeed: randomInvoiceSeed(),
+      toAddresses: [evm, tron],
+    });
+    expect(otherSeed).to.not.equal(id);
+  });
+
+  it("changes when merchant destinations change", function () {
+    const seed = randomInvoiceSeed();
+    const a = getAddress(Wallet.createRandom().address);
+    const b = getAddress(Wallet.createRandom().address);
+    const idA = getCommerceInvoiceId({ invoiceSeed: seed, toAddresses: [a] });
+    const idB = getCommerceInvoiceId({ invoiceSeed: seed, toAddresses: [b] });
+    expect(idA).to.not.equal(idB);
+  });
+
+  it("ignores clientInvoiceId / price for the invoice id", function () {
+    const seed = randomInvoiceSeed();
+    const to = [getAddress(Wallet.createRandom().address)];
+    const base = getCommerceInvoiceId({ invoiceSeed: seed, toAddresses: to });
+    const withMeta = getCommerceInvoiceId({
+      invoiceSeed: seed,
+      toAddresses: to,
+      clientInvoiceId: "order-1",
+      priceUsd: "999",
+    });
+    expect(withMeta).to.equal(base);
   });
 
   it("normalizes merchant addresses by kind", function () {
@@ -43,7 +71,7 @@ describe("Commerce invoice id (string[] merchants)", function () {
 
   it("enforces token–chain pairs", function () {
     expect(tokenAllowedOnChain("11155111", "USDC")).to.equal(true);
-    expect(tokenAllowedOnChain("11155111", "USDT")).to.equal(false);
+    expect(tokenAllowedOnChain("11155111", "USDT")).to.equal(true);
     expect(tokenAllowedOnChain("nile", "USDT")).to.equal(true);
     expect(tokenAllowedOnChain("nile", "USDC")).to.equal(false);
   });

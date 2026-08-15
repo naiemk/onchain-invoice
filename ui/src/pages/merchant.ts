@@ -1,10 +1,11 @@
-import { getAddress } from "ethers";
 import { escapeHtml, shortId } from "../shared/dom.js";
 import {
   chainChipHtml,
   explorerAddressUrl,
   explorerTxUrl,
   formatTokenAmount,
+  looksLikeTronAddress,
+  normalizeAddress,
   tokenChipHtml,
 } from "../shared/networks.js";
 import { apiUrl } from "../shared/site.js";
@@ -127,7 +128,9 @@ export function renderMerchant(root: HTMLElement): void {
     const statusEl = root.querySelector<HTMLElement>("#merchant-status");
     const raw = root.querySelector<HTMLInputElement>("#merchant-address")?.value.trim() ?? "";
     try {
-      state.address = getAddress(raw);
+      state.address = looksLikeTronAddress(raw)
+        ? normalizeAddress(raw, "tron")
+        : normalizeAddress(raw, "evm");
       localStorage.setItem(STORAGE_KEY, state.address);
       root.querySelector<HTMLInputElement>("#merchant-address")!.value = state.address;
       syncFiltersFromForm();

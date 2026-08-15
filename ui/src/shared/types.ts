@@ -7,7 +7,10 @@ export interface PayLinkFields {
   to: string[];
   chains: string[];
   tokens: string[];
-  clientInvoiceId: string;
+  /** Random bytes32; hashed with `to` into the invoice id. */
+  invoiceSeed: string;
+  /** Optional merchant order/reference (not part of the invoice id). */
+  clientInvoiceId?: string;
   callback?: string;
   title?: string;
   description?: string;
@@ -16,6 +19,7 @@ export interface PayLinkFields {
 
 export interface InvoiceRecord {
   id: string;
+  invoiceSeed: string;
   clientInvoiceId: string;
   priceUsd: string;
   toAddresses: string[];
