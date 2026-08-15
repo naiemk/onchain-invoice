@@ -127,10 +127,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const port = Number(env.PORT ?? file.port ?? 8080);
   const evmChains = loadEvmChains(env, file.evm);
   const legacy = evmChains[EVM_LEGACY_CHAIN_ID];
+  const dbPathRaw = expand(env.DB_PATH ?? file.db?.path ?? "./trustless-commerce.db");
+  // better-sqlite3 treats ":memory:" specially — do not path-resolve it into a real file.
+  const dbPath = dbPathRaw === ":memory:" ? ":memory:" : resolve(dbPathRaw);
   return {
     port,
     baseUrl: expand(env.BASE_URL ?? file.baseUrl ?? `http://localhost:${port}`),
-    dbPath: resolve(expand(env.DB_PATH ?? file.db?.path ?? "./trustless-commerce.db")),
+    dbPath,
     sweeperApiKey: expand(env.SWEEPER_API_KEY ?? file.sweeperApiKey ?? ""),
     adminApiKey: expand(env.ADMIN_API_KEY ?? file.adminApiKey ?? ""),
     evmChains,
