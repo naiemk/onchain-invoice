@@ -27,15 +27,29 @@ chains:
     forwarderImplementation: ""
     deployedAt: ""
     deployTx: ""
-  # Example — enable when ready:
-  # baseSepolia:
-  #   kind: evm
-  #   chainId: 84532
-  #   rpcUrl: https://sepolia.base.org
-  #   explorer: https://sepolia.basescan.org
-  #   enabled: false
-  #   sweeper: ""
-  #   forwarderImplementation: ""
+  # Mainnet rails — deploy via console, then paste into API/nodes env:
+  #   EVM_8453_SWEEPER_ADDRESS / EVM_8453_FORWARDER_IMPLEMENTATION
+  #   EVM_56_SWEEPER_ADDRESS / EVM_56_FORWARDER_IMPLEMENTATION
+  base:
+    kind: evm
+    chainId: 8453
+    rpcUrl: https://mainnet.base.org
+    explorer: https://basescan.org
+    enabled: true
+    sweeper: ""
+    forwarderImplementation: ""
+    deployedAt: ""
+    deployTx: ""
+  bsc:
+    kind: evm
+    chainId: 56
+    rpcUrl: https://bsc-dataseed.binance.org
+    explorer: https://bscscan.com
+    enabled: true
+    sweeper: ""
+    forwarderImplementation: ""
+    deployedAt: ""
+    deployTx: ""
 
 solana:
   kind: solana

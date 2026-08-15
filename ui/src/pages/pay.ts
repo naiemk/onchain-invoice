@@ -311,7 +311,7 @@ function renderPaidStage(
     status === "swept" ? "Payment complete" : status === "paid_partial" ? "Partial payment received" : "Payment received";
   const chainId = invoice.chainId ?? fields.chains[0];
   const addressUrl = invoice.invoiceAddress ? explorerAddressUrl(chainId, invoice.invoiceAddress) : null;
-  const paidDisplay = formatTokenAmount(invoice.amountPaid, invoice.token);
+  const paidDisplay = formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId);
 
   root.innerHTML = `
     <div class="invoice-shell">

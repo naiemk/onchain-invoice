@@ -17,6 +17,7 @@ export {
   normalizeMerchantAddresses,
   tokenAllowedOnChain,
   tronNumericChainId,
+  TRON_MAINNET_NUMERIC_CHAIN_ID,
   TRON_NILE_NUMERIC_CHAIN_ID,
   TRON_SHASTA_NUMERIC_CHAIN_ID,
   type ChainKind,

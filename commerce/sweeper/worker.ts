@@ -134,7 +134,15 @@ export class SweeperWorker {
 
   constructor(private readonly config: SweeperConfig) {
     this.role = resolveRole(config);
-    this.chains = this.role === "tron" || this.role === "solana" ? [] : config.chains ?? [];
+    const rawChains = this.role === "tron" || this.role === "solana" ? [] : config.chains ?? [];
+    // Soft-skip incomplete EVM entries (empty sweeper after env expand) so mainnet templates stay up.
+    this.chains = rawChains.filter(
+      (c) =>
+        Boolean(c.rpcUrl?.trim()) &&
+        Boolean(c.sweeperAddress?.trim()) &&
+        !/^0x0{40}$/i.test(c.sweeperAddress.trim()) &&
+        Boolean(c.privateKey?.trim())
+    );
     this.tron =
       this.role === "evm" || this.role === "solana"
         ? undefined
@@ -450,7 +458,7 @@ export class SweeperWorker {
     if (!this.tron?.enabled) return null;
     if (!invoice.chainId || !invoice.invoiceAddress || !invoice.selectedTo) return null;
     if (invoice.status === "swept") return null;
-    const expectedChain = this.tron.chainId ?? "nile";
+    const expectedChain = nonempty(this.tron.chainId) ?? "nile";
     if (String(invoice.chainId) !== expectedChain) return null;
 
     const token = resolveTronToken(this.tron, invoice.token);
@@ -819,7 +827,14 @@ function resolveRole(config: SweeperConfig): SweeperRole {
 
 function isTronInvoice(invoice: InvoiceRecord): boolean {
   const id = String(invoice.chainId ?? "");
-  return id === "nile" || id === "shasta" || id === "tron" || id === "3448148188";
+  return (
+    id === "nile" ||
+    id === "shasta" ||
+    id === "tron" ||
+    id === "3448148188" ||
+    id === "728126428" ||
+    id === "2494104990"
+  );
 }
 
 function isSolanaInvoice(invoice: InvoiceRecord): boolean {

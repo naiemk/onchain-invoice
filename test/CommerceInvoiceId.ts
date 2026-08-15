@@ -65,14 +65,20 @@ describe("Commerce invoice id (seed + toAddresses)", function () {
     );
   });
 
-  it("maps nile product id to numeric derivation id", function () {
+  it("maps nile / tron product ids to numeric derivation ids", function () {
     expect(String(tronNumericChainId("nile"))).to.equal("3448148188");
+    expect(String(tronNumericChainId("tron"))).to.equal("728126428");
   });
 
   it("enforces token–chain pairs", function () {
     expect(tokenAllowedOnChain("11155111", "USDC")).to.equal(true);
     expect(tokenAllowedOnChain("11155111", "USDT")).to.equal(true);
+    expect(tokenAllowedOnChain("8453", "USDC")).to.equal(true);
+    expect(tokenAllowedOnChain("8453", "USDT")).to.equal(false);
+    expect(tokenAllowedOnChain("56", "USDC")).to.equal(true);
+    expect(tokenAllowedOnChain("56", "USDT")).to.equal(true);
     expect(tokenAllowedOnChain("nile", "USDT")).to.equal(true);
     expect(tokenAllowedOnChain("nile", "USDC")).to.equal(false);
+    expect(tokenAllowedOnChain("tron", "USDT")).to.equal(true);
   });
 });

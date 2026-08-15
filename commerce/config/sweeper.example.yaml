@@ -8,6 +8,7 @@ activityLogPath: "${ACTIVITY_LOG_PATH}"
 intervalMs: 15000
 maxRetries: 5
 # Prefer SWEEPER_ROLE=evm|tron|all via compose (filters this shared file per process)
+# Incomplete EVM rows (empty sweeper) are soft-skipped at runtime.
 chains:
   - chainId: "11155111"
     rpcUrl: "${EVM_RPC_URL}"
@@ -17,12 +18,31 @@ chains:
       - symbol: USDC
         address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
         decimals: 6
+  - chainId: "8453"
+    rpcUrl: "${EVM_8453_RPC_URL}"
+    sweeperAddress: "${EVM_8453_SWEEPER_ADDRESS}"
+    privateKey: "${SWEEPER_PRIVATE_KEY}"
+    tokens:
+      - symbol: USDC
+        address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+        decimals: 6
+  - chainId: "56"
+    rpcUrl: "${EVM_56_RPC_URL}"
+    sweeperAddress: "${EVM_56_SWEEPER_ADDRESS}"
+    privateKey: "${SWEEPER_PRIVATE_KEY}"
+    tokens:
+      - symbol: USDC
+        address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+        decimals: 18
+      - symbol: USDT
+        address: "0x55d398326f99059fF775485246999027B3197955"
+        decimals: 18
 tron:
   enabled: true
-  chainId: "nile"
+  chainId: "${TRON_CHAIN_ID}"
   fullHost: "${TRON_FULL_HOST}"
   invoiceMasterSecret: "${TRON_INVOICE_MASTER_SECRET}"
-  # Nile USDT TRC-20 (override via TRON_USDT_ADDRESS if Nile listing changes)
+  # Nile USDT TRC-20 (override via TRON_USDT_ADDRESS; mainnet TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t)
   usdtAddress: "${TRON_USDT_ADDRESS}"
   privateKey: "${TRON_SPONSOR_PRIVATE_KEY}"
   feeLimit: 150000000

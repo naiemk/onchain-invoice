@@ -35,12 +35,23 @@ The MetaMask account only needs gas. It does **not** have to be `owner`.
 
 Copy addresses into API / nodes env:
 
-- `SWEEPER_ADDRESS` ← `chains.<name>.sweeper`
-- `FORWARDER_IMPLEMENTATION` ← `chains.<name>.forwarderImplementation`
+- Sepolia: `SWEEPER_ADDRESS` / `FORWARDER_IMPLEMENTATION` ← `chains.sepolia.*`
+- Base: `EVM_8453_SWEEPER_ADDRESS` / `EVM_8453_FORWARDER_IMPLEMENTATION` ← `chains.base.*`
+- BNB: `EVM_56_SWEEPER_ADDRESS` / `EVM_56_FORWARDER_IMPLEMENTATION` ← `chains.bsc.*`
 - `SOLANA_PROGRAM_ID` ← `solana.programId` (after program deploy + initialize)
+
+## Mainnet launch checklist (Tron + Base + BNB)
+
+1. `npm run deploy:console` → CREATE2 deploy **Base** (`8453`) and **BNB** (`56`) with the same seed / owner / feeRecipient.
+2. Fill mainnet API `.env` with the two sweeper/forwarder pairs + Tron master secret + `TRON_USDT_ADDRESS=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t` + `TRON_FULL_HOST=https://api.trongrid.io`.
+3. Fill sweeper `.env` / YAML; set `SWEEPER_CHAINS=8453,56,tron` and `TRON_CHAIN_ID=tron`; register the sweeper.
+4. Build/serve UI with `VITE_DEPLOYMENT_MODE=mainnet` (or a hostname without `testnet.`).
+5. Smoke: create invoice per chain → pay a small amount → confirm sweep.
+
+Out of scope for the prep PR: live CREATE2, committing real mainnet addresses, Solana mainnet, Ethereum/Arbitrum settlement.
 
 ## Notes
 
-- CREATE2 factory must exist on the target chain (it does on Sepolia / Ethereum / most L2s).
-- Hardhat verify needs `@nomicfoundation/hardhat-verify` (installed) and ideally `ETHERSCAN_API_KEY` in the repo-root `.env` for Etherscan. Sourcify/Blockscout still attempt without a key.
+- CREATE2 factory must exist on the target chain (it does on Sepolia / Ethereum / Base / BNB / most L2s).
+- Hardhat verify needs `@nomicfoundation/hardhat-verify` (installed) and ideally `ETHERSCAN_API_KEY` in the repo-root `.env` for Etherscan. Networks `base` and `bsc` are defined in `hardhat.config.ts` (RPC from `BASE_RPC_URL` / `BSC_RPC_URL` or `EVM_8453_RPC_URL` / `EVM_56_RPC_URL`). Sourcify/Blockscout still attempt without a key.
 - Solana **program** deploy still uses the in-repo program keypair for the fixed program id; set authority pubkey in config and run `npm run solana:deploy:devnet` (or extend this console) with a funded authority — never put that secret in `config.yaml`.

@@ -19,7 +19,7 @@ import { encodePayLink, invoiceIdFromPayLink, normalizePayLinkFields } from "../
 import type { InvoiceStatus, PayLinkFields } from "../shared/types.js";
 import { requireApiKey, requireMerchant } from "./auth.js";
 import { verifyCaptcha } from "./captcha.js";
-import type { AppConfig } from "./config.js";
+import { resolveEvmChain, type AppConfig } from "./config.js";
 import type { CommerceDb } from "./db.js";
 import { log, newRequestId } from "./logger.js";
 import { clientIp, takeToken } from "./rate-limit.js";
@@ -421,25 +421,33 @@ async function getInvoiceAddress(
     return predictCommerceSolanaInvoiceAta(chain.programId, selectedTo, invoiceId, tokenCfg.mint);
   }
 
-  if (!config.sweeperAddress) {
-    return null;
+  const evm = resolveEvmChain(config.evmChains, chainId);
+  if (!evm?.sweeperAddress) {
+    throw Object.assign(
+      new Error(
+        `EVM chain ${chainId} is not configured — set EVM_${chainId}_SWEEPER_ADDRESS and EVM_${chainId}_FORWARDER_IMPLEMENTATION (or legacy SWEEPER_ADDRESS for Sepolia)`
+      ),
+      { statusCode: 503 }
+    );
   }
-  if (config.forwarderImplementation) {
+  if (evm.forwarderImplementation) {
     return predictCommerceInvoiceAddress(
-      config.sweeperAddress,
-      config.forwarderImplementation,
+      evm.sweeperAddress,
+      evm.forwarderImplementation,
       selectedTo,
       invoiceId
     );
   }
-  if (!config.evmRpcUrl) {
+  if (!evm.rpcUrl) {
     throw Object.assign(
-      new Error("EVM_RPC_URL or FORWARDER_IMPLEMENTATION is required when SWEEPER_ADDRESS is set"),
+      new Error(
+        `EVM_${chainId}_RPC_URL or EVM_${chainId}_FORWARDER_IMPLEMENTATION is required when sweeper address is set`
+      ),
       { statusCode: 503 }
     );
   }
-  const provider = new JsonRpcProvider(config.evmRpcUrl);
-  const sdk = new CommerceInvoiceSdk({ provider, sweeperAddress: config.sweeperAddress });
+  const provider = new JsonRpcProvider(evm.rpcUrl);
+  const sdk = new CommerceInvoiceSdk({ provider, sweeperAddress: evm.sweeperAddress });
   return sdk.getInvoiceAddress(selectedTo, invoiceId);
 }
 
