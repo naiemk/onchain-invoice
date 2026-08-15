@@ -2,15 +2,28 @@ import "dotenv/config";
 import { defineConfig } from "hardhat/config";
 import hardhatEthers from "@nomicfoundation/hardhat-ethers";
 import hardhatMocha from "@nomicfoundation/hardhat-mocha";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 
 const sepoliaRpcUrl = process.env.SEPOLIA_RPC_URL?.trim();
 const evmPrivateKey = process.env.EVM_PRIVATE_KEY?.trim();
+const etherscanApiKey = process.env.ETHERSCAN_API_KEY?.trim();
 
 export default defineConfig({
-  plugins: [hardhatEthers, hardhatMocha],
+  plugins: [hardhatEthers, hardhatMocha, hardhatVerify],
   solidity: {
     profiles: {
       default: {
+        version: "0.8.24",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1_000_000,
+          },
+          viaIR: true,
+        },
+      },
+      // hardhat-verify defaults to this profile — keep identical to `default`.
+      production: {
         version: "0.8.24",
         settings: {
           optimizer: {
@@ -26,8 +39,14 @@ export default defineConfig({
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: sepoliaRpcUrl || "https://rpc.sepolia.org",
+      url: sepoliaRpcUrl || "https://ethereum-sepolia-rpc.publicnode.com",
       accounts: evmPrivateKey ? [evmPrivateKey] : [],
+    },
+  },
+  verify: {
+    etherscan: {
+      // Optional — Sourcify/Blockscout still run without it. Set ETHERSCAN_API_KEY in root .env.
+      apiKey: etherscanApiKey || "",
     },
   },
 });

@@ -1,6 +1,11 @@
-import { getAddress } from "ethers";
 import { getCommerceInvoiceId, type CommerceInvoiceParams } from "onchain-invoice";
-import { filterSupportedTokens, looksLikeTronAddress } from "./networks.js";
+import {
+  filterSupportedTokens,
+  isChecksummedTronAddress,
+  looksLikeSolanaAddress,
+  looksLikeTronAddress,
+  normalizeAddress,
+} from "./networks.js";
 import type { PayLinkFields } from "./types.js";
 
 const DEFAULT_CHAIN = "11155111";
@@ -15,12 +20,14 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
         : objectToSearchParams(input);
 
   const to = splitList(params.get("to")).map((value) => {
-    if (looksLikeTronAddress(value)) return value.trim();
-    try {
-      return getAddress(value);
-    } catch {
-      return value;
+    if (looksLikeTronAddress(value)) {
+      if (!isChecksummedTronAddress(value)) {
+        throw new Error(`Invalid Tron address checksum: ${value}`);
+      }
+      return value.trim();
     }
+    if (looksLikeSolanaAddress(value)) return value.trim();
+    return normalizeAddress(value, "evm");
   });
 
   return {
@@ -28,7 +35,8 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
     to,
     chains: splitList(params.get("chains") ?? DEFAULT_CHAIN),
     tokens: filterSupportedTokens(splitList(params.get("tokens") ?? DEFAULT_TOKEN)),
-    clientInvoiceId: requiredParam(params, "client_invoice_id"),
+    invoiceSeed: requiredParam(params, "invoice_seed"),
+    clientInvoiceId: optionalParam(params, "client_invoice_id"),
     callback: optionalParam(params, "callback"),
     title: optionalParam(params, "title"),
     description: optionalParam(params, "description"),
@@ -42,7 +50,8 @@ export function encodePayLink(fields: PayLinkFields): string {
   params.set("to", fields.to.join(","));
   params.set("chains", fields.chains.join(","));
   params.set("tokens", fields.tokens.join(","));
-  params.set("client_invoice_id", fields.clientInvoiceId);
+  params.set("invoice_seed", fields.invoiceSeed);
+  if (fields.clientInvoiceId) params.set("client_invoice_id", fields.clientInvoiceId);
   if (fields.callback) params.set("callback", fields.callback);
   if (fields.title) params.set("title", fields.title);
   if (fields.description) params.set("description", fields.description);
@@ -56,9 +65,10 @@ export function payPath(fields: PayLinkFields): string {
 
 export function commerceParamsFromPayLink(fields: PayLinkFields): CommerceInvoiceParams {
   return {
-    priceUsd: fields.price,
+    invoiceSeed: fields.invoiceSeed,
     toAddresses: fields.to,
     clientInvoiceId: fields.clientInvoiceId,
+    priceUsd: fields.price,
     callbackUrl: fields.callback,
     title: fields.title,
     description: fields.description,
@@ -78,6 +88,7 @@ export function normalizePayLinkFields(input: Partial<PayLinkFields> & Record<st
     to: Array.isArray(input.to) ? input.to.join(",") : input.to,
     chains: Array.isArray(input.chains) ? input.chains.join(",") : input.chains,
     tokens: Array.isArray(input.tokens) ? input.tokens.join(",") : input.tokens,
+    invoice_seed: input.invoiceSeed ?? input.invoice_seed,
     client_invoice_id: input.clientInvoiceId ?? input.client_invoice_id,
     callback: input.callback,
     title: input.title,

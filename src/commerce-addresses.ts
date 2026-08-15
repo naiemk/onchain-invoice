@@ -127,8 +127,8 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   if (kind === "solana") {
     return symbol === "USDC" || symbol === "USDT";
   }
-  // EVM commerce launch: USDC only
-  return symbol === "USDC";
+  // EVM: USDC and USDT where the sweeper/API has a contract configured for that chain.
+  return symbol === "USDC" || symbol === "USDT";
 }
 
 export function defaultTokenForChain(chainId: string): string {

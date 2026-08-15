@@ -2,7 +2,7 @@
 name: trustless-commerce-invoice
 description: >-
   Create Trustless Commerce crypto invoices and check payment status. Use when building
-  or verifying USDC/USDT pay links, client_invoice_id fields, invoiceAddress, awaiting_payment,
+  or verifying USDC/USDT pay links, invoice_seed fields, invoiceAddress, awaiting_payment,
   POST /api/invoices create invoice API, GET /api/invoices/:id polling, sweep status,
   Trustless Commerce checkout, Sepolia, Nile, or crypto invoice integration for shops and agents.
 ---
@@ -30,6 +30,7 @@ Content-Type: application/json
   "to": ["0x…"],
   "chains": ["11155111"],
   "tokens": ["USDC"],
+  "invoiceSeed": "0x…32-byte hex…",
   "clientInvoiceId": "order-1",
   "chainId": "11155111",
   "token": "USDC",
@@ -50,6 +51,7 @@ Content-Type: application/json
   "to": ["T…"],
   "chains": ["nile"],
   "tokens": ["USDT"],
+  "invoiceSeed": "0x…32-byte hex…",
   "clientInvoiceId": "order-1",
   "chainId": "nile",
   "token": "USDT",
@@ -78,6 +80,7 @@ Content-Type: application/json
   "to": ["So111…"],
   "chains": ["devnet"],
   "tokens": ["USDC", "USDT"],
+  "invoiceSeed": "0x…32-byte hex…",
   "clientInvoiceId": "order-1",
   "chainId": "devnet",
   "token": "USDC",
@@ -94,15 +97,16 @@ Stablecoins only for now (`USDC`/`USDT` on Solana, `USDC` on EVM, `USDT` on Nile
 ## Pay link (browser)
 
 ```text
-/pay?price=10&to=0x…&chains=11155111&tokens=USDC&client_invoice_id=order-1&title=Order&allow_partial=0
-/pay?price=10&to=T…&chains=nile&tokens=USDT&client_invoice_id=order-1&title=Order&allow_partial=0
+/pay?price=10&to=0x…&chains=11155111&tokens=USDC&invoice_seed=0x…&title=Order&allow_partial=0
+/pay?price=10&to=T…&chains=nile&tokens=USDT&invoice_seed=0x…&title=Order&allow_partial=0
 ```
 
 Payer can open the link and create on Continue if the merchant did not call the API first.
 
-Deterministic `invoiceId` = `keccak256` of ABI-encoded:
-`priceUsd`, `toAddresses` (**`string[]`**, EVM checksum + Tron `T…`), `clientInvoiceId`, `callbackUrl`, `title`, `description`, `allowPartial`
-(`chains` / `tokens` are not part of the hash. This encoding is **testnet-breaking** vs older `address[]` hashes.)
+Deterministic `invoiceId` = `keccak256(abi.encode(bytes32 invoiceSeed, string[] toAddresses))`.
+Uniqueness comes from a random `invoiceSeed`; `toAddresses` bind payout destinations.
+`clientInvoiceId`, price, title, etc. are metadata only (not part of the hash).
+`chains` / `tokens` are not part of the hash.
 
 Helpers: `ui/src/shared/invoice.ts`. Manual UI: `/create`. Docs: https://naiemk.github.io/onchain-invoice/
 

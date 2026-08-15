@@ -41,7 +41,7 @@ export function renderPay(root: HTMLElement): void {
           <p class="eyebrow">Checkout</p>
           <h1>Pay link missing</h1>
           <p class="danger">${escapeHtml(error instanceof Error ? error.message : "Invalid pay link")}</p>
-          <p>Open a link from <a href="/create" data-route>Create invoice</a>, or pass price, to, and client_invoice_id query params.</p>
+          <p>Open a link from <a href="/create" data-route>Create invoice</a>, or pass price, to, and invoice_seed query params.</p>
         </section>
       </div>
     `;
@@ -97,7 +97,7 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId
         <h1>${escapeHtml(fields.title ?? "Invoice")}</h1>
         <p class="amount">$${escapeHtml(fields.price)}</p>
         <p class="muted">${escapeHtml(fields.description ?? "Complete payment with crypto.")}</p>
-        <p class="muted" style="margin-top:1.25rem;font-size:0.78rem">Invoice · ${escapeHtml(short(invoiceId))}</p>
+        <p class="muted" style="margin-top:1.25rem;font-size:0.78rem">Invoice id is assigned when you continue.</p>
       </aside>
       <div class="checkout-panel">
         <p class="eyebrow">Payment method</p>
@@ -362,7 +362,8 @@ function renderPaidStage(
     const statusEl = root.querySelector<HTMLElement>("#pay-status");
     const url = new URL(fields.callback);
     url.searchParams.set("invoice_id", invoiceId);
-    url.searchParams.set("client_invoice_id", fields.clientInvoiceId);
+    if (fields.clientInvoiceId) url.searchParams.set("client_invoice_id", fields.clientInvoiceId);
+    url.searchParams.set("invoice_seed", fields.invoiceSeed);
     url.searchParams.set("status", status);
     if (invoice.invoiceAddress) url.searchParams.set("invoice_address", invoice.invoiceAddress);
     if (statusEl) {
@@ -446,6 +447,7 @@ function fieldsToBody(fields: PayLinkFields): Record<string, unknown> {
     to: fields.to,
     chains: fields.chains,
     tokens: fields.tokens,
+    invoiceSeed: fields.invoiceSeed,
     clientInvoiceId: fields.clientInvoiceId,
     callback: fields.callback,
     title: fields.title,

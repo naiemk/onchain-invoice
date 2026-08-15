@@ -1,0 +1,52 @@
+# Local operator deploy config (CREATE2 seed — no private keys).
+# Copy to config.yaml (gitignored) and fill addresses / seed.
+#
+#   cp deploy/operator/config.example.yaml deploy/operator/config.yaml
+#   npm run deploy:console
+
+seed: "replace-with-long-random-operator-seed"
+
+# EVM constructor params (addresses only — these bake into CREATE2 initcode).
+# Deployer wallet (MetaMask) only pays gas; it does not need to equal owner.
+feeBps: 50
+feeRecipient: "0x0000000000000000000000000000000000000000"
+owner: "0x0000000000000000000000000000000000000000"
+
+# Nick's CREATE2 factory (same address on Ethereum / Sepolia / most L2s).
+create2Factory: "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+
+chains:
+  sepolia:
+    kind: evm
+    chainId: 11155111
+    rpcUrl: https://ethereum-sepolia-rpc.publicnode.com
+    explorer: https://sepolia.etherscan.io
+    enabled: true
+    # Filled after deploy
+    sweeper: ""
+    forwarderImplementation: ""
+    deployedAt: ""
+    deployTx: ""
+  # Example — enable when ready:
+  # baseSepolia:
+  #   kind: evm
+  #   chainId: 84532
+  #   rpcUrl: https://sepolia.base.org
+  #   explorer: https://sepolia.basescan.org
+  #   enabled: false
+  #   sweeper: ""
+  #   forwarderImplementation: ""
+
+solana:
+  kind: solana
+  chainId: devnet
+  rpcUrl: https://api.devnet.solana.com
+  enabled: true
+  feeBps: 50
+  # Authority / fee recipient pubkeys (base58) — not secret keys
+  authority: ""
+  feeRecipient: ""
+  programId: ""
+  configPda: ""
+  deployedAt: ""
+  initializeTx: ""

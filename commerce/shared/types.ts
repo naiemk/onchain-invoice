@@ -7,7 +7,8 @@ export interface PayLinkFields {
   to: string[];
   chains: string[];
   tokens: string[];
-  clientInvoiceId: string;
+  invoiceSeed: string;
+  clientInvoiceId?: string;
   callback?: string;
   title?: string;
   description?: string;
@@ -16,6 +17,7 @@ export interface PayLinkFields {
 
 export interface InvoiceRecord {
   id: string;
+  invoiceSeed: string;
   clientInvoiceId: string;
   priceUsd: string;
   toAddresses: string[];

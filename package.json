@@ -47,10 +47,14 @@
     "docker:domains:down": "docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains down",
     "system-test": "bash system-tests/scripts/run.sh",
     "system-test:install": "bash system-tests/scripts/run-install-e2e.sh",
+    "test:live-testnet": "LIVE_TESTNET=1 hardhat test test/live/LiveTestnetInvoicePay.ts",
     "solana:build": "cd solana/programs/commerce-invoice && cargo-build-sbf",
     "solana:test": "bash solana/e2e/scripts/run-success.sh",
     "solana:deploy:devnet": "bash solana/scripts/deploy-devnet.sh",
-    "solana:smoke:devnet": "bash solana/e2e/scripts/run-devnet-smoke.sh"
+    "solana:smoke:devnet": "bash solana/e2e/scripts/run-devnet-smoke.sh",
+    "deploy:console:api": "node --experimental-strip-types --experimental-transform-types deploy/operator/server.ts",
+    "deploy:console:ui": "vite --config deploy/operator/ui/vite.config.ts",
+    "deploy:console": "node --experimental-strip-types --experimental-transform-types deploy/operator/scripts/dev.mts"
   },
   "repository": {
     "type": "git",
@@ -66,6 +70,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.10",
     "@nomicfoundation/hardhat-mocha": "^3.0.18",
+    "@nomicfoundation/hardhat-verify": "^3.0.10",
     "@types/better-sqlite3": "^7.6.13",
     "@types/chai": "^5.2.3",
     "@types/js-yaml": "^4.0.9",

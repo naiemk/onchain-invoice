@@ -1,9 +1,10 @@
-import { AbiCoder, getAddress, keccak256, type BytesLike } from "ethers";
+import { AbiCoder, getAddress, getBytes, hexlify, keccak256, randomBytes, type BytesLike } from "ethers";
 
 export interface CommerceInvoiceParams {
-  priceUsd: string;
+  invoiceSeed: BytesLike;
   toAddresses: string[];
-  clientInvoiceId: string;
+  clientInvoiceId?: string;
+  priceUsd?: string;
   callbackUrl?: string;
   title?: string;
   description?: string;
@@ -19,7 +20,11 @@ function normalizeMerchantAddress(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) throw new Error("Merchant address is required");
   if (trimmed.startsWith("0x") || trimmed.startsWith("0X")) {
-    return getAddress(trimmed);
+    const checksummed = getAddress(trimmed);
+    if (checksummed !== trimmed) {
+      throw new Error(`EVM merchant address must be EIP-55 checksummed (expected ${checksummed})`);
+    }
+    return checksummed;
   }
   if (TRON_BASE58_RE.test(trimmed)) return trimmed;
   if (SOLANA_BASE58_RE.test(trimmed) && !(trimmed.startsWith("T") && trimmed.length === 34)) {
@@ -28,25 +33,30 @@ function normalizeMerchantAddress(value: string): string {
   throw new Error(`Invalid merchant address: ${value}`);
 }
 
+export function randomInvoiceSeed(): string {
+  return hexlify(randomBytes(32));
+}
+
+export function normalizeInvoiceSeed(seed: BytesLike): string {
+  const hex = hexlify(seed);
+  if (getBytes(hex).length !== 32) {
+    throw new Error(`invoiceSeed must be 32 bytes, got ${getBytes(hex).length}`);
+  }
+  return hexlify(getBytes(hex));
+}
+
 /**
- * Deterministic invoice id. Merchant destinations are `string[]` so Tron `T…` works
- * (testnet-breaking vs older `address[]` encoding).
+ * Invoice id = keccak256(abi.encode(bytes32 invoiceSeed, string[] toAddresses)).
  */
-export function getCommerceInvoiceId(params: CommerceInvoiceParams | BytesLike): string {
+export function getCommerceInvoiceId(
+  params: Pick<CommerceInvoiceParams, "invoiceSeed" | "toAddresses"> | BytesLike
+): string {
   if (typeof params === "string" || params instanceof Uint8Array) {
     return keccak256(params);
   }
   const encoded = AbiCoder.defaultAbiCoder().encode(
-    ["string", "string[]", "string", "string", "string", "string", "bool"],
-    [
-      params.priceUsd,
-      params.toAddresses.map(normalizeMerchantAddress),
-      params.clientInvoiceId,
-      params.callbackUrl ?? "",
-      params.title ?? "",
-      params.description ?? "",
-      params.allowPartial ?? false,
-    ]
+    ["bytes32", "string[]"],
+    [normalizeInvoiceSeed(params.invoiceSeed), params.toAddresses.map(normalizeMerchantAddress)]
   );
   return keccak256(encoded);
 }
