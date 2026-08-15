@@ -5,6 +5,7 @@ import {
   addressesEqual,
   chainKind,
   CommerceInvoiceSdk,
+  defaultTronFullHost,
   deriveTronInvoiceAddress,
   looksLikeSolanaAddress,
   normalizeMerchantAddress,
@@ -205,7 +206,7 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
   const fields = normalizePayLinkFields(body);
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
-  assertTokenChainPair(chainId, token);
+  assertTokenChainPair(chainId, token, config);
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
   const invoiceAddress = await getInvoiceAddress(config, selectedTo, invoiceId, chainId, token);
@@ -246,7 +247,7 @@ async function createSessionDeprecated(
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
-  assertTokenChainPair(chainId, token);
+  assertTokenChainPair(chainId, token, context.config);
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
   const invoiceAddress = await getInvoiceAddress(context.config, selectedTo, invoiceId, chainId, token);
@@ -385,7 +386,7 @@ async function getInvoiceAddress(
   invoiceId: string,
   chainId: string,
   token: string
-): Promise<string | null> {
+): Promise<string> {
   const kind = chainKind(chainId);
   if (kind === "tron") {
     if (!config.tronInvoiceMasterSecret) {
@@ -394,7 +395,7 @@ async function getInvoiceAddress(
         { statusCode: 503 }
       );
     }
-    const fullHost = config.tronFullHost ?? "https://nile.trongrid.io";
+    const fullHost = config.tronFullHost ?? defaultTronFullHost(chainId);
     return deriveTronInvoiceAddress(
       config.tronInvoiceMasterSecret,
       tronNumericChainId(chainId),
@@ -430,6 +431,7 @@ async function getInvoiceAddress(
       { statusCode: 503 }
     );
   }
+  // Prefer offline CREATE2 via forwarderImplementation. RPC lookup is a fallback when only sweeper is set.
   if (evm.forwarderImplementation) {
     return predictCommerceInvoiceAddress(
       evm.sweeperAddress,
@@ -441,7 +443,7 @@ async function getInvoiceAddress(
   if (!evm.rpcUrl) {
     throw Object.assign(
       new Error(
-        `EVM_${chainId}_RPC_URL or EVM_${chainId}_FORWARDER_IMPLEMENTATION is required when sweeper address is set`
+        `EVM_${chainId}_FORWARDER_IMPLEMENTATION (preferred) or EVM_${chainId}_RPC_URL is required when sweeper address is set`
       ),
       { statusCode: 503 }
     );
@@ -489,10 +491,21 @@ function pickDefaultTo(fields: PayLinkFields, chainId: string): string | undefin
   return match ?? fields.to[0];
 }
 
-function assertTokenChainPair(chainId: string, token: string): void {
+function assertTokenChainPair(chainId: string, token: string, config?: AppConfig): void {
   if (!tokenAllowedOnChain(chainId, token)) {
     throw Object.assign(
       new Error(`Token ${token} is not allowed on chain ${chainId}`),
+      { statusCode: 400 }
+    );
+  }
+  if (!config || chainKind(chainId) !== "evm") return;
+  const chain = config.evmChains[String(chainId)];
+  const tokens = chain?.tokens;
+  if (!tokens || Object.keys(tokens).length === 0) return;
+  const symbol = token.trim().toUpperCase();
+  if (!tokens[symbol]?.address) {
+    throw Object.assign(
+      new Error(`Token ${symbol} is not configured for EVM chain ${chainId}`),
       { statusCode: 400 }
     );
   }

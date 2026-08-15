@@ -1,6 +1,6 @@
 import { encodePayLink } from "../shared/invoice.js";
 import { howCreateArt, howPayArt, howSettleArt } from "../shared/how-graphics.js";
-import { deploymentMode, networksForDeployment } from "../shared/networks.js";
+import { deploymentMode, networkKind, networksForDeployment } from "../shared/networks.js";
 import { randomInvoiceSeed } from "../onchain-invoice-browser.js";
 import { SITE } from "../shared/site.js";
 
@@ -11,12 +11,21 @@ function chip(label: string, kind: "muted" | "warn" | "ok" | "accent" = "muted")
 export function renderHome(root: HTMLElement): void {
   const mode = deploymentMode();
   const networks = networksForDeployment(mode);
-  const demoChain = networks[0]?.id ?? (mode === "testnet" ? "11155111" : "1");
-  const demoToken = demoChain === "nile" ? "USDT" : "USDC";
+  // Prefer Base on mainnet so the demo link keeps an EVM merchant address.
+  const demoChain =
+    mode === "mainnet"
+      ? (networks.find((n) => n.id === "8453")?.id ?? networks[0]?.id ?? "8453")
+      : (networks[0]?.id ?? "11155111");
+  const demoKind = networkKind(demoChain);
+  const demoToken = demoKind === "tron" ? "USDT" : "USDC";
+  const demoTo =
+    demoKind === "tron"
+      ? ["TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf"]
+      : ["0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb"];
   const invoiceSeed = randomInvoiceSeed();
   const demo = {
     price: "0.01",
-    to: ["0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb"],
+    to: demoTo,
     chains: [demoChain],
     tokens: [demoToken],
     invoiceSeed,
@@ -24,7 +33,9 @@ export function renderHome(root: HTMLElement): void {
     callback: "",
     title: "Demo invoice",
     description:
-      mode === "testnet" ? "Try a Sepolia USDC or Nile USDT test payment." : "Try a USDC payment.",
+      mode === "testnet"
+        ? "Try a Sepolia USDC or Nile USDT test payment."
+        : "Try Base USDC, BNB USDC/USDT, or Tron USDT.",
     allowPartial: false,
   };
   const demoLink = `/pay?${encodePayLink(demo)}`;

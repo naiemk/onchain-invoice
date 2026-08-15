@@ -42,7 +42,8 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/i
 #   BASE_URL=https://trustless-commerce.com
 #   DOCKER_NAME=mainnet-api
 #   DOCKER_NETWORK=trustless-commerce-edge
-#   different ADMIN/SWEEPER keys; set mainnet SWEEPER_ADDRESS later
+#   different ADMIN/SWEEPER keys; set EVM_8453_* / EVM_56_* sweeper+forwarder after CREATE2
+#   TRON_FULL_HOST=https://api.trongrid.io  TRON_USDT_ADDRESS=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
 # use a free host port if testnet already took 8080, e.g. in onchain-invoice-api.yaml:
 #   docker.port: 8081
 ./start-onchain-invoice-api.sh

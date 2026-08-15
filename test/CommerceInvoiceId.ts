@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { getAddress, Wallet } from "ethers";
 import {
+  defaultTronFullHost,
   getCommerceInvoiceId,
   looksLikeTronAddress,
   normalizeMerchantAddress,
@@ -68,6 +69,11 @@ describe("Commerce invoice id (seed + toAddresses)", function () {
   it("maps nile / tron product ids to numeric derivation ids", function () {
     expect(String(tronNumericChainId("nile"))).to.equal("3448148188");
     expect(String(tronNumericChainId("tron"))).to.equal("728126428");
+  });
+
+  it("defaults Tron fullHost by product chain id", function () {
+    expect(defaultTronFullHost("nile")).to.equal("https://nile.trongrid.io");
+    expect(defaultTronFullHost("tron")).to.equal("https://api.trongrid.io");
   });
 
   it("enforces token–chain pairs", function () {

@@ -5,6 +5,7 @@ import {
   CommerceSolanaSdk,
   COMMERCE_ERC20_ABI,
   COMMERCE_NATIVE_TOKEN,
+  defaultTronFullHost,
   deriveTronInvoiceAddress,
   prepareInvoiceResourcesForSweep,
   readTronTokenBalance,
@@ -462,7 +463,9 @@ export class SweeperWorker {
     if (String(invoice.chainId) !== expectedChain) return null;
 
     const token = resolveTronToken(this.tron, invoice.token);
-    const tronWeb = new TronWeb({ fullHost: this.tron.fullHost ?? "https://nile.trongrid.io" });
+    const tronWeb = new TronWeb({
+      fullHost: this.tron.fullHost ?? defaultTronFullHost(expectedChain),
+    });
     const balance = await readTronTokenBalance(tronWeb, invoice.invoiceAddress, token);
     if (balance === 0n) return null;
     return { invoice, token, balance };
@@ -620,7 +623,7 @@ export class SweeperWorker {
     const merchant = invoice.selectedTo!;
     const chainId = String(invoice.chainId ?? tron.chainId ?? "nile");
     const numericId = tronNumericChainId(chainId);
-    const fullHost = tron.fullHost ?? "https://nile.trongrid.io";
+    const fullHost = tron.fullHost ?? defaultTronFullHost(chainId);
 
     // Sanity: invoice address must match EOA derivation
     const expected = deriveTronInvoiceAddress(tron.invoiceMasterSecret!, numericId, invoice.id, fullHost);

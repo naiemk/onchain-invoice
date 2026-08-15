@@ -42,6 +42,14 @@ export function tronNumericChainId(chainId: string | bigint): string | bigint {
   return chainId;
 }
 
+/** Default TronGrid (or Nile/Shasta) full node host for a product chain id. */
+export function defaultTronFullHost(chainId: string | null | undefined): string {
+  const id = String(chainId ?? "");
+  if (id === "nile" || id === TRON_NILE_NUMERIC_CHAIN_ID) return "https://nile.trongrid.io";
+  if (id === "shasta" || id === TRON_SHASTA_NUMERIC_CHAIN_ID) return "https://api.shasta.trongrid.io";
+  return "https://api.trongrid.io";
+}
+
 /** Lightweight shape check (no checksum) — safe for browser bundles. */
 export function looksLikeTronAddress(value: string): boolean {
   return TRON_BASE58_RE.test(value.trim());

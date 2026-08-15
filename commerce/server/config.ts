@@ -108,6 +108,7 @@ export const EVM_LEGACY_CHAIN_ID = "11155111";
 /**
  * Resolve EVM settlement config for a product chainId.
  * Returns undefined when the chain has no sweeper address (create should 503).
+ * Operators should also set `forwarderImplementation` for offline CREATE2; RPC is a fallback.
  */
 export function resolveEvmChain(
   chains: EvmNetworksConfig | undefined,
