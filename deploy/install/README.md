@@ -61,7 +61,7 @@ curl -fsS https://testnet.trustless-commerce.com/api/health
 curl -fsS https://trustless-commerce.com/api/health
 ```
 
-### 4) Sweeper nodes (testnet — Sepolia + Nile + Solana Devnet)
+### 4) Sweeper nodes (testnet — Sepolia + Nile; Solana optional)
 
 ```bash
 # Replace any old single/dual sweeper layout first:
@@ -71,14 +71,13 @@ docker rm -f onchain-invoice-node \
 mkdir -p ~/tc/sweeper && cd ~/tc/sweeper
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 # .env: API_URL=https://testnet.trustless-commerce.com
-#       SWEEPER_CHAINS=11155111,nile,devnet
-#       TRON_* + SOLANA_PROGRAM_ID / SOLANA_SWEEPER_KEY (base58 preferred)
-# Also set SOLANA_PROGRAM_ID on the API .env (install-api refreshes start script).
+#       SWEEPER_CHAINS=11155111,nile
+#       TRON_* keys
+# Solana (optional): SWEEPER_SOLANA_ENABLED=1, SWEEPER_CHAINS=…,devnet,
+#       SOLANA_PROGRAM_ID / SOLANA_SWEEPER_KEY — also set program id on the API .env
 ./register-onchain-invoice-node.sh
 ./start-onchain-invoice-nodes.sh
-# → onchain-invoice-sweeper-evm + -tron + -solana
-# Solana service soft-skips until SOLANA_PROGRAM_ID + SOLANA_SWEEPER_KEY are set
-# (activity log stage: solana-disabled). Requires GHCR sweeper image built from this PR.
+# → onchain-invoice-sweeper-evm + -tron (+ -solana only if SWEEPER_SOLANA_ENABLED=1)
 ```
 
 ## API only (no gateway)
@@ -97,7 +96,7 @@ Creates (if missing): `onchain-invoice-api.yaml`, `start-onchain-invoice-api.sh`
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 # edit .env: TRON_* + SOLANA_* + SWEEPER_CHAINS=11155111,nile,devnet
 ./register-onchain-invoice-node.sh
-./start-onchain-invoice-nodes.sh   # triple compose: sweeper-evm + sweeper-tron + sweeper-solana
+./start-onchain-invoice-nodes.sh   # compose: sweeper-evm + sweeper-tron (+ solana if SWEEPER_SOLANA_ENABLED=1)
 ```
 
 Optional: `./register-onchain-invoice-node.sh --address 0x… --label dtn-node --chains 11155111,nile,devnet`
@@ -115,13 +114,21 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/i
 
 Host cron pulls GHCR images and recreates containers only when the image digest changed. Sweeper updates use `docker stop -t` so an in-flight sweep can finish before recreate.
 
+On small VPS hosts (≈1 GB), overlapping `docker pull` can wedge Docker. Install scripts harden that path:
+
+- **Host flock** (`UPDATE_LOCK_FILE`, default `/var/lock/tc-auto-update.lock`): only one api/nodes/gateway update runs at a time; busy crons log and exit 0.
+- **Digest-gated pull**: `docker buildx imagetools inspect` vs local `RepoDigest` — skip pull when unchanged.
+- **Staggered cron**: api at `:00`, nodes at `:10`, gateway at `:20` (defaults **30m** / **30m** / **20m**).
+- Prefer **`/etc/cron.d/tc-<role>-<dir>`** when writable (persists for Docker-helper installs); else user crontab.
+- Gateway pulls UI/nginx **before** any `docker stop`, so a failed pull cannot leave the site down.
+
 | Flag | Container | Default | Interval env |
 |------|-----------|---------|--------------|
-| `UI_TESTNET_AUTO_UPDATE` | `testnet-ui` | on | `GATEWAY_AUTO_UPDATE_INTERVAL_MIN` (5m) |
+| `UI_TESTNET_AUTO_UPDATE` | `testnet-ui` | on | `GATEWAY_AUTO_UPDATE_INTERVAL_MIN` (20m @ :20) |
 | `UI_MAINNET_AUTO_UPDATE` | `mainnet-ui` | on | same cron |
 | `GATEWAY_AUTO_UPDATE` | nginx gateway | on | same cron |
-| `NODES_AUTO_UPDATE` | sweeper node | on (testnet example) | `NODES_AUTO_UPDATE_INTERVAL_MIN` (15m) |
-| `API_AUTO_UPDATE` | API | **off** | `API_AUTO_UPDATE_INTERVAL_MIN` (15m) |
+| `NODES_AUTO_UPDATE` | sweeper node | on (testnet example) | `NODES_AUTO_UPDATE_INTERVAL_MIN` (30m @ :10) |
+| `API_AUTO_UPDATE` | API | **off** | `API_AUTO_UPDATE_INTERVAL_MIN` (30m @ :00) |
 
 ```bash
 # After editing flags in .env:
@@ -134,6 +141,21 @@ tail -f ~/tc/gateway/logs/auto-update.log
 ```
 
 Installers refresh cron from these flags (no `ROLE=` required). Legacy `AUTO_UPDATE` is still accepted if the role flag is unset.
+
+### Memory caps (1 GB host defaults)
+
+Override in `.env` if needed:
+
+| Env | Default | Applied via |
+|-----|---------|-------------|
+| `API_MEMORY_LIMIT` | `384m` | `docker create --memory` |
+| `SWEEPER_MEMORY_LIMIT` | `192m` | compose `mem_limit` / single-container `--memory` |
+| `UI_MEMORY_LIMIT` | `64m` | `docker run --memory` |
+| `GATEWAY_MEMORY_LIMIT` | `64m` | `docker run --memory` |
+
+### Solana sweeper (optional)
+
+Testnet compose puts `sweeper-solana` behind profile `solana`. Default **`SWEEPER_SOLANA_ENABLED=0`** — start/update skip that service and remove it if left running. Set `SWEEPER_SOLANA_ENABLED=1` when Devnet program + keys are ready. Mainnet compose has no Solana service.
 
 ## Sweeper activity log
 

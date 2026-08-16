@@ -91,11 +91,15 @@ write_template "onchain-invoice-api.yaml"
 write_template "start-onchain-invoice-api.sh"
 write_template "update-onchain-invoice-api.sh"
 write_template "lib-env.sh"
+write_template "install-auto-update.sh"
 if [[ -f "$DEST/start-onchain-invoice-api.sh" ]]; then
   chmod +x "$DEST/start-onchain-invoice-api.sh"
 fi
 if [[ -f "$DEST/update-onchain-invoice-api.sh" ]]; then
   chmod +x "$DEST/update-onchain-invoice-api.sh"
+fi
+if [[ -f "$DEST/install-auto-update.sh" ]]; then
+  chmod +x "$DEST/install-auto-update.sh"
 fi
 
 cp "$DEST/.env.api.example" "$DEST/.env.example"
@@ -107,7 +111,7 @@ if [[ ! -f "$DEST/.env" ]]; then
 else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.api.example" "$DEST/.env" \
-    API_AUTO_UPDATE API_AUTO_UPDATE_INTERVAL_MIN API_STOP_TIMEOUT \
+    API_AUTO_UPDATE API_AUTO_UPDATE_INTERVAL_MIN API_STOP_TIMEOUT API_MEMORY_LIMIT \
     TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS \
     SOLANA_RPC_URL SOLANA_PROGRAM_ID SOLANA_USDC_MINT SOLANA_USDT_MINT \
     SOLANA_MAINNET_ENABLED SOLANA_MAINNET_RPC_URL SOLANA_MAINNET_PROGRAM_ID

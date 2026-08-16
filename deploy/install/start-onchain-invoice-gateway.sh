@@ -46,6 +46,8 @@ TLS_PRIVKEY="${TLS_PRIVKEY:-/etc/letsencrypt/live/trustless-commerce.com/privkey
 CERTBOT_WWW="${CERTBOT_WWW:-/var/www/certbot}"
 HTTP_PORT="${HTTP_PORT:-80}"
 HTTPS_PORT="${HTTPS_PORT:-443}"
+UI_MEMORY_LIMIT="${UI_MEMORY_LIMIT:-64m}"
+GATEWAY_MEMORY_LIMIT="${GATEWAY_MEMORY_LIMIT:-64m}"
 
 NGINX_CONF="$SCRIPT_DIR/gateway/nginx.conf"
 CONF_D="$SCRIPT_DIR/gateway/conf.d"
@@ -77,15 +79,20 @@ docker network create "$DOCKER_NETWORK" >/dev/null 2>&1 || true
 
 run_ui() {
   local name="$1"
+  local mem_args=()
+  if [[ -n "$UI_MEMORY_LIMIT" ]]; then
+    mem_args+=(--memory="$UI_MEMORY_LIMIT")
+  fi
   if docker inspect "$name" >/dev/null 2>&1; then
     echo "Removing existing container $name ..."
     docker rm -f "$name" >/dev/null
   fi
-  echo "Starting $name ..."
+  echo "Starting $name (memory ${UI_MEMORY_LIMIT:-unlimited}) ..."
   docker run -d \
     --name "$name" \
     --restart unless-stopped \
     --network "$DOCKER_NETWORK" \
+    "${mem_args[@]}" \
     "$UI_IMAGE" >/dev/null
 }
 
@@ -97,11 +104,17 @@ if docker inspect "$GATEWAY_NAME" >/dev/null 2>&1; then
   docker rm -f "$GATEWAY_NAME" >/dev/null
 fi
 
-echo "Starting $GATEWAY_NAME (HTTPS ${HTTPS_PORT}, HTTP ${HTTP_PORT}) ..."
+GW_MEM_ARGS=()
+if [[ -n "$GATEWAY_MEMORY_LIMIT" ]]; then
+  GW_MEM_ARGS+=(--memory="$GATEWAY_MEMORY_LIMIT")
+fi
+
+echo "Starting $GATEWAY_NAME (HTTPS ${HTTPS_PORT}, HTTP ${HTTP_PORT}, memory ${GATEWAY_MEMORY_LIMIT:-unlimited}) ..."
 docker run -d \
   --name "$GATEWAY_NAME" \
   --restart unless-stopped \
   --network "$DOCKER_NETWORK" \
+  "${GW_MEM_ARGS[@]}" \
   -p "${HTTP_PORT}:80" \
   -p "${HTTPS_PORT}:443" \
   -v "$NGINX_CONF:/etc/nginx/nginx.conf:ro" \
