@@ -24,10 +24,14 @@ export function renderCreate(root: HTMLElement): void {
       <p class="eyebrow">Create invoice · ${escapeHtml(modeLabel)}</p>
       <h1>Build a payment link</h1>
       <p>Enter invoice details, copy a pay button for your site, and share the link. No wallet connection required.</p>
-      <p class="callout info" role="status">
-        This ${escapeHtml(modeLabel.toLowerCase())} UI only lists ${escapeHtml(modeLabel.toLowerCase())} networks.
-        ${mode === "testnet" ? "Use the mainnet site for production chains." : "Use the testnet site for Sepolia, Nile, and other test networks."}
-      </p>
+      ${
+        mode === "testnet"
+          ? `<p class="callout info" role="status">
+        This testnet UI only lists testnet networks.
+        Use the mainnet site for production chains.
+      </p>`
+          : ""
+      }
     </header>
 
     <div class="create-layout">
@@ -123,6 +127,12 @@ export function renderCreate(root: HTMLElement): void {
             </label>
             <p class="field-hint">When enabled, underpayment can mark the invoice <span class="mono">paid_partial</span> instead of waiting for the full amount.</p>
           </div>
+
+          <div class="btn-row create-actions">
+            <button type="submit" id="open-checkout" disabled>Open checkout</button>
+            <button type="button" id="copy-pay-link" class="secondary" disabled>Copy pay link</button>
+          </div>
+          <p class="status" id="form-action-status" role="status"></p>
         </form>
       </section>
 
@@ -218,37 +228,52 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
   const refresh = () => {
     syncKindFields();
     renderTokenOptions(root, checked(root, "chains"));
+    const openBtn = root.querySelector<HTMLButtonElement>("#open-checkout");
+    const copyBtn = root.querySelector<HTMLButtonElement>("#copy-pay-link");
     if (!previewBody) return;
     try {
       const fields = readForm(root);
-      const link = `${location.origin}${payPath(fields)}`;
+      const path = payPath(fields);
+      const link = `${location.origin}${path}`;
+      const embed = `<a href="${link}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">Pay $${fields.price} with crypto</a>`;
       previewBody.innerHTML = `
         <div class="field">
           <label>Pay link</label>
-          <div class="field-row">
-            <input class="mono" readonly value="${escapeHtml(link)}" />
-            <button type="button" class="secondary" data-copy="${escapeHtml(link)}">Copy</button>
-          </div>
+          <div class="mono-block" id="out-url">${escapeHtml(link)}</div>
         </div>
         <div class="field">
-          <label>Embed button</label>
-          <pre>&lt;a href="${escapeHtml(link)}"&gt;Pay with crypto&lt;/a&gt;</pre>
-          <button type="button" class="secondary" data-copy="${escapeHtml(`<a href="${link}">Pay with crypto</a>`)}">Copy HTML</button>
+          <label>Embed button HTML</label>
+          <div class="mono-block" id="out-embed">${escapeHtml(embed)}</div>
+          <button type="button" class="secondary" id="copy-embed">Copy HTML</button>
+        </div>
+        <div class="field">
+          <label>Rendered pay button</label>
+          <div class="pay-button-preview">
+            <a href="${escapeHtml(path)}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">Pay $${escapeHtml(fields.price)} with crypto</a>
+          </div>
         </div>
         <p class="field-hint" id="copy-status"></p>
       `;
-      previewBody.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          await copyText(btn.dataset.copy ?? "");
-          const note = previewBody.querySelector<HTMLElement>("#copy-status");
-          if (note) note.textContent = "Copied.";
-        });
+      if (openBtn) openBtn.disabled = false;
+      if (copyBtn) {
+        copyBtn.disabled = false;
+        copyBtn.dataset.link = link;
+      }
+      previewBody.querySelector<HTMLButtonElement>("#copy-embed")?.addEventListener("click", async () => {
+        await copyText(embed);
+        const note = previewBody.querySelector<HTMLElement>("#copy-status");
+        if (note) note.textContent = "Embed HTML copied.";
       });
       if (docsQuery) {
         docsQuery.textContent = `${location.origin}/pay?${encodePayLink(fields)}`;
       }
     } catch (error) {
       previewBody.innerHTML = `<p class="danger">${escapeHtml(error instanceof Error ? error.message : "Incomplete")}</p>`;
+      if (openBtn) openBtn.disabled = true;
+      if (copyBtn) {
+        copyBtn.disabled = true;
+        delete copyBtn.dataset.link;
+      }
       if (docsQuery) {
         try {
           docsQuery.textContent = `${location.origin}/pay?${encodePayLink(readFormLoose(root))}`;
@@ -271,6 +296,33 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
   form?.addEventListener("change", ensureMinOneChain);
   form?.addEventListener("input", refresh);
   form?.addEventListener("change", refresh);
+  form?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    try {
+      const fields = readForm(root);
+      const path = payPath(fields);
+      window.open(path, "_blank", "noopener,noreferrer");
+      const note = root.querySelector<HTMLElement>("#form-action-status");
+      if (note) note.textContent = "Opened checkout in a new tab.";
+    } catch (error) {
+      const note = root.querySelector<HTMLElement>("#form-action-status");
+      if (note) {
+        note.textContent = error instanceof Error ? error.message : "Fill required fields first.";
+        note.classList.add("danger");
+      }
+    }
+  });
+  root.querySelector<HTMLButtonElement>("#copy-pay-link")?.addEventListener("click", async () => {
+    const btn = root.querySelector<HTMLButtonElement>("#copy-pay-link");
+    const link = btn?.dataset.link ?? "";
+    if (!link) return;
+    await copyText(link);
+    const note = root.querySelector<HTMLElement>("#form-action-status");
+    if (note) {
+      note.textContent = "Pay link copied.";
+      note.classList.remove("danger");
+    }
+  });
 
   for (const [id, kind] of [
     ["toEvm", "evm"],

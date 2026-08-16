@@ -38,6 +38,7 @@
     "commerce:sweeper": "node commerce-dist/sweeper/index.js",
     "ui": "vite --config ui/vite.config.ts",
     "ui:build": "vite build --config ui/vite.config.ts",
+    "ui:verify": "bash ui/scripts/verify-ui-steps.sh",
     "docker:certs": "bash deploy/gen-dev-certs.sh",
     "docker:up": "bash deploy/gen-dev-certs.sh && docker compose -f deploy/docker-compose.yml up --build -d",
     "docker:smoke": "bash deploy/smoke-test.sh",
