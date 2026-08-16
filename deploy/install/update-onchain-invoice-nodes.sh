@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # Pull latest sweeper image and recreate node(s) if the digest changed.
 # Honors NODES_AUTO_UPDATE=0|1 (legacy AUTO_UPDATE fallback).
-#
-# Compose file selection (first match):
-#   1. COMPOSE_FILE from .env (absolute or relative to this dir)
-#   2. docker-compose.sweepers-mainnet.yml (mainnet-sweeper-*)
-#   3. docker-compose.sweepers.yml (onchain-invoice-sweeper-*)
+# Prefers COMPOSE_FILE (docker-compose.sweepers.yml or *-mainnet.yml) when present.
+# Host flock + digest-gated pull (see lib-env.sh) — safe on small VPS.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,11 +20,16 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-CONFIG="${ONCHAIN_INVOICE_NODES_CONFIG:-onchain-invoice-nodes.yaml}"
-IMAGE="ghcr.io/naiemk/trustless-commerce-sweeper:main"
-NAME="onchain-invoice-node"
-if [[ -f "$CONFIG" ]]; then
-  IMAGE="$(python3 - "$CONFIG" <<'PY'
+run_nodes_update() {
+  CONFIG="${ONCHAIN_INVOICE_NODES_CONFIG:-onchain-invoice-nodes.yaml}"
+  COMPOSE_FILE="${COMPOSE_FILE:-${SCRIPT_DIR}/docker-compose.sweepers.yml}"
+  if [[ "$COMPOSE_FILE" != /* ]]; then
+    COMPOSE_FILE="${SCRIPT_DIR}/${COMPOSE_FILE}"
+  fi
+  IMAGE="ghcr.io/naiemk/trustless-commerce-sweeper:main"
+  NAME="onchain-invoice-node"
+  if [[ -f "$CONFIG" ]]; then
+    IMAGE="$(python3 - "$CONFIG" <<'PY'
 import sys
 text = open(sys.argv[1], encoding="utf-8").read().splitlines()
 for line in text:
@@ -40,7 +42,7 @@ else:
     print("ghcr.io/naiemk/trustless-commerce-sweeper:main")
 PY
 )"
-  NAME="$(python3 - "$CONFIG" <<'PY'
+    NAME="$(python3 - "$CONFIG" <<'PY'
 import sys
 text = open(sys.argv[1], encoding="utf-8").read().splitlines()
 in_docker = False
@@ -57,94 +59,67 @@ else:
     print("onchain-invoice-node")
 PY
 )"
-fi
-IMAGE="${IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}"
-NAME="${NAME:-onchain-invoice-node}"
-STOP_TIMEOUT="${NODES_STOP_TIMEOUT:-${STOP_TIMEOUT:-180}}"
+  fi
+  IMAGE="${SWEEPER_IMAGE:-${IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}}"
+  NAME="${NAME:-onchain-invoice-node}"
+  STOP_TIMEOUT="${NODES_STOP_TIMEOUT:-${STOP_TIMEOUT:-180}}"
 
-resolve_compose_file() {
-  local candidate="${COMPOSE_FILE:-}"
-  if [[ -n "$candidate" ]]; then
-    if [[ "$candidate" != /* ]]; then
-      candidate="${SCRIPT_DIR}/${candidate}"
+  pull_status="$(pull_image_if_needed "$IMAGE")"
+  log_update "$SCRIPT_DIR" "nodes: $IMAGE — $pull_status"
+  export SWEEPER_IMAGE="$IMAGE"
+
+  if [[ -f "$COMPOSE_FILE" ]]; then
+    # Container names from compose basename (testnet vs mainnet).
+    local containers=()
+    if [[ "$(basename "$COMPOSE_FILE")" == *mainnet* ]]; then
+      containers=(mainnet-sweeper-evm mainnet-sweeper-tron)
+    else
+      containers=(onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron)
+      if env_flag_on SWEEPER_SOLANA_ENABLED; then
+        containers+=(onchain-invoice-sweeper-solana)
+      elif docker inspect onchain-invoice-sweeper-solana >/dev/null 2>&1; then
+        # Disable path: stop idle solana on update so it does not keep RAM.
+        log_update "$SCRIPT_DIR" "nodes: SWEEPER_SOLANA_ENABLED off — stopping solana sweeper"
+        graceful_stop onchain-invoice-sweeper-solana "$STOP_TIMEOUT"
+        docker rm -f onchain-invoice-sweeper-solana >/dev/null 2>&1 || true
+      fi
     fi
-    if [[ -f "$candidate" ]]; then
-      echo "$candidate"
+
+    needs=0
+    for cname in "${containers[@]}"; do
+      if container_needs_image "$cname" "$IMAGE"; then
+        needs=1
+        break
+      fi
+      if ! docker inspect "$cname" >/dev/null 2>&1; then
+        needs=1
+        break
+      fi
+    done
+    if [[ "$needs" -eq 0 ]]; then
+      log_update "$SCRIPT_DIR" "nodes: compose sweepers already on latest $IMAGE"
       return 0
     fi
-  fi
-  if [[ -f "${SCRIPT_DIR}/docker-compose.sweepers-mainnet.yml" ]]; then
-    echo "${SCRIPT_DIR}/docker-compose.sweepers-mainnet.yml"
+    log_update "$SCRIPT_DIR" "nodes: updating compose sweepers (stop -t $STOP_TIMEOUT, recreate)"
+    for cname in "${containers[@]}"; do
+      if docker inspect "$cname" >/dev/null 2>&1; then
+        graceful_stop "$cname" "$STOP_TIMEOUT"
+      fi
+    done
+    PULL=0 ONCHAIN_INVOICE_SKIP_PULL=1 "$SCRIPT_DIR/start-onchain-invoice-nodes.sh"
+    log_update "$SCRIPT_DIR" "nodes: compose sweepers updated"
     return 0
   fi
-  if [[ -f "${SCRIPT_DIR}/docker-compose.sweepers.yml" ]]; then
-    echo "${SCRIPT_DIR}/docker-compose.sweepers.yml"
+
+  if ! container_needs_image "$NAME" "$IMAGE"; then
+    log_update "$SCRIPT_DIR" "nodes: $NAME already on latest $IMAGE"
     return 0
   fi
-  echo ""
+
+  log_update "$SCRIPT_DIR" "nodes: updating $NAME (stop -t $STOP_TIMEOUT, recreate)"
+  graceful_stop "$NAME" "$STOP_TIMEOUT"
+  PULL=0 ONCHAIN_INVOICE_SKIP_PULL=1 USE_COMPOSE=0 "$SCRIPT_DIR/start-onchain-invoice-nodes.sh"
+  log_update "$SCRIPT_DIR" "nodes: $NAME updated"
 }
 
-compose_container_names() {
-  local file="$1"
-  python3 - "$file" <<'PY'
-import re, sys
-path = sys.argv[1]
-names = []
-for line in open(path, encoding="utf-8"):
-    m = re.match(r"\s*container_name:\s*([^\s#]+)", line)
-    if m:
-        names.append(m.group(1).strip().strip('"').strip("'"))
-print("\n".join(names))
-PY
-}
-
-log_update "$SCRIPT_DIR" "nodes: pulling $IMAGE"
-docker pull "$IMAGE" >/dev/null
-export SWEEPER_IMAGE="$IMAGE"
-
-COMPOSE_PATH="$(resolve_compose_file)"
-if [[ -n "$COMPOSE_PATH" ]]; then
-  mapfile -t CONTAINERS < <(compose_container_names "$COMPOSE_PATH")
-  if [[ ${#CONTAINERS[@]} -eq 0 ]]; then
-    log_update "$SCRIPT_DIR" "nodes: no container_name entries in $COMPOSE_PATH"
-    exit 1
-  fi
-
-  needs=0
-  for cname in "${CONTAINERS[@]}"; do
-    if container_needs_image "$cname" "$IMAGE"; then
-      needs=1
-      break
-    fi
-    if ! docker inspect "$cname" >/dev/null 2>&1; then
-      needs=1
-      break
-    fi
-  done
-  if [[ "$needs" -eq 0 ]]; then
-    log_update "$SCRIPT_DIR" "nodes: compose sweepers already on latest $IMAGE ($(basename "$COMPOSE_PATH"))"
-    exit 0
-  fi
-
-  log_update "$SCRIPT_DIR" "nodes: updating compose sweepers via $(basename "$COMPOSE_PATH") (stop -t $STOP_TIMEOUT)"
-  for cname in "${CONTAINERS[@]}"; do
-    if docker inspect "$cname" >/dev/null 2>&1; then
-      graceful_stop "$cname" "$STOP_TIMEOUT"
-    fi
-  done
-  # Ensure start script uses the same compose file we inspected.
-  export COMPOSE_FILE="$COMPOSE_PATH"
-  PULL=0 ONCHAIN_INVOICE_SKIP_PULL=1 "$SCRIPT_DIR/start-onchain-invoice-nodes.sh"
-  log_update "$SCRIPT_DIR" "nodes: compose sweepers updated (${CONTAINERS[*]})"
-  exit 0
-fi
-
-if ! container_needs_image "$NAME" "$IMAGE"; then
-  log_update "$SCRIPT_DIR" "nodes: $NAME already on latest $IMAGE"
-  exit 0
-fi
-
-log_update "$SCRIPT_DIR" "nodes: updating $NAME (stop -t $STOP_TIMEOUT, recreate)"
-graceful_stop "$NAME" "$STOP_TIMEOUT"
-PULL=0 ONCHAIN_INVOICE_SKIP_PULL=1 USE_COMPOSE=0 "$SCRIPT_DIR/start-onchain-invoice-nodes.sh"
-log_update "$SCRIPT_DIR" "nodes: $NAME updated"
+with_update_lock "$SCRIPT_DIR" "nodes" run_nodes_update

@@ -18,11 +18,11 @@ docker run --rm \
   alpine sh -c '
     set -e
     for pair in \
-      "api-mainnet:lib-env.sh install-auto-update.sh update-onchain-invoice-api.sh" \
-      "api:lib-env.sh install-auto-update.sh update-onchain-invoice-api.sh" \
+      "api-mainnet:lib-env.sh install-auto-update.sh update-onchain-invoice-api.sh start-onchain-invoice-api.sh" \
+      "api:lib-env.sh install-auto-update.sh update-onchain-invoice-api.sh start-onchain-invoice-api.sh" \
       "sweeper-mainnet:lib-env.sh install-auto-update.sh update-onchain-invoice-nodes.sh start-onchain-invoice-nodes.sh docker-compose.sweepers-mainnet.yml" \
-      "sweeper:lib-env.sh install-auto-update.sh update-onchain-invoice-nodes.sh start-onchain-invoice-nodes.sh" \
-      "gateway:lib-env.sh install-auto-update.sh update-onchain-invoice-gateway.sh"
+      "sweeper:lib-env.sh install-auto-update.sh update-onchain-invoice-nodes.sh start-onchain-invoice-nodes.sh docker-compose.sweepers.yml" \
+      "gateway:lib-env.sh install-auto-update.sh update-onchain-invoice-gateway.sh start-onchain-invoice-gateway.sh"
     do
       dir="${pair%%:*}"
       files="${pair#*:}"
@@ -40,7 +40,10 @@ docker run --rm \
         && sed -i "s|^API_AUTO_UPDATE=.*|API_AUTO_UPDATE=1|" /tc/api-mainnet/.env \
         || echo API_AUTO_UPDATE=1 >> /tc/api-mainnet/.env
       grep -q "^API_AUTO_UPDATE_INTERVAL_MIN=" /tc/api-mainnet/.env \
-        || echo API_AUTO_UPDATE_INTERVAL_MIN=15 >> /tc/api-mainnet/.env
+        && sed -i "s|^API_AUTO_UPDATE_INTERVAL_MIN=.*|API_AUTO_UPDATE_INTERVAL_MIN=30|" /tc/api-mainnet/.env \
+        || echo API_AUTO_UPDATE_INTERVAL_MIN=30 >> /tc/api-mainnet/.env
+      grep -q "^API_MEMORY_LIMIT=" /tc/api-mainnet/.env \
+        || echo API_MEMORY_LIMIT=384m >> /tc/api-mainnet/.env
     fi
 
     # Mainnet sweepers — must track GHCR :main (not a local-only tag)
@@ -49,7 +52,12 @@ docker run --rm \
         && sed -i "s|^NODES_AUTO_UPDATE=.*|NODES_AUTO_UPDATE=1|" /tc/sweeper-mainnet/.env \
         || echo NODES_AUTO_UPDATE=1 >> /tc/sweeper-mainnet/.env
       grep -q "^NODES_AUTO_UPDATE_INTERVAL_MIN=" /tc/sweeper-mainnet/.env \
-        || echo NODES_AUTO_UPDATE_INTERVAL_MIN=15 >> /tc/sweeper-mainnet/.env
+        && sed -i "s|^NODES_AUTO_UPDATE_INTERVAL_MIN=.*|NODES_AUTO_UPDATE_INTERVAL_MIN=30|" /tc/sweeper-mainnet/.env \
+        || echo NODES_AUTO_UPDATE_INTERVAL_MIN=30 >> /tc/sweeper-mainnet/.env
+      grep -q "^SWEEPER_MEMORY_LIMIT=" /tc/sweeper-mainnet/.env \
+        || echo SWEEPER_MEMORY_LIMIT=192m >> /tc/sweeper-mainnet/.env
+      grep -q "^SWEEPER_SOLANA_ENABLED=" /tc/sweeper-mainnet/.env \
+        || echo SWEEPER_SOLANA_ENABLED=0 >> /tc/sweeper-mainnet/.env
       grep -q "^SWEEPER_IMAGE=" /tc/sweeper-mainnet/.env \
         && sed -i "s|^SWEEPER_IMAGE=.*|SWEEPER_IMAGE=ghcr.io/naiemk/trustless-commerce-sweeper:main|" /tc/sweeper-mainnet/.env \
         || echo SWEEPER_IMAGE=ghcr.io/naiemk/trustless-commerce-sweeper:main >> /tc/sweeper-mainnet/.env
@@ -69,6 +77,11 @@ docker run --rm \
           && sed -i "s|^${key}=.*|${key}=1|" /tc/gateway/.env \
           || echo "${key}=1" >> /tc/gateway/.env
       done
+      grep -q "^GATEWAY_AUTO_UPDATE_INTERVAL_MIN=" /tc/gateway/.env \
+        && sed -i "s|^GATEWAY_AUTO_UPDATE_INTERVAL_MIN=.*|GATEWAY_AUTO_UPDATE_INTERVAL_MIN=20|" /tc/gateway/.env \
+        || echo GATEWAY_AUTO_UPDATE_INTERVAL_MIN=20 >> /tc/gateway/.env
+      grep -q "^UI_MEMORY_LIMIT=" /tc/gateway/.env || echo UI_MEMORY_LIMIT=64m >> /tc/gateway/.env
+      grep -q "^GATEWAY_MEMORY_LIMIT=" /tc/gateway/.env || echo GATEWAY_MEMORY_LIMIT=64m >> /tc/gateway/.env
     fi
   '
 

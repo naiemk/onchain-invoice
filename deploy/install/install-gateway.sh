@@ -86,6 +86,7 @@ write_if_missing "install-auto-update.sh"
 write_if_missing "gateway/nginx.conf"
 write_if_missing "gateway/conf.d/domains.conf"
 write_template ".env.gateway.example"
+write_template "start-onchain-invoice-gateway.sh"
 write_template "update-onchain-invoice-gateway.sh"
 write_template "lib-env.sh"
 write_template "install-auto-update.sh"
@@ -105,7 +106,8 @@ else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.gateway.example" "$DEST/.env" \
     UI_TESTNET_AUTO_UPDATE UI_MAINNET_AUTO_UPDATE GATEWAY_AUTO_UPDATE \
-    GATEWAY_AUTO_UPDATE_INTERVAL_MIN GATEWAY_STOP_TIMEOUT
+    GATEWAY_AUTO_UPDATE_INTERVAL_MIN GATEWAY_STOP_TIMEOUT \
+    UI_MEMORY_LIMIT GATEWAY_MEMORY_LIMIT
 fi
 
 (

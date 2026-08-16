@@ -17,10 +17,6 @@ api_json() {
   local path="$2"
   local body="${3:-}"
   local extra_headers="${4-}"
-  local api_key=""
-  if [[ -n "$extra_headers" && "$extra_headers" != "{}" ]]; then
-    api_key="$(printf '%s' "$extra_headers" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("x-api-key",""))')"
-  fi
   # Retry only when docker exec / fetch returns empty (transport flake).
   # Do not reinterpret a real HTTP status (callers assert 200/201/401).
   local attempts=5
@@ -30,15 +26,16 @@ api_json() {
       -e T_METHOD="$method" \
       -e T_PATH="$path" \
       -e T_BODY="$body" \
-      -e T_API_KEY="$api_key" \
+      -e T_HEADERS="${extra_headers:-{}}" \
       api node -e '
+const headers = Object.assign(
+  {},
+  process.env.T_BODY ? { "content-type": "application/json" } : {},
+  (() => { try { return JSON.parse(process.env.T_HEADERS || "{}"); } catch { return {}; } })()
+);
 fetch("http://127.0.0.1:8080" + process.env.T_PATH, {
   method: process.env.T_METHOD,
-  headers: Object.assign(
-    {},
-    process.env.T_BODY ? { "content-type": "application/json" } : {},
-    process.env.T_API_KEY ? { "x-api-key": process.env.T_API_KEY } : {}
-  ),
+  headers,
   body: process.env.T_BODY || undefined,
 }).then(async (res) => {
   process.stdout.write(JSON.stringify({ status: res.status, body: await res.text() }));

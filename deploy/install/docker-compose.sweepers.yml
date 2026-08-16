@@ -1,6 +1,8 @@
 # Triple sweeper processes sharing one YAML + .env.
 # From the nodes install directory:
 #   docker compose -f docker-compose.sweepers.yml up -d
+# Solana (optional): SWEEPER_SOLANA_ENABLED=1 and:
+#   docker compose -f docker-compose.sweepers.yml --profile solana up -d
 #
 # SWEEPER_ROLE filters which half of onchain-invoice-nodes.yaml each service uses.
 # VPS refresh (replace old single/dual layout):
@@ -15,6 +17,7 @@ services:
     image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
     container_name: onchain-invoice-sweeper-evm
     restart: unless-stopped
+    mem_limit: ${SWEEPER_MEMORY_LIMIT:-192m}
     env_file: .env
     environment:
       SWEEPER_ROLE: evm
@@ -30,6 +33,7 @@ services:
     image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
     container_name: onchain-invoice-sweeper-tron
     restart: unless-stopped
+    mem_limit: ${SWEEPER_MEMORY_LIMIT:-192m}
     env_file: .env
     environment:
       SWEEPER_ROLE: tron
@@ -42,9 +46,11 @@ services:
       - "host.docker.internal:host-gateway"
 
   sweeper-solana:
+    profiles: ["solana"]
     image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
     container_name: onchain-invoice-sweeper-solana
     restart: unless-stopped
+    mem_limit: ${SWEEPER_MEMORY_LIMIT:-192m}
     env_file: .env
     environment:
       SWEEPER_ROLE: solana
