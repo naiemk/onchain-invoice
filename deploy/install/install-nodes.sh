@@ -95,7 +95,8 @@ write_template "start-onchain-invoice-nodes.sh"
 write_template "update-onchain-invoice-nodes.sh"
 write_template "register-onchain-invoice-node.sh"
 write_template "lib-env.sh"
-for f in start-onchain-invoice-nodes.sh update-onchain-invoice-nodes.sh register-onchain-invoice-node.sh; do
+write_template "install-auto-update.sh"
+for f in start-onchain-invoice-nodes.sh update-onchain-invoice-nodes.sh register-onchain-invoice-node.sh install-auto-update.sh; do
   if [[ -f "$DEST/$f" ]]; then
     chmod +x "$DEST/$f"
   fi
@@ -111,6 +112,7 @@ else
   echo "exists: $DEST/.env (secrets preserved)"
   append_missing_env_keys "$DEST/.env.nodes.example" "$DEST/.env" \
     ACTIVITY_LOG_PATH NODES_AUTO_UPDATE NODES_AUTO_UPDATE_INTERVAL_MIN NODES_STOP_TIMEOUT \
+    SWEEPER_MEMORY_LIMIT SWEEPER_SOLANA_ENABLED \
     TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS TRON_SPONSOR_PRIVATE_KEY \
     SOLANA_RPC_URL SOLANA_PROGRAM_ID SOLANA_USDC_MINT SOLANA_USDT_MINT \
     SOLANA_SWEEPER_KEY SOLANA_FEE_RECIPIENT \

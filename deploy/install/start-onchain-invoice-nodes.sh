@@ -105,6 +105,15 @@ if [[ -z "${SERVER_URL:-}" && -n "${API_URL:-}" ]]; then
   export SERVER_URL
 fi
 
+# Memory cap for single-container (non-compose) path; compose uses SWEEPER_MEMORY_LIMIT via yml.
+SWEEPER_MEMORY_LIMIT="${SWEEPER_MEMORY_LIMIT:-192m}"
+
+# Solana compose profile — off unless explicitly enabled (saves RAM on small VPS).
+solana_enabled=0
+case "${SWEEPER_SOLANA_ENABLED:-0}" in
+  1|true|TRUE|yes|YES|on|ON) solana_enabled=1 ;;
+esac
+
 # Fail fast: ethers crashes with a redacted "invalid private key" if these are empty/malformed.
 # Allow operator placeholder `_PRIVATE_KEY_` so mainnet can be staged before keys are filled
 # (sweeper soft-skips until a real 64-hex key is set).
@@ -165,14 +174,33 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
       .env > .env.runtime
   fi
 
-  echo "Starting sweepers via $COMPOSE_FILE ..."
-  if [[ -f .env.runtime ]]; then
-    docker compose -f "$COMPOSE_FILE" --env-file .env.runtime up -d --force-recreate
+  COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+  if [[ "$solana_enabled" -eq 1 ]]; then
+    COMPOSE_ARGS+=(--profile solana)
   else
-    docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+    # Ensure idle solana is not left running when disabled.
+    if docker inspect onchain-invoice-sweeper-solana >/dev/null 2>&1; then
+      echo "SWEEPER_SOLANA_ENABLED off — removing onchain-invoice-sweeper-solana ..."
+      docker rm -f onchain-invoice-sweeper-solana >/dev/null || true
+    fi
+  fi
+
+  echo "Starting sweepers via $COMPOSE_FILE (memory ${SWEEPER_MEMORY_LIMIT}) ..."
+  if [[ "$solana_enabled" -eq 1 ]]; then
+    echo "  (Solana profile enabled)"
+  fi
+  if [[ -f .env.runtime ]]; then
+    docker compose "${COMPOSE_ARGS[@]}" --env-file .env.runtime up -d --force-recreate
+  else
+    docker compose "${COMPOSE_ARGS[@]}" up -d --force-recreate
   fi
   echo "Sweepers up (container names from $COMPOSE_FILE)"
-  echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl"
+  if [[ "$solana_enabled" -eq 1 ]]; then
+    echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-solana.jsonl"
+  else
+    echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl"
+    echo "(Solana sweeper off — set SWEEPER_SOLANA_ENABLED=1 to start)"
+  fi
   exit 0
 fi
 
@@ -216,10 +244,16 @@ add_env ACTIVITY_LOG_PATH "$ACTIVITY_LOG_PATH"
 # Config lands in /tmp (image has no /config dir; docker cp avoids host bind-mounts).
 SWEEPER_CONFIG_IN_CONTAINER=/tmp/sweeper.yaml
 
-echo "Creating $NAME ..."
+MEM_ARGS=()
+if [[ -n "$SWEEPER_MEMORY_LIMIT" ]]; then
+  MEM_ARGS+=(--memory="$SWEEPER_MEMORY_LIMIT")
+fi
+
+echo "Creating $NAME (memory ${SWEEPER_MEMORY_LIMIT:-unlimited}) ..."
 docker create \
   --name "$NAME" \
   --restart "$RESTART" \
+  "${MEM_ARGS[@]}" \
   "${EXTRA_HOSTS[@]}" \
   -v "${LOGS_ABS}:/data/logs" \
   -e SWEEPER_CONFIG="$SWEEPER_CONFIG_IN_CONTAINER" \

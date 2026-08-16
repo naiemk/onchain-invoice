@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pull latest API image and recreate if the digest changed.
 # Honors API_AUTO_UPDATE=0|1 (legacy AUTO_UPDATE fallback).
+# Host flock + digest-gated pull (see lib-env.sh) — safe on small VPS.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,11 +19,12 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-CONFIG="${ONCHAIN_INVOICE_API_CONFIG:-onchain-invoice-api.yaml}"
-IMAGE="ghcr.io/naiemk/trustless-commerce-api:main"
-NAME="onchain-invoice-api"
-if [[ -f "$CONFIG" ]]; then
-  IMAGE="$(python3 - "$CONFIG" <<'PY'
+run_api_update() {
+  CONFIG="${ONCHAIN_INVOICE_API_CONFIG:-onchain-invoice-api.yaml}"
+  IMAGE="ghcr.io/naiemk/trustless-commerce-api:main"
+  NAME="onchain-invoice-api"
+  if [[ -f "$CONFIG" ]]; then
+    IMAGE="$(python3 - "$CONFIG" <<'PY'
 import sys
 text = open(sys.argv[1], encoding="utf-8").read().splitlines()
 for line in text:
@@ -35,7 +37,7 @@ else:
     print("ghcr.io/naiemk/trustless-commerce-api:main")
 PY
 )"
-  NAME="$(python3 - "$CONFIG" <<'PY'
+    NAME="$(python3 - "$CONFIG" <<'PY'
 import sys
 text = open(sys.argv[1], encoding="utf-8").read().splitlines()
 in_docker = False
@@ -52,20 +54,23 @@ else:
     print("onchain-invoice-api")
 PY
 )"
-fi
-NAME="${DOCKER_NAME:-${NAME:-onchain-invoice-api}}"
-IMAGE="${IMAGE:-ghcr.io/naiemk/trustless-commerce-api:main}"
-STOP_TIMEOUT="${API_STOP_TIMEOUT:-${STOP_TIMEOUT:-120}}"
+  fi
+  NAME="${DOCKER_NAME:-${NAME:-onchain-invoice-api}}"
+  IMAGE="${IMAGE:-ghcr.io/naiemk/trustless-commerce-api:main}"
+  STOP_TIMEOUT="${API_STOP_TIMEOUT:-${STOP_TIMEOUT:-120}}"
 
-log_update "$SCRIPT_DIR" "api: pulling $IMAGE"
-docker pull "$IMAGE" >/dev/null
+  pull_status="$(pull_image_if_needed "$IMAGE")"
+  log_update "$SCRIPT_DIR" "api: $IMAGE — $pull_status"
 
-if ! container_needs_image "$NAME" "$IMAGE"; then
-  log_update "$SCRIPT_DIR" "api: $NAME already on latest $IMAGE"
-  exit 0
-fi
+  if ! container_needs_image "$NAME" "$IMAGE"; then
+    log_update "$SCRIPT_DIR" "api: $NAME already on latest $IMAGE"
+    return 0
+  fi
 
-log_update "$SCRIPT_DIR" "api: updating $NAME (stop -t $STOP_TIMEOUT, recreate)"
-graceful_stop "$NAME" "$STOP_TIMEOUT"
-PULL=0 ONCHAIN_INVOICE_SKIP_PULL=1 "$SCRIPT_DIR/start-onchain-invoice-api.sh"
-log_update "$SCRIPT_DIR" "api: $NAME updated"
+  log_update "$SCRIPT_DIR" "api: updating $NAME (stop -t $STOP_TIMEOUT, recreate)"
+  graceful_stop "$NAME" "$STOP_TIMEOUT"
+  PULL=0 ONCHAIN_INVOICE_SKIP_PULL=1 "$SCRIPT_DIR/start-onchain-invoice-api.sh"
+  log_update "$SCRIPT_DIR" "api: $NAME updated"
+}
+
+with_update_lock "$SCRIPT_DIR" "api" run_api_update

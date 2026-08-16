@@ -104,6 +104,7 @@ HOST_PORT="${HOST_PORT:-8080}"
 DATA_DIR="${DATA_DIR:-./data/onchain-invoice-api}"
 RESTART="${RESTART:-unless-stopped}"
 DOCKER_NETWORK="${DOCKER_NETWORK:-}"
+API_MEMORY_LIMIT="${API_MEMORY_LIMIT:-384m}"
 
 CONFIG_ABS="$(cd "$(dirname "$CONFIG")" && pwd)/$(basename "$CONFIG")"
 
@@ -173,10 +174,16 @@ if [[ -n "$DOCKER_NETWORK" ]]; then
   echo "Docker network: $DOCKER_NETWORK"
 fi
 
-echo "Creating $NAME (host port $HOST_PORT) ..."
+MEM_ARGS=()
+if [[ -n "$API_MEMORY_LIMIT" ]]; then
+  MEM_ARGS+=(--memory="$API_MEMORY_LIMIT")
+fi
+
+echo "Creating $NAME (host port $HOST_PORT, memory ${API_MEMORY_LIMIT:-unlimited}) ..."
 docker create \
   --name "$NAME" \
   --restart "$RESTART" \
+  "${MEM_ARGS[@]}" \
   "${NET_ARGS[@]}" \
   -p "${HOST_PORT}:8080" \
   -e CONFIG_PATH=/config/server.yaml \
