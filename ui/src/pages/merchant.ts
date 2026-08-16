@@ -60,7 +60,7 @@ export function renderMerchant(root: HTMLElement): void {
         <form id="merchant-form" class="merchant-toolbar">
           <div class="field" style="margin:0;flex:1;min-width:16rem">
             <label for="merchant-address">Settlement address</label>
-            <p class="field-hint">EVM wallet used as merchant <span class="mono">to</span> on your pay links.</p>
+            <p class="field-hint">EVM wallet used as the merchant <span class="mono">to</span> field on your pay links.</p>
             <input id="merchant-address" class="mono" placeholder="0x…" value="${escapeHtml(state.address)}" required />
           </div>
           <div class="field" style="margin:0;min-width:10rem">

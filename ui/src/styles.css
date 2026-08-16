@@ -1354,6 +1354,14 @@ button:disabled {
   max-width: 1080px;
 }
 
+.create-actions {
+  margin-top: 0.35rem;
+}
+
+.create-actions + .status {
+  margin: 0.35rem 0 0;
+}
+
 .create-output .mono-block {
   background: var(--surface-code);
   border: 1px solid var(--line);

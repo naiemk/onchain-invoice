@@ -213,7 +213,7 @@ export function renderHome(root: HTMLElement): void {
           <div class="how-art-wrap">${howSettleArt()}</div>
           <span class="how-step">3</span>
           <h3>Only your wallet receives settlement</h3>
-          <p>CREATE2 salt binds merchant <span class="mono">to</span>. A sweep can take the fee — it cannot redirect your funds.</p>
+          <p>CREATE2 salt binds the merchant <span class="mono">to</span> address into the invoice. A sweep can take the fee — it cannot redirect your funds.</p>
         </article>
       </div>
     </section>
