@@ -6,6 +6,7 @@ import {
   chainLogoSvg,
   explorerAddressUrl,
   formatTokenAmount,
+  isTestnet,
   looksLikeSolanaAddress,
   looksLikeTronAddress,
   networkKind,
@@ -256,7 +257,9 @@ async function renderInvoiceStage(
           Sending from another chain can result in lost funds. Confirm your wallet network matches before you send.
           ${
             networkKind(chainId) === "tron"
-              ? " Use Nile Tronscan to verify the address when paying on Nile."
+              ? isTestnet(chainId)
+                ? " Use Nile Tronscan to verify the address when paying on Nile."
+                : " Use Tronscan to verify the address before sending TRC-20."
               : networkKind(chainId) === "solana"
                 ? " Send SPL tokens to this token account (ATA). Verify on Solana Explorer."
                 : ""
@@ -311,7 +314,7 @@ function renderPaidStage(
     status === "swept" ? "Payment complete" : status === "paid_partial" ? "Partial payment received" : "Payment received";
   const chainId = invoice.chainId ?? fields.chains[0];
   const addressUrl = invoice.invoiceAddress ? explorerAddressUrl(chainId, invoice.invoiceAddress) : null;
-  const paidDisplay = formatTokenAmount(invoice.amountPaid, invoice.token);
+  const paidDisplay = formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId);
 
   root.innerHTML = `
     <div class="invoice-shell">

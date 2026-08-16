@@ -22,9 +22,12 @@ export const NETWORKS: NetworkOption[] = [
   { id: "nile", label: "TRON Nile", short: "Nile", kind: "tron", testnet: true },
   // Kept for explorer/label helpers; re-enable when Solana settle ships in the UI.
   { id: "devnet", label: "Solana Devnet", short: "Sol Devnet", kind: "solana", testnet: true, enabled: false },
-  { id: "1", label: "Ethereum Mainnet", short: "Ethereum", kind: "evm" },
+  // Mainnet rails: Tron + Base + BNB (ETH / Arbitrum disabled until settlement is ready).
+  { id: "tron", label: "TRON", short: "TRON", kind: "tron" },
   { id: "8453", label: "Base", short: "Base", kind: "evm" },
-  { id: "42161", label: "Arbitrum One", short: "Arbitrum", kind: "evm" },
+  { id: "56", label: "BNB Smart Chain", short: "BNB", kind: "evm" },
+  { id: "1", label: "Ethereum Mainnet", short: "Ethereum", kind: "evm", enabled: false },
+  { id: "42161", label: "Arbitrum One", short: "Arbitrum", kind: "evm", enabled: false },
   { id: "mainnet-beta", label: "Solana", short: "Solana", kind: "solana", enabled: false },
 ];
 
@@ -166,11 +169,16 @@ export function networkKind(chainId: string | null | undefined): ChainKind {
 
 export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   const symbol = token.trim().toUpperCase();
+  const id = String(chainId);
   const kind = networkKind(chainId);
   if (kind === "tron") return symbol === "USDT";
   // Devnet USDT mint is still a PLACEHOLDER in operator templates — offer USDC only in UI.
   if (kind === "solana") return symbol === "USDC";
-  // EVM: USDC and USDT (mainnets + any testnet that lists a USDT contract for the sweeper).
+  // Base: USDC only
+  if (id === "8453") return symbol === "USDC";
+  // BNB Smart Chain: USDC + USDT
+  if (id === "56") return symbol === "USDC" || symbol === "USDT";
+  // Other EVM (Sepolia): USDC and USDT when the sweeper lists a contract.
   return symbol === "USDC" || symbol === "USDT";
 }
 
@@ -245,6 +253,9 @@ export function chainLogoSvg(chainId: string | null | undefined, size = 20): str
   if (id === "8453") {
     return `<svg class="chain-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#0052FF"/><path d="M16.1 6.4c-5.3 0-9.6 4.1-9.9 9.3h13.1c.4 0 .7.3.7.7s-.3.7-.7.7H6.2c.4 5.1 4.7 9.1 9.9 9.1 5.5 0 10-4.5 10-10s-4.5-9.8-10-9.8z" fill="#fff"/></svg>`;
   }
+  if (id === "56") {
+    return `<svg class="chain-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#F0B90B"/><path d="M16 7.2 12.4 10.8l3.6 3.6 3.6-3.6L16 7.2zm-7.2 7.2L5.2 18l3.6 3.6L12.4 18l-3.6-3.6zm14.4 0L19.6 18l3.6 3.6L26.8 18l-3.6-3.6zM16 17.6l-3.6 3.6L16 24.8l3.6-3.6L16 17.6z" fill="#fff"/></svg>`;
+  }
   if (id === "42161") {
     return `<svg class="chain-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#213147"/><path d="M10.2 22.8 16 7.2l5.8 15.6h-3.1l-1.3-3.6h-2.8l-1.3 3.6h-3.1zm5.8-10.4-1.2 3.4h2.4l-1.2-3.4z" fill="#28A0F0"/><path d="m21.4 22.8 2.4-6.4H9.8l1.2 3.2h8.2l.8 2.1 1.4 1.1z" fill="#96BEDC"/></svg>`;
   }
@@ -275,17 +286,24 @@ function escapeText(value: string): string {
   );
 }
 
-export function tokenDecimals(token: string | null | undefined): number {
+export function tokenDecimals(token: string | null | undefined, chainId?: string | null): number {
   const symbol = (token ?? "").toUpperCase();
+  const id = String(chainId ?? "");
+  // BNB Smart Chain pegged USDC/USDT use 18 decimals.
+  if (id === "56" && (symbol === "USDC" || symbol === "USDT")) return 18;
   if (symbol === "ETH" || symbol === "NATIVE" || symbol === "") return 18;
   if (symbol === "USDC" || symbol === "USDT") return 6;
   return 18;
 }
 
 /** Format a raw on-chain amount (integer string) for display. */
-export function formatTokenAmount(raw: string | null | undefined, token: string | null | undefined): string {
+export function formatTokenAmount(
+  raw: string | null | undefined,
+  token: string | null | undefined,
+  chainId?: string | null
+): string {
   if (!raw || raw === "0") return `0 ${token ?? ""}`.trim();
-  const decimals = tokenDecimals(token);
+  const decimals = tokenDecimals(token, chainId);
   const negative = raw.startsWith("-");
   const digits = negative ? raw.slice(1) : raw;
   if (!/^\d+$/.test(digits)) return raw;
@@ -305,14 +323,17 @@ export function explorerBase(chainId: string | null | undefined): string | null 
       return "https://sepolia.etherscan.io";
     case "8453":
       return "https://basescan.org";
+    case "56":
+      return "https://bscscan.com";
     case "42161":
       return "https://arbiscan.io";
     case "nile":
+    case "3448148188":
       return "https://nile.tronscan.org";
     case "shasta":
       return "https://shasta.tronscan.org";
     case "tron":
-    case "3448148188":
+    case "728126428":
       return "https://tronscan.org";
     case "devnet":
       return "https://explorer.solana.com";

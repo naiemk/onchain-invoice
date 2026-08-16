@@ -15,15 +15,37 @@ export interface RateLimitConfig {
   sweeperPerIpPerSecond: number;
 }
 
+export type EvmTokenConfig = {
+  address: string;
+  decimals?: number;
+};
+
+/** Per product chainId (`11155111`, `8453`, `56`). */
+export type EvmChainConfig = {
+  rpcUrl?: string;
+  sweeperAddress?: string;
+  forwarderImplementation?: string;
+  tokens?: Record<string, EvmTokenConfig>;
+};
+
+export type EvmNetworksConfig = Record<string, EvmChainConfig>;
+
 export interface AppConfig {
   port: number;
   baseUrl: string;
   dbPath: string;
   sweeperApiKey: string;
   adminApiKey: string;
+  /**
+   * Per-chainId EVM settlement config (preferred).
+   * Legacy flat `EVM_RPC_URL` / `SWEEPER_ADDRESS` synthesize `11155111` when `evm.chains` is absent.
+   */
+  evmChains: EvmNetworksConfig;
+  /** @deprecated Prefer `resolveEvmChain(config.evmChains, chainId)`. Sepolia / flat-env mirror. */
   evmRpcUrl?: string;
+  /** @deprecated Prefer `resolveEvmChain(config.evmChains, chainId)`. */
   sweeperAddress?: string;
-  /** Optional; enables offline CREATE2 invoice address prediction without RPC. */
+  /** @deprecated Prefer `resolveEvmChain(config.evmChains, chainId)`. */
   forwarderImplementation?: string;
   sweeperPrivateKey?: string;
   /** Nile (or other) Tron full node host for EOA address derivation. */
@@ -52,6 +74,9 @@ interface YamlFile {
   adminApiKey?: string;
   sweeperApiKey?: string;
   evm?: {
+    /** Preferred: per-chainId map */
+    chains?: EvmNetworksConfig;
+    /** @deprecated flat single-chain fields — mapped to `11155111` when `chains` absent */
     rpcUrl?: string;
     sweeperAddress?: string;
     forwarderImplementation?: string;
@@ -77,22 +102,44 @@ interface YamlFile {
   claimLeaseMs?: number;
 }
 
+/** Sepolia product chainId used when synthesizing legacy flat EVM env. */
+export const EVM_LEGACY_CHAIN_ID = "11155111";
+
+/**
+ * Resolve EVM settlement config for a product chainId.
+ * Returns undefined when the chain has no sweeper address (create should 503).
+ * Operators should also set `forwarderImplementation` for offline CREATE2; RPC is a fallback.
+ */
+export function resolveEvmChain(
+  chains: EvmNetworksConfig | undefined,
+  chainId: string | null | undefined
+): EvmChainConfig | undefined {
+  if (!chains || !chainId) return undefined;
+  const chain = chains[String(chainId)];
+  if (!chain?.sweeperAddress) return undefined;
+  return chain;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const configPath = env.CONFIG_PATH ? resolve(env.CONFIG_PATH) : undefined;
   const file = configPath && existsSync(configPath) ? readYamlFile(configPath) : {};
 
   const port = Number(env.PORT ?? file.port ?? 8080);
+  const evmChains = loadEvmChains(env, file.evm);
+  const legacy = evmChains[EVM_LEGACY_CHAIN_ID];
+  const dbPathRaw = expand(env.DB_PATH ?? file.db?.path ?? "./trustless-commerce.db");
+  // better-sqlite3 treats ":memory:" specially — do not path-resolve it into a real file.
+  const dbPath = dbPathRaw === ":memory:" ? ":memory:" : resolve(dbPathRaw);
   return {
     port,
     baseUrl: expand(env.BASE_URL ?? file.baseUrl ?? `http://localhost:${port}`),
-    dbPath: resolve(expand(env.DB_PATH ?? file.db?.path ?? "./trustless-commerce.db")),
+    dbPath,
     sweeperApiKey: expand(env.SWEEPER_API_KEY ?? file.sweeperApiKey ?? ""),
     adminApiKey: expand(env.ADMIN_API_KEY ?? file.adminApiKey ?? ""),
-    evmRpcUrl: blankToUndefined(expand(env.EVM_RPC_URL ?? file.evm?.rpcUrl ?? "")),
-    sweeperAddress: normalizeAddress(expand(env.SWEEPER_ADDRESS ?? file.evm?.sweeperAddress ?? "")),
-    forwarderImplementation: normalizeAddress(
-      expand(env.FORWARDER_IMPLEMENTATION ?? file.evm?.forwarderImplementation ?? "")
-    ),
+    evmChains,
+    evmRpcUrl: legacy?.rpcUrl,
+    sweeperAddress: legacy?.sweeperAddress,
+    forwarderImplementation: legacy?.forwarderImplementation,
     sweeperPrivateKey: blankToUndefined(expand(env.SWEEPER_PRIVATE_KEY ?? file.evm?.sweeperPrivateKey ?? "")),
     tronFullHost: blankToUndefined(expand(env.TRON_FULL_HOST ?? file.tron?.fullHost ?? "")),
     tronInvoiceMasterSecret: blankToUndefined(
@@ -111,6 +158,92 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     claimLeaseMs: Number(env.CLAIM_LEASE_MS ?? file.claimLeaseMs ?? 180_000),
     configPath,
   };
+}
+
+function loadEvmChains(env: NodeJS.ProcessEnv, fileEvm: YamlFile["evm"] | undefined): EvmNetworksConfig {
+  const fromFile = expandEvmChains(fileEvm?.chains);
+  if (Object.keys(fromFile).length > 0) {
+    return mergeEnvEvmOverrides(fromFile, env);
+  }
+
+  // Legacy flat env / yaml → synthesize Sepolia `11155111`.
+  const rpcUrl = blankToUndefined(expand(env.EVM_RPC_URL ?? fileEvm?.rpcUrl ?? ""));
+  const sweeperAddress = normalizeAddress(expand(env.SWEEPER_ADDRESS ?? fileEvm?.sweeperAddress ?? ""));
+  const forwarderImplementation = normalizeAddress(
+    expand(env.FORWARDER_IMPLEMENTATION ?? fileEvm?.forwarderImplementation ?? "")
+  );
+
+  const chains: EvmNetworksConfig = {};
+  if (rpcUrl || sweeperAddress || forwarderImplementation) {
+    chains[EVM_LEGACY_CHAIN_ID] = { rpcUrl, sweeperAddress, forwarderImplementation };
+  }
+  return mergeEnvEvmOverrides(chains, env);
+}
+
+function expandEvmChains(chains: EvmNetworksConfig | undefined): EvmNetworksConfig {
+  if (!chains) return {};
+  const out: EvmNetworksConfig = {};
+  for (const [id, chain] of Object.entries(chains)) {
+    const tokens: EvmChainConfig["tokens"] = {};
+    for (const [symbol, token] of Object.entries(chain.tokens ?? {})) {
+      const address = normalizeAddress(expand(token.address ?? ""));
+      if (!address) continue;
+      tokens[symbol.toUpperCase()] = {
+        address,
+        decimals: token.decimals,
+      };
+    }
+    out[String(id)] = {
+      rpcUrl: blankToUndefined(expand(chain.rpcUrl ?? "")),
+      sweeperAddress: normalizeAddress(expand(chain.sweeperAddress ?? "")),
+      forwarderImplementation: normalizeAddress(expand(chain.forwarderImplementation ?? "")),
+      tokens: Object.keys(tokens).length > 0 ? tokens : undefined,
+    };
+  }
+  return out;
+}
+
+/**
+ * Apply `EVM_<chainId>_RPC_URL` / `_SWEEPER_ADDRESS` / `_FORWARDER_IMPLEMENTATION`
+ * and legacy flat Sepolia env onto the map (live env wins over YAML blanks).
+ */
+function mergeEnvEvmOverrides(chains: EvmNetworksConfig, env: NodeJS.ProcessEnv): EvmNetworksConfig {
+  const out: EvmNetworksConfig = { ...chains };
+
+  for (const [key, raw] of Object.entries(env)) {
+    const match = /^EVM_(\d+)_(RPC_URL|SWEEPER_ADDRESS|FORWARDER_IMPLEMENTATION)$/.exec(key);
+    if (!match || raw == null) continue;
+    const chainId = match[1]!;
+    const field = match[2]!;
+    const value = expand(String(raw));
+    const prev = out[chainId] ?? {};
+    if (field === "RPC_URL") {
+      const rpcUrl = blankToUndefined(value);
+      if (rpcUrl) out[chainId] = { ...prev, rpcUrl };
+    } else if (field === "SWEEPER_ADDRESS") {
+      const sweeperAddress = normalizeAddress(value);
+      if (sweeperAddress) out[chainId] = { ...prev, sweeperAddress };
+    } else {
+      const forwarderImplementation = normalizeAddress(value);
+      if (forwarderImplementation) out[chainId] = { ...prev, forwarderImplementation };
+    }
+  }
+
+  // Legacy flat env → Sepolia (covers docker -e after config mount).
+  const legacyRpc = blankToUndefined(expand(env.EVM_RPC_URL ?? ""));
+  const legacySweeper = normalizeAddress(expand(env.SWEEPER_ADDRESS ?? ""));
+  const legacyForwarder = normalizeAddress(expand(env.FORWARDER_IMPLEMENTATION ?? ""));
+  if (legacyRpc || legacySweeper || legacyForwarder) {
+    const prev = out[EVM_LEGACY_CHAIN_ID] ?? {};
+    out[EVM_LEGACY_CHAIN_ID] = {
+      ...prev,
+      rpcUrl: legacyRpc ?? prev.rpcUrl,
+      sweeperAddress: legacySweeper ?? prev.sweeperAddress,
+      forwarderImplementation: legacyForwarder ?? prev.forwarderImplementation,
+    };
+  }
+
+  return out;
 }
 
 function loadSolanaChains(

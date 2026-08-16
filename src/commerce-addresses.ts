@@ -8,6 +8,8 @@ export type ChainKind = "evm" | "tron" | "solana";
 export const TRON_NILE_NUMERIC_CHAIN_ID = "3448148188";
 /** Shasta full-node chain id (reserved). */
 export const TRON_SHASTA_NUMERIC_CHAIN_ID = "2494104990";
+/** TRON mainnet full-node chain id. */
+export const TRON_MAINNET_NUMERIC_CHAIN_ID = "728126428";
 
 const TRON_BASE58_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 /** Solana base58 pubkeys are typically 32–44 chars; exclude Tron `T…` and EVM `0x`. */
@@ -20,7 +22,8 @@ export function chainKind(chainId: string | null | undefined): ChainKind {
     id === "shasta" ||
     id === "tron" ||
     id === TRON_NILE_NUMERIC_CHAIN_ID ||
-    id === TRON_SHASTA_NUMERIC_CHAIN_ID
+    id === TRON_SHASTA_NUMERIC_CHAIN_ID ||
+    id === TRON_MAINNET_NUMERIC_CHAIN_ID
   ) {
     return "tron";
   }
@@ -30,12 +33,21 @@ export function chainKind(chainId: string | null | undefined): ChainKind {
   return "evm";
 }
 
-/** Map product chain ids (`nile`) to numeric ids for `deriveTronInvoice*`. */
+/** Map product chain ids (`nile`, `tron`) to numeric ids for `deriveTronInvoice*`. */
 export function tronNumericChainId(chainId: string | bigint): string | bigint {
   const id = String(chainId);
   if (id === "nile") return TRON_NILE_NUMERIC_CHAIN_ID;
   if (id === "shasta") return TRON_SHASTA_NUMERIC_CHAIN_ID;
+  if (id === "tron") return TRON_MAINNET_NUMERIC_CHAIN_ID;
   return chainId;
+}
+
+/** Default TronGrid (or Nile/Shasta) full node host for a product chain id. */
+export function defaultTronFullHost(chainId: string | null | undefined): string {
+  const id = String(chainId ?? "");
+  if (id === "nile" || id === TRON_NILE_NUMERIC_CHAIN_ID) return "https://nile.trongrid.io";
+  if (id === "shasta" || id === TRON_SHASTA_NUMERIC_CHAIN_ID) return "https://api.shasta.trongrid.io";
+  return "https://api.trongrid.io";
 }
 
 /** Lightweight shape check (no checksum) — safe for browser bundles. */
@@ -120,6 +132,7 @@ export function addressesEqual(a: string, b: string): boolean {
 
 export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   const symbol = token.trim().toUpperCase();
+  const id = String(chainId);
   const kind = chainKind(chainId);
   if (kind === "tron") {
     return symbol === "USDT";
@@ -127,7 +140,11 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   if (kind === "solana") {
     return symbol === "USDC" || symbol === "USDT";
   }
-  // EVM: USDC and USDT where the sweeper/API has a contract configured for that chain.
+  // Base mainnet: USDC only
+  if (id === "8453") return symbol === "USDC";
+  // BNB Smart Chain: USDC + USDT
+  if (id === "56") return symbol === "USDC" || symbol === "USDT";
+  // Other EVM (Sepolia and legacy): USDC + USDT when the sweeper lists a contract.
   return symbol === "USDC" || symbol === "USDT";
 }
 

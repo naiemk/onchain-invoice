@@ -18,11 +18,35 @@ db:
   path: /data/trustless-commerce.db
 adminApiKey: "${ADMIN_API_KEY}"
 sweeperApiKey: "${SWEEPER_API_KEY}"
+# Per-chainId EVM config. Empty sweeper/forwarder → create returns 503 for that chain (UI can still list it).
 evm:
-  rpcUrl: "${EVM_RPC_URL}"
-  # Quote 0x values — unquoted YAML 1.1 parses them as ints and corrupts addresses.
-  sweeperAddress: "${SWEEPER_ADDRESS}"
-  forwarderImplementation: "${FORWARDER_IMPLEMENTATION}"
+  chains:
+    "11155111":
+      rpcUrl: "${EVM_RPC_URL}"
+      # Quote 0x values — unquoted YAML 1.1 parses them as ints and corrupts addresses.
+      sweeperAddress: "${SWEEPER_ADDRESS}"
+      forwarderImplementation: "${FORWARDER_IMPLEMENTATION}"
+    "8453":
+      rpcUrl: "${EVM_8453_RPC_URL}"
+      sweeperAddress: "${EVM_8453_SWEEPER_ADDRESS}"
+      forwarderImplementation: "${EVM_8453_FORWARDER_IMPLEMENTATION}"
+      tokens:
+        USDC:
+          address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+          decimals: 6
+    "56":
+      rpcUrl: "${EVM_56_RPC_URL}"
+      sweeperAddress: "${EVM_56_SWEEPER_ADDRESS}"
+      forwarderImplementation: "${EVM_56_FORWARDER_IMPLEMENTATION}"
+      tokens:
+        # Binance-Peg USD Coin (18 decimals) — not Circle native USDC
+        USDC:
+          address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+          decimals: 18
+        # Binance-Peg BSC-USD / USDT (18 decimals)
+        USDT:
+          address: "0x55d398326f99059fF775485246999027B3197955"
+          decimals: 18
 tron:
   fullHost: "${TRON_FULL_HOST}"
   invoiceMasterSecret: "${TRON_INVOICE_MASTER_SECRET}"

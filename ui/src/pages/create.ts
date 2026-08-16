@@ -6,6 +6,7 @@ import {
   networkKind,
   networksForDeployment,
   normalizeAddress,
+  tokenAllowedOnChain,
   tokensForChains,
   type ChainKind,
   type NetworkOption,
@@ -96,7 +97,7 @@ export function renderCreate(root: HTMLElement): void {
             <label for="toTron">Tron merchant wallet <span class="required">*</span></label>
             <div class="callout info wallet-settlement-note" role="note">
               <strong>Funds are swept to this address.</strong>
-              USDT on Nile is sent here after payment. Use a wallet that can receive TRC-20 on Nile.
+              USDT on Tron is sent here after payment. Use a wallet that can receive TRC-20 on the selected Tron network.
             </div>
             <p class="field-hint">Valid base58check address starting with <span class="mono">T</span>. Bound into the invoice id with your EVM wallet when both are used.</p>
             <input id="toTron" name="toTron" class="mono" placeholder="T…" autocomplete="off" spellcheck="false" disabled />
@@ -116,7 +117,7 @@ export function renderCreate(root: HTMLElement): void {
 
           <div class="field">
             <label>Accepted tokens <span class="required">*</span></label>
-            <p class="field-hint">EVM → USDC/USDT, Nile → USDT (required when Tron is on). Only offer tokens your sweeper is configured to settle.</p>
+            <p class="field-hint">Base → USDC, BNB → USDC/USDT, Sepolia → USDC/USDT, Tron → USDT (required when Tron is on). Only offer tokens your sweeper is configured to settle.</p>
             <div class="field-row" id="tokens"></div>
           </div>
 
@@ -482,16 +483,11 @@ function readForm(root: HTMLElement): PayLinkFields {
   if (chains.length === 0) throw new Error("Select at least one network.");
   if (tokens.length === 0) throw new Error("Select at least one token.");
   if (needsTron && !tokens.includes("USDT")) {
-    throw new Error("USDT is required when Tron (Nile) is selected.");
+    throw new Error("USDT is required when Tron is selected.");
   }
 
   for (const chainId of chains) {
-    const allowed = tokens.some((token) => {
-      const kind = networkKind(chainId);
-      if (kind === "tron") return token === "USDT";
-      if (kind === "solana") return token === "USDC";
-      return token === "USDC" || token === "USDT";
-    });
+    const allowed = tokens.some((token) => tokenAllowedOnChain(chainId, token));
     if (!allowed) {
       throw new Error(`No compatible token selected for ${chainId}.`);
     }

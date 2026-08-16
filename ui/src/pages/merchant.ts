@@ -216,7 +216,7 @@ export function renderMerchant(root: HTMLElement): void {
                   </td>
                   <td>${escapeHtml(invoice.title ?? "—")}</td>
                   <td class="mono">$${escapeHtml(invoice.priceUsd)}</td>
-                  <td class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token))}</td>
+                  <td class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId))}</td>
                   <td><span class="pill pill-${escapeHtml(invoice.status)}">${escapeHtml(formatStatus(invoice.status))}</span></td>
                   <td>${invoice.chainId ? chainChipHtml(invoice.chainId, { size: "sm", short: true }) : "—"}</td>
                 </tr>`;
@@ -361,9 +361,9 @@ function detailFields(invoice: InvoiceWithEvents): string {
   return `
     <dl class="detail-list">
       <div><dt>Amount due</dt><dd class="mono">$${escapeHtml(invoice.priceUsd)}</dd></div>
-      <div><dt>Amount paid</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token))}</dd></div>
-      <div><dt>Amount swept</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountSwept, invoice.token))}</dd></div>
-      <div><dt>Platform fee</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.feeCollected, invoice.token))}</dd></div>
+      <div><dt>Amount paid</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId))}</dd></div>
+      <div><dt>Amount swept</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountSwept, invoice.token, invoice.chainId))}</dd></div>
+      <div><dt>Platform fee</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.feeCollected, invoice.token, invoice.chainId))}</dd></div>
       <div><dt>Customer ref</dt><dd>${escapeHtml(invoice.clientInvoiceId)}</dd></div>
       <div><dt>Invoice id</dt><dd class="mono wrap">${escapeHtml(invoice.id)}</dd></div>
       <div><dt>Payment address</dt><dd class="mono wrap">${
