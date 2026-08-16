@@ -101,13 +101,22 @@ local_image_id() {
 # Best-effort remote manifest digest (sha256:...). Empty if inspect fails.
 remote_image_digest() {
   local image="$1"
-  local digest=""
-  if docker buildx imagetools inspect "$image" -f '{{.Manifest.Digest}}' >/tmp/tc-digest.out 2>/dev/null; then
-    digest="$(tr -d '[:space:]' </tmp/tc-digest.out)"
-  elif docker buildx imagetools inspect "$image" -f '{{println .Manifest.Digest}}' >/tmp/tc-digest.out 2>/dev/null; then
-    digest="$(tr -d '[:space:]' </tmp/tc-digest.out)"
+  local digest="" out
+  # Prefer Go template when supported (newer buildx). Fall back to parsing
+  # the human "Digest:" line — some buildx builds ignore -f/--format.
+  if out="$(docker buildx imagetools inspect "$image" --format '{{.Manifest.Digest}}' 2>/dev/null)"; then
+    digest="$(printf '%s\n' "$out" | tr -d '[:space:]')"
   fi
-  rm -f /tmp/tc-digest.out 2>/dev/null || true
+  if [[ "$digest" != sha256:* ]]; then
+    if out="$(docker buildx imagetools inspect "$image" -f '{{.Manifest.Digest}}' 2>/dev/null)"; then
+      digest="$(printf '%s\n' "$out" | tr -d '[:space:]')"
+    fi
+  fi
+  if [[ "$digest" != sha256:* ]]; then
+    if out="$(docker buildx imagetools inspect "$image" 2>/dev/null)"; then
+      digest="$(printf '%s\n' "$out" | awk '/^Digest:/{print $2; exit}')"
+    fi
+  fi
   if [[ "$digest" == sha256:* ]]; then
     echo "$digest"
   fi
