@@ -8,6 +8,7 @@ const sepoliaRpcUrl = process.env.SEPOLIA_RPC_URL?.trim();
 const baseRpcUrl = process.env.BASE_RPC_URL?.trim() || process.env.EVM_8453_RPC_URL?.trim();
 const bscRpcUrl = process.env.BSC_RPC_URL?.trim() || process.env.EVM_56_RPC_URL?.trim();
 const evmPrivateKey = process.env.EVM_PRIVATE_KEY?.trim();
+// Etherscan API v2 key covers Ethereum / Base / BNB and other supported explorers.
 const etherscanApiKey = process.env.ETHERSCAN_API_KEY?.trim();
 
 export default defineConfig({
@@ -41,18 +42,21 @@ export default defineConfig({
     sepolia: {
       type: "http",
       chainType: "l1",
+      chainId: 11155111,
       url: sepoliaRpcUrl || "https://ethereum-sepolia-rpc.publicnode.com",
       accounts: evmPrivateKey ? [evmPrivateKey] : [],
     },
     base: {
       type: "http",
       chainType: "l1",
+      chainId: 8453,
       url: baseRpcUrl || "https://mainnet.base.org",
       accounts: evmPrivateKey ? [evmPrivateKey] : [],
     },
     bsc: {
       type: "http",
       chainType: "l1",
+      chainId: 56,
       url: bscRpcUrl || "https://bsc-dataseed.binance.org",
       accounts: evmPrivateKey ? [evmPrivateKey] : [],
     },

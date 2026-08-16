@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { decodePayLink, encodePayLink, invoiceIdFromPayLink } from "../shared/invoice.js";
+import { decodePayLink, encodeInvoiceResumeLink, encodePayLink } from "../shared/invoice.js";
 import { escapeHtml } from "../shared/dom.js";
 import {
   chainChipHtml,
@@ -25,12 +25,20 @@ import type {
 import { apiUrl } from "../shared/site.js";
 
 const ACTIVATION_KEY = (invoiceId: string) => `tc.activation.${invoiceId}`;
+const CHECKOUT_KEY = (fingerprint: string) => `tc.checkout.${fingerprint}`;
 const POLL_MS = 2000;
 
 type PayRoot = HTMLElement & { __tcPollToken?: number };
 
 export function renderPay(root: HTMLElement): void {
   stopPolling(root);
+
+  const params = new URLSearchParams(location.search);
+  const resumeId = params.get("id")?.trim();
+  if (resumeId) {
+    void resumeByInvoiceId(root, resumeId);
+    return;
+  }
 
   let fields: PayLinkFields;
   try {
@@ -42,31 +50,83 @@ export function renderPay(root: HTMLElement): void {
           <p class="eyebrow">Checkout</p>
           <h1>Pay link missing</h1>
           <p class="danger">${escapeHtml(error instanceof Error ? error.message : "Invalid pay link")}</p>
-          <p>Open a link from <a href="/create" data-route>Create invoice</a>, or pass price, to, and invoice_seed query params.</p>
+          <p>Open a link from <a href="/create" data-route>Create invoice</a>, or pass price, to, chains, and tokens query params.</p>
         </section>
       </div>
     `;
     return;
   }
 
-  const invoiceId = invoiceIdFromPayLink(fields);
-  const activation = readJson<CreateInvoiceResponse>(ACTIVATION_KEY(invoiceId));
-  const invoice = activation?.invoice;
-  const hasAddress = Boolean(invoice?.invoiceAddress);
+  const fingerprint = checkoutFingerprint(fields);
+  const cachedId = sessionStorage.getItem(CHECKOUT_KEY(fingerprint));
+  if (cachedId) {
+    const activation = readJson<CreateInvoiceResponse>(ACTIVATION_KEY(cachedId));
+    const invoice = activation?.invoice;
+    if (invoice?.invoiceAddress) {
+      replaceResumeUrl(cachedId);
+      if (isPaidLike(invoice.status)) {
+        renderPaidStage(root, fieldsFromInvoice(invoice, fields), cachedId, invoice);
+      } else {
+        void renderInvoiceStage(root, fieldsFromInvoice(invoice, fields), cachedId, invoice);
+      }
+      return;
+    }
+  }
 
-  if (hasAddress && invoice && isPaidLike(invoice.status)) {
-    renderPaidStage(root, fields, invoiceId, invoice);
+  renderCheckoutStage(root, fields);
+}
+
+async function resumeByInvoiceId(root: HTMLElement, invoiceId: string): Promise<void> {
+  const cached = readJson<CreateInvoiceResponse>(ACTIVATION_KEY(invoiceId));
+  if (cached?.invoice?.invoiceAddress) {
+    const fields = fieldsFromInvoice(cached.invoice);
+    if (isPaidLike(cached.invoice.status)) {
+      renderPaidStage(root, fields, invoiceId, cached.invoice);
+    } else {
+      void renderInvoiceStage(root, fields, invoiceId, cached.invoice);
+    }
     return;
   }
 
-  if (hasAddress && invoice) {
-    void renderInvoiceStage(root, fields, invoiceId, invoice);
-  } else {
-    renderCheckoutStage(root, fields, invoiceId);
+  root.innerHTML = `
+    <div class="invoice-shell">
+      <section class="invoice-doc">
+        <p class="eyebrow">Checkout</p>
+        <h1>Loading invoice…</h1>
+        <div id="pay-status" class="status">Fetching <span class="mono">${escapeHtml(short(invoiceId))}</span></div>
+      </section>
+    </div>
+  `;
+
+  try {
+    const response = await fetch(apiUrl(`/api/invoices/${encodeURIComponent(invoiceId)}`));
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Invoice not found (${response.status})`);
+    }
+    const invoice = (await response.json()) as InvoiceWithEvents;
+    sessionStorage.setItem(ACTIVATION_KEY(invoiceId), JSON.stringify({ invoice, created: false }));
+    const fields = fieldsFromInvoice(invoice);
+    if (isPaidLike(invoice.status)) {
+      renderPaidStage(root, fields, invoiceId, invoice);
+    } else {
+      void renderInvoiceStage(root, fields, invoiceId, invoice);
+    }
+  } catch (error) {
+    root.innerHTML = `
+      <div class="invoice-shell">
+        <section class="invoice-doc">
+          <p class="eyebrow">Checkout</p>
+          <h1>Invoice unavailable</h1>
+          <p class="danger">${escapeHtml(error instanceof Error ? error.message : "Load failed")}</p>
+          <p><a href="/create" data-route>Create a new pay link</a></p>
+        </section>
+      </div>
+    `;
   }
 }
 
-function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId: string): void {
+function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
   const initialChain = fields.chains[0];
   const recipientsForChain = (chainId: string) =>
     fields.to.filter((addr) => {
@@ -191,7 +251,10 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields, invoiceId
       });
       const body = (await response.json()) as CreateInvoiceResponse & { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Create failed");
+      const invoiceId = body.invoice.id;
       sessionStorage.setItem(ACTIVATION_KEY(invoiceId), JSON.stringify(body));
+      sessionStorage.setItem(CHECKOUT_KEY(checkoutFingerprint(fields)), invoiceId);
+      replaceResumeUrl(invoiceId);
       renderPay(root);
     } catch (error) {
       if (status) status.textContent = error instanceof Error ? error.message : "Create failed";
@@ -296,6 +359,9 @@ async function renderInvoiceStage(
   root.querySelector<HTMLButtonElement>("#change-method")?.addEventListener("click", () => {
     stopPolling(root);
     sessionStorage.removeItem(ACTIVATION_KEY(invoiceId));
+    const fingerprint = checkoutFingerprint(fields);
+    sessionStorage.removeItem(CHECKOUT_KEY(fingerprint));
+    history.replaceState(null, "", `/pay?${encodePayLink(fields)}`);
     renderPay(root);
   });
 
@@ -366,7 +432,6 @@ function renderPaidStage(
     const url = new URL(fields.callback);
     url.searchParams.set("invoice_id", invoiceId);
     if (fields.clientInvoiceId) url.searchParams.set("client_invoice_id", fields.clientInvoiceId);
-    url.searchParams.set("invoice_seed", fields.invoiceSeed);
     url.searchParams.set("status", status);
     if (invoice.invoiceAddress) url.searchParams.set("invoice_address", invoice.invoiceAddress);
     if (statusEl) {
@@ -450,13 +515,45 @@ function fieldsToBody(fields: PayLinkFields): Record<string, unknown> {
     to: fields.to,
     chains: fields.chains,
     tokens: fields.tokens,
-    invoiceSeed: fields.invoiceSeed,
     clientInvoiceId: fields.clientInvoiceId,
     callback: fields.callback,
     title: fields.title,
     description: fields.description,
     allowPartial: fields.allowPartial,
   };
+}
+
+function fieldsFromInvoice(invoice: InvoiceRecord, fallback?: PayLinkFields): PayLinkFields {
+  return {
+    price: invoice.priceUsd || fallback?.price || "0",
+    to: invoice.toAddresses?.length ? invoice.toAddresses : fallback?.to ?? [],
+    chains: invoice.chainId ? [invoice.chainId] : fallback?.chains ?? [],
+    tokens: invoice.token ? [invoice.token] : fallback?.tokens ?? [],
+    invoiceSeed: invoice.invoiceSeed || undefined,
+    clientInvoiceId: invoice.clientInvoiceId || fallback?.clientInvoiceId,
+    callback: invoice.callbackUrl ?? fallback?.callback,
+    title: invoice.title ?? fallback?.title,
+    description: invoice.description ?? fallback?.description,
+    allowPartial: invoice.allowPartial ?? fallback?.allowPartial ?? false,
+  };
+}
+
+function checkoutFingerprint(fields: PayLinkFields): string {
+  return [
+    fields.price,
+    fields.to.join(","),
+    fields.chains.join(","),
+    fields.tokens.join(","),
+    fields.clientInvoiceId ?? "",
+    fields.callback ?? "",
+    fields.title ?? "",
+    fields.description ?? "",
+    fields.allowPartial ? "1" : "0",
+  ].join("|");
+}
+
+function replaceResumeUrl(invoiceId: string): void {
+  history.replaceState(null, "", `/pay?${encodeInvoiceResumeLink(invoiceId)}`);
 }
 
 function short(value: string): string {

@@ -30,12 +30,14 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
     }
   });
 
+  const seed = optionalParam(params, "invoice_seed");
   return {
     price: requiredParam(params, "price"),
     to,
     chains: splitList(params.get("chains") ?? DEFAULT_CHAIN),
     tokens: splitList(params.get("tokens") ?? DEFAULT_TOKEN).map((t) => t.toUpperCase()),
-    invoiceSeed: requiredParam(params, "invoice_seed"),
+    // Seed is never part of a shareable pay link; tolerate legacy links only for decode.
+    ...(seed ? { invoiceSeed: seed } : {}),
     clientInvoiceId: optionalParam(params, "client_invoice_id"),
     callback: optionalParam(params, "callback"),
     title: optionalParam(params, "title"),
@@ -44,13 +46,13 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
   };
 }
 
+/** Shareable checkout query string — never includes invoice_seed or invoice id. */
 export function encodePayLink(fields: PayLinkFields): string {
   const params = new URLSearchParams();
   params.set("price", fields.price);
   params.set("to", fields.to.join(","));
   params.set("chains", fields.chains.join(","));
   params.set("tokens", fields.tokens.join(","));
-  params.set("invoice_seed", fields.invoiceSeed);
   if (fields.clientInvoiceId) params.set("client_invoice_id", fields.clientInvoiceId);
   if (fields.callback) params.set("callback", fields.callback);
   if (fields.title) params.set("title", fields.title);
@@ -59,11 +61,21 @@ export function encodePayLink(fields: PayLinkFields): string {
   return params.toString();
 }
 
+/** Resume link for an already-created invoice. */
+export function encodeInvoiceResumeLink(invoiceId: string): string {
+  const params = new URLSearchParams();
+  params.set("id", invoiceId);
+  return params.toString();
+}
+
 export function payPath(fields: PayLinkFields): string {
   return `/pay?${encodePayLink(fields)}`;
 }
 
 export function commerceParamsFromPayLink(fields: PayLinkFields): CommerceInvoiceParams {
+  if (!fields.invoiceSeed) {
+    throw new Error("invoiceSeed is required to derive the commerce invoice id");
+  }
   return {
     invoiceSeed: fields.invoiceSeed,
     toAddresses: fields.to,
@@ -88,7 +100,6 @@ export function normalizePayLinkFields(input: Partial<PayLinkFields> & Record<st
     to: Array.isArray(input.to) ? input.to.join(",") : input.to,
     chains: Array.isArray(input.chains) ? input.chains.join(",") : input.chains,
     tokens: Array.isArray(input.tokens) ? input.tokens.join(",") : input.tokens,
-    invoice_seed: input.invoiceSeed ?? input.invoice_seed,
     client_invoice_id: input.clientInvoiceId ?? input.client_invoice_id,
     callback: input.callback,
     title: input.title,

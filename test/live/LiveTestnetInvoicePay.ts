@@ -15,7 +15,6 @@ import {
   parseUnits,
 } from "ethers";
 import { TronWeb } from "tronweb";
-import { getCommerceInvoiceId, randomInvoiceSeed } from "../../src/index.js";
 
 const API_BASE = (process.env.LIVE_TESTNET_API_URL ?? "https://testnet.trustless-commerce.com").replace(
   /\/$/,
@@ -169,7 +168,6 @@ function encodeUiPayLink(fields: {
   to: string[];
   chains: string[];
   tokens: string[];
-  invoiceSeed: string;
   clientInvoiceId?: string;
   callback?: string;
   title?: string;
@@ -181,7 +179,6 @@ function encodeUiPayLink(fields: {
   params.set("to", fields.to.join(","));
   params.set("chains", fields.chains.join(","));
   params.set("tokens", fields.tokens.join(","));
-  params.set("invoice_seed", fields.invoiceSeed);
   if (fields.clientInvoiceId) params.set("client_invoice_id", fields.clientInvoiceId);
   if (fields.callback) params.set("callback", fields.callback);
   if (fields.title) params.set("title", fields.title);
@@ -231,7 +228,6 @@ describe("Live testnet invoice pay (API → chain → sweeper)", function () {
       to: [merchant],
       chains: ["11155111"],
       tokens: ["USDC"],
-      invoiceSeed: randomInvoiceSeed(),
       clientInvoiceId: `live-evm-${Date.now()}`,
       chainId: "11155111",
       token: "USDC",
@@ -266,7 +262,6 @@ describe("Live testnet invoice pay (API → chain → sweeper)", function () {
       to: [merchant],
       chains: ["nile"],
       tokens: ["USDT"],
-      invoiceSeed: randomInvoiceSeed(),
       clientInvoiceId: `live-tron-${Date.now()}`,
       chainId: "nile",
       token: "USDT",
@@ -313,7 +308,6 @@ describe("Live testnet UI pay link + callback", function () {
       to: [merchant],
       chains: ["11155111"],
       tokens: ["USDC"],
-      invoiceSeed: randomInvoiceSeed(),
       clientInvoiceId: `ui-evm-${Date.now()}`,
       callback: webhook.url,
       title: "UI live callback",
@@ -321,26 +315,23 @@ describe("Live testnet UI pay link + callback", function () {
       allowPartial: false,
     };
 
-    // Same pay URL the Create page would emit.
+    // Same pay URL the Create page would emit (no invoice_seed).
     const payUrl = `${UI_BASE}/pay?${encodeUiPayLink(fields)}`;
     const payPage = await fetch(payUrl);
     expect(payPage.status).to.equal(200);
     const html = await payPage.text();
     expect(html).to.match(/Trustless Commerce|invoice|pay/i);
+    expect(payUrl).to.not.include("invoice_seed");
 
-    const expectedId = getCommerceInvoiceId({
-      invoiceSeed: fields.invoiceSeed,
-      toAddresses: fields.to,
-    });
-
-    // Same POST the pay page "Continue" button sends.
+    // Same POST the pay page "Continue" button sends — API assigns seed + invoice id.
     const created = await createInvoice({
       ...fields,
       chainId: "11155111",
       token: "USDC",
       selectedTo: merchant,
     });
-    expect(created.id).to.equal(expectedId);
+    expect(created.id).to.match(/^0x[0-9a-fA-F]{64}$/);
+    expect(created.invoiceSeed).to.match(/^0x[0-9a-fA-F]{64}$/);
     expect(created.callbackUrl ?? fields.callback).to.equal(webhook.url);
 
     const merchantBeforeSweep = await usdc.balanceOf(merchant);

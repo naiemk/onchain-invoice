@@ -80,8 +80,9 @@ export class CommerceDb {
   }
 
   /**
-   * Idempotent create: same invoiceId + same activation fields → return existing.
-   * Conflicting activation fields → 409.
+   * Create invoice by primary key `invoiceId`.
+   * Duplicate invoice ids are always rejected (409) unless the same Idempotency-Key
+   * is retried (returns the prior invoice).
    */
   createInvoice(input: {
     invoiceId: string;
@@ -94,84 +95,75 @@ export class CommerceDb {
     idempotencyKey?: string | null;
   }): { invoice: InvoiceRecord; created: boolean } {
     const now = new Date().toISOString();
-    const existing = this.getInvoice(input.invoiceId);
-    if (existing) {
-      if (existing.status !== "created" && existing.status !== "awaiting_payment") {
-        return { invoice: existing, created: false };
-      }
-      const same =
-        existing.chainId === input.chainId &&
-        (existing.token ?? "").toUpperCase() === input.token.toUpperCase() &&
-        (existing.selectedTo ?? "").toLowerCase() === input.selectedTo.toLowerCase() &&
-        existing.priceUsd === input.fields.price &&
-        existing.invoiceSeed === input.fields.invoiceSeed;
-      if (same && existing.invoiceAddress) {
-        return { invoice: existing, created: false };
-      }
-      if (existing.invoiceAddress && !same) {
-        throw Object.assign(new Error("Invoice already exists with different chain/token/to"), { statusCode: 409 });
+
+    if (input.idempotencyKey) {
+      const prior = this.db
+        .prepare("SELECT invoice_id FROM idempotency_keys WHERE key = ?")
+        .get(input.idempotencyKey) as { invoice_id: string } | undefined;
+      if (prior) {
+        const inv = this.getInvoice(prior.invoice_id);
+        if (inv) return { invoice: inv, created: false };
       }
     }
 
-    const tx = this.db.transaction(() => {
-      if (input.idempotencyKey) {
-        const prior = this.db
-          .prepare("SELECT invoice_id FROM idempotency_keys WHERE key = ?")
-          .get(input.idempotencyKey) as { invoice_id: string } | undefined;
-        if (prior) {
-          const inv = this.getInvoice(prior.invoice_id);
-          if (inv) return { invoice: inv, created: false };
-        }
-      }
+    const existing = this.getInvoice(input.invoiceId);
+    if (existing) {
+      throw Object.assign(new Error("Invoice id already exists"), {
+        statusCode: 409,
+        invoice: existing,
+      });
+    }
 
-      this.db
-        .prepare(
-          `INSERT INTO invoices (
-            id, invoice_seed, client_invoice_id, price_usd, to_addresses, selected_to, chain_id, token,
-            invoice_address, title, description, callback_url, allow_partial, status,
-            amount_paid, amount_swept, fee_collected, gas_spent_wei, sweep_tx,
-            pay_session_id, version, claimed_by, claimed_until,
-            created_at, updated_at, paid_at, swept_at
-          ) VALUES (
-            @id, @invoiceSeed, @clientInvoiceId, @priceUsd, @toAddresses, @selectedTo, @chainId, @token,
-            @invoiceAddress, @title, @description, @callbackUrl, @allowPartial, 'awaiting_payment',
-            '0', '0', '0', '0', NULL,
-            @paySessionId, 1, NULL, NULL,
-            @now, @now, NULL, NULL
+    if (!input.fields.invoiceSeed) {
+      throw Object.assign(new Error("invoiceSeed is required"), { statusCode: 500 });
+    }
+
+    const tx = this.db.transaction(() => {
+      try {
+        this.db
+          .prepare(
+            `INSERT INTO invoices (
+              id, invoice_seed, client_invoice_id, price_usd, to_addresses, selected_to, chain_id, token,
+              invoice_address, title, description, callback_url, allow_partial, status,
+              amount_paid, amount_swept, fee_collected, gas_spent_wei, sweep_tx,
+              pay_session_id, version, claimed_by, claimed_until,
+              created_at, updated_at, paid_at, swept_at
+            ) VALUES (
+              @id, @invoiceSeed, @clientInvoiceId, @priceUsd, @toAddresses, @selectedTo, @chainId, @token,
+              @invoiceAddress, @title, @description, @callbackUrl, @allowPartial, 'awaiting_payment',
+              '0', '0', '0', '0', NULL,
+              @paySessionId, 1, NULL, NULL,
+              @now, @now, NULL, NULL
+            )`
           )
-          ON CONFLICT(id) DO UPDATE SET
-            invoice_seed = COALESCE(excluded.invoice_seed, invoices.invoice_seed),
-            selected_to = excluded.selected_to,
-            chain_id = excluded.chain_id,
-            token = excluded.token,
-            invoice_address = COALESCE(excluded.invoice_address, invoices.invoice_address),
-            title = excluded.title,
-            description = excluded.description,
-            callback_url = excluded.callback_url,
-            allow_partial = excluded.allow_partial,
-            status = CASE WHEN invoices.status = 'created' THEN 'awaiting_payment' ELSE invoices.status END,
-            pay_session_id = COALESCE(excluded.pay_session_id, invoices.pay_session_id),
-            version = invoices.version + 1,
-            updated_at = excluded.updated_at
-          WHERE invoices.status IN ('created', 'awaiting_payment')`
-        )
-        .run({
-          id: input.invoiceId,
-          invoiceSeed: input.fields.invoiceSeed,
-          clientInvoiceId: input.fields.clientInvoiceId ?? "",
-          priceUsd: input.fields.price,
-          toAddresses: JSON.stringify(input.fields.to),
-          selectedTo: input.selectedTo,
-          chainId: input.chainId,
-          token: input.token,
-          invoiceAddress: input.invoiceAddress,
-          title: input.fields.title ?? null,
-          description: input.fields.description ?? null,
-          callbackUrl: input.fields.callback ?? null,
-          allowPartial: input.fields.allowPartial ? 1 : 0,
-          paySessionId: input.paySessionId ?? null,
-          now,
-        });
+          .run({
+            id: input.invoiceId,
+            invoiceSeed: input.fields.invoiceSeed,
+            clientInvoiceId: input.fields.clientInvoiceId ?? "",
+            priceUsd: input.fields.price,
+            toAddresses: JSON.stringify(input.fields.to),
+            selectedTo: input.selectedTo,
+            chainId: input.chainId,
+            token: input.token,
+            invoiceAddress: input.invoiceAddress,
+            title: input.fields.title ?? null,
+            description: input.fields.description ?? null,
+            callbackUrl: input.fields.callback ?? null,
+            allowPartial: input.fields.allowPartial ? 1 : 0,
+            paySessionId: input.paySessionId ?? null,
+            now,
+          });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/UNIQUE|constraint/i.test(message)) {
+          const raced = this.getInvoice(input.invoiceId);
+          throw Object.assign(new Error("Invoice id already exists"), {
+            statusCode: 409,
+            invoice: raced ?? undefined,
+          });
+        }
+        throw error;
+      }
 
       this.addEvent(
         input.invoiceId,
@@ -197,7 +189,7 @@ export class CommerceDb {
 
       const invoice = this.getInvoice(input.invoiceId);
       if (!invoice) throw new Error("Failed to create invoice");
-      return { invoice, created: !existing };
+      return { invoice, created: true };
     });
     return tx();
   }

@@ -27,6 +27,7 @@
   "scripts": {
     "build": "tsc && npm run sweep-node:build && npm run commerce:build",
     "compile": "hardhat compile",
+    "pretest": "tsc",
     "test": "hardhat test test/*.ts",
     "test:contracts": "hardhat test",
     "clean": "hardhat clean",

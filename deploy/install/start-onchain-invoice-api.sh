@@ -80,13 +80,15 @@ PY
 }
 
 # Only pass -e when non-empty so blank env does not override YAML literals.
+# Skip `_PRIVATE_KEY_` placeholders so mainnet can boot before chain secrets are filled.
 env_args=()
 add_env() {
   local name="$1"
   local value="${2-}"
-  if [[ -n "$value" ]]; then
-    env_args+=(-e "${name}=${value}")
+  if [[ -z "$value" || "$value" == "_PRIVATE_KEY_" ]]; then
+    return 0
   fi
+  env_args+=(-e "${name}=${value}")
 }
 
 IMAGE="$(yaml_get docker.image)"

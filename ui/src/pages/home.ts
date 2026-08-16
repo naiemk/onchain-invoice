@@ -1,7 +1,6 @@
 import { encodePayLink } from "../shared/invoice.js";
 import { howCreateArt, howPayArt, howSettleArt } from "../shared/how-graphics.js";
 import { deploymentMode, networkKind, networksForDeployment } from "../shared/networks.js";
-import { randomInvoiceSeed } from "../onchain-invoice-browser.js";
 import { SITE } from "../shared/site.js";
 
 function chip(label: string, kind: "muted" | "warn" | "ok" | "accent" = "muted"): string {
@@ -22,14 +21,12 @@ export function renderHome(root: HTMLElement): void {
     demoKind === "tron"
       ? ["TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf"]
       : ["0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb"];
-  const invoiceSeed = randomInvoiceSeed();
   const demo = {
     price: "0.01",
     to: demoTo,
     chains: [demoChain],
     tokens: [demoToken],
-    invoiceSeed,
-    clientInvoiceId: `order-${invoiceSeed.slice(2, 14).toLowerCase()}`,
+    clientInvoiceId: `order-${Date.now().toString(36)}`,
     callback: "",
     title: "Demo invoice",
     description:

@@ -7,8 +7,8 @@ export interface PayLinkFields {
   to: string[];
   chains: string[];
   tokens: string[];
-  /** Random bytes32; hashed with `to` into the invoice id. */
-  invoiceSeed: string;
+  /** Server-assigned only; never present on shareable pay-link query strings. */
+  invoiceSeed?: string;
   /** Optional merchant order/reference (not part of the invoice id). */
   clientInvoiceId?: string;
   callback?: string;

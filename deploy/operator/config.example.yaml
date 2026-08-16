@@ -3,6 +3,12 @@
 #
 #   cp deploy/operator/config.example.yaml deploy/operator/config.yaml
 #   npm run deploy:console
+#
+# Mainnet product EVM chains today: Base (8453) + BNB (56).
+# Tron needs no contract deploy. Solana is separate (program id / authority).
+# After CREATE2, copy addresses into deploy/.env.mainnet.api.example / VPS api-mainnet .env:
+#   EVM_8453_SWEEPER_ADDRESS / EVM_8453_FORWARDER_IMPLEMENTATION
+#   EVM_56_SWEEPER_ADDRESS / EVM_56_FORWARDER_IMPLEMENTATION
 
 seed: "replace-with-long-random-operator-seed"
 
@@ -12,22 +18,12 @@ feeBps: 50
 feeRecipient: "0x0000000000000000000000000000000000000000"
 owner: "0x0000000000000000000000000000000000000000"
 
-# Nick's CREATE2 factory (same address on Ethereum / Sepolia / most L2s).
+# Nick's CREATE2 factory (same address on Ethereum / Sepolia / Base / BNB / most L2s).
 create2Factory: "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 
 chains:
-  sepolia:
-    kind: evm
-    chainId: 11155111
-    rpcUrl: https://ethereum-sepolia-rpc.publicnode.com
-    explorer: https://sepolia.etherscan.io
-    enabled: true
-    # Filled after deploy
-    sweeper: ""
-    forwarderImplementation: ""
-    deployedAt: ""
-    deployTx: ""
-  # Mainnet rails — deploy via console, then paste into API/nodes env:
+  # --- Mainnet ---
+  # After deploy, paste into API/nodes env:
   #   EVM_8453_SWEEPER_ADDRESS / EVM_8453_FORWARDER_IMPLEMENTATION
   #   EVM_56_SWEEPER_ADDRESS / EVM_56_FORWARDER_IMPLEMENTATION
   base:
@@ -50,12 +46,23 @@ chains:
     forwarderImplementation: ""
     deployedAt: ""
     deployTx: ""
+  # --- Testnet (optional) ---
+  sepolia:
+    kind: evm
+    chainId: 11155111
+    rpcUrl: https://ethereum-sepolia-rpc.publicnode.com
+    explorer: https://sepolia.etherscan.io
+    enabled: true
+    sweeper: ""
+    forwarderImplementation: ""
+    deployedAt: ""
+    deployTx: ""
 
 solana:
   kind: solana
   chainId: devnet
   rpcUrl: https://api.devnet.solana.com
-  enabled: true
+  enabled: false
   feeBps: 50
   # Authority / fee recipient pubkeys (base58) — not secret keys
   authority: ""

@@ -40,6 +40,6 @@ export type OperatorConfig = {
 
 export type LogEvent = {
   ts: string;
-  stream: "stdout" | "stderr" | "info" | "error" | "success";
+  stream: "stdout" | "stderr" | "info" | "error" | "success" | "warn";
   line: string;
 };
