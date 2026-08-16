@@ -71,6 +71,8 @@ web_modules/
 !.env.example
 !.env.testnet.example
 !.env.mainnet.example
+!.env.mainnet.api.example
+!.env.mainnet.nodes.example
 !.env.domains.example
 !.env.api.example
 !.env.nodes.example

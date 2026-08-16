@@ -95,7 +95,8 @@ write_template "start-onchain-invoice-nodes.sh"
 write_template "update-onchain-invoice-nodes.sh"
 write_template "register-onchain-invoice-node.sh"
 write_template "lib-env.sh"
-for f in start-onchain-invoice-nodes.sh update-onchain-invoice-nodes.sh register-onchain-invoice-node.sh; do
+write_template "install-auto-update.sh"
+for f in start-onchain-invoice-nodes.sh update-onchain-invoice-nodes.sh register-onchain-invoice-node.sh install-auto-update.sh; do
   if [[ -f "$DEST/$f" ]]; then
     chmod +x "$DEST/$f"
   fi

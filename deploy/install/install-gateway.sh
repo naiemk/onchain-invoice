@@ -86,6 +86,14 @@ write_if_missing "install-auto-update.sh"
 write_if_missing "gateway/nginx.conf"
 write_if_missing "gateway/conf.d/domains.conf"
 write_template ".env.gateway.example"
+write_template "update-onchain-invoice-gateway.sh"
+write_template "lib-env.sh"
+write_template "install-auto-update.sh"
+for f in start-onchain-invoice-gateway.sh update-onchain-invoice-gateway.sh install-auto-update.sh; do
+  if [[ -f "$DEST/$f" ]]; then
+    chmod +x "$DEST/$f"
+  fi
+done
 
 cp "$DEST/.env.gateway.example" "$DEST/.env.example"
 echo "updated: $DEST/.env.example"
