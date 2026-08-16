@@ -132,12 +132,31 @@ export function isUnsetSecret(value: string | undefined | null): boolean {
   return false;
 }
 
+/** Chains that can observe balances / mark invoices paid (RPC required). */
+export function filterEvmObserveChains(chains: EvmChainConfig[]): EvmChainConfig[] {
+  return chains.filter((c) => Boolean(c.rpcUrl?.trim()));
+}
+
+/** Chains that can submit sweeps (RPC + sweeper contract + private key). */
+export function filterEvmSweepChains(chains: EvmChainConfig[]): EvmChainConfig[] {
+  return chains.filter(
+    (c) =>
+      Boolean(c.rpcUrl?.trim()) &&
+      Boolean(c.sweeperAddress?.trim()) &&
+      !/^0x0{40}$/i.test(c.sweeperAddress.trim()) &&
+      !isUnsetSecret(c.privateKey)
+  );
+}
+
 export class SweeperWorker {
   private stopped = false;
   private tickInFlight: Promise<void> | null = null;
   private wallet: Wallet | null = null;
   private readonly activity: ActivityLog | null;
   private readonly role: SweeperRole;
+  /** Chains with RPC — used to detect payment / mark paid (no private key required). */
+  private readonly observeChains: EvmChainConfig[];
+  /** Chains that can submit on-chain sweeps (RPC + sweeper + private key). */
   private readonly chains: EvmChainConfig[];
   private tron: TronSweeperConfig | undefined;
   private solana: SolanaSweeperConfig | undefined;
@@ -146,14 +165,10 @@ export class SweeperWorker {
   constructor(private readonly config: SweeperConfig) {
     this.role = resolveRole(config);
     const rawChains = this.role === "tron" || this.role === "solana" ? [] : config.chains ?? [];
-    // Soft-skip incomplete EVM entries (empty/placeholder key or sweeper) so mainnet templates stay up.
-    this.chains = rawChains.filter(
-      (c) =>
-        Boolean(c.rpcUrl?.trim()) &&
-        Boolean(c.sweeperAddress?.trim()) &&
-        !/^0x0{40}$/i.test(c.sweeperAddress.trim()) &&
-        !isUnsetSecret(c.privateKey)
-    );
+    // Payment detection only needs RPC (+ token metadata). Soft-skip empty RPC rows.
+    this.observeChains = filterEvmObserveChains(rawChains);
+    // Sweep needs a real key + sweeper address — incomplete rows stay observation-only.
+    this.chains = filterEvmSweepChains(this.observeChains);
     this.tron =
       this.role === "evm" || this.role === "solana"
         ? undefined
@@ -185,7 +200,8 @@ export class SweeperWorker {
         level: "info",
         msg: "sweeper role",
         role: this.role,
-        evmChains: this.chains.map((c) => String(c.chainId)),
+        evmObserveChains: this.observeChains.map((c) => String(c.chainId)),
+        evmSweepChains: this.chains.map((c) => String(c.chainId)),
         tronEnabled: Boolean(this.tron?.enabled),
         solanaEnabled: Boolean(this.solana?.enabled),
       })
@@ -358,28 +374,52 @@ export class SweeperWorker {
     }
 
     for (const [chainId, batch] of readyByChain) {
-      const chain = this.chains.find((entry) => String(entry.chainId) === chainId);
-      if (!chain || batch.length === 0) continue;
+      if (batch.length === 0) continue;
+      const sweepChain = this.chains.find((entry) => String(entry.chainId) === chainId);
 
       for (const item of batch) {
         try {
-          const claimed = await this.claimWithRetry(item.invoice);
+          // Mark paid as soon as balance is observed — does not require a sweep key.
+          let version = item.invoice.version;
+          if (item.invoice.status === "awaiting_payment" || item.invoice.status === "created") {
+            const afterPaid = await this.trackWithRetry({
+              invoiceId: item.invoice.id,
+              status: item.invoice.allowPartial ? "paid_partial" : "paid",
+              amountPaid: item.balance.toString(),
+              expectedVersion: version,
+              payload: {
+                observedBalance: item.balance.toString(),
+                token: item.token ?? COMMERCE_NATIVE_TOKEN,
+              },
+            });
+            if (!afterPaid) continue;
+            version = afterPaid.version;
+          }
+
+          if (!sweepChain || isUnsetSecret(sweepChain.privateKey)) {
+            this.activity?.append("sweep-deferred", {
+              invoiceId: item.invoice.id,
+              chainId,
+              invoiceAddress: item.invoice.invoiceAddress ?? undefined,
+              payload: {
+                reason: "missing_sweep_private_key",
+                token: item.token ?? COMMERCE_NATIVE_TOKEN,
+                amount: item.balance.toString(),
+              },
+            });
+            continue;
+          }
+
+          const claimed = await this.claimWithRetry({ ...item.invoice, version });
           if (!claimed) continue;
-          const afterPaid = await this.trackWithRetry({
-            invoiceId: item.invoice.id,
-            status: item.invoice.allowPartial ? "paid_partial" : "paid",
-            amountPaid: item.balance.toString(),
-            expectedVersion: claimed.version,
-            payload: { observedBalance: item.balance.toString(), token: item.token ?? COMMERCE_NATIVE_TOKEN },
-          });
-          const provider = new JsonRpcProvider(chain.rpcUrl);
-          const signer = new Wallet(chain.privateKey, provider);
+          const provider = new JsonRpcProvider(sweepChain.rpcUrl);
+          const signer = new Wallet(sweepChain.privateKey, provider);
           const sdk = new CommerceInvoiceSdk({
             provider,
             signer,
-            sweeperAddress: chain.sweeperAddress,
+            sweeperAddress: sweepChain.sweeperAddress,
           });
-          await this.sweepOne(sdk, item.invoice, item.token, item.balance, afterPaid?.version ?? claimed.version + 1);
+          await this.sweepOne(sdk, item.invoice, item.token, item.balance, claimed.version);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           this.activity?.append("sweep-failed", {
@@ -470,7 +510,7 @@ export class SweeperWorker {
   ): Promise<{ chain: EvmChainConfig; token: string | null; balance: bigint } | null> {
     if (!invoice.chainId || !invoice.invoiceAddress || !invoice.selectedTo) return null;
     if (invoice.status === "swept") return null;
-    const chain = this.chains.find((entry) => String(entry.chainId) === String(invoice.chainId));
+    const chain = this.observeChains.find((entry) => String(entry.chainId) === String(invoice.chainId));
     if (!chain) return null;
 
     const provider = new JsonRpcProvider(chain.rpcUrl);

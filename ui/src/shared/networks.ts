@@ -277,7 +277,22 @@ export function chainChipHtml(
 export function tokenChipHtml(token: string | null | undefined, opts: { size?: "sm" | "md" | "lg" } = {}): string {
   const size = opts.size ?? "md";
   const symbol = (token ?? "—").toUpperCase();
-  return `<span class="token-chip token-chip-${size}"><span class="token-chip-mark">${escapeText(symbol.slice(0, 1))}</span><span class="token-chip-label">${escapeText(symbol)}</span></span>`;
+  const logoPx = size === "lg" ? 28 : size === "sm" ? 16 : 20;
+  return `<span class="token-chip token-chip-${size}">${tokenLogoSvg(symbol, logoPx)}<span class="token-chip-label">${escapeText(symbol)}</span></span>`;
+}
+
+/** Inline SVG token mark (safe HTML fragment). */
+export function tokenLogoSvg(token: string | null | undefined, size = 20): string {
+  const symbol = String(token ?? "").toUpperCase();
+  const s = String(size);
+  if (symbol === "USDC") {
+    return `<svg class="token-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2775CA"/><path fill="#fff" d="M20.7 18.3c0-1.9-1.1-2.7-3.4-3l-2.5-.4c-.8-.1-1.3-.4-1.3-1.1s.6-1.1 1.7-1.1c1 0 1.7.3 2.1.9l1.8-1.1c-.7-1-1.9-1.6-3.5-1.7v-1.6h-1.6v1.6c-2 .3-3.3 1.5-3.3 3.2 0 1.9 1.1 2.7 3.4 3l2.5.4c.9.1 1.3.5 1.3 1.2s-.7 1.2-1.9 1.2c-1.2 0-2-.5-2.5-1.2l-1.9 1.1c.7 1.2 2.1 1.9 3.9 2.1v1.6h1.6v-1.6c2.1-.2 3.6-1.5 3.6-3.5z"/><path fill="#fff" fill-opacity=".85" d="M12.2 7.4 10.4 9.2A11 11 0 0 0 7.8 16a11 11 0 0 0 2.6 6.8l1.8 1.8A13.4 13.4 0 0 1 5.4 16a13.4 13.4 0 0 1 6.8-8.6zm7.6 0A13.4 13.4 0 0 1 26.6 16a13.4 13.4 0 0 1-6.8 11.4l1.8-1.8A11 11 0 0 0 24.2 16a11 11 0 0 0-2.6-6.8L19.8 7.4z"/></svg>`;
+  }
+  if (symbol === "USDT") {
+    return `<svg class="token-logo" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#26A17B"/><path fill="#fff" d="M17.4 14.9v-2.2h4.3V9.4H10.3v3.3h4.3v2.2c-3.5.2-6.1 1-6.1 1.9 0 1 2.9 1.8 6.5 1.9v5.5h2.4v-5.5c3.6-.1 6.4-.9 6.4-1.9 0-.9-2.6-1.7-6.4-1.9zm0 3.1v.1c-.1 0-.3 0-.4.1h-.1c-.3 0-.7 0-1.1-.1v-.1c-2.5-.1-4.4-.6-4.4-1.1 0-.5 1.9-1 4.4-1.1v.1c.3 0 .7.1 1.1.1h.1c.2 0 .3 0 .4-.1v-.1c2.5.1 4.3.6 4.3 1.1 0 .5-1.8 1-4.3 1.1z"/></svg>`;
+  }
+  const letter = escapeText((symbol || "?").slice(0, 1));
+  return `<span class="token-chip-mark" aria-hidden="true">${letter}</span>`;
 }
 
 function escapeText(value: string): string {

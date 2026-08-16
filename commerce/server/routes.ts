@@ -361,6 +361,7 @@ async function applyTrack(
   if (typeof body.invoiceId !== "string") {
     throw Object.assign(new Error("invoiceId is required"), { statusCode: 400 });
   }
+  const before = db.getInvoice(body.invoiceId);
   const invoice = db.trackInvoice({
     invoiceId: body.invoiceId,
     status: parseInvoiceStatus(body.status),
@@ -375,7 +376,10 @@ async function applyTrack(
     sweeperAddress,
   });
 
-  if ((invoice.status === "paid" || invoice.status === "paid_partial" || invoice.status === "swept") && invoice.callbackUrl) {
+  // Callback on first transition into paid / paid_partial / swept (not on every re-track).
+  const becamePaidLike =
+    isPaidLikeStatus(invoice.status) && (!before || !isPaidLikeStatus(before.status) || before.status !== invoice.status);
+  if (becamePaidLike && invoice.callbackUrl) {
     await postCallback(db, invoice.callbackUrl, invoice);
   }
 }
@@ -621,6 +625,10 @@ function parseInvoiceStatus(value: unknown): InvoiceStatus | undefined {
     return value;
   }
   throw Object.assign(new Error("Invalid invoice status"), { statusCode: 400 });
+}
+
+function isPaidLikeStatus(status: InvoiceStatus): boolean {
+  return status === "paid" || status === "paid_partial" || status === "swept";
 }
 
 function bigintReplacer(_: string, value: unknown): unknown {
