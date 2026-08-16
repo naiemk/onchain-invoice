@@ -55,8 +55,8 @@ html[data-theme="dark"] {
   --surface-code: #080c14;
   --surface-code-ink: #dce6f5;
   --ink: #eef3fb;
-  --ink-muted: #b0bdcf;
-  --ink-faint: #93a1b6;
+  --ink-muted: #c2cddc;
+  --ink-faint: #a8b6c9;
   --line: #2c3a51;
   --line-strong: #455672;
   --accent: #5b9bff;
@@ -431,9 +431,9 @@ main {
 
 .shopify-crypto {
   align-items: center;
-  background: var(--ink);
+  background: var(--brand-panel);
   border-radius: 8px;
-  color: #fff;
+  color: var(--brand-panel-ink);
   cursor: default;
   display: inline-flex;
   font-weight: 600;
@@ -732,9 +732,9 @@ p {
 
 .how-step {
   align-items: center;
-  background: var(--ink);
+  background: var(--brand-panel);
   border-radius: 999px;
-  color: #fff;
+  color: var(--brand-panel-ink);
   display: inline-flex;
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -754,11 +754,11 @@ p {
   margin: 0;
 }
 
-/* Security band */
+/* Security band — always a dark brand panel so light copy stays readable in both themes. */
 .security-band {
-  background: var(--ink);
+  background: var(--brand-panel);
   border-radius: var(--radius-lg);
-  color: #fff;
+  color: var(--brand-panel-ink);
   padding: clamp(1.75rem, 4vw, 2.5rem);
 }
 
@@ -768,13 +768,13 @@ p {
 }
 
 .security-band p {
-  color: rgba(255, 255, 255, 0.78);
+  color: color-mix(in srgb, var(--brand-panel-ink) 86%, transparent);
   margin: 0;
   max-width: 40rem;
 }
 
 .security-band .eyebrow {
-  color: rgba(255, 255, 255, 0.55);
+  color: color-mix(in srgb, var(--brand-panel-ink) 70%, transparent);
 }
 
 /* Forms */
@@ -975,7 +975,7 @@ button:disabled {
 }
 
 .checkout-summary .muted {
-  color: rgba(255, 255, 255, 0.65);
+  color: color-mix(in srgb, var(--brand-panel-ink) 88%, transparent);
 }
 
 .checkout-panel {
@@ -1091,7 +1091,8 @@ button:disabled {
 
 .token-chip-mark {
   align-items: center;
-  background: var(--ink);
+  /* Fixed brand navy — never use --ink (light in dark mode) or the glyph vanishes. */
+  background: #0a2540;
   border-radius: 50%;
   color: #fff;
   display: inline-flex;
@@ -1100,6 +1101,12 @@ button:disabled {
   height: 1.55em;
   justify-content: center;
   width: 1.55em;
+}
+
+.token-logo {
+  border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
 }
 
 .token-chip-lg .token-chip-mark {
