@@ -112,7 +112,7 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/i
 
 ## Auto-update (optional per role)
 
-Host cron pulls GHCR images and recreates containers only when the image digest changed. Sweeper updates use `docker stop -t` so an in-flight sweep can finish before recreate.
+Host cron pulls GHCR `:main` images and recreates containers only when the image digest changed. Sweeper updates use `docker stop -t` so an in-flight sweep can finish before recreate.
 
 On small VPS hosts (≈1 GB), overlapping `docker pull` can wedge Docker. Install scripts harden that path:
 
@@ -127,20 +127,30 @@ On small VPS hosts (≈1 GB), overlapping `docker pull` can wedge Docker. Instal
 | `UI_TESTNET_AUTO_UPDATE` | `testnet-ui` | on | `GATEWAY_AUTO_UPDATE_INTERVAL_MIN` (20m @ :20) |
 | `UI_MAINNET_AUTO_UPDATE` | `mainnet-ui` | on | same cron |
 | `GATEWAY_AUTO_UPDATE` | nginx gateway | on | same cron |
-| `NODES_AUTO_UPDATE` | sweeper node | on (testnet example) | `NODES_AUTO_UPDATE_INTERVAL_MIN` (30m @ :10) |
-| `API_AUTO_UPDATE` | API | **off** | `API_AUTO_UPDATE_INTERVAL_MIN` (30m @ :00) |
+| `NODES_AUTO_UPDATE` | sweeper compose (`onchain-invoice-sweeper-*` or `mainnet-sweeper-*`) | on | `NODES_AUTO_UPDATE_INTERVAL_MIN` (30m @ :10) |
+| `API_AUTO_UPDATE` | API (`testnet-api` / `mainnet-api` via `DOCKER_NAME`) | **off** in testnet example; **on** in `deploy/.env.mainnet.api.example` | `API_AUTO_UPDATE_INTERVAL_MIN` (30m @ :00) |
 
 ```bash
-# After editing flags in .env:
-cd ~/tc/gateway && ./install-auto-update.sh
-cd ~/tc/sweeper && ./install-auto-update.sh
-cd ~/tc/api-testnet && ./install-auto-update.sh   # only schedules if API_AUTO_UPDATE=1
+# After editing flags in .env (and for mainnet dirs too):
+cd /root/tc/gateway && ./install-auto-update.sh
+cd /root/tc/sweeper && ./install-auto-update.sh
+cd /root/tc/sweeper-mainnet && ./install-auto-update.sh
+cd /root/tc/api && ./install-auto-update.sh
+cd /root/tc/api-mainnet && ./install-auto-update.sh
+
+# Prefer host cron.d when installing via Docker helper:
+docker run --rm -v /root/tc:/root/tc -v /etc/cron.d:/etc/cron.d -v /var/run/docker.sock:/var/run/docker.sock \
+  -w /root/tc/api-mainnet docker:27-cli sh -c 'apk add --no-cache bash >/dev/null && ./install-auto-update.sh'
 
 # Host log:
-tail -f ~/tc/gateway/logs/auto-update.log
+tail -f /root/tc/gateway/logs/auto-update.log /root/tc/api-mainnet/logs/auto-update.log
 ```
 
+`install-auto-update.sh` writes `/etc/cron.d/tc-<role>-<dir>` when that directory is writable (so cron survives ephemeral Docker install helpers). Otherwise it falls back to the invoking user's crontab.
+
 Installers refresh cron from these flags (no `ROLE=` required). Legacy `AUTO_UPDATE` is still accepted if the role flag is unset.
+
+Mainnet sweepers must use `SWEEPER_IMAGE=ghcr.io/naiemk/trustless-commerce-sweeper:main` (not a local-only tag) and `COMPOSE_FILE=docker-compose.sweepers-mainnet.yml` so auto-update recreates `mainnet-sweeper-evm` / `mainnet-sweeper-tron`. On a Docker-helper VPS you can sync scripts + cron with `deploy/install/wire-host-auto-update.sh`.
 
 ### Memory caps (1 GB host defaults)
 
