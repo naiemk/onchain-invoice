@@ -11,12 +11,18 @@ import {
   normalizeMerchantAddress,
   predictCommerceInvoiceAddress,
   predictCommerceSolanaInvoiceAta,
+  randomInvoiceSeed,
   resolveSolanaChain,
   resolveSolanaToken,
   tokenAllowedOnChain,
   tronNumericChainId,
 } from "onchain-invoice";
-import { encodePayLink, invoiceIdFromPayLink, normalizePayLinkFields } from "../shared/invoice.js";
+import {
+  encodeInvoiceResumeLink,
+  encodePayLink,
+  invoiceIdFromPayLink,
+  normalizePayLinkFields,
+} from "../shared/invoice.js";
 import type { InvoiceStatus, PayLinkFields } from "../shared/types.js";
 import { requireApiKey, requireMerchant } from "./auth.js";
 import { verifyCaptcha } from "./captcha.js";
@@ -203,7 +209,15 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
     }
   }
 
-  const fields = normalizePayLinkFields(body);
+  if (body.invoiceSeed != null || body.invoice_seed != null) {
+    throw Object.assign(new Error("invoiceSeed is server-assigned; do not provide it in the request"), {
+      statusCode: 400,
+    });
+  }
+
+  const baseFields = normalizePayLinkFields(body);
+  const invoiceSeed = randomInvoiceSeed();
+  const fields: PayLinkFields = { ...baseFields, invoiceSeed };
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
   assertTokenChainPair(chainId, token, config);
@@ -226,7 +240,8 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
   sendJson(res, created ? 201 : 200, {
     invoice,
     created,
-    payLink: `/pay?${encodePayLink(fields)}`,
+    payLink: `/pay?${encodeInvoiceResumeLink(invoice.id)}`,
+    checkoutLink: `/pay?${encodePayLink(baseFields)}`,
   });
 }
 
@@ -242,7 +257,14 @@ async function createSessionDeprecated(
       throw Object.assign(new Error("Captcha verification failed"), { statusCode: 400 });
     }
   }
-  const fields = normalizePayLinkFields(body);
+  if (body.invoiceSeed != null || body.invoice_seed != null) {
+    throw Object.assign(new Error("invoiceSeed is server-assigned; do not provide it in the request"), {
+      statusCode: 400,
+    });
+  }
+  const baseFields = normalizePayLinkFields(body);
+  const invoiceSeed = randomInvoiceSeed();
+  const fields: PayLinkFields = { ...baseFields, invoiceSeed };
   const paySessionId = randomUUID();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
@@ -264,7 +286,7 @@ async function createSessionDeprecated(
     paySessionId,
     invoiceId,
     expiresAt,
-    payLink: `/pay?${encodePayLink(fields)}`,
+    payLink: `/pay?${encodeInvoiceResumeLink(invoice.id)}`,
     invoice,
     deprecated: true,
     notice: "Use POST /api/invoices instead of /api/sessions",

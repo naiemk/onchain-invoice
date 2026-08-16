@@ -2,7 +2,7 @@
 name: trustless-commerce-invoice
 description: >-
   Create Trustless Commerce crypto invoices and check payment status. Use when building
-  or verifying USDC/USDT pay links, invoice_seed fields, invoiceAddress, awaiting_payment,
+  or verifying USDC/USDT pay links, invoiceAddress, awaiting_payment,
   POST /api/invoices create invoice API, GET /api/invoices/:id polling, sweep status,
   Trustless Commerce checkout, Sepolia, Nile, or crypto invoice integration for shops and agents.
 ---
@@ -30,7 +30,6 @@ Content-Type: application/json
   "to": ["0x…"],
   "chains": ["11155111"],
   "tokens": ["USDC"],
-  "invoiceSeed": "0x…32-byte hex…",
   "clientInvoiceId": "order-1",
   "chainId": "11155111",
   "token": "USDC",
@@ -51,7 +50,6 @@ Content-Type: application/json
   "to": ["T…"],
   "chains": ["nile"],
   "tokens": ["USDT"],
-  "invoiceSeed": "0x…32-byte hex…",
   "clientInvoiceId": "order-1",
   "chainId": "nile",
   "token": "USDT",
@@ -63,9 +61,11 @@ Content-Type: application/json
 
 Multi-chain links may include both an EVM `0x…` and Tron `T…` in `to`, with `chains: ["11155111","nile"]` and `tokens: ["USDC","USDT"]`. Pick `chainId` / `token` / `selectedTo` consistent with one kind when creating.
 
-Response includes `invoice` (with `invoiceAddress`, status `awaiting_payment`) and `payLink`.
+**Do not** send `invoiceSeed` / `invoice_seed` — the API assigns a random seed and derives `invoice.id`. Client-supplied seeds are rejected (`400`).
 
-Idempotent: same deterministic invoice id returns the same invoice (`200` if already created).
+Response includes `invoice` (with `invoiceAddress`, status `awaiting_payment`), resume `payLink` (`/pay?id=…`), and `checkoutLink` (shareable template without seed).
+
+Duplicate invoice ids are rejected with `409`. Use `Idempotency-Key` for safe retries of the same create.
 
 **Do not** use deprecated `POST /api/sessions` + `POST /api/invoices/activate`.
 
@@ -80,7 +80,6 @@ Content-Type: application/json
   "to": ["So111…"],
   "chains": ["devnet"],
   "tokens": ["USDC", "USDT"],
-  "invoiceSeed": "0x…32-byte hex…",
   "clientInvoiceId": "order-1",
   "chainId": "devnet",
   "token": "USDC",
@@ -97,14 +96,14 @@ Stablecoins only for now (`USDC`/`USDT` on Solana, `USDC` on EVM, `USDT` on Nile
 ## Pay link (browser)
 
 ```text
-/pay?price=10&to=0x…&chains=11155111&tokens=USDC&invoice_seed=0x…&title=Order&allow_partial=0
-/pay?price=10&to=T…&chains=nile&tokens=USDT&invoice_seed=0x…&title=Order&allow_partial=0
+/pay?price=10&to=0x…&chains=11155111&tokens=USDC&title=Order&allow_partial=0
+/pay?price=10&to=T…&chains=nile&tokens=USDT&title=Order&allow_partial=0
 ```
 
-Payer can open the link and create on Continue if the merchant did not call the API first.
+Shareable checkout links never include `invoice_seed`. The API creates the seed when the payer continues (or when you call `POST /api/invoices`). After create, resume with `/pay?id=<invoiceId>`.
 
 Deterministic `invoiceId` = `keccak256(abi.encode(bytes32 invoiceSeed, string[] toAddresses))`.
-Uniqueness comes from a random `invoiceSeed`; `toAddresses` bind payout destinations.
+Uniqueness comes from a server-generated random `invoiceSeed`; `toAddresses` bind payout destinations.
 `clientInvoiceId`, price, title, etc. are metadata only (not part of the hash).
 `chains` / `tokens` are not part of the hash.
 
@@ -117,10 +116,3 @@ GET /api/invoices/{invoiceId}
 ```
 
 Poll every few seconds until `paid`, `paid_partial`, or `swept`.
-
-## Agent checklist
-
-1. Collect required fields; default chain `11155111` + `USDC` or `nile` + `USDT` only if the merchant agrees.
-2. `POST /api/invoices` with matching `chainId`, `token`, `selectedTo`.
-3. Return pay URL, `invoiceAddress`, and status API URL.
-4. To verify payment: `GET /api/invoices/{invoiceId}` and report `status`, `invoiceAddress`, `amountPaid`, `sweepTx`.

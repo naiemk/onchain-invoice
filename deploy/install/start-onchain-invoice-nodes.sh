@@ -106,11 +106,15 @@ if [[ -z "${SERVER_URL:-}" && -n "${API_URL:-}" ]]; then
 fi
 
 # Fail fast: ethers crashes with a redacted "invalid private key" if these are empty/malformed.
+# Allow operator placeholder `_PRIVATE_KEY_` so mainnet can be staged before keys are filled
+# (sweeper soft-skips until a real 64-hex key is set).
 pk="${SWEEPER_WALLET_KEY:-${SWEEPER_PRIVATE_KEY:-}}"
 pk="${pk#0x}"
-if [[ ! "$pk" =~ ^[0-9a-fA-F]{64}$ ]]; then
-  echo "Invalid or missing SWEEPER_WALLET_KEY / SWEEPER_PRIVATE_KEY in .env (need 64 hex chars, optional 0x)." >&2
-  echo "Unset any empty exports (unset SWEEPER_WALLET_KEY SWEEPER_PRIVATE_KEY) and ensure .env has the Hardhat #0 key for testnet." >&2
+if [[ "$pk" == "_PRIVATE_KEY_" ]]; then
+  echo "warning: SWEEPER_WALLET_KEY / SWEEPER_PRIVATE_KEY is still _PRIVATE_KEY_ — sweepers will soft-skip until you set real keys." >&2
+elif [[ ! "$pk" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  echo "Invalid or missing SWEEPER_WALLET_KEY / SWEEPER_PRIVATE_KEY in .env (need 64 hex chars, optional 0x, or _PRIVATE_KEY_ placeholder)." >&2
+  echo "Unset any empty exports (unset SWEEPER_WALLET_KEY SWEEPER_PRIVATE_KEY) and ensure .env has a key." >&2
   exit 1
 fi
 
@@ -128,10 +132,15 @@ else
 fi
 chmod 755 "$LOGS_ABS" 2>/dev/null || true
 
-COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.sweepers.yml"
+COMPOSE_FILE="${COMPOSE_FILE:-${SCRIPT_DIR}/docker-compose.sweepers.yml}"
+# Allow COMPOSE_FILE=docker-compose.sweepers-mainnet.yml (relative to install dir)
+if [[ "$COMPOSE_FILE" != /* ]]; then
+  COMPOSE_FILE="${SCRIPT_DIR}/${COMPOSE_FILE}"
+fi
 if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
-  IMAGE="$(yaml_get docker.image)"
-  IMAGE="${IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}"
+  # Prefer SWEEPER_IMAGE from .env (e.g. local soft-skip build) over yaml docker.image.
+  yaml_image="$(yaml_get docker.image)"
+  IMAGE="${SWEEPER_IMAGE:-${yaml_image:-ghcr.io/naiemk/trustless-commerce-sweeper:main}}"
   export SWEEPER_IMAGE="$IMAGE"
 
   if [[ "${ONCHAIN_INVOICE_SKIP_PULL:-}" == "1" || "${PULL:-1}" == "0" ]]; then
@@ -147,13 +156,23 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
     docker rm -f onchain-invoice-node >/dev/null || true
   fi
 
-  echo "Starting triple sweepers via $COMPOSE_FILE ..."
-  docker compose -f "$COMPOSE_FILE" up -d --force-recreate
-  echo "Sweepers running: onchain-invoice-sweeper-evm + onchain-invoice-sweeper-tron + onchain-invoice-sweeper-solana"
-  echo "Logs: docker logs -f onchain-invoice-sweeper-evm"
-  echo "      docker logs -f onchain-invoice-sweeper-tron"
-  echo "      docker logs -f onchain-invoice-sweeper-solana"
-  echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-solana.jsonl"
+  # Materialize .env.runtime: blank operator placeholders so current images soft-skip
+  # until real keys are filled in .env (keeps `_PRIVATE_KEY_` visible in .env for operators).
+  if [[ -f .env ]]; then
+    sed -E \
+      -e 's/^(SWEEPER_WALLET_KEY|SWEEPER_PRIVATE_KEY|TRON_SPONSOR_PRIVATE_KEY|SOLANA_SWEEPER_KEY|TRON_INVOICE_MASTER_SECRET)=_PRIVATE_KEY_$/\1=/' \
+      -e 's/^(SWEEPER_WALLET_KEY|SWEEPER_PRIVATE_KEY|TRON_SPONSOR_PRIVATE_KEY|SOLANA_SWEEPER_KEY|TRON_INVOICE_MASTER_SECRET)=change-me.*$/\1=/' \
+      .env > .env.runtime
+  fi
+
+  echo "Starting sweepers via $COMPOSE_FILE ..."
+  if [[ -f .env.runtime ]]; then
+    docker compose -f "$COMPOSE_FILE" --env-file .env.runtime up -d --force-recreate
+  else
+    docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+  fi
+  echo "Sweepers up (container names from $COMPOSE_FILE)"
+  echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl"
   exit 0
 fi
 

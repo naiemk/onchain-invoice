@@ -7,7 +7,8 @@ export interface PayLinkFields {
   to: string[];
   chains: string[];
   tokens: string[];
-  invoiceSeed: string;
+  /** Server-assigned only; never present on shareable pay-link query strings. */
+  invoiceSeed?: string;
   clientInvoiceId?: string;
   callback?: string;
   title?: string;

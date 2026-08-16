@@ -11,15 +11,13 @@ import {
   type ChainKind,
   type NetworkOption,
 } from "../shared/networks.js";
-import { randomInvoiceSeed } from "../onchain-invoice-browser.js";
 import type { PayLinkFields } from "../shared/types.js";
 
 export function renderCreate(root: HTMLElement): void {
   const mode = deploymentMode();
   const networks = networksForDeployment(mode);
   const modeLabel = mode === "testnet" ? "Testnet" : "Mainnet";
-  const initialSeed = randomInvoiceSeed();
-  const initialOrderId = orderRefFromHex(initialSeed);
+  const initialOrderId = `order-${Date.now().toString(36)}`;
 
   root.innerHTML = `
     <header class="page-header">
@@ -36,18 +34,9 @@ export function renderCreate(root: HTMLElement): void {
       <section class="panel">
         <form id="create-form" autocomplete="off">
           <div class="field">
-            <label for="invoiceSeed">Invoice seed</label>
-            <p class="field-hint">System-generated random <span class="mono">bytes32</span> (not editable). Used when we create the invoice id on our side (<span class="mono">keccak256(seed, to[])</span>). Not the invoice id itself — and not shown as an <span class="mono">invoice_id</span> query param on the pay link.</p>
-            <div class="field-row">
-              <input id="invoiceSeed" name="invoiceSeed" class="mono" required readonly spellcheck="false" value="${escapeHtml(initialSeed)}" />
-              <button type="button" class="secondary" id="regen-seed">New seed</button>
-            </div>
-          </div>
-
-          <div class="field">
             <label for="clientInvoiceId">Order / reference id</label>
-            <p class="field-hint">Optional. Your local client id as managed by your system — not part of the on-chain invoice id. Prefilled as a short helper (<span class="mono">order-&lt;6 bytes&gt;</span>); replace with your own order number anytime.</p>
-            <input id="clientInvoiceId" name="clientInvoiceId" class="mono" placeholder="order-…" value="${escapeHtml(initialOrderId)}" data-auto="1" />
+            <p class="field-hint">Optional. Your local client id as managed by your system — not part of the on-chain invoice id. The invoice seed and invoice id are assigned by the API when the payer continues checkout.</p>
+            <input id="clientInvoiceId" name="clientInvoiceId" class="mono" placeholder="order-…" value="${escapeHtml(initialOrderId)}" />
           </div>
 
           <div class="field">
@@ -150,13 +139,13 @@ export function renderCreate(root: HTMLElement): void {
         <p class="eyebrow">Developers</p>
         <h2>Create invoices programmatically</h2>
         <p>
-          The same fields become a query string on <span class="mono">/pay</span> (no invoice id), or a JSON body for
-          <span class="mono">POST /api/invoices</span>, which returns the created invoice id. Poll status with
+          The same fields become a query string on <span class="mono">/pay</span> (no invoice id / seed), or a JSON body for
+          <span class="mono">POST /api/invoices</span>, which assigns a random seed and returns the created invoice id. Poll status with
           <span class="mono">GET /api/invoices/&#123;invoiceId&#125;</span>.
         </p>
 
         <h3 style="margin-top:1.5rem">1. Pay link query string</h3>
-        <p class="field-hint">Shareable checkout URL. It does <strong>not</strong> include an invoice id — that is created when the invoice is activated.</p>
+        <p class="field-hint">Shareable checkout URL. It does <strong>not</strong> include <span class="mono">invoice_seed</span> or an invoice id — those are created server-side when checkout continues.</p>
         <pre id="docs-query"></pre>
 
         <h3 style="margin-top:1.5rem">2. Create an invoice (one step)</h3>
@@ -168,7 +157,6 @@ Content-Type: application/json
   "to": ["0x…", "T…"],
   "chains": ["11155111", "nile"],
   "tokens": ["USDC", "USDT"],
-  "invoiceSeed": "0x…",
   "clientInvoiceId": "order-1042",
   "chainId": "11155111",
   "token": "USDC",
@@ -178,13 +166,13 @@ Content-Type: application/json
   "description": "Optional",
   "allowPartial": false
 }</pre>
-        <p class="field-hint">Response includes <span class="mono">invoice.id</span> (created by the API from <span class="mono">invoiceSeed</span> + <span class="mono">to</span>). Idempotent for the same seed and destinations. Deprecated: <span class="mono">/api/sessions</span> and <span class="mono">/api/invoices/activate</span>.</p>
+        <p class="field-hint">Do not send <span class="mono">invoiceSeed</span> — the API generates it. Response includes <span class="mono">invoice.id</span> and a resume <span class="mono">payLink</span> (<span class="mono">/pay?id=…</span>). Duplicate invoice ids are rejected with <span class="mono">409</span>. Use <span class="mono">Idempotency-Key</span> for safe retries.</p>
 
         <h3 style="margin-top:1.5rem">3. Check invoice status</h3>
         <pre>GET /api/invoices/{invoiceId}
 
 Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
-        <p class="field-hint">Use the <span class="mono">invoice.id</span> returned from create — not a field on the pay link.</p>
+        <p class="field-hint">Use the <span class="mono">invoice.id</span> returned from create — not a field on the shareable pay link.</p>
 
         <h3 style="margin-top:1.5rem">For AI agents</h3>
         <p>
@@ -218,13 +206,6 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
     setWalletField(evmField, toEvm, needsEvm);
     setWalletField(tronField, toTron, needsTron);
     setWalletField(solanaField, toSolana, needsSolana);
-
-    renderTokenOptions(root, chains);
-  };
-
-  const refresh = () => {
-    syncKindFields();
-    // Docs query should update even when wallets are incomplete (preview still validates strictly).
     if (docsQuery) {
       try {
         docsQuery.textContent = `${location.origin}/pay?${encodePayLink(readFormLoose(root))}`;
@@ -232,56 +213,52 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
         docsQuery.textContent = `${location.origin}/pay?…`;
       }
     }
+  };
+
+  const refresh = () => {
+    syncKindFields();
+    renderTokenOptions(root, checked(root, "chains"));
+    if (!previewBody) return;
     try {
       const fields = readForm(root);
-      const path = payPath(fields);
-      const absolute = `${location.origin}${path}`;
-      const embed = `<a href="${absolute}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">Pay $${fields.price} with crypto</a>`;
-
-      if (previewBody) {
-        previewBody.innerHTML = `
-          <label class="field-hint">Pay URL</label>
-          <div class="mono-block" id="out-url">${escapeHtml(absolute)}</div>
-          <p class="field-hint">No invoice id in this link — the API creates the id when the payer continues (or you call <span class="mono">POST /api/invoices</span>).</p>
-          <label class="field-hint">Embed button</label>
-          <div class="mono-block" id="out-embed">${escapeHtml(embed)}</div>
-          <div class="btn-row">
-            <button type="button" class="secondary" data-copy="url">Copy pay URL</button>
-            <button type="button" class="secondary" data-copy="embed">Copy embed</button>
-            <a class="tc-btn" href="${path}" target="_blank" rel="noopener noreferrer">Open checkout</a>
+      const link = `${location.origin}${payPath(fields)}`;
+      previewBody.innerHTML = `
+        <div class="field">
+          <label>Pay link</label>
+          <div class="field-row">
+            <input class="mono" readonly value="${escapeHtml(link)}" />
+            <button type="button" class="secondary" data-copy="${escapeHtml(link)}">Copy</button>
           </div>
-          <p id="copy-status" class="status"></p>
-          <label class="field-hint" style="margin-top:1rem">Rendered pay button</label>
-          <div class="pay-button-preview">
-            <a href="${path}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">Pay $${escapeHtml(fields.price)} with crypto</a>
-          </div>
-        `;
-
-        previewBody.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const kind = btn.dataset.copy;
-            const value = kind === "embed" ? embed : absolute;
-            await copyText(value);
-            const note = previewBody.querySelector<HTMLElement>("#copy-status");
-            if (note) note.textContent = "Copied to clipboard.";
-          });
+        </div>
+        <div class="field">
+          <label>Embed button</label>
+          <pre>&lt;a href="${escapeHtml(link)}"&gt;Pay with crypto&lt;/a&gt;</pre>
+          <button type="button" class="secondary" data-copy="${escapeHtml(`<a href="${link}">Pay with crypto</a>`)}">Copy HTML</button>
+        </div>
+        <p class="field-hint" id="copy-status"></p>
+      `;
+      previewBody.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await copyText(btn.dataset.copy ?? "");
+          const note = previewBody.querySelector<HTMLElement>("#copy-status");
+          if (note) note.textContent = "Copied.";
         });
-      }
-
-      // Prefer the validated encoding once the form is complete.
+      });
       if (docsQuery) {
         docsQuery.textContent = `${location.origin}/pay?${encodePayLink(fields)}`;
       }
     } catch (error) {
-      if (previewBody) {
-        previewBody.innerHTML = `<p class="danger">${escapeHtml(
-          error instanceof Error ? error.message : "Invalid form"
-        )}</p>`;
+      previewBody.innerHTML = `<p class="danger">${escapeHtml(error instanceof Error ? error.message : "Incomplete")}</p>`;
+      if (docsQuery) {
+        try {
+          docsQuery.textContent = `${location.origin}/pay?${encodePayLink(readFormLoose(root))}`;
+        } catch {
+          docsQuery.textContent = `${location.origin}/pay?…`;
+        }
       }
     }
   };
 
-  /** Keep at least one network selected. */
   const ensureMinOneChain = (event: Event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || target.name !== "chains") return;
@@ -291,33 +268,9 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
     }
   };
 
-  const clientIdInput = root.querySelector<HTMLInputElement>("#clientInvoiceId");
-  clientIdInput?.addEventListener("input", () => {
-    if (clientIdInput.value.trim() === "") {
-      clientIdInput.dataset.auto = "1";
-      const seed = valueOf(root, "invoiceSeed");
-      if (seed) clientIdInput.value = orderRefFromHex(seed);
-    } else {
-      clientIdInput.dataset.auto = "0";
-    }
-  });
-
   form?.addEventListener("change", ensureMinOneChain);
   form?.addEventListener("input", refresh);
   form?.addEventListener("change", refresh);
-
-  root.querySelector("#regen-seed")?.addEventListener("click", () => {
-    const input = root.querySelector<HTMLInputElement>("#invoiceSeed");
-    if (!input) return;
-    const seed = randomInvoiceSeed();
-    input.value = seed;
-    const client = root.querySelector<HTMLInputElement>("#clientInvoiceId");
-    if (client && client.dataset.auto !== "0") {
-      client.value = orderRefFromHex(seed);
-      client.dataset.auto = "1";
-    }
-    refresh();
-  });
 
   for (const [id, kind] of [
     ["toEvm", "evm"],
@@ -339,16 +292,6 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
   }
 }
 
-function valueOf(root: HTMLElement, id: string): string {
-  return root.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)?.value.trim() ?? "";
-}
-
-/** Short helper ref: `order-` + first 6 bytes (12 hex chars) of a 0x-hex value. */
-function orderRefFromHex(hexValue: string): string {
-  const hex = hexValue.startsWith("0x") || hexValue.startsWith("0X") ? hexValue.slice(2) : hexValue;
-  return `order-${hex.slice(0, 12).toLowerCase()}`;
-}
-
 function chainPillHtml(network: NetworkOption, checked: boolean): string {
   return `
     <label class="chain-pill">
@@ -360,7 +303,6 @@ function chainPillHtml(network: NetworkOption, checked: boolean): string {
     </label>`;
 }
 
-/** Show merchant wallet only while that network kind is selected; clear when hidden. */
 function setWalletField(
   field: HTMLElement | null,
   input: HTMLInputElement | null,
@@ -439,7 +381,6 @@ function renderTokenOptions(root: HTMLElement, chains: string[]): void {
     })
     .join("");
 
-  // Disabled checkboxes are skipped by some form readers — mirror locked USDT.
   if (needsTron) {
     host.insertAdjacentHTML(
       "beforeend",
@@ -452,7 +393,6 @@ function checked(root: HTMLElement, name: string): string[] {
   const values = [...root.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)].map(
     (el) => el.value
   );
-  // Include locked/disabled token checkboxes (and the Tron USDT hidden mirror).
   for (const el of root.querySelectorAll<HTMLInputElement>(`input[name="${name}"][disabled], input[name="${name}"][data-tron-usdt-lock]`)) {
     if (el.value && !values.includes(el.value)) values.push(el.value);
   }
@@ -464,7 +404,6 @@ function readForm(root: HTMLElement): PayLinkFields {
     root.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)?.value.trim() ?? "";
 
   const price = value("price");
-  const invoiceSeed = value("invoiceSeed");
   const clientInvoiceId = value("clientInvoiceId") || undefined;
   const chains = checked(root, "chains");
   const tokens = checked(root, "tokens");
@@ -475,10 +414,6 @@ function readForm(root: HTMLElement): PayLinkFields {
   const toTron = value("toTron");
   const toSolana = value("toSolana");
 
-  if (!invoiceSeed) throw new Error("Invoice seed is required.");
-  if (!/^0x[0-9a-fA-F]{64}$/.test(invoiceSeed)) {
-    throw new Error("Invoice seed must be a 32-byte hex value (0x + 64 hex chars).");
-  }
   if (!price) throw new Error("Amount (USD) is required.");
   if (chains.length === 0) throw new Error("Select at least one network.");
   if (tokens.length === 0) throw new Error("Select at least one token.");
@@ -512,7 +447,6 @@ function readForm(root: HTMLElement): PayLinkFields {
     to,
     chains,
     tokens,
-    invoiceSeed,
     clientInvoiceId,
     callback: value("callback") || undefined,
     title: value("title") || undefined,
@@ -521,7 +455,6 @@ function readForm(root: HTMLElement): PayLinkFields {
   };
 }
 
-/** Best-effort fields for the docs query string (no address validation). */
 function readFormLoose(root: HTMLElement): PayLinkFields {
   const value = (id: string) =>
     root.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)?.value.trim() ?? "";
@@ -537,13 +470,11 @@ function readFormLoose(root: HTMLElement): PayLinkFields {
   if (needsTron) to.push(value("toTron") || "T…");
   if (needsSolana) to.push(value("toSolana") || "So…");
 
-  const seed = value("invoiceSeed");
   return {
     price: value("price") || "0",
     to: to.length > 0 ? to : ["0x…"],
     chains: chains.length > 0 ? chains : ["11155111"],
     tokens: tokens.length > 0 ? tokens : ["USDC"],
-    invoiceSeed: /^0x[0-9a-fA-F]{64}$/.test(seed) ? seed : `0x${"00".repeat(32)}`,
     clientInvoiceId: value("clientInvoiceId") || undefined,
     callback: value("callback") || undefined,
     title: value("title") || undefined,

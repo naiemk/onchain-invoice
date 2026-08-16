@@ -122,6 +122,16 @@ export interface SolanaSweeperConfig {
 
 const ERC20_ABI = ["function balanceOf(address account) view returns (uint256)"] as const;
 
+/** Empty / operator placeholder secrets — treat as unset so containers can boot before keys are filled. */
+export function isUnsetSecret(value: string | undefined | null): boolean {
+  const v = value?.trim() ?? "";
+  if (!v) return true;
+  if (v === "_PRIVATE_KEY_") return true;
+  if (/^change-me/i.test(v)) return true;
+  if (/^PLACEHOLDER/i.test(v)) return true;
+  return false;
+}
+
 export class SweeperWorker {
   private stopped = false;
   private tickInFlight: Promise<void> | null = null;
@@ -136,13 +146,13 @@ export class SweeperWorker {
   constructor(private readonly config: SweeperConfig) {
     this.role = resolveRole(config);
     const rawChains = this.role === "tron" || this.role === "solana" ? [] : config.chains ?? [];
-    // Soft-skip incomplete EVM entries (empty sweeper after env expand) so mainnet templates stay up.
+    // Soft-skip incomplete EVM entries (empty/placeholder key or sweeper) so mainnet templates stay up.
     this.chains = rawChains.filter(
       (c) =>
         Boolean(c.rpcUrl?.trim()) &&
         Boolean(c.sweeperAddress?.trim()) &&
         !/^0x0{40}$/i.test(c.sweeperAddress.trim()) &&
-        Boolean(c.privateKey?.trim())
+        !isUnsetSecret(c.privateKey)
     );
     this.tron =
       this.role === "evm" || this.role === "solana"
@@ -157,10 +167,13 @@ export class SweeperWorker {
           ? config.solana
           : undefined;
 
-    if (config.sweeperWalletKey) {
-      this.wallet = new Wallet(config.sweeperWalletKey);
-    } else if (this.chains[0]?.privateKey) {
-      this.wallet = new Wallet(this.chains[0].privateKey);
+    const walletKey = !isUnsetSecret(config.sweeperWalletKey)
+      ? config.sweeperWalletKey
+      : this.chains[0] && !isUnsetSecret(this.chains[0].privateKey)
+        ? this.chains[0].privateKey
+        : undefined;
+    if (walletKey) {
+      this.wallet = new Wallet(walletKey);
     }
     const logPath = config.activityLogPath?.trim();
     this.activity = logPath ? new ActivityLog(logPath) : null;
@@ -187,7 +200,7 @@ export class SweeperWorker {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const incomplete =
-          !this.solana.privateKey?.trim() || listSweeperSolanaChains(this.solana).length === 0;
+          isUnsetSecret(this.solana.privateKey) || listSweeperSolanaChains(this.solana).length === 0;
         // Soft-skip empty defaults so triple-compose stays up before SOLANA_* is filled in.
         // Hard-fail when role=solana and keys look present but invalid.
         if (this.role === "solana" && !incomplete) {
@@ -212,12 +225,26 @@ export class SweeperWorker {
     if (this.tron?.enabled) {
       try {
         assertTronConfig(this.tron);
+        const sponsorKey =
+          this.tron.sponsorPrivateKey ?? this.tron.privateKey ?? this.config.sweeperWalletKey;
+        if (isUnsetSecret(sponsorKey)) {
+          throw new Error("tron sponsor private key is unset (use a real key instead of _PRIVATE_KEY_)");
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (this.role === "tron") {
-          throw new Error(`Tron sweeper misconfigured: ${message}`);
-        }
-        console.warn(JSON.stringify({ level: "warn", msg: "Tron enabled but incomplete; skipping", error: message }));
+        // Soft-skip when role=tron and keys are still placeholders so compose stays healthy.
+        console.warn(
+          JSON.stringify({
+            level: "warn",
+            msg: "tron-disabled",
+            detail: "Tron enabled but incomplete; skipping until keys / master secret are set",
+            role: this.role,
+            error: message,
+          })
+        );
+        this.activity?.append("tron-disabled", {
+          payload: { role: this.role, error: message },
+        });
         this.tron = undefined;
       }
     }

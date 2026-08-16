@@ -3,6 +3,7 @@
  * Serves config + CREATE2 plans, streams CLI logs (compile / verify / solana build),
  * never stores private keys.
  */
+import { config as loadDotenv } from "dotenv";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
 import { readFileSync, existsSync, mkdirSync, rmSync, readdirSync } from "node:fs";
@@ -15,6 +16,7 @@ import type { LogEvent, OperatorConfig } from "./lib/types.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../..");
+loadDotenv({ path: resolve(REPO_ROOT, ".env") });
 const PORT = Number(process.env.DEPLOY_CONSOLE_PORT ?? 8790);
 const HARDHAT_BIN = resolve(REPO_ROOT, "node_modules/.bin/hardhat");
 const DEFAULT_SEPOLIA_RPC = "https://ethereum-sepolia-rpc.publicnode.com";
@@ -359,9 +361,13 @@ async function handler(req: IncomingMessage, res: ServerResponse): Promise<void>
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         // Always override — root .env may still point at a 403'd provider (e.g. drpc).
-        SEPOLIA_RPC_URL: rpcUrl,
+        SEPOLIA_RPC_URL: body.chainKey === "sepolia" ? rpcUrl : process.env.SEPOLIA_RPC_URL,
+        BASE_RPC_URL: body.chainKey === "base" ? rpcUrl : process.env.BASE_RPC_URL,
+        BSC_RPC_URL: body.chainKey === "bsc" ? rpcUrl : process.env.BSC_RPC_URL,
+        EVM_8453_RPC_URL: body.chainKey === "base" ? rpcUrl : process.env.EVM_8453_RPC_URL,
+        EVM_56_RPC_URL: body.chainKey === "bsc" ? rpcUrl : process.env.EVM_56_RPC_URL,
       };
-      logLine("info", `verify using SEPOLIA_RPC_URL=${rpcUrl}`);
+      logLine("info", `verify ${network} using rpc=${rpcUrl}`);
       void withHardhatLock(async () => {
         prepareHardhatCache();
         // Warm production artifacts (verify defaults to that profile) under the same lock.
@@ -381,6 +387,23 @@ async function handler(req: IncomingMessage, res: ServerResponse): Promise<void>
           ],
           { env }
         );
+        const forwarder = chain?.forwarderImplementation?.trim();
+        if (forwarder) {
+          logLine("info", `verify forwarderImplementation ${forwarder}`);
+          await runCommand(
+            HARDHAT_BIN,
+            [
+              "verify",
+              "--network",
+              network,
+              "--contract",
+              "contracts/commerce/CommerceForwarder.sol:CommerceForwarder",
+              forwarder,
+              body.address,
+            ],
+            { env }
+          );
+        }
       });
       return;
     }
