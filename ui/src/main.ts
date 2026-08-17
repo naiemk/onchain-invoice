@@ -87,7 +87,7 @@ function shell(pathname: string): string {
   return `
     <header class="topbar">
       <a class="brand" href="/" data-route>
-        <span class="brand-mark"><img src="/logo-64.png" alt="" width="32" height="32" /></span>
+        <span class="brand-mark"><img src="/logo.svg" alt="" width="32" height="32" /></span>
         <span>Trustless Commerce</span>
       </a>
       <nav>
