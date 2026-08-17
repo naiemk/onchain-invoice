@@ -17,6 +17,10 @@ api_json() {
   local path="$2"
   local body="${3:-}"
   local extra_headers="${4-}"
+  # Base64 so JSON quotes in x-api-key / Idempotency-Key survive `docker compose exec -e`.
+  # Passing raw JSON as T_HEADERS was parsed as `{}` (quotes stripped) → silent 401 / lost idempotency.
+  local headers_b64
+  headers_b64="$(printf '%s' "${extra_headers:-{}}" | base64 | tr -d '\n')"
   # Retry only when docker exec / fetch returns empty (transport flake).
   # Do not reinterpret a real HTTP status (callers assert 200/201/401).
   local attempts=5
@@ -26,12 +30,20 @@ api_json() {
       -e T_METHOD="$method" \
       -e T_PATH="$path" \
       -e T_BODY="$body" \
-      -e T_HEADERS="${extra_headers:-{}}" \
+      -e T_HEADERS_B64="$headers_b64" \
       api node -e '
+const extra = (() => {
+  try {
+    const raw = Buffer.from(process.env.T_HEADERS_B64 || "", "base64").toString("utf8") || "{}";
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+})();
 const headers = Object.assign(
   {},
   process.env.T_BODY ? { "content-type": "application/json" } : {},
-  (() => { try { return JSON.parse(process.env.T_HEADERS || "{}"); } catch { return {}; } })()
+  extra
 );
 fetch("http://127.0.0.1:8080" + process.env.T_PATH, {
   method: process.env.T_METHOD,
