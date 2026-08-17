@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+  <!-- App / favicon tile: navy rounded square + overlapping T. -->
+  <rect width="64" height="64" rx="14" fill="#003087"/>
+  <path fill="#001F5C" d="M9 10h34a4.5 4.5 0 0 1 0 9H30.5v28a4.5 4.5 0 0 1-9 0V19H9a4.5 4.5 0 0 1 0-9z"/>
+  <path fill="#009CDE" d="M17 18h34a4.5 4.5 0 0 1 0 9H38.5v28a4.5 4.5 0 0 1-9 0V27H17a4.5 4.5 0 0 1 0-9z"/>
+</svg>
