@@ -6,6 +6,9 @@ import { renderMerchant } from "./pages/merchant.js";
 import { renderPay } from "./pages/pay.js";
 import { SITE } from "./shared/site.js";
 import { applyTheme, initThemeToggle, preferredTheme } from "./shared/theme.js";
+import { isLocale, LOCALES, LOCALE_NATIVE_NAMES } from "./i18n/locales.js";
+import { applyLocale, getLocale, setLocale, t } from "./i18n/t.js";
+import { preferredLocale } from "./i18n/detect.js";
 
 export type PageRenderer = (root: HTMLElement) => void | Promise<void>;
 
@@ -17,30 +20,8 @@ const routes: Record<string, PageRenderer> = {
   "/admin": renderAdmin,
 };
 
-const pageMeta: Record<string, { title: string; description: string }> = {
-  "/": {
-    title: "Trustless Commerce",
-    description: "Accept crypto payments with deterministic on-chain invoices. No account, no KYC.",
-  },
-  "/create": {
-    title: "Create invoice · Trustless Commerce",
-    description: "Build a crypto payment link and share it with your customer.",
-  },
-  "/pay": {
-    title: "Pay invoice · Trustless Commerce",
-    description: "Pay a Trustless Commerce crypto invoice on-chain.",
-  },
-  "/merchant": {
-    title: "Merchant · Trustless Commerce",
-    description: "View and manage your Trustless Commerce invoices.",
-  },
-  "/admin": {
-    title: "Admin · Trustless Commerce",
-    description: "Platform admin overview.",
-  },
-};
-
 applyTheme(preferredTheme());
+applyLocale(preferredLocale());
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app");
@@ -68,15 +49,55 @@ async function render(): Promise<void> {
   const outlet = appRoot.querySelector<HTMLElement>("#outlet");
   if (!outlet) throw new Error("Missing outlet");
   initThemeToggle(appRoot.querySelector<HTMLButtonElement>("#theme-toggle"));
+  initLocaleSelect(appRoot.querySelector<HTMLSelectElement>("#locale-select"));
   await route(outlet);
 }
 
 function applyMeta(pathname: string): void {
   const key = pathname.startsWith("/merchant") ? "/merchant" : pathname;
-  const meta = pageMeta[key] ?? pageMeta["/"];
+  const meta = pageMeta(key);
   document.title = meta.title;
   const desc = document.querySelector('meta[name="description"]');
   if (desc) desc.setAttribute("content", meta.description);
+}
+
+function pageMeta(path: string): { title: string; description: string } {
+  switch (path) {
+    case "/create":
+      return { title: t("meta.createTitle"), description: t("meta.createDescription") };
+    case "/pay":
+      return { title: t("meta.payTitle"), description: t("meta.payDescription") };
+    case "/merchant":
+      return { title: t("meta.merchantTitle"), description: t("meta.merchantDescription") };
+    case "/admin":
+      return { title: t("meta.adminTitle"), description: t("meta.adminDescription") };
+    default:
+      return { title: t("meta.homeTitle"), description: t("meta.homeDescription") };
+  }
+}
+
+function initLocaleSelect(select: HTMLSelectElement | null): void {
+  if (!select) return;
+  select.value = getLocale();
+  select.addEventListener("change", () => {
+    const value = select.value;
+    if (!isLocale(value)) return;
+    setLocale(value);
+    void render();
+  });
+}
+
+function localeSelectHtml(): string {
+  const current = getLocale();
+  const options = LOCALES.map(
+    (locale) =>
+      `<option value="${locale}" ${locale === current ? "selected" : ""}>${LOCALE_NATIVE_NAMES[locale]}</option>`
+  ).join("");
+  return `
+    <label class="locale-switch">
+      <span class="visually-hidden">${t("locale.label")}</span>
+      <select id="locale-select" aria-label="${t("locale.label")}">${options}</select>
+    </label>`;
 }
 
 function shell(pathname: string): string {
@@ -88,29 +109,30 @@ function shell(pathname: string): string {
     <header class="topbar">
       <a class="brand" href="/" data-route>
         <span class="brand-mark"><img src="/logo.svg" alt="" width="32" height="32" /></span>
-        <span>Trustless Commerce</span>
+        <span>${t("brand")}</span>
       </a>
       <nav>
-        ${link("/", "Product")}
-        ${link("/create", "Create invoice")}
-        ${link("/merchant", "Merchant")}
-        <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">Docs</a>
-        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="Switch theme"></button>
+        ${link("/", t("nav.product"))}
+        ${link("/create", t("nav.create"))}
+        ${link("/merchant", t("nav.merchant"))}
+        <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">${t("nav.docs")}</a>
+        ${localeSelectHtml()}
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="${t("theme.switchTheme")}"></button>
       </nav>
     </header>
     <main id="outlet"></main>
     <footer class="site-footer global-footer">
-      <span>Trustless Commerce</span>
+      <span>${t("brand")}</span>
       <span>
-        <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">Docs</a>
+        <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">${t("nav.docs")}</a>
         ·
-        <a href="${SITE.agentSkillUrl}" rel="alternate noopener noreferrer" target="_blank" data-agent-skill="trustless-commerce-invoice">AI skill</a>
+        <a href="${SITE.agentSkillUrl}" rel="alternate noopener noreferrer" target="_blank" data-agent-skill="trustless-commerce-invoice">${t("nav.aiSkill")}</a>
         ·
-        <a href="${SITE.githubUrl}" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="${SITE.githubUrl}" target="_blank" rel="noopener noreferrer">${t("nav.github")}</a>
         ·
-        <a href="${SITE.telegramChannel}" target="_blank" rel="noopener noreferrer">Telegram</a>
+        <a href="${SITE.telegramChannel}" target="_blank" rel="noopener noreferrer">${t("nav.telegram")}</a>
         ·
-        <a href="${SITE.telegramSupport}" target="_blank" rel="noopener noreferrer">Support</a>
+        <a href="${SITE.telegramSupport}" target="_blank" rel="noopener noreferrer">${t("nav.support")}</a>
       </span>
     </footer>
   `;

@@ -1,4 +1,6 @@
 import { getAddress, sha256, getBytes } from "ethers";
+import { localizedNetworkLabel, localizedNetworkShort } from "../i18n/networks.js";
+import { t } from "../i18n/t.js";
 
 export type ChainKind = "evm" | "tron" | "solana";
 
@@ -188,11 +190,11 @@ export function tokensForChains(chainIds: string[]): TokenOption[] {
 }
 
 export function networkLabel(chainId: string): string {
-  return NETWORKS.find((n) => n.id === chainId)?.label ?? `Chain ${chainId}`;
+  return localizedNetworkLabel(chainId);
 }
 
 export function networkShort(chainId: string): string {
-  return NETWORKS.find((n) => n.id === chainId)?.short ?? networkLabel(chainId);
+  return localizedNetworkShort(chainId);
 }
 
 export function isTestnet(chainId: string | null | undefined): boolean {
@@ -236,7 +238,7 @@ export function networksForDeployment(mode: DeploymentMode = deploymentMode()): 
 
 export function testnetPillHtml(chainId: string | null | undefined): string {
   if (!isTestnet(chainId)) return "";
-  return `<span class="testnet-pill" role="status">Testnet invoice — no real value</span>`;
+  return `<span class="testnet-pill" role="status">${escapeText(t("networks.testnetPill"))}</span>`;
 }
 
 /** Inline SVG chain mark (safe HTML fragment). */

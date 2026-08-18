@@ -1,4 +1,7 @@
 import { escapeHtml, shortId } from "../shared/dom.js";
+import { localizeError, statusLabel } from "../i18n/errors.js";
+import { formatDateTime, formatRelativeTime } from "../i18n/format.js";
+import { t } from "../i18n/t.js";
 import {
   chainChipHtml,
   explorerAddressUrl,
@@ -51,60 +54,60 @@ export function renderMerchant(root: HTMLElement): void {
   root.innerHTML = `
     <div class="admin-shell merchant-shell">
       <header class="page-header" style="max-width:none;margin:0 0 1.25rem">
-        <p class="eyebrow">Merchant</p>
-        <h1>Invoices</h1>
-        <p>Enter your settlement address to review invoices, filter by status and time, and open payment details.</p>
+        <p class="eyebrow">${t("merchant.eyebrow")}</p>
+        <h1>${t("merchant.h1")}</h1>
+        <p>${t("merchant.lede")}</p>
       </header>
 
       <section class="panel">
         <form id="merchant-form" class="merchant-toolbar">
           <div class="field" style="margin:0;flex:1;min-width:16rem">
-            <label for="merchant-address">Settlement address</label>
-            <p class="field-hint">EVM wallet used as the merchant <span class="mono">to</span> field on your pay links.</p>
+            <label for="merchant-address">${t("merchant.addressLabel")}</label>
+            <p class="field-hint">${t("merchant.addressHint")}</p>
             <input id="merchant-address" class="mono" placeholder="0x…" value="${escapeHtml(state.address)}" required />
           </div>
           <div class="field" style="margin:0;min-width:10rem">
-            <label for="filter-status">Status</label>
-            <p class="field-hint">Filter by lifecycle state.</p>
+            <label for="filter-status">${t("merchant.statusLabel")}</label>
+            <p class="field-hint">${t("merchant.statusHint")}</p>
             <select id="filter-status">
-              <option value="">Any status</option>
+              <option value="">${t("merchant.anyStatus")}</option>
               ${statusOptions(state.status)}
             </select>
           </div>
           <div class="field" style="margin:0;min-width:9rem">
-            <label for="filter-time">Created</label>
-            <p class="field-hint">Time window.</p>
+            <label for="filter-time">${t("merchant.createdLabel")}</label>
+            <p class="field-hint">${t("merchant.timeHint")}</p>
             <select id="filter-time">
-              <option value="all" ${state.time === "all" ? "selected" : ""}>Any time</option>
-              <option value="24h" ${state.time === "24h" ? "selected" : ""}>Last 24 hours</option>
-              <option value="7d" ${state.time === "7d" ? "selected" : ""}>Last 7 days</option>
-              <option value="30d" ${state.time === "30d" ? "selected" : ""}>Last 30 days</option>
+              <option value="all" ${state.time === "all" ? "selected" : ""}>${t("merchant.anyTime")}</option>
+              <option value="24h" ${state.time === "24h" ? "selected" : ""}>${t("merchant.last24h")}</option>
+              <option value="7d" ${state.time === "7d" ? "selected" : ""}>${t("merchant.last7d")}</option>
+              <option value="30d" ${state.time === "30d" ? "selected" : ""}>${t("merchant.last30d")}</option>
             </select>
           </div>
           <div class="field" style="margin:0;min-width:9rem">
-            <label for="filter-sort">Sort</label>
-            <p class="field-hint">Order results.</p>
+            <label for="filter-sort">${t("merchant.sortLabel")}</label>
+            <p class="field-hint">${t("merchant.sortHint")}</p>
             <select id="filter-sort">
-              <option value="createdAt" ${state.sort === "createdAt" ? "selected" : ""}>Created</option>
-              <option value="updatedAt" ${state.sort === "updatedAt" ? "selected" : ""}>Updated</option>
-              <option value="priceUsd" ${state.sort === "priceUsd" ? "selected" : ""}>Amount</option>
-              <option value="status" ${state.sort === "status" ? "selected" : ""}>Status</option>
-              <option value="amountPaid" ${state.sort === "amountPaid" ? "selected" : ""}>Paid</option>
+              <option value="createdAt" ${state.sort === "createdAt" ? "selected" : ""}>${t("merchant.sortCreated")}</option>
+              <option value="updatedAt" ${state.sort === "updatedAt" ? "selected" : ""}>${t("merchant.sortUpdated")}</option>
+              <option value="priceUsd" ${state.sort === "priceUsd" ? "selected" : ""}>${t("merchant.sortAmount")}</option>
+              <option value="status" ${state.sort === "status" ? "selected" : ""}>${t("merchant.sortStatus")}</option>
+              <option value="amountPaid" ${state.sort === "amountPaid" ? "selected" : ""}>${t("merchant.sortPaid")}</option>
             </select>
           </div>
           <div class="field" style="margin:0;min-width:7rem">
-            <label for="filter-dir">Direction</label>
+            <label for="filter-dir">${t("merchant.dirLabel")}</label>
             <p class="field-hint">&nbsp;</p>
             <select id="filter-dir">
-              <option value="desc" ${state.dir === "desc" ? "selected" : ""}>Newest first</option>
-              <option value="asc" ${state.dir === "asc" ? "selected" : ""}>Oldest first</option>
+              <option value="desc" ${state.dir === "desc" ? "selected" : ""}>${t("merchant.newestFirst")}</option>
+              <option value="asc" ${state.dir === "asc" ? "selected" : ""}>${t("merchant.oldestFirst")}</option>
             </select>
           </div>
           <div class="merchant-actions">
-            <button type="submit">Load invoices</button>
+            <button type="submit">${t("merchant.load")}</button>
           </div>
         </form>
-        <div id="merchant-status" class="status">Enter an address to load invoices.</div>
+        <div id="merchant-status" class="status">${t("merchant.enterAddress")}</div>
       </section>
 
       <div id="merchant-table"></div>
@@ -134,15 +137,18 @@ export function renderMerchant(root: HTMLElement): void {
       localStorage.setItem(STORAGE_KEY, state.address);
       root.querySelector<HTMLInputElement>("#merchant-address")!.value = state.address;
       syncFiltersFromForm();
-      if (statusEl) statusEl.textContent = "Loading invoices…";
+      if (statusEl) statusEl.textContent = t("merchant.loading");
       const url = new URL(apiUrl("/api/invoices"), location.origin);
       url.searchParams.set("to", state.address);
       const response = await fetch(url.toString());
       const body = (await response.json()) as { invoices?: InvoiceRecord[]; error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Failed to load invoices");
+      if (!response.ok) throw new Error(body.error ?? t("merchant.loadFailed"));
       state.invoices = body.invoices ?? [];
       if (statusEl) {
-        statusEl.textContent = `${state.invoices.length} invoice${state.invoices.length === 1 ? "" : "s"} for ${shortId(state.address)}`;
+        statusEl.textContent =
+          state.invoices.length === 1
+            ? t("merchant.countOne", { count: 1, address: shortId(state.address) })
+            : t("merchant.countMany", { count: state.invoices.length, address: shortId(state.address) });
       }
       updateListUrl();
       renderTable();
@@ -150,7 +156,7 @@ export function renderMerchant(root: HTMLElement): void {
         await openModal(state.selectedId);
       }
     } catch (error) {
-      if (statusEl) statusEl.textContent = error instanceof Error ? error.message : "Failed to load invoices";
+      if (statusEl) statusEl.textContent = localizeError(error);
       root.querySelector<HTMLElement>("#merchant-table")!.innerHTML = "";
     }
   }
@@ -178,26 +184,26 @@ export function renderMerchant(root: HTMLElement): void {
     const tableHost = root.querySelector<HTMLElement>("#merchant-table");
     if (!tableHost) return;
     if (rows.length === 0) {
-      tableHost.innerHTML = `<section class="panel" style="margin-top:1.25rem"><p>No invoices match these filters.</p></section>`;
+      tableHost.innerHTML = `<section class="panel" style="margin-top:1.25rem"><p>${t("merchant.noMatch")}</p></section>`;
       return;
     }
     tableHost.innerHTML = `
       <section class="panel table-panel" style="margin-top:1.25rem">
         <div class="table-meta">
-          <strong>${rows.length}</strong> shown
-          ${state.status ? `· status <span class="mono">${escapeHtml(state.status)}</span>` : ""}
+          ${escapeHtml(t("merchant.shown", { count: rows.length }))}
+          ${state.status ? escapeHtml(t("merchant.shownStatus", { status: state.status })) : ""}
         </div>
         <div class="table-scroll">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Created</th>
-                <th>Customer ref</th>
-                <th>Title</th>
-                <th>Amount</th>
-                <th>Paid</th>
-                <th>Status</th>
-                <th>Network</th>
+                <th>${t("merchant.colCreated")}</th>
+                <th>${t("merchant.colRef")}</th>
+                <th>${t("merchant.colTitle")}</th>
+                <th>${t("merchant.colAmount")}</th>
+                <th>${t("merchant.colPaid")}</th>
+                <th>${t("merchant.colStatus")}</th>
+                <th>${t("merchant.colNetwork")}</th>
               </tr>
             </thead>
             <tbody>
@@ -207,8 +213,8 @@ export function renderMerchant(root: HTMLElement): void {
                   return `
                 <tr class="data-row${active}" data-id="${escapeHtml(invoice.id)}">
                   <td>
-                    <div class="cell-primary">${escapeHtml(formatDate(invoice.createdAt))}</div>
-                    <div class="cell-muted">${escapeHtml(formatRelative(invoice.createdAt))}</div>
+                    <div class="cell-primary">${escapeHtml(formatDateTime(invoice.createdAt))}</div>
+                    <div class="cell-muted">${escapeHtml(formatRelativeTime(invoice.createdAt))}</div>
                   </td>
                   <td>
                     <div class="cell-primary">${escapeHtml(invoice.clientInvoiceId)}</div>
@@ -217,7 +223,7 @@ export function renderMerchant(root: HTMLElement): void {
                   <td>${escapeHtml(invoice.title ?? "—")}</td>
                   <td class="mono">$${escapeHtml(invoice.priceUsd)}</td>
                   <td class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId))}</td>
-                  <td><span class="pill pill-${escapeHtml(invoice.status)}">${escapeHtml(formatStatus(invoice.status))}</span></td>
+                  <td><span class="pill pill-${escapeHtml(invoice.status)}">${escapeHtml(statusLabel(invoice.status))}</span></td>
                   <td>${invoice.chainId ? chainChipHtml(invoice.chainId, { size: "sm", short: true }) : "—"}</td>
                 </tr>`;
                 })
@@ -246,7 +252,7 @@ export function renderMerchant(root: HTMLElement): void {
     modal.innerHTML = `
       <div class="modal-backdrop" data-close></div>
       <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div class="modal-body"><p class="status">Loading invoice…</p></div>
+        <div class="modal-body"><p class="status">${t("merchant.loadingInvoice")}</p></div>
       </div>
     `;
     updateListUrl();
@@ -258,22 +264,22 @@ export function renderMerchant(root: HTMLElement): void {
     try {
       const response = await fetch(apiUrl(`/api/invoices/${encodeURIComponent(id)}`));
       const invoice = (await response.json()) as InvoiceWithEvents & { error?: string };
-      if (!response.ok) throw new Error(invoice.error ?? "Invoice not found");
+      if (!response.ok) throw new Error(invoice.error ?? t("merchant.invoiceNotFound"));
       const pageHref = invoicePageHref(invoice.id, state.address);
       const dialog = modal.querySelector(".modal-dialog");
       if (dialog) {
         dialog.innerHTML = `
           <div class="modal-header">
             <div>
-              <p class="eyebrow">Invoice</p>
+              <p class="eyebrow">${t("merchant.invoiceEyebrow")}</p>
               <h2 id="modal-title">${escapeHtml(invoice.title ?? invoice.clientInvoiceId)}</h2>
             </div>
-            <button type="button" class="ghost" data-close aria-label="Close">Close</button>
+            <button type="button" class="ghost" data-close aria-label="${t("common.close")}">${t("common.close")}</button>
           </div>
           <div class="modal-body">${detailFields(invoice)}</div>
           <div class="modal-footer btn-row">
-            <a class="tc-btn secondary" href="${escapeHtml(pageHref)}" target="_blank" rel="noopener noreferrer">Open in separate page</a>
-            <button type="button" class="secondary" data-close>Done</button>
+            <a class="tc-btn secondary" href="${escapeHtml(pageHref)}" target="_blank" rel="noopener noreferrer">${t("merchant.openPage")}</a>
+            <button type="button" class="secondary" data-close>${t("common.done")}</button>
           </div>
         `;
         dialog.querySelectorAll("[data-close]").forEach((el) => el.addEventListener("click", closeModal));
@@ -281,7 +287,7 @@ export function renderMerchant(root: HTMLElement): void {
     } catch (error) {
       const body = modal.querySelector(".modal-body");
       if (body) {
-        body.innerHTML = `<p class="danger">${escapeHtml(error instanceof Error ? error.message : "Failed to load")}</p>`;
+        body.innerHTML = `<p class="danger">${escapeHtml(localizeError(error))}</p>`;
       }
     }
   }
@@ -319,30 +325,30 @@ async function renderInvoicePage(root: HTMLElement, invoiceId: string, to: strin
   root.innerHTML = `
     <div class="admin-shell">
       <header class="page-header" style="max-width:none;margin:0 0 1.25rem">
-        <p class="eyebrow">Merchant · Invoice</p>
-        <h1>Invoice detail</h1>
-        <p><a href="${escapeHtml(back)}" data-route>← Back to invoices</a></p>
+        <p class="eyebrow">${t("merchant.pageEyebrow")}</p>
+        <h1>${t("merchant.pageTitle")}</h1>
+        <p><a href="${escapeHtml(back)}" data-route>${t("merchant.back")}</a></p>
       </header>
-      <section class="panel" id="invoice-page-body"><p class="status">Loading…</p></section>
+      <section class="panel" id="invoice-page-body"><p class="status">${t("common.loading")}</p></section>
     </div>
   `;
   try {
     const response = await fetch(apiUrl(`/api/invoices/${encodeURIComponent(invoiceId)}`));
     const invoice = (await response.json()) as InvoiceWithEvents & { error?: string };
-    if (!response.ok) throw new Error(invoice.error ?? "Invoice not found");
+    if (!response.ok) throw new Error(invoice.error ?? t("merchant.invoiceNotFound"));
     const body = root.querySelector("#invoice-page-body");
     if (body) {
       body.innerHTML = `
         <h2>${escapeHtml(invoice.title ?? invoice.clientInvoiceId)}</h2>
-        <p class="field-hint">${escapeHtml(invoice.description ?? "No description")}</p>
-        <span class="pill pill-${escapeHtml(invoice.status)}">${escapeHtml(formatStatus(invoice.status))}</span>
+        <p class="field-hint">${escapeHtml(invoice.description ?? t("merchant.noDescription"))}</p>
+        <span class="pill pill-${escapeHtml(invoice.status)}">${escapeHtml(statusLabel(invoice.status))}</span>
         ${detailFields(invoice)}
       `;
     }
   } catch (error) {
     const body = root.querySelector("#invoice-page-body");
     if (body) {
-      body.innerHTML = `<p class="danger">${escapeHtml(error instanceof Error ? error.message : "Failed to load")}</p>`;
+      body.innerHTML = `<p class="danger">${escapeHtml(localizeError(error))}</p>`;
     }
   }
 }
@@ -360,32 +366,32 @@ function detailFields(invoice: InvoiceWithEvents): string {
 
   return `
     <dl class="detail-list">
-      <div><dt>Amount due</dt><dd class="mono">$${escapeHtml(invoice.priceUsd)}</dd></div>
-      <div><dt>Amount paid</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId))}</dd></div>
-      <div><dt>Amount swept</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountSwept, invoice.token, invoice.chainId))}</dd></div>
-      <div><dt>Platform fee</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.feeCollected, invoice.token, invoice.chainId))}</dd></div>
-      <div><dt>Customer ref</dt><dd>${escapeHtml(invoice.clientInvoiceId)}</dd></div>
-      <div><dt>Invoice id</dt><dd class="mono wrap">${escapeHtml(invoice.id)}</dd></div>
-      <div><dt>Payment address</dt><dd class="mono wrap">${
+      <div><dt>${t("merchant.amountDue")}</dt><dd class="mono">$${escapeHtml(invoice.priceUsd)}</dd></div>
+      <div><dt>${t("merchant.amountPaid")}</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId))}</dd></div>
+      <div><dt>${t("merchant.amountSwept")}</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountSwept, invoice.token, invoice.chainId))}</dd></div>
+      <div><dt>${t("merchant.platformFee")}</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.feeCollected, invoice.token, invoice.chainId))}</dd></div>
+      <div><dt>${t("merchant.customerRef")}</dt><dd>${escapeHtml(invoice.clientInvoiceId)}</dd></div>
+      <div><dt>${t("merchant.invoiceId")}</dt><dd class="mono wrap">${escapeHtml(invoice.id)}</dd></div>
+      <div><dt>${t("merchant.paymentAddress")}</dt><dd class="mono wrap">${
         invoice.invoiceAddress
           ? addressUrl
             ? `<a href="${escapeHtml(addressUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(invoice.invoiceAddress)}</a>`
             : escapeHtml(invoice.invoiceAddress)
-          : "—"
+          : t("common.emDash")
       }</dd></div>
-      <div><dt>Sweep tx</dt><dd class="mono wrap">${
+      <div><dt>${t("merchant.sweepTx")}</dt><dd class="mono wrap">${
         invoice.sweepTx
           ? txUrl
             ? `<a href="${escapeHtml(txUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(invoice.sweepTx)}</a>`
             : escapeHtml(invoice.sweepTx)
-          : "—"
+          : t("common.emDash")
       }</dd></div>
-      <div><dt>Network</dt><dd>${invoice.chainId ? chainChipHtml(invoice.chainId, { size: "md" }) : "—"}</dd></div>
-      <div><dt>Token</dt><dd>${tokenChipHtml(invoice.token, { size: "md" })}</dd></div>
-      <div><dt>Created</dt><dd>${escapeHtml(formatDate(invoice.createdAt))}</dd></div>
-      <div><dt>Updated</dt><dd>${escapeHtml(formatDate(invoice.updatedAt))}</dd></div>
-      <div><dt>Paid at</dt><dd>${escapeHtml(invoice.paidAt ? formatDate(invoice.paidAt) : "—")}</dd></div>
-      <div><dt>Swept at</dt><dd>${escapeHtml(invoice.sweptAt ? formatDate(invoice.sweptAt) : "—")}</dd></div>
+      <div><dt>${t("merchant.network")}</dt><dd>${invoice.chainId ? chainChipHtml(invoice.chainId, { size: "md" }) : t("common.emDash")}</dd></div>
+      <div><dt>${t("merchant.token")}</dt><dd>${tokenChipHtml(invoice.token, { size: "md" })}</dd></div>
+      <div><dt>${t("merchant.created")}</dt><dd>${escapeHtml(formatDateTime(invoice.createdAt))}</dd></div>
+      <div><dt>${t("merchant.updated")}</dt><dd>${escapeHtml(formatDateTime(invoice.updatedAt))}</dd></div>
+      <div><dt>${t("merchant.paidAt")}</dt><dd>${escapeHtml(invoice.paidAt ? formatDateTime(invoice.paidAt) : t("common.emDash"))}</dd></div>
+      <div><dt>${t("merchant.sweptAt")}</dt><dd>${escapeHtml(invoice.sweptAt ? formatDateTime(invoice.sweptAt) : t("common.emDash"))}</dd></div>
     </dl>
   `;
 }
@@ -393,7 +399,7 @@ function detailFields(invoice: InvoiceWithEvents): string {
 function statusOptions(selected: string): string {
   const statuses: InvoiceStatus[] = ["created", "awaiting_payment", "paid", "paid_partial", "swept"];
   return statuses
-    .map((status) => `<option value="${status}" ${selected === status ? "selected" : ""}>${formatStatus(status)}</option>`)
+    .map((status) => `<option value="${status}" ${selected === status ? "selected" : ""}>${statusLabel(status)}</option>`)
     .join("");
 }
 
@@ -417,33 +423,4 @@ function timeCutoff(time: TimeFilter): number | null {
   if (time === "7d") return now - 7 * 24 * 60 * 60 * 1000;
   if (time === "30d") return now - 30 * 24 * 60 * 60 * 1000;
   return null;
-}
-
-function formatStatus(status: string): string {
-  return status.replace(/_/g, " ");
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatRelative(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const delta = Date.now() - date.getTime();
-  const minutes = Math.round(delta / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
 }

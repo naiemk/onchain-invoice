@@ -1,6 +1,8 @@
 import QRCode from "qrcode";
 import { decodePayLink, encodeInvoiceResumeLink, encodePayLink } from "../shared/invoice.js";
 import { escapeHtml } from "../shared/dom.js";
+import { localizeError, statusLabel } from "../i18n/errors.js";
+import { t } from "../i18n/t.js";
 import {
   chainChipHtml,
   chainLogoSvg,
@@ -47,10 +49,11 @@ export function renderPay(root: HTMLElement): void {
     root.innerHTML = `
       <div class="invoice-shell">
         <section class="invoice-doc">
-          <p class="eyebrow">Checkout</p>
-          <h1>Pay link missing</h1>
-          <p class="danger">${escapeHtml(error instanceof Error ? error.message : "Invalid pay link")}</p>
-          <p>Open a link from <a href="/create" data-route>Create invoice</a>, or pass price, to, chains, and tokens query params.</p>
+          <p class="eyebrow">${t("pay.eyebrow")}</p>
+          <h1>${t("pay.missingTitle")}</h1>
+          <p class="danger">${escapeHtml(error instanceof Error ? localizeError(error) : t("errors.invalidPayLink"))}</p>
+          <p>${t("pay.missingHint")}</p>
+          <p><a href="/create" data-route>${t("pay.createInvoiceLink")}</a></p>
         </section>
       </div>
     `;
@@ -91,9 +94,9 @@ async function resumeByInvoiceId(root: HTMLElement, invoiceId: string): Promise<
   root.innerHTML = `
     <div class="invoice-shell">
       <section class="invoice-doc">
-        <p class="eyebrow">Checkout</p>
-        <h1>Loading invoice…</h1>
-        <div id="pay-status" class="status">Fetching <span class="mono">${escapeHtml(short(invoiceId))}</span></div>
+          <p class="eyebrow">${t("pay.eyebrow")}</p>
+          <h1>${t("pay.loadingTitle")}</h1>
+          <div id="pay-status" class="status">${t("pay.fetching", { id: short(invoiceId) })}</div>
       </section>
     </div>
   `;
@@ -102,7 +105,7 @@ async function resumeByInvoiceId(root: HTMLElement, invoiceId: string): Promise<
     const response = await fetch(apiUrl(`/api/invoices/${encodeURIComponent(invoiceId)}`));
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error ?? `Invoice not found (${response.status})`);
+      throw new Error(body.error ?? t("errors.invoiceNotFoundStatus", { status: String(response.status) }));
     }
     const invoice = (await response.json()) as InvoiceWithEvents;
     sessionStorage.setItem(ACTIVATION_KEY(invoiceId), JSON.stringify({ invoice, created: false }));
@@ -116,10 +119,10 @@ async function resumeByInvoiceId(root: HTMLElement, invoiceId: string): Promise<
     root.innerHTML = `
       <div class="invoice-shell">
         <section class="invoice-doc">
-          <p class="eyebrow">Checkout</p>
-          <h1>Invoice unavailable</h1>
-          <p class="danger">${escapeHtml(error instanceof Error ? error.message : "Load failed")}</p>
-          <p><a href="/create" data-route>Create a new pay link</a></p>
+          <p class="eyebrow">${t("pay.eyebrow")}</p>
+          <h1>${t("pay.unavailableTitle")}</h1>
+          <p class="danger">${escapeHtml(error instanceof Error ? localizeError(error) : t("pay.loadFailed"))}</p>
+          <p><a href="/create" data-route>${t("pay.createNewLink")}</a></p>
         </section>
       </div>
     `;
@@ -139,8 +142,8 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
   const toField =
     fields.to.length > 1
       ? `<div class="field">
-          <label for="to">Recipient</label>
-          <p class="field-hint">Choose which merchant wallet this payment settles to.</p>
+          <label for="to">${t("pay.recipient")}</label>
+          <p class="field-hint">${t("pay.recipientHint")}</p>
           <select id="to">${initialRecipients
             .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(maskMerchant(value))}</option>`)
             .join("")}</select>
@@ -154,21 +157,21 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
   root.innerHTML = `
     <section class="checkout">
       <aside class="checkout-summary">
-        <p class="eyebrow">Order summary</p>
-        <h1>${escapeHtml(fields.title ?? "Invoice")}</h1>
+        <p class="eyebrow">${t("pay.orderSummary")}</p>
+        <h1>${escapeHtml(fields.title ?? t("pay.defaultTitle"))}</h1>
         <p class="amount">$${escapeHtml(fields.price)}</p>
-        <p class="muted">${escapeHtml(fields.description ?? "Complete payment with crypto.")}</p>
-        <p class="muted" style="margin-top:1.25rem;font-size:0.78rem">Invoice id is assigned when you continue.</p>
+        <p class="muted">${escapeHtml(fields.description ?? t("pay.defaultDescription"))}</p>
+        <p class="muted" style="margin-top:1.25rem;font-size:0.78rem">${t("pay.invoiceIdAssignedLater")}</p>
       </aside>
       <div class="checkout-panel">
-        <p class="eyebrow">Payment method</p>
+        <p class="eyebrow">${t("pay.paymentMethod")}</p>
         <div id="testnet-banner">${testnetPillHtml(initialChain)}</div>
-        <h2>Choose network & token</h2>
-        <p>Select where you’ll send funds. You’ll get a dedicated invoice address on the next step.</p>
+        <h2>${t("pay.chooseNetworkToken")}</h2>
+        <p>${t("pay.chooseHint")}</p>
         ${toField}
         <div class="field">
-          <label for="chain">Network</label>
-          <p class="field-hint">Send only on the network you select here.</p>
+          <label for="chain">${t("pay.network")}</label>
+          <p class="field-hint">${t("pay.networkHint")}</p>
           <select id="chain">${fields.chains
             .map(
               (value) =>
@@ -178,14 +181,14 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
           <div class="chain-select-preview" id="chain-preview">${chainChipHtml(initialChain, { size: "md" })}</div>
         </div>
         <div class="field">
-          <label for="token">Token</label>
-          <p class="field-hint">Use the same asset your wallet will transfer.</p>
+          <label for="token">${t("pay.token")}</label>
+          <p class="field-hint">${t("pay.tokenHint")}</p>
           <select id="token">${initialTokens.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}</select>
           <div class="chain-select-preview" id="token-preview">${tokenChipHtml(initialTokens[0] ?? fields.tokens[0], { size: "md" })}</div>
         </div>
-        <button id="activate">Continue to payment</button>
-        <button id="copy-link" type="button" class="secondary" style="margin-left:.5rem">Copy pay link</button>
-        <div id="pay-status" class="status">Ready when your network and token are set.</div>
+        <button id="activate">${t("pay.continue")}</button>
+        <button id="copy-link" type="button" class="secondary" style="margin-left:.5rem">${t("pay.copyPayLink")}</button>
+        <div id="pay-status" class="status">${t("pay.ready")}</div>
         <p class="merchant-hint">${escapeHtml(merchantHint)}</p>
       </div>
     </section>
@@ -229,7 +232,7 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
 
   root.querySelector<HTMLButtonElement>("#copy-link")?.addEventListener("click", async () => {
     await navigator.clipboard.writeText(`${location.origin}/pay?${encodePayLink(fields)}`);
-    if (status) status.textContent = "Pay link copied.";
+    if (status) status.textContent = t("pay.payLinkCopied");
   });
 
   root.querySelector<HTMLButtonElement>("#activate")?.addEventListener("click", async () => {
@@ -237,7 +240,7 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
     const token = root.querySelector<HTMLSelectElement>("#token")?.value ?? fields.tokens[0];
     const toEl = root.querySelector<HTMLSelectElement | HTMLInputElement>("#to");
     const selectedTo = toEl?.value ?? recipientsForChain(chainId)[0] ?? fields.to[0];
-    if (status) status.textContent = "Creating invoice address…";
+    if (status) status.textContent = t("pay.creatingAddress");
     try {
       const response = await fetch(apiUrl("/api/invoices"), {
         method: "POST",
@@ -250,14 +253,14 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
         }),
       });
       const body = (await response.json()) as CreateInvoiceResponse & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Create failed");
+      if (!response.ok) throw new Error(body.error ?? t("errors.createFailed"));
       const invoiceId = body.invoice.id;
       sessionStorage.setItem(ACTIVATION_KEY(invoiceId), JSON.stringify(body));
       sessionStorage.setItem(CHECKOUT_KEY(checkoutFingerprint(fields)), invoiceId);
       replaceResumeUrl(invoiceId);
       renderPay(root);
     } catch (error) {
-      if (status) status.textContent = error instanceof Error ? error.message : "Create failed";
+      if (status) status.textContent = error instanceof Error ? localizeError(error) : t("errors.createFailed");
     }
   });
 }
@@ -284,18 +287,18 @@ async function renderInvoiceStage(
   root.innerHTML = `
     <div class="invoice-shell">
       <section class="invoice-doc">
-        <p class="eyebrow">Invoice</p>
+        <p class="eyebrow">${t("pay.invoiceEyebrow")}</p>
         ${testnetPillHtml(chainId)}
-        <h1>${escapeHtml(fields.title ?? "Payment due")}</h1>
+        <h1>${escapeHtml(fields.title ?? t("pay.paymentDue"))}</h1>
         <p class="amount-due">$${escapeHtml(fields.price)}</p>
-        <span class="status-badge ${escapeHtml(statusClass)}" id="status-badge">${escapeHtml(formatStatus(statusClass))}</span>
+        <span class="status-badge ${escapeHtml(statusClass)}" id="status-badge">${escapeHtml(statusLabel(statusClass))}</span>
         <div class="pay-asset-banner">
           <div class="pay-asset-item">
-            <span class="pay-asset-label">Network</span>
+            <span class="pay-asset-label">${t("pay.network")}</span>
             ${chainChipHtml(chainId, { size: "lg" })}
           </div>
           <div class="pay-asset-item">
-            <span class="pay-asset-label">Token</span>
+            <span class="pay-asset-label">${t("pay.token")}</span>
             ${tokenChipHtml(token, { size: "lg" })}
           </div>
         </div>
@@ -306,36 +309,36 @@ async function renderInvoiceStage(
         }
         ${
           qrDataUrl
-            ? `<div class="qr-wrap"><img src="${qrDataUrl}" alt="Payment address QR code" /></div>`
+            ? `<div class="qr-wrap"><img src="${qrDataUrl}" alt="${escapeHtml(t("pay.qrAlt"))}" /></div>`
             : ""
         }
-        <p class="field-hint" style="text-align:left">Send exactly on this network</p>
-        <div class="address-box" id="invoice-address">${escapeHtml(address || "Address pending")}</div>
+        <p class="field-hint" style="text-align:start">${t("pay.sendExactly")}</p>
+        <div class="address-box" id="invoice-address">${escapeHtml(address || t("pay.addressPending"))}</div>
         <div class="btn-row" style="justify-content:center">
-          <button type="button" id="copy-address" ${address ? "" : "disabled"}>Copy address</button>
-          <button type="button" class="secondary" id="change-method">Change network / token</button>
+          <button type="button" id="copy-address" ${address ? "" : "disabled"}>${t("pay.copyAddress")}</button>
+          <button type="button" class="secondary" id="change-method">${t("pay.changeMethod")}</button>
         </div>
         <div class="callout warn">
-          <strong class="callout-chain">${chainLogoSvg(chainId, 22)}${escapeHtml(networkLabel(chainId))} only</strong>
-          Sending from another chain can result in lost funds. Confirm your wallet network matches before you send.
+          <strong class="callout-chain">${chainLogoSvg(chainId, 22)}${escapeHtml(t("pay.networkOnly", { network: networkLabel(chainId) }))}</strong>
+          ${t("pay.lostFundsWarn")}
           ${
             networkKind(chainId) === "tron"
               ? isTestnet(chainId)
-                ? " Use Nile Tronscan to verify the address when paying on Nile."
-                : " Use Tronscan to verify the address before sending TRC-20."
+                ? t("pay.tronNileHint")
+                : t("pay.tronMainnetHint")
               : networkKind(chainId) === "solana"
-                ? " Send SPL tokens to this token account (ATA). Verify on Solana Explorer."
+                ? t("pay.solanaHint")
                 : ""
           }
         </div>
         <div class="callout info">
-          Pay with <strong class="pay-token-emphasis">${escapeHtml(token ?? "token")}</strong> to the address above.
-          Keep this page open — status updates automatically when payment is detected.
-          Partial payments are ${fields.allowPartial ? "allowed" : "not allowed"} on this invoice.
+          ${t("pay.payWithToken", { token: token ?? t("pay.token") })}
+          ${t("pay.keepPageOpen")}
+          ${fields.allowPartial ? t("pay.partialAllowed") : t("pay.partialNotAllowed")}
         </div>
         <div id="pay-status" class="status">
-          <p><strong>Status:</strong> ${escapeHtml(formatStatus(statusClass))} · monitoring…</p>
-          <p class="field-hint" style="margin:0.35rem 0 0">Invoice · <span class="mono">${escapeHtml(short(invoiceId))}</span></p>
+          <p>${escapeHtml(t("pay.statusLine", { status: statusLabel(statusClass) }))}</p>
+          <p class="field-hint" style="margin:0.35rem 0 0">${t("pay.invoiceShort", { id: short(invoiceId) })}</p>
         </div>
         <p class="merchant-hint">${escapeHtml(maskMerchant(invoice.selectedTo ?? fields.to[0] ?? ""))}</p>
       </section>
@@ -349,7 +352,7 @@ async function renderInvoiceStage(
     if (!address || !statusEl) return;
     await navigator.clipboard.writeText(address);
     const previous = statusEl.innerHTML;
-    statusEl.innerHTML = `<p>Address copied.</p>`;
+    statusEl.innerHTML = `<p>${t("pay.addressCopied")}</p>`;
     clearTimeout(copyFlash);
     copyFlash = setTimeout(() => {
       if (statusEl.isConnected) statusEl.innerHTML = previous;
@@ -377,7 +380,7 @@ function renderPaidStage(
   stopPolling(root);
   const status = invoice.status;
   const title =
-    status === "swept" ? "Payment complete" : status === "paid_partial" ? "Partial payment received" : "Payment received";
+    status === "swept" ? t("pay.completeTitle") : status === "paid_partial" ? t("pay.partialTitle") : t("pay.receivedTitle");
   const chainId = invoice.chainId ?? fields.chains[0];
   const addressUrl = invoice.invoiceAddress ? explorerAddressUrl(chainId, invoice.invoiceAddress) : null;
   const paidDisplay = formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId);
@@ -385,30 +388,30 @@ function renderPaidStage(
   root.innerHTML = `
     <div class="invoice-shell">
       <section class="invoice-doc">
-        <p class="eyebrow">Invoice</p>
+        <p class="eyebrow">${t("pay.invoiceEyebrow")}</p>
         ${testnetPillHtml(chainId)}
-        <h1>${escapeHtml(fields.title ?? "Invoice")}</h1>
+        <h1>${escapeHtml(fields.title ?? t("pay.defaultTitle"))}</h1>
         <p class="amount-due">$${escapeHtml(fields.price)}</p>
-        <span class="status-badge ${escapeHtml(status)}">${escapeHtml(formatStatus(status))}</span>
+        <span class="status-badge ${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span>
         <div class="pay-asset-banner">
           <div class="pay-asset-item">
-            <span class="pay-asset-label">Network</span>
+            <span class="pay-asset-label">${t("pay.network")}</span>
             ${chainChipHtml(chainId, { size: "lg" })}
           </div>
           <div class="pay-asset-item">
-            <span class="pay-asset-label">Token</span>
+            <span class="pay-asset-label">${t("pay.token")}</span>
             ${tokenChipHtml(invoice.token, { size: "lg" })}
           </div>
         </div>
         <div class="callout ok">
           <strong>${escapeHtml(title)}.</strong>
-          ${status === "swept" ? " Payment confirmed." : " We’re confirming settlement on-chain."}
+          ${status === "swept" ? t("pay.confirmed") : t("pay.confirming")}
         </div>
-        <div class="address-box" style="text-align:left">
-          <div><strong>Invoice id</strong><br /><span class="mono">${escapeHtml(invoiceId)}</span></div>
+        <div class="address-box" style="text-align:start">
+          <div><strong>${t("pay.invoiceId")}</strong><br /><span class="mono">${escapeHtml(invoiceId)}</span></div>
           ${
             invoice.invoiceAddress
-              ? `<div style="margin-top:0.75rem"><strong>Payment address</strong><br />${
+              ? `<div style="margin-top:0.75rem"><strong>${t("pay.paymentAddress")}</strong><br />${
                   addressUrl
                     ? `<a class="mono" href="${escapeHtml(addressUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(invoice.invoiceAddress)}</a>`
                     : `<span class="mono">${escapeHtml(invoice.invoiceAddress)}</span>`
@@ -417,7 +420,7 @@ function renderPaidStage(
           }
           ${
             invoice.amountPaid && invoice.amountPaid !== "0"
-              ? `<div style="margin-top:0.75rem"><strong>Amount paid</strong><br /><span class="mono">${escapeHtml(paidDisplay)}</span></div>`
+              ? `<div style="margin-top:0.75rem"><strong>${t("pay.amountPaid")}</strong><br /><span class="mono">${escapeHtml(paidDisplay)}</span></div>`
               : ""
           }
         </div>
@@ -435,7 +438,7 @@ function renderPaidStage(
     url.searchParams.set("status", status);
     if (invoice.invoiceAddress) url.searchParams.set("invoice_address", invoice.invoiceAddress);
     if (statusEl) {
-      statusEl.innerHTML = `<p class="ok">Redirecting to <span class="mono">${escapeHtml(url.toString())}</span>…</p>`;
+      statusEl.innerHTML = `<p class="ok">${escapeHtml(t("pay.redirecting", { url: url.toString() }))}</p>`;
     }
     setTimeout(() => {
       location.href = url.toString();
@@ -465,13 +468,13 @@ function startPolling(root: HTMLElement, invoiceId: string, fields: PayLinkField
         const badge = root.querySelector("#status-badge");
         if (badge) {
           badge.className = `status-badge ${invoice.status}`;
-          badge.textContent = formatStatus(invoice.status);
+          badge.textContent = statusLabel(invoice.status);
         }
         const statusEl = root.querySelector<HTMLElement>("#pay-status");
         if (statusEl) {
           statusEl.innerHTML = `
-            <p><strong>Status:</strong> ${escapeHtml(formatStatus(invoice.status))} · monitoring…</p>
-            <p class="field-hint" style="margin:0.35rem 0 0">Checking every ${POLL_MS / 1000}s for on-chain payment.</p>
+            <p>${escapeHtml(t("pay.statusLine", { status: statusLabel(invoice.status) }))}</p>
+            <p class="field-hint" style="margin:0.35rem 0 0">${escapeHtml(t("pay.checkingEvery", { seconds: POLL_MS / 1000 }))}</p>
           `;
         }
       }
@@ -492,10 +495,6 @@ function stopPolling(root: HTMLElement): void {
 
 function isPaidLike(status: InvoiceStatus): boolean {
   return status === "paid" || status === "paid_partial" || status === "swept";
-}
-
-function formatStatus(status: string): string {
-  return status.replace(/_/g, " ");
 }
 
 function readJson<T>(key: string): T | null {

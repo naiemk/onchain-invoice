@@ -1,9 +1,12 @@
 import { encodePayLink, payPath } from "../shared/invoice.js";
 import { copyText, escapeHtml } from "../shared/dom.js";
+import { localizeError } from "../i18n/errors.js";
+import { t } from "../i18n/t.js";
 import {
   chainLogoSvg,
   deploymentMode,
   networkKind,
+  networkShort,
   networksForDeployment,
   normalizeAddress,
   tokenAllowedOnChain,
@@ -16,20 +19,17 @@ import type { PayLinkFields } from "../shared/types.js";
 export function renderCreate(root: HTMLElement): void {
   const mode = deploymentMode();
   const networks = networksForDeployment(mode);
-  const modeLabel = mode === "testnet" ? "Testnet" : "Mainnet";
+  const modeLabel = mode === "testnet" ? t("common.testnet") : t("common.mainnet");
   const initialOrderId = `order-${Date.now().toString(36)}`;
 
   root.innerHTML = `
     <header class="page-header">
-      <p class="eyebrow">Create invoice · ${escapeHtml(modeLabel)}</p>
-      <h1>Build a payment link</h1>
-      <p>Enter invoice details, copy a pay button for your site, and share the link. No wallet connection required.</p>
+      <p class="eyebrow">${escapeHtml(t("create.eyebrow", { mode: modeLabel }))}</p>
+      <h1>${t("create.h1")}</h1>
+      <p>${t("create.lede")}</p>
       ${
         mode === "testnet"
-          ? `<p class="callout info" role="status">
-        This testnet UI only lists testnet networks.
-        Use the mainnet site for production chains.
-      </p>`
+          ? `<p class="callout info" role="status">${t("create.testnetCallout")}</p>`
           : ""
       }
     </header>
@@ -38,127 +38,121 @@ export function renderCreate(root: HTMLElement): void {
       <section class="panel">
         <form id="create-form" autocomplete="off">
           <div class="field">
-            <label for="clientInvoiceId">Order / reference id</label>
-            <p class="field-hint">Optional. Your local client id as managed by your system — not part of the on-chain invoice id. The invoice seed and invoice id are assigned by the API when the payer continues checkout.</p>
-            <input id="clientInvoiceId" name="clientInvoiceId" class="mono" placeholder="order-…" value="${escapeHtml(initialOrderId)}" />
+            <label for="clientInvoiceId">${t("create.clientIdLabel")}</label>
+            <p class="field-hint">${t("create.clientIdHint")}</p>
+            <input id="clientInvoiceId" name="clientInvoiceId" class="mono" placeholder="${escapeHtml(t("create.clientIdPlaceholder"))}" value="${escapeHtml(initialOrderId)}" />
           </div>
 
           <div class="field">
-            <label for="title">Title</label>
-            <p class="field-hint">Optional heading shown on the customer checkout page.</p>
-            <input id="title" name="title" placeholder="Invoice for Acme Co." />
+            <label for="title">${t("create.titleLabel")}</label>
+            <p class="field-hint">${t("create.titleHint")}</p>
+            <input id="title" name="title" placeholder="${escapeHtml(t("create.titlePlaceholder"))}" />
           </div>
 
           <div class="field">
-            <label for="description">Description</label>
-            <p class="field-hint">Optional note for the payer — line items, due date, or context.</p>
-            <textarea id="description" name="description" placeholder="Consulting — March 2026"></textarea>
+            <label for="description">${t("create.descriptionLabel")}</label>
+            <p class="field-hint">${t("create.descriptionHint")}</p>
+            <textarea id="description" name="description" placeholder="${escapeHtml(t("create.descriptionPlaceholder"))}"></textarea>
           </div>
 
           <div class="field">
-            <label for="price">Amount (USD) <span class="required">*</span></label>
-            <p class="field-hint">Invoice total in USD. The payer settles an equivalent amount in the selected token.</p>
+            <label for="price">${t("create.amountLabel")} <span class="required">${t("common.required")}</span></label>
+            <p class="field-hint">${t("create.amountHint")}</p>
             <input id="price" name="price" required inputmode="decimal" placeholder="128.00" value="10.00" />
           </div>
 
           <div class="field">
-            <label>Accepted networks <span class="required">*</span></label>
-            <p class="field-hint">Tap a chain to enable it (at least one required). Each selected network kind needs its own merchant wallet below.</p>
-            <div class="chain-pill-row" id="chains" role="group" aria-label="Accepted networks">
+            <label>${t("create.networksLabel")} <span class="required">${t("common.required")}</span></label>
+            <p class="field-hint">${t("create.networksHint")}</p>
+            <div class="chain-pill-row" id="chains" role="group" aria-label="${escapeHtml(t("create.networksAria"))}">
               ${
                 networks.length === 0
-                  ? `<p class="danger">No ${escapeHtml(modeLabel.toLowerCase())} networks are configured.</p>`
+                  ? `<p class="danger">${escapeHtml(t("create.noNetworks", { mode: modeLabel }))}</p>`
                   : networks.map((n, i) => chainPillHtml(n, i === 0)).join("")
               }
             </div>
           </div>
 
           <div class="field" id="evm-wallet-field" hidden>
-            <label for="toEvm">EVM merchant wallet <span class="required">*</span></label>
+            <label for="toEvm">${t("create.evmWalletLabel")} <span class="required">${t("common.required")}</span></label>
             <div class="callout info wallet-settlement-note" role="note">
-              <strong>Funds are swept to this address.</strong>
-              The full invoice value (minus protocol fee) is sent here after payment.
-              Make sure you can receive the selected tokens on this wallet on every EVM network you enable —
-              otherwise tokens may be lost permanently.
+              <strong>${t("create.fundsSweptStrong")}</strong>
+              ${t("create.evmWalletNote")}
             </div>
-            <p class="field-hint">EIP-55 checksummed <span class="mono">0x</span> address (MetaMask copy format). Bound into the invoice salt — sweeps cannot redirect funds elsewhere.</p>
+            <p class="field-hint">${t("create.evmWalletHint")}</p>
             <input id="toEvm" name="toEvm" class="mono" placeholder="0x…" autocomplete="off" spellcheck="false" disabled />
             <p class="field-error" id="toEvm-error" hidden></p>
           </div>
 
           <div class="field" id="tron-wallet-field" hidden>
-            <label for="toTron">Tron merchant wallet <span class="required">*</span></label>
+            <label for="toTron">${t("create.tronWalletLabel")} <span class="required">${t("common.required")}</span></label>
             <div class="callout info wallet-settlement-note" role="note">
-              <strong>Funds are swept to this address.</strong>
-              USDT on Tron is sent here after payment. Use a wallet that can receive TRC-20 on the selected Tron network.
+              <strong>${t("create.fundsSweptStrong")}</strong>
+              ${t("create.tronWalletNote")}
             </div>
-            <p class="field-hint">Valid base58check address starting with <span class="mono">T</span>. Bound into the invoice id with your EVM wallet when both are used.</p>
+            <p class="field-hint">${t("create.tronWalletHint")}</p>
             <input id="toTron" name="toTron" class="mono" placeholder="T…" autocomplete="off" spellcheck="false" disabled />
             <p class="field-error" id="toTron-error" hidden></p>
           </div>
 
           <div class="field" id="solana-wallet-field" hidden>
-            <label for="toSolana">Solana merchant wallet <span class="required">*</span></label>
+            <label for="toSolana">${t("create.solanaWalletLabel")} <span class="required">${t("common.required")}</span></label>
             <div class="callout info wallet-settlement-note" role="note">
-              <strong>Funds are swept to this address.</strong>
-              Devnet USDC is settled here by the program — the sweeper cannot redirect to another wallet.
+              <strong>${t("create.fundsSweptStrong")}</strong>
+              ${t("create.solanaWalletNote")}
             </div>
-            <p class="field-hint">Base58 Solana pubkey. Bound into the invoice PDA seeds with the invoice id.</p>
+            <p class="field-hint">${t("create.solanaWalletHint")}</p>
             <input id="toSolana" name="toSolana" class="mono" placeholder="So…" autocomplete="off" spellcheck="false" disabled />
             <p class="field-error" id="toSolana-error" hidden></p>
           </div>
 
           <div class="field">
-            <label>Accepted tokens <span class="required">*</span></label>
-            <p class="field-hint">Base → USDC, BNB → USDC/USDT, Sepolia → USDC/USDT, Tron → USDT (required when Tron is on). Only offer tokens your sweeper is configured to settle.</p>
+            <label>${t("create.tokensLabel")} <span class="required">${t("common.required")}</span></label>
+            <p class="field-hint">${t("create.tokensHint")}</p>
             <div class="field-row" id="tokens"></div>
           </div>
 
           <div class="field">
-            <label for="callback">Callback URL</label>
-            <p class="field-hint">Optional. After payment we POST a webhook here and redirect the browser with invoice status query params.</p>
+            <label for="callback">${t("create.callbackLabel")}</label>
+            <p class="field-hint">${t("create.callbackHint")}</p>
             <input id="callback" name="callback" type="url" placeholder="https://shop.example/webhooks/trustless-commerce" />
           </div>
 
           <div class="field">
             <label class="check">
               <input type="checkbox" id="allowPartial" name="allowPartial" />
-              Allow partial payments
+              ${t("create.allowPartial")}
             </label>
-            <p class="field-hint">When enabled, underpayment can mark the invoice <span class="mono">paid_partial</span> instead of waiting for the full amount.</p>
+            <p class="field-hint">${t("create.allowPartialHint")}</p>
           </div>
 
           <div class="btn-row create-actions">
-            <button type="submit" id="open-checkout" disabled>Open checkout</button>
-            <button type="button" id="copy-pay-link" class="secondary" disabled>Copy pay link</button>
+            <button type="submit" id="open-checkout" disabled>${t("create.openCheckout")}</button>
+            <button type="button" id="copy-pay-link" class="secondary" disabled>${t("create.copyPayLink")}</button>
           </div>
           <p class="status" id="form-action-status" role="status"></p>
         </form>
       </section>
 
       <aside class="panel create-output" id="preview">
-        <p class="eyebrow">Output</p>
-        <h2>Pay link &amp; embed</h2>
-        <p class="field-hint">Updates as you edit. Copy into your storefront or share the URL.</p>
+        <p class="eyebrow">${t("create.outputEyebrow")}</p>
+        <h2>${t("create.outputTitle")}</h2>
+        <p class="field-hint">${t("create.outputHint")}</p>
         <div id="preview-body"></div>
       </aside>
     </div>
 
     <section class="docs-block" id="docs">
       <div class="panel panel-quiet">
-        <p class="eyebrow">Developers</p>
-        <h2>Create invoices programmatically</h2>
-        <p>
-          The same fields become a query string on <span class="mono">/pay</span> (no invoice id / seed), or a JSON body for
-          <span class="mono">POST /api/invoices</span>, which assigns a random seed and returns the created invoice id. Poll status with
-          <span class="mono">GET /api/invoices/&#123;invoiceId&#125;</span>.
-        </p>
+        <p class="eyebrow">${t("create.docsEyebrow")}</p>
+        <h2>${t("create.docsTitle")}</h2>
+        <p>${t("create.docsIntro")}</p>
 
-        <h3 style="margin-top:1.5rem">1. Pay link query string</h3>
-        <p class="field-hint">Shareable checkout URL. It does <strong>not</strong> include <span class="mono">invoice_seed</span> or an invoice id — those are created server-side when checkout continues.</p>
+        <h3 style="margin-top:1.5rem">${t("create.docsQueryTitle")}</h3>
+        <p class="field-hint">${t("create.docsQueryHint")}</p>
         <pre id="docs-query"></pre>
 
-        <h3 style="margin-top:1.5rem">2. Create an invoice (one step)</h3>
+        <h3 style="margin-top:1.5rem">${t("create.docsCreateTitle")}</h3>
         <pre>POST /api/invoices
 Content-Type: application/json
 
@@ -176,22 +170,22 @@ Content-Type: application/json
   "description": "Optional",
   "allowPartial": false
 }</pre>
-        <p class="field-hint">Do not send <span class="mono">invoiceSeed</span> — the API generates it. Response includes <span class="mono">invoice.id</span> and a resume <span class="mono">payLink</span> (<span class="mono">/pay?id=…</span>). Duplicate invoice ids are rejected with <span class="mono">409</span>. Use <span class="mono">Idempotency-Key</span> for safe retries.</p>
+        <p class="field-hint">${t("create.docsCreateHint")}</p>
 
-        <h3 style="margin-top:1.5rem">3. Check invoice status</h3>
+        <h3 style="margin-top:1.5rem">${t("create.docsStatusTitle")}</h3>
         <pre>GET /api/invoices/{invoiceId}
 
-Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
-        <p class="field-hint">Use the <span class="mono">invoice.id</span> returned from create — not a field on the shareable pay link.</p>
+${t("create.docsStatusLine")}</pre>
+        <p class="field-hint">${t("create.docsStatusHint")}</p>
 
-        <h3 style="margin-top:1.5rem">For AI agents</h3>
+        <h3 style="margin-top:1.5rem">${t("create.docsAgentsTitle")}</h3>
         <p>
-          Use the project Cursor skill
+          ${t("create.docsAgentsBody")}
           <a href="https://raw.githubusercontent.com/naiemk/onchain-invoice/main/.cursor/skills/trustless-commerce-invoice/SKILL.md"
              rel="alternate noopener noreferrer"
              target="_blank"><span class="mono">.cursor/skills/trustless-commerce-invoice/SKILL.md</span></a>
-          to create invoices and poll status without a merchant dashboard. Full docs:
-          <a href="https://naiemk.github.io/onchain-invoice/" target="_blank" rel="noopener noreferrer">GitHub Pages</a>.
+          ·
+          <a href="https://naiemk.github.io/onchain-invoice/" target="_blank" rel="noopener noreferrer">${t("create.docsGithubPages")}</a>.
         </p>
       </div>
     </section>
@@ -235,21 +229,22 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
       const fields = readForm(root);
       const path = payPath(fields);
       const link = `${location.origin}${path}`;
-      const embed = `<a href="${link}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">Pay $${fields.price} with crypto</a>`;
+      const payLabel = t("create.payWithCrypto", { price: fields.price });
+      const embed = `<a href="${link}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">${payLabel}</a>`;
       previewBody.innerHTML = `
         <div class="field">
-          <label>Pay link</label>
+          <label>${t("create.payLinkLabel")}</label>
           <div class="mono-block" id="out-url">${escapeHtml(link)}</div>
         </div>
         <div class="field">
-          <label>Embed button HTML</label>
+          <label>${t("create.embedLabel")}</label>
           <div class="mono-block" id="out-embed">${escapeHtml(embed)}</div>
-          <button type="button" class="secondary" id="copy-embed">Copy HTML</button>
+          <button type="button" class="secondary" id="copy-embed">${t("create.copyHtml")}</button>
         </div>
         <div class="field">
-          <label>Rendered pay button</label>
+          <label>${t("create.renderedLabel")}</label>
           <div class="pay-button-preview">
-            <a href="${escapeHtml(path)}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">Pay $${escapeHtml(fields.price)} with crypto</a>
+            <a href="${escapeHtml(path)}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">${escapeHtml(payLabel)}</a>
           </div>
         </div>
         <p class="field-hint" id="copy-status"></p>
@@ -262,13 +257,13 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
       previewBody.querySelector<HTMLButtonElement>("#copy-embed")?.addEventListener("click", async () => {
         await copyText(embed);
         const note = previewBody.querySelector<HTMLElement>("#copy-status");
-        if (note) note.textContent = "Embed HTML copied.";
+        if (note) note.textContent = t("create.embedCopied");
       });
       if (docsQuery) {
         docsQuery.textContent = `${location.origin}/pay?${encodePayLink(fields)}`;
       }
     } catch (error) {
-      previewBody.innerHTML = `<p class="danger">${escapeHtml(error instanceof Error ? error.message : "Incomplete")}</p>`;
+      previewBody.innerHTML = `<p class="danger">${escapeHtml(error instanceof Error ? localizeError(error) : t("common.incomplete"))}</p>`;
       if (openBtn) openBtn.disabled = true;
       if (copyBtn) {
         copyBtn.disabled = true;
@@ -303,11 +298,11 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
       const path = payPath(fields);
       window.open(path, "_blank", "noopener,noreferrer");
       const note = root.querySelector<HTMLElement>("#form-action-status");
-      if (note) note.textContent = "Opened checkout in a new tab.";
+      if (note) note.textContent = t("create.openedCheckout");
     } catch (error) {
       const note = root.querySelector<HTMLElement>("#form-action-status");
       if (note) {
-        note.textContent = error instanceof Error ? error.message : "Fill required fields first.";
+        note.textContent = error instanceof Error ? localizeError(error) : t("errors.fillRequired");
         note.classList.add("danger");
       }
     }
@@ -319,7 +314,7 @@ Statuses: created · awaiting_payment · paid · paid_partial · swept</pre>
     await copyText(link);
     const note = root.querySelector<HTMLElement>("#form-action-status");
     if (note) {
-      note.textContent = "Pay link copied.";
+      note.textContent = t("create.payLinkCopied");
       note.classList.remove("danger");
     }
   });
@@ -350,7 +345,7 @@ function chainPillHtml(network: NetworkOption, checked: boolean): string {
       <input type="checkbox" name="chains" value="${escapeHtml(network.id)}" ${checked ? "checked" : ""} />
       <span class="chain-pill-face">
         ${chainLogoSvg(network.id, 20)}
-        <span class="chain-pill-label">${escapeHtml(network.short)}</span>
+        <span class="chain-pill-label">${escapeHtml(networkShort(network.id))}</span>
       </span>
     </label>`;
 }
@@ -399,7 +394,7 @@ function markAddressField(root: HTMLElement, inputId: string, kind: ChainKind): 
     normalizeAddress(value, kind);
     clearAddressFieldError(root, inputId);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid address";
+    const message = error instanceof Error ? localizeError(error) : t("errors.invalidAddress");
     input.setAttribute("aria-invalid", "true");
     if (err) {
       err.hidden = false;
@@ -417,18 +412,18 @@ function renderTokenOptions(root: HTMLElement, chains: string[]): void {
   const tokens = tokensForChains(chains);
   const needsTron = chains.some((id) => networkKind(id) === "tron");
   if (tokens.length === 0) {
-    host.innerHTML = `<p class="field-hint">Select a network to see matching tokens.</p>`;
+    host.innerHTML = `<p class="field-hint">${t("create.selectNetworkForTokens")}</p>`;
     return;
   }
   host.innerHTML = tokens
-    .map((t) => {
-      const locked = needsTron && t.id === "USDT";
-      const selected = locked || (previous.size > 0 ? previous.has(t.id) : true);
+    .map((token) => {
+      const locked = needsTron && token.id === "USDT";
+      const selected = locked || (previous.size > 0 ? previous.has(token.id) : true);
       return `
         <label class="check">
-          <input type="checkbox" name="tokens" value="${escapeHtml(t.id)}"
+          <input type="checkbox" name="tokens" value="${escapeHtml(token.id)}"
             ${selected ? "checked" : ""} ${locked ? "disabled" : ""} />
-          ${escapeHtml(t.label)}${locked ? " · required for Tron" : ""}
+          ${escapeHtml(token.label)}${locked ? ` · ${t("create.usdtRequiredForTron")}` : ""}
         </label>`;
     })
     .join("");
@@ -466,31 +461,31 @@ function readForm(root: HTMLElement): PayLinkFields {
   const toTron = value("toTron");
   const toSolana = value("toSolana");
 
-  if (!price) throw new Error("Amount (USD) is required.");
-  if (chains.length === 0) throw new Error("Select at least one network.");
-  if (tokens.length === 0) throw new Error("Select at least one token.");
+  if (!price) throw new Error(t("errors.missingPrice"));
+  if (chains.length === 0) throw new Error(t("errors.missingNetwork"));
+  if (tokens.length === 0) throw new Error(t("errors.missingToken"));
   if (needsTron && !tokens.includes("USDT")) {
-    throw new Error("USDT is required when Tron is selected.");
+    throw new Error(t("errors.usdtRequiredForTron"));
   }
 
   for (const chainId of chains) {
     const allowed = tokens.some((token) => tokenAllowedOnChain(chainId, token));
     if (!allowed) {
-      throw new Error(`No compatible token selected for ${chainId}.`);
+      throw new Error(t("errors.noCompatibleToken", { chainId }));
     }
   }
 
   const to: string[] = [];
   if (needsEvm) {
-    if (!toEvm) throw new Error("EVM merchant wallet is required.");
+    if (!toEvm) throw new Error(t("errors.evmWalletRequired"));
     to.push(normalizeAddress(toEvm, "evm"));
   }
   if (needsTron) {
-    if (!toTron) throw new Error("Tron merchant wallet is required.");
+    if (!toTron) throw new Error(t("errors.tronWalletRequired"));
     to.push(normalizeAddress(toTron, "tron"));
   }
   if (needsSolana) {
-    if (!toSolana) throw new Error("Solana merchant wallet is required.");
+    if (!toSolana) throw new Error(t("errors.solanaWalletRequired"));
     to.push(normalizeAddress(toSolana, "solana"));
   }
 
