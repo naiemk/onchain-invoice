@@ -1,3 +1,5 @@
+import { t } from "../i18n/t.js";
+
 const STORAGE_KEY = "tc-theme";
 
 export type Theme = "light" | "dark";
@@ -54,8 +56,9 @@ export function initThemeToggle(button: HTMLButtonElement | null): void {
   const syncLabel = () => {
     const dark = document.documentElement.dataset.theme === "dark";
     button.setAttribute("aria-pressed", dark ? "true" : "false");
-    button.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
-    button.title = dark ? "Switch to light theme" : "Switch to dark theme";
+    const label = dark ? t("theme.switchToLight") : t("theme.switchToDark");
+    button.setAttribute("aria-label", label);
+    button.title = label;
     // Light mode → moon (go dark); dark mode → sun (go light)
     button.innerHTML = dark ? ICON_SUN : ICON_MOON;
   };

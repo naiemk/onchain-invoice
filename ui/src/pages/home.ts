@@ -2,6 +2,7 @@ import { encodePayLink } from "../shared/invoice.js";
 import { howCreateArt, howPayArt, howSettleArt } from "../shared/how-graphics.js";
 import { deploymentMode, networkKind, networksForDeployment } from "../shared/networks.js";
 import { SITE } from "../shared/site.js";
+import { t } from "../i18n/t.js";
 
 function chip(label: string, kind: "muted" | "warn" | "ok" | "accent" = "muted"): string {
   return `<span class="cmp-chip cmp-chip-${kind}">${label}</span>`;
@@ -28,11 +29,8 @@ export function renderHome(root: HTMLElement): void {
     tokens: [demoToken],
     clientInvoiceId: `order-${Date.now().toString(36)}`,
     callback: "",
-    title: "Demo invoice",
-    description:
-      mode === "testnet"
-        ? "Try a Sepolia USDC or Nile USDT test payment."
-        : "Try Base USDC, BNB USDC/USDT, or Tron USDT.",
+    title: t("home.demoTitle"),
+    description: mode === "testnet" ? t("home.demoDescriptionTestnet") : t("home.demoDescriptionMainnet"),
     allowPartial: false,
   };
   const demoLink = `/pay?${encodePayLink(demo)}`;
@@ -40,22 +38,19 @@ export function renderHome(root: HTMLElement): void {
   root.innerHTML = `
     <section class="landing-hero">
       <div>
-        <p class="brand-hero">Trustless Commerce</p>
-        <h1>Crypto invoices your customers can pay today.</h1>
-        <p class="lede">
-          Create a payment link, share it, and get paid on-chain — without opening an account
-          or waiting on compliance review.
-        </p>
+        <p class="brand-hero">${t("brand")}</p>
+        <h1>${t("home.h1")}</h1>
+        <p class="lede">${t("home.lede")}</p>
         <div class="cta-row">
-          <a class="tc-btn" href="/create" data-route>Create an invoice</a>
-          <a class="tc-btn secondary" href="${demoLink}" target="_blank" rel="noopener noreferrer">See a live checkout</a>
+          <a class="tc-btn" href="/create" data-route>${t("home.ctaCreate")}</a>
+          <a class="tc-btn secondary" href="${demoLink}" target="_blank" rel="noopener noreferrer">${t("home.ctaLiveCheckout")}</a>
         </div>
       </div>
       <aside class="hero-shopify" aria-hidden="true">
         <div class="shopify-shot">
           <div class="shopify-shot-inner">
-            <p class="shopify-store">Northline Supply</p>
-            <p class="shopify-step">Checkout</p>
+            <p class="shopify-store">${t("home.shopifyStore")}</p>
+            <p class="shopify-step">${t("home.shopifyStep")}</p>
             <div class="shopify-line">
               <img
                 class="shopify-thumb"
@@ -66,32 +61,29 @@ export function renderHome(root: HTMLElement): void {
                 decoding="async"
               />
               <div class="shopify-line-copy">
-                <p class="shopify-product">Canvas weekender bag</p>
-                <p class="shopify-variant">Natural · Qty 1</p>
+                <p class="shopify-product">${t("home.shopifyProduct")}</p>
+                <p class="shopify-variant">${t("home.shopifyVariant")}</p>
               </div>
               <p class="shopify-price">$128.00</p>
             </div>
             <div class="shopify-totals">
-              <div><span>Subtotal</span><span>$128.00</span></div>
-              <div><span>Shipping</span><span>Free</span></div>
-              <div class="shopify-total"><span>Total</span><span>$128.00</span></div>
+              <div><span>${t("home.shopifySubtotal")}</span><span>$128.00</span></div>
+              <div><span>${t("home.shopifyShipping")}</span><span>${t("home.shopifyShippingFree")}</span></div>
+              <div class="shopify-total"><span>${t("home.shopifyTotal")}</span><span>$128.00</span></div>
             </div>
             <div class="shopify-pay">
-              <span class="shopify-crypto">Pay with crypto</span>
+              <span class="shopify-crypto">${t("home.shopifyPayCrypto")}</span>
             </div>
           </div>
         </div>
-        <p class="shopify-caption">Example Shopify checkout with Pay with crypto</p>
+        <p class="shopify-caption">${t("home.shopifyCaption")}</p>
       </aside>
     </section>
 
     <section class="section" id="agents">
-      <p class="eyebrow">AI agents</p>
-      <h2>Invoice skill for coding agents</h2>
-      <p class="section-lede">
-        Bots and assistants can create pay links and poll status from the published Cursor skill —
-        no merchant dashboard required.
-      </p>
+      <p class="eyebrow">${t("home.agentsEyebrow")}</p>
+      <h2>${t("home.agentsTitle")}</h2>
+      <p class="section-lede">${t("home.agentsLede")}</p>
       <p>
         <a
           id="agent-skill"
@@ -100,90 +92,85 @@ export function renderHome(root: HTMLElement): void {
           rel="alternate noopener noreferrer"
           target="_blank"
           data-agent-skill="trustless-commerce-invoice"
-        >AI agent skill (SKILL.md)</a>
+        >${t("home.agentsSkillLink")}</a>
         ·
-        <a href="${SITE.agentsDocsUrl}" target="_blank" rel="noopener noreferrer">Agent docs</a>
+        <a href="${SITE.agentsDocsUrl}" target="_blank" rel="noopener noreferrer">${t("home.agentsDocs")}</a>
       </p>
       <p class="field-hint mono">${SITE.agentSkillPath}</p>
     </section>
 
     <section class="section">
-      <p class="eyebrow">Why shops switch</p>
-      <h2>From idea to paid invoice before your coffee cools.</h2>
-      <p class="section-lede">
-        Fill in amount and wallet, copy a pay button into your site, and you’re live.
-        No developer ticket queue, no merchant dashboard signup wall.
-      </p>
+      <p class="eyebrow">${t("home.whyEyebrow")}</p>
+      <h2>${t("home.whyTitle")}</h2>
+      <p class="section-lede">${t("home.whyLede")}</p>
       <div class="feature-row">
         <article>
-          <h3>About a minute to go live</h3>
-          <p>Generate a pay link with the fields you already know from your order system.</p>
+          <h3>${t("home.whyMinuteTitle")}</h3>
+          <p>${t("home.whyMinuteBody")}</p>
         </article>
         <article>
-          <h3>Skip the paperwork</h3>
-          <p>No registration and no KYC. Your settlement address is part of the invoice itself.</p>
+          <h3>${t("home.whyPaperworkTitle")}</h3>
+          <p>${t("home.whyPaperworkBody")}</p>
         </article>
         <article>
-          <h3>Drop in without an integration project</h3>
-          <p>Paste a link or HTML button. Wire the API later when you’re ready to automate.</p>
+          <h3>${t("home.whyDropinTitle")}</h3>
+          <p>${t("home.whyDropinBody")}</p>
         </article>
       </div>
     </section>
 
     <section class="section">
-      <p class="eyebrow">Getting started</p>
-      <h2>What it takes elsewhere vs here</h2>
-      <p class="section-lede">
-        Most crypto payment products ask you to join their platform first. We ask for an invoice.
-      </p>
-      <p class="compare-callout">No signup wall. Settlement is on-chain to your address.</p>
+      <p class="eyebrow">${t("home.compareEyebrow")}</p>
+      <h2>${t("home.compareTitle")}</h2>
+      <p class="section-lede">${t("home.compareLede")}</p>
+      <p class="compare-callout">${t("home.compareCallout")}</p>
       <div class="compare-wrap">
         <table class="compare-table">
           <thead>
             <tr>
-              <th class="sticky-col">Step</th>
+              <th class="sticky-col">${t("home.compareStep")}</th>
               <th>BitPay</th>
               <th>Coinbase Commerce</th>
               <th>NOWPayments</th>
               <th>BTCPay Server</th>
               <th class="highlight-col">
-                <span class="ours-pill">Ours</span>
-                Trustless Commerce
+                <span class="ours-pill">${t("home.compareOurs")}</span>
+                ${t("brand")}
               </th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td class="sticky-col">Create an account</td>
-              <td>${chip("Account", "warn")}</td>
-              <td>${chip("Account", "warn")}</td>
-              <td>${chip("Account", "warn")}</td>
-              <td>${chip("Self-host", "muted")}</td>
-              <td class="highlight-col">${chip("None", "ok")}</td>
+              <td class="sticky-col">${t("home.compareAccountRow")}</td>
+              <td>${chip(t("home.chipAccount"), "warn")}</td>
+              <td>${chip(t("home.chipAccount"), "warn")}</td>
+              <td>${chip(t("home.chipAccount"), "warn")}</td>
+              <td>${chip(t("home.chipSelfHost"), "muted")}</td>
+              <td class="highlight-col">${chip(t("home.chipNone"), "ok")}</td>
             </tr>
             <tr>
-              <td class="sticky-col">Identity / business checks</td>
-              <td>${chip("KYC", "warn")}</td>
-              <td>${chip("Verify", "warn")}</td>
-              <td>${chip("Often KYC", "warn")}</td>
-              <td>${chip("Varies", "muted")}</td>
-              <td class="highlight-col">${chip("None", "ok")}</td>
+              <td class="sticky-col">${t("home.compareKycRow")}</td>
+              <td>${chip(t("home.chipKyc"), "warn")}</td>
+              <td>${chip(t("home.chipVerify"), "warn")}</td>
+              <td>${chip(t("home.chipOftenKyc"), "warn")}</td>
+              <td>${chip(t("home.chipVaries"), "muted")}</td>
+              <td class="highlight-col">${chip(t("home.chipNone"), "ok")}</td>
             </tr>
             <tr>
-              <td class="sticky-col">Time to first invoice</td>
-              <td>${chip("Days", "muted")}</td>
-              <td>${chip("Hours–days", "muted")}</td>
-              <td>${chip("Hours", "muted")}</td>
-              <td>${chip("Setup hours", "muted")}</td>
-              <td class="highlight-col">${chip("~1 min", "accent")}</td>
+              <td class="sticky-col">${t("home.compareTimeRow")}</td>
+              <td>${chip(t("home.chipDays"), "muted")}</td>
+              <td>${chip(t("home.chipHoursDays"), "muted")}</td>
+              <td>${chip(t("home.chipHours"), "muted")}</td>
+              <td>${chip(t("home.chipSetupHours"), "muted")}</td>
+              <td class="highlight-col">${chip(t("home.chipOneMin"), "accent")}</td>
             </tr>
             <tr>
-              <td class="sticky-col">Who controls settlement</td>
-              <td>${chip("Processor", "muted")}</td>
-              <td>${chip("Processor", "muted")}</td>
-              <td>${chip("Processor", "muted")}</td>
-              <td>${chip("Your node", "muted")}</td>
-              <td class="highlight-col">${chip("Your wallet", "accent")}</td>
+              <td class="sticky-col">${t("home.compareControlRow")}</td>
+              <td>${chip(t("home.chipProcessor"), "muted")}</td>
+              <td>${chip(t("home.chipProcessor"), "muted")}</td>
+              <td>${chip(t("home.chipProcessor"), "muted")}</td>
+              <td>${chip(t("home.chipYourNode"), "muted")}</td>
+              <td class="highlight-col">${chip(t("home.chipYourWallet"), "accent")}</td>
             </tr>
           </tbody>
         </table>
@@ -191,64 +178,56 @@ export function renderHome(root: HTMLElement): void {
     </section>
 
     <section class="section">
-      <p class="eyebrow">How it works</p>
-      <h2>Trustless invoices that can only settle to you.</h2>
-      <p class="section-lede">
-        No custodian in the middle. The payment address is derived so your wallet is part of the invoice itself.
-      </p>
+      <p class="eyebrow">${t("home.howEyebrow")}</p>
+      <h2>${t("home.howTitle")}</h2>
+      <p class="section-lede">${t("home.howLede")}</p>
       <div class="how-grid">
         <article class="how-card how-card-1">
           <div class="how-art-wrap">${howCreateArt()}</div>
           <span class="how-step">1</span>
-          <h3>Create the invoice</h3>
-          <p>Set the amount and your wallet. Share a pay link — we create the invoice id when payment starts. No account required.</p>
+          <h3>${t("home.how1Title")}</h3>
+          <p>${t("home.how1Body")}</p>
         </article>
         <article class="how-card how-card-2">
           <div class="how-art-wrap">${howPayArt()}</div>
           <span class="how-step">2</span>
-          <h3>Customer pays a unique address</h3>
-          <p>Checkout activates a deterministic payment address for that invoice on the network they choose.</p>
+          <h3>${t("home.how2Title")}</h3>
+          <p>${t("home.how2Body")}</p>
         </article>
         <article class="how-card how-card-3">
-          <div class="how-art-wrap">${howSettleArt()}</div>
+          <div class="how-art-wrap">${howSettleArt(t("home.howFee"), t("home.howYourWallet"))}</div>
           <span class="how-step">3</span>
-          <h3>Only your wallet receives settlement</h3>
-          <p>CREATE2 salt binds the merchant <span class="mono">to</span> address into the invoice. A sweep can take the fee — it cannot redirect your funds.</p>
+          <h3>${t("home.how3Title")}</h3>
+          <p>${t("home.how3Body")}</p>
         </article>
       </div>
     </section>
 
     <section class="section">
       <div class="security-band">
-        <p class="eyebrow">Security guarantee</p>
-        <h2>Paid only to you — enforced by the contract, not a promise.</h2>
-        <p>
-          Each invoice address is derived so the merchant recipient is baked into the CREATE2 salt.
-          A sweep can collect the platform fee, but it cannot redirect settlement away from the
-          wallet encoded in the invoice. You don’t need to trust a company ledger. Trust the chain.
-        </p>
+        <p class="eyebrow">${t("home.securityEyebrow")}</p>
+        <h2>${t("home.securityTitle")}</h2>
+        <p>${t("home.securityBody")}</p>
       </div>
     </section>
 
     <section class="section section-narrow" style="text-align:center">
-      <h2>Ready when your customer is.</h2>
-      <p class="section-lede" style="margin-left:auto;margin-right:auto">
-        Create your first invoice now, or embed a pay button and check status over HTTP when you automate.
-      </p>
+      <h2>${t("home.readyTitle")}</h2>
+      <p class="section-lede" style="margin-left:auto;margin-right:auto">${t("home.readyLede")}</p>
       <div class="cta-row" style="justify-content:center">
-        <a class="tc-btn" href="/create" data-route>Create an invoice</a>
-        <a class="tc-btn secondary" href="/create#docs" data-route>View API docs</a>
+        <a class="tc-btn" href="/create" data-route>${t("home.ctaCreate")}</a>
+        <a class="tc-btn secondary" href="/create#docs" data-route>${t("home.ctaApiDocs")}</a>
       </div>
     </section>
 
     <footer class="site-footer">
-      <span>Trustless Commerce</span>
+      <span>${t("brand")}</span>
       <span>
-        <a href="/create" data-route>Create</a>
+        <a href="/create" data-route>${t("home.footerCreate")}</a>
         ·
-        <a href="/merchant" data-route>Merchant</a>
+        <a href="/merchant" data-route>${t("nav.merchant")}</a>
         ·
-        <a href="${SITE.agentSkillUrl}" rel="alternate noopener noreferrer" target="_blank" data-agent-skill="trustless-commerce-invoice">AI skill</a>
+        <a href="${SITE.agentSkillUrl}" rel="alternate noopener noreferrer" target="_blank" data-agent-skill="trustless-commerce-invoice">${t("nav.aiSkill")}</a>
       </span>
     </footer>
   `;

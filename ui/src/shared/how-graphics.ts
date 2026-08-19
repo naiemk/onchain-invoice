@@ -30,7 +30,7 @@ export function howPayArt(): string {
 </svg>`;
 }
 
-export function howSettleArt(): string {
+export function howSettleArt(feeLabel = "fee", walletLabel = "Your wallet"): string {
   return `
 <svg class="how-art" viewBox="0 0 280 160" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M40 80h52" stroke="#0a6cff" stroke-width="2.5" stroke-linecap="round"/>
@@ -42,8 +42,14 @@ export function howSettleArt(): string {
   <path d="M156 66v-6a8 8 0 0 1 16 0v6" stroke="#67e8db" stroke-width="1.5" stroke-linecap="round"/>
   <path d="M200 64h36" stroke="#aec7c9" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>
   <rect x="236" y="54" width="28" height="20" rx="6" fill="#e6ebf1"/>
-  <text x="250" y="68" text-anchor="middle" fill="#6b7c93" font-family="IBM Plex Mono, monospace" font-size="8">fee</text>
+  <text x="250" y="68" text-anchor="middle" fill="#6b7c93" font-family="IBM Plex Mono, monospace" font-size="8">${escapeXml(feeLabel)}</text>
   <path d="M164 112v16M152 120h24" stroke="#18c9b7" stroke-width="2" stroke-linecap="round"/>
-  <text x="164" y="144" text-anchor="middle" fill="#0a2540" font-family="Instrument Sans, sans-serif" font-size="11" font-weight="600">Your wallet</text>
+  <text x="164" y="144" text-anchor="middle" fill="#0a2540" font-family="Instrument Sans, sans-serif" font-size="11" font-weight="600">${escapeXml(walletLabel)}</text>
 </svg>`;
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char] ?? char
+  );
 }

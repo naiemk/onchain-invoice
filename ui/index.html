@@ -45,6 +45,37 @@
           document.documentElement.dataset.theme = theme;
           document.documentElement.style.colorScheme = theme;
         } catch (e) {}
+        try {
+          var rtl = { ar: 1, fa: 1, he: 1, ur: 1 };
+          var aliases = {
+            zh: "zh-Hans", "zh-cn": "zh-Hans", "zh-sg": "zh-Hans", "zh-hans": "zh-Hans",
+            "zh-tw": "zh-Hant", "zh-hk": "zh-Hant", "zh-mo": "zh-Hant", "zh-hant": "zh-Hant",
+            pt: "pt-BR", "pt-br": "pt-BR", "pt-pt": "pt-BR",
+            "ar-sa": "ar", "fa-ir": "fa", "he-il": "he", iw: "he", "ur-pk": "ur"
+          };
+          var supported = "en,zh-Hans,zh-Hant,es,ar,hi,pt-BR,bn,ru,ja,de,fr,id,ko,tr,it,vi,th,pl,nl,uk,fa,ms,he,ur";
+          function match(tag) {
+            if (!tag) return "";
+            var n = String(tag).trim().replace(/_/g, "-");
+            if (supported.split(",").indexOf(n) >= 0) return n;
+            var low = n.toLowerCase();
+            if (aliases[low]) return aliases[low];
+            var lang = low.split("-")[0];
+            if (aliases[lang]) return aliases[lang];
+            if (supported.split(",").indexOf(lang) >= 0) return lang;
+            return "";
+          }
+          var locale = match(localStorage.getItem("tc-locale"));
+          if (!locale && navigator.languages) {
+            for (var i = 0; i < navigator.languages.length; i++) {
+              locale = match(navigator.languages[i]);
+              if (locale) break;
+            }
+          }
+          if (!locale) locale = match(navigator.language) || "en";
+          document.documentElement.lang = locale;
+          document.documentElement.dir = rtl[locale] ? "rtl" : "ltr";
+        } catch (e) {}
       })();
     </script>
   </head>
