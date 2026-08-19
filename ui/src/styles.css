@@ -1276,6 +1276,105 @@ button:disabled {
   text-align: center;
 }
 
+.invoice-doc-head {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem 1rem;
+  justify-content: space-between;
+  margin: 0 0 0.15rem;
+  text-align: start;
+}
+
+.invoice-doc-head .eyebrow {
+  margin: 0;
+}
+
+.pay-more {
+  position: relative;
+}
+
+.pay-more-summary {
+  align-items: center;
+  border-radius: 8px;
+  color: var(--ink-faint);
+  cursor: pointer;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  list-style: none;
+  margin: -0.25rem -0.35rem 0 0;
+  user-select: none;
+  width: 2rem;
+}
+
+.pay-more-summary::-webkit-details-marker,
+.pay-more-summary::marker {
+  content: none;
+  display: none;
+}
+
+.pay-more-icon {
+  display: block;
+  fill: currentColor;
+  height: 16px;
+  width: 16px;
+}
+
+.pay-more-summary:hover {
+  background: var(--surface-muted);
+  color: var(--ink-muted);
+}
+
+.pay-more[open] > .pay-more-summary {
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+
+.pay-more-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pay-more-menu {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  inset-inline-end: 0;
+  min-width: 12.75rem;
+  padding: 0.35rem;
+  position: absolute;
+  text-align: start;
+  top: calc(100% + 0.4rem);
+  z-index: 6;
+}
+
+.pay-more-item,
+button.pay-more-item {
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  box-shadow: none;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  justify-content: flex-start;
+  line-height: 1.35;
+  padding: 0.6rem 0.75rem;
+  text-align: start;
+  transform: none;
+  width: 100%;
+}
+
+.pay-more-item:hover,
+button.pay-more-item:hover {
+  background: var(--surface-muted);
+  transform: none;
+}
+
 .invoice-doc .amount-due {
   font-family: var(--font-display);
   font-size: 2.5rem;
@@ -1346,6 +1445,15 @@ button:disabled {
   padding: 0.85rem;
   text-align: left;
   word-break: break-all;
+}
+
+.pay-copy-row {
+  justify-content: center;
+  margin-top: 0;
+}
+
+.pay-copy-row #copy-address {
+  min-width: min(100%, 16rem);
 }
 
 .callout {
