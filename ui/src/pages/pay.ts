@@ -30,7 +30,7 @@ const ACTIVATION_KEY = (invoiceId: string) => `tc.activation.${invoiceId}`;
 const CHECKOUT_KEY = (fingerprint: string) => `tc.checkout.${fingerprint}`;
 const POLL_MS = 2000;
 
-type PayRoot = HTMLElement & { __tcPollToken?: number };
+type PayRoot = HTMLElement & { __tcPollToken?: number; __tcMoreAbort?: AbortController };
 
 export function renderPay(root: HTMLElement): void {
   stopPolling(root);
@@ -287,7 +287,21 @@ async function renderInvoiceStage(
   root.innerHTML = `
     <div class="invoice-shell">
       <section class="invoice-doc">
-        <p class="eyebrow">${t("pay.invoiceEyebrow")}</p>
+        <div class="invoice-doc-head">
+          <p class="eyebrow">${t("pay.invoiceEyebrow")}</p>
+          <details class="pay-more">
+            <summary class="pay-more-summary" aria-label="${escapeHtml(t("pay.changeMethod"))}">
+              <svg class="pay-more-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="3.5" cy="8" r="1.45" />
+                <circle cx="8" cy="8" r="1.45" />
+                <circle cx="12.5" cy="8" r="1.45" />
+              </svg>
+            </summary>
+            <div class="pay-more-menu" role="menu">
+              <button type="button" class="pay-more-item" id="change-method" role="menuitem">${t("pay.changeMethod")}</button>
+            </div>
+          </details>
+        </div>
         ${testnetPillHtml(chainId)}
         <h1>${escapeHtml(fields.title ?? t("pay.paymentDue"))}</h1>
         <p class="amount-due">$${escapeHtml(fields.price)}</p>
@@ -314,9 +328,8 @@ async function renderInvoiceStage(
         }
         <p class="field-hint" style="text-align:start">${t("pay.sendExactly")}</p>
         <div class="address-box" id="invoice-address">${escapeHtml(address || t("pay.addressPending"))}</div>
-        <div class="btn-row" style="justify-content:center">
+        <div class="btn-row pay-copy-row">
           <button type="button" id="copy-address" ${address ? "" : "disabled"}>${t("pay.copyAddress")}</button>
-          <button type="button" class="secondary" id="change-method">${t("pay.changeMethod")}</button>
         </div>
         <div class="callout warn">
           <strong class="callout-chain">${chainLogoSvg(chainId, 22)}${escapeHtml(t("pay.networkOnly", { network: networkLabel(chainId) }))}</strong>
@@ -368,6 +381,7 @@ async function renderInvoiceStage(
     renderPay(root);
   });
 
+  bindPayMoreMenu(root);
   startPolling(root, invoiceId, fields);
 }
 
@@ -491,6 +505,31 @@ function startPolling(root: HTMLElement, invoiceId: string, fields: PayLinkField
 function stopPolling(root: HTMLElement): void {
   const payRoot = root as PayRoot;
   payRoot.__tcPollToken = (payRoot.__tcPollToken ?? 0) + 1;
+  payRoot.__tcMoreAbort?.abort();
+}
+
+function bindPayMoreMenu(root: HTMLElement): void {
+  const payRoot = root as PayRoot;
+  payRoot.__tcMoreAbort?.abort();
+  const more = root.querySelector<HTMLDetailsElement>(".pay-more");
+  if (!more) return;
+  const ac = new AbortController();
+  payRoot.__tcMoreAbort = ac;
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (!more.open) return;
+      if (!more.contains(event.target as Node)) more.open = false;
+    },
+    { signal: ac.signal }
+  );
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Escape") more.open = false;
+    },
+    { signal: ac.signal }
+  );
 }
 
 function isPaidLike(status: InvoiceStatus): boolean {
