@@ -12,7 +12,7 @@ Checks HTTPS health, HTTP→HTTPS redirect, HSTS, and create rate limit (via com
 
 ## Images (GHCR)
 
-Built on every push to `main` by `.github/workflows/docker.yml`:
+Built on every push to `main` by [`.github/workflows/docker.yml`](../.github/workflows/docker.yml). Reusable pattern: [`infra/github/workflows/docker-build-reusable.yml`](../infra/github/workflows/docker-build-reusable.yml).
 
 - `ghcr.io/naiemk/trustless-commerce-api`
 - `ghcr.io/naiemk/trustless-commerce-sweeper`
@@ -91,7 +91,9 @@ Prefer the wget installers on worker hosts ([`install/README.md`](install/README
 
 ## Operator install (wget | bash, includes HTTPS gateway)
 
-Preferred path for a VPS: API(s) + **install-gateway** (nginx + UI + Let’s Encrypt mounts) + sweeper nodes.
+Preferred path for a VPS: API(s) + **install-gateway** (nginx + UI + Let's Encrypt mounts) + sweeper nodes.
+
+**Infra packager:** generic installer under [`infra/`](../infra/README.md). Product config: [`packageconfig.yaml`](packageconfig.yaml). Templates: [`templates/`](templates/).
 
 See [`install/README.md`](install/README.md):
 
@@ -99,6 +101,12 @@ See [`install/README.md`](install/README.md):
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-api.sh | bash
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-gateway.sh | bash
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
+```
+
+Or interactive (all components):
+
+```bash
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install.sh | bash
 ```
 
 `docker-compose.domains.yml` is an equivalent all-in-one compose alternative to the wget gateway.

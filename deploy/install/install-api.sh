@@ -1,138 +1,14 @@
 #!/usr/bin/env bash
-# Install Trustless Commerce API operator files into the current directory.
+# Install Trustless Commerce API — thin wrapper over infra packager.
 #
 #   wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-api.sh | bash
-#
-# Creates (if missing):
-#   onchain-invoice-api.yaml
-#   start-onchain-invoice-api.sh
-#   .env.example
-#   .env  (from .env.example, only if .env is missing)
 set -euo pipefail
-
-RAW_BASE="${ONCHAIN_INVOICE_RAW:-https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install}"
-DEST="${INSTALL_DIR:-.}"
-mkdir -p "$DEST"
-DEST="$(cd "$DEST" && pwd)"
-
-fetch_or_fail() {
-  local url="$1"
-  local out="$2"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$url" -o "$out"
-  else
-    wget -qO "$out" "$url"
-  fi
-}
-
-write_if_missing() {
-  local name="$1"
-  local path="$DEST/$name"
-  if [[ -f "$path" ]]; then
-    echo "exists (unchanged): $path"
-    return 0
-  fi
-  echo "downloading $name ..."
-  fetch_or_fail "$RAW_BASE/$name" "$path"
-  if [[ "$name" == *.sh ]]; then
-    chmod +x "$path"
-  fi
-  echo "created: $path"
-}
-
-write_template() {
-  local name="$1"
-  local path="$DEST/$name"
-  echo "refreshing $name ..."
-  fetch_or_fail "$RAW_BASE/$name" "$path"
-  echo "updated: $path"
-}
-
-append_missing_env_keys() {
-  local example="$1"
-  local envfile="$2"
-  shift 2
-  [[ -f "$example" && -f "$envfile" ]] || return 0
-  local key line added=0
-  local legacy_off=0
-  if grep -qiE "^[[:space:]]*AUTO_UPDATE=(0|false|off)\b" "$envfile"; then
-    legacy_off=1
-  fi
-  for key in "$@"; do
-    if grep -qE "^[[:space:]]*${key}=" "$envfile"; then
-      continue
-    fi
-    line="$(grep -E "^[[:space:]]*${key}=" "$example" | head -1 || true)"
-    [[ -n "$line" ]] || continue
-    # Preserve legacy AUTO_UPDATE=0 when introducing role-specific flags.
-    if [[ "$legacy_off" -eq 1 && "$key" == *_AUTO_UPDATE ]]; then
-      line="${key}=0"
-    fi
-    if [[ "$added" -eq 0 ]]; then
-      {
-        echo ""
-        echo "# --- Auto-update (added by install; see .env.example) ---"
-      } >>"$envfile"
-    fi
-    echo "$line" >>"$envfile"
-    echo "appended to .env: $key"
-    added=1
-  done
-}
-
-write_if_missing "onchain-invoice-api.yaml"
-write_if_missing "start-onchain-invoice-api.sh"
-write_if_missing "lib-env.sh"
-write_if_missing "update-onchain-invoice-api.sh"
-write_if_missing "install-auto-update.sh"
-write_template ".env.api.example"
-write_template "onchain-invoice-api.yaml"
-# Refresh start/update so SOLANA_* injection and flags land on existing installs
-write_template "start-onchain-invoice-api.sh"
-write_template "update-onchain-invoice-api.sh"
-write_template "lib-env.sh"
-write_template "install-auto-update.sh"
-if [[ -f "$DEST/start-onchain-invoice-api.sh" ]]; then
-  chmod +x "$DEST/start-onchain-invoice-api.sh"
-fi
-if [[ -f "$DEST/update-onchain-invoice-api.sh" ]]; then
-  chmod +x "$DEST/update-onchain-invoice-api.sh"
-fi
-if [[ -f "$DEST/install-auto-update.sh" ]]; then
-  chmod +x "$DEST/install-auto-update.sh"
-fi
-
-cp "$DEST/.env.api.example" "$DEST/.env.example"
-echo "updated: $DEST/.env.example"
-
-if [[ ! -f "$DEST/.env" ]]; then
-  cp "$DEST/.env.example" "$DEST/.env"
-  echo "created: $DEST/.env  (edit secrets before starting)"
+REF="${ONCHAIN_INVOICE_REF:-main}"
+PACKAGER_RAW="${PACKAGER_RAW:-https://raw.githubusercontent.com/naiemk/onchain-invoice/${REF}/infra}"
+PACKAGECONFIG_URL="${PACKAGECONFIG_URL:-https://raw.githubusercontent.com/naiemk/onchain-invoice/${REF}/deploy/packageconfig.yaml}"
+export PACKAGER_RAW PACKAGECONFIG_URL INFRA_PROFILE=api INSTALL_DIR="${INSTALL_DIR:-.}"
+if command -v curl >/dev/null 2>&1; then
+  exec bash <(curl -fsSL "${PACKAGER_RAW}/install.sh") --profile api
 else
-  echo "exists: $DEST/.env (secrets preserved)"
-  append_missing_env_keys "$DEST/.env.api.example" "$DEST/.env" \
-    API_AUTO_UPDATE API_AUTO_UPDATE_INTERVAL_MIN API_STOP_TIMEOUT API_MEMORY_LIMIT \
-    TRON_FULL_HOST TRON_INVOICE_MASTER_SECRET TRON_USDT_ADDRESS \
-    SOLANA_RPC_URL SOLANA_PROGRAM_ID SOLANA_USDC_MINT SOLANA_USDT_MINT \
-    SOLANA_MAINNET_ENABLED SOLANA_MAINNET_RPC_URL SOLANA_MAINNET_PROGRAM_ID
+  exec bash <(wget -qO- "${PACKAGER_RAW}/install.sh") --profile api
 fi
-
-(
-  cd "$DEST"
-  ./install-auto-update.sh || true
-)
-
-cat <<EOF
-
-Trustless Commerce API install complete in:
-  $DEST
-
-Next:
-  1. Edit $DEST/.env  (ADMIN_API_KEY, SWEEPER_API_KEY, BASE_URL, Sepolia addresses)
-  2. Start:
-       cd $DEST && ./start-onchain-invoice-api.sh
-  3. Health:
-       curl -s http://localhost:8080/api/health
-  4. Auto-update (off by default): set API_AUTO_UPDATE=1 then ./install-auto-update.sh
-
-EOF
