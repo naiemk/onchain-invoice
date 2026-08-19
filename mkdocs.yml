@@ -9,6 +9,7 @@ nav:
   - Home: index.md
   - Create invoice: create.md
   - HTTP API: api.md
+  - Platform integrations: platform-integration.md
   - Agents: agents.md
   - Sweepers: sweepers.md
   - Ops / Docker: ops.md
