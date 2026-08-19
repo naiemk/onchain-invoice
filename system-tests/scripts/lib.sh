@@ -17,41 +17,45 @@ api_json() {
   local path="$2"
   local body="${3:-}"
   local extra_headers="${4-}"
-  # Base64 so JSON quotes in x-api-key / Idempotency-Key survive `docker compose exec -e`.
-  # Passing raw JSON as T_HEADERS was parsed as `{}` (quotes stripped) → silent 401 / lost idempotency.
-  local headers_b64
-  headers_b64="$(printf '%s' "${extra_headers:-{}}" | base64 | tr -d '\n')"
+  # Pipe a single-line JSON envelope through stdin so shell quoting / docker exec
+  # env-var limits never mangle the API key, Idempotency-Key, or request body.
+  # Envelope format: {"method":"...","path":"...","body":"...","headers":{...}}
+  local envelope
+  envelope="$(python3 -c '
+import json, sys
+method = sys.argv[1]
+path   = sys.argv[2]
+body   = sys.argv[3]
+try:
+    extra = json.loads(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4] else {}
+except Exception:
+    extra = {}
+print(json.dumps({"method": method, "path": path, "body": body, "headers": extra}))
+' "$method" "$path" "$body" "${extra_headers:-}")"
   # Retry only when docker exec / fetch returns empty (transport flake).
-  # Do not reinterpret a real HTTP status (callers assert 200/201/401).
   local attempts=5
   local attempt out=""
   for ((attempt=1; attempt<=attempts; attempt++)); do
-    out="$("${COMPOSE[@]}" exec -T \
-      -e T_METHOD="$method" \
-      -e T_PATH="$path" \
-      -e T_BODY="$body" \
-      -e T_HEADERS_B64="$headers_b64" \
-      api node -e '
-const extra = (() => {
-  try {
-    const raw = Buffer.from(process.env.T_HEADERS_B64 || "", "base64").toString("utf8") || "{}";
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-})();
-const headers = Object.assign(
-  {},
-  process.env.T_BODY ? { "content-type": "application/json" } : {},
-  extra
-);
-fetch("http://127.0.0.1:8080" + process.env.T_PATH, {
-  method: process.env.T_METHOD,
-  headers,
-  body: process.env.T_BODY || undefined,
-}).then(async (res) => {
-  process.stdout.write(JSON.stringify({ status: res.status, body: await res.text() }));
-}).then(() => process.exit(0)).catch((e) => { console.error(String(e)); process.exit(1); });
+    out="$(printf '%s\n' "$envelope" | "${COMPOSE[@]}" exec -T api node -e '
+let raw = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (c) => { raw += c; });
+process.stdin.on("end", () => {
+  const { method, path, body, headers: extra } = JSON.parse(raw);
+  const headers = Object.assign(
+    {},
+    body ? { "content-type": "application/json" } : {},
+    extra || {}
+  );
+  fetch("http://127.0.0.1:8080" + path, {
+    method,
+    headers,
+    body: body || undefined,
+  }).then(async (res) => {
+    process.stdout.write(JSON.stringify({ status: res.status, body: await res.text() }));
+    process.exit(0);
+  }).catch((e) => { console.error(String(e)); process.exit(1); });
+});
 ' 2>/dev/null || true)"
     if [[ -n "$out" ]]; then
       printf '%s' "$out"
