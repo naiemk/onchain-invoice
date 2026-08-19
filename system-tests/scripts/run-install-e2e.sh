@@ -5,6 +5,8 @@ set -euo pipefail
 ST_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "$ST_ROOT/.." && pwd)"
 INSTALL_SRC="$REPO_ROOT/deploy/install"
+INFRA_SRC="$REPO_ROOT/infra"
+TEMPLATE_SRC="$REPO_ROOT/deploy/templates"
 
 # shellcheck disable=SC1091
 source "$ST_ROOT/scripts/lib.sh"
@@ -33,7 +35,11 @@ pick_port() {
   python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
 }
 HTTP_PORT="$(pick_port)"
-RAW_BASE="http://127.0.0.1:${HTTP_PORT}"
+HTTP_ROOT="http://127.0.0.1:${HTTP_PORT}"
+PACKAGER_RAW="${HTTP_ROOT}/infra"
+PACKAGECONFIG_URL="${HTTP_ROOT}/deploy/packageconfig.yaml"
+PRODUCT_RAW="${HTTP_ROOT}/deploy/templates"
+RAW_BASE="${HTTP_ROOT}/deploy/install"
 
 cleanup_install() {
   if [[ -n "$HTTP_PID" ]]; then
@@ -50,17 +56,30 @@ trap cleanup_install EXIT
 
 echo "======== wget install e2e ========"
 echo "INSTALL_DIR=$INSTALL_DIR"
-echo "ONCHAIN_INVOICE_RAW=$RAW_BASE"
+echo "PACKAGER_RAW=$PACKAGER_RAW"
+echo "PRODUCT_RAW=$PRODUCT_RAW"
 echo "IMAGE_TAG=$IMAGE_TAG"
 
+if [[ "${BUILD_LOCAL:-1}" == "1" ]] && [[ "$IMAGE_TAG" != "main" ]]; then
+  echo "== build local Docker images (:${IMAGE_TAG}) =="
+  (
+    cd "$REPO_ROOT"
+    npm run commerce:build >/dev/null
+    docker compose -f deploy/docker-compose.yml build api
+    docker build -f deploy/Dockerfile.sweeper -t "$SWEEPER_IMAGE" .
+  )
+  export PULL=0
+  export ONCHAIN_INVOICE_SKIP_PULL=1
+fi
+
 (
-  cd "$INSTALL_SRC"
+  cd "$REPO_ROOT"
   exec python3 -m http.server "$HTTP_PORT" --bind 127.0.0.1
 ) >/dev/null 2>&1 &
 HTTP_PID=$!
 
-for _ in $(seq 1 20); do
-  if wget -qO- "${RAW_BASE}/install-api.sh" >/dev/null 2>&1; then
+for _ in $(seq 1 30); do
+  if wget -qO- "${PACKAGER_RAW}/install.sh" >/dev/null 2>&1; then
     break
   fi
   sleep 0.2
@@ -70,18 +89,26 @@ docker rm -f "$API_CONTAINER" "$NODE_CONTAINER" \
   onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana \
   >/dev/null 2>&1 || true
 
-echo "== wget|bash install-api.sh =="
+echo "== wget|bash install-api.sh (infra packager) =="
 wget -qO- "${RAW_BASE}/install-api.sh" | \
-  env ONCHAIN_INVOICE_RAW="$RAW_BASE" INSTALL_DIR="$INSTALL_DIR" bash
+  env PACKAGER_RAW="$PACKAGER_RAW" \
+      PACKAGECONFIG_URL="$PACKAGECONFIG_URL" \
+      ONCHAIN_INVOICE_RAW="$PRODUCT_RAW" \
+      INSTALL_DIR="$INSTALL_DIR" bash
 
-echo "== wget|bash install-nodes.sh =="
+echo "== wget|bash install-nodes.sh (infra packager) =="
 wget -qO- "${RAW_BASE}/install-nodes.sh" | \
-  env ONCHAIN_INVOICE_RAW="$RAW_BASE" INSTALL_DIR="$INSTALL_DIR" bash
+  env PACKAGER_RAW="$PACKAGER_RAW" \
+      PACKAGECONFIG_URL="$PACKAGECONFIG_URL" \
+      ONCHAIN_INVOICE_RAW="$PRODUCT_RAW" \
+      INSTALL_DIR="$INSTALL_DIR" bash
 
 [[ -x "$INSTALL_DIR/start-onchain-invoice-api.sh" ]]
 [[ -x "$INSTALL_DIR/start-onchain-invoice-nodes.sh" ]]
 [[ -f "$INSTALL_DIR/onchain-invoice-api.yaml" ]]
 [[ -f "$INSTALL_DIR/onchain-invoice-nodes.yaml" ]]
+[[ -f "$INSTALL_DIR/lib-env.sh" ]]
+[[ -f "$INSTALL_DIR/.infra-profile" ]]
 
 echo "== patch YAML images / rate limit =="
 python3 - "$INSTALL_DIR/onchain-invoice-api.yaml" "$API_IMAGE" <<'PY'
