@@ -10,6 +10,7 @@ export const en = {
 
   nav: {
     product: "Product",
+    integrations: "Integrations",
     create: "Create invoice",
     merchant: "Merchant",
     docs: "Docs",
@@ -38,6 +39,9 @@ export const en = {
     payDescription: "Pay a Trustless Commerce crypto invoice on-chain.",
     merchantTitle: "Merchant · Trustless Commerce",
     merchantDescription: "View and manage your Trustless Commerce invoices.",
+    integrationsTitle: "Integrations · Trustless Commerce",
+    integrationsDescription:
+      "Accept USDC and USDT on WooCommerce, Shopify, Kajabi, Teachable, and more with hosted crypto checkout.",
     adminTitle: "Admin · Trustless Commerce",
     adminDescription: "Platform admin overview.",
   },
@@ -132,6 +136,11 @@ export const en = {
       "Bots and assistants can create pay links and poll status from the published Cursor skill — no merchant dashboard required.",
     agentsSkillLink: "AI agent skill (SKILL.md)",
     agentsDocs: "Agent docs",
+    integrationsEyebrow: "Integrations",
+    integrationsTitle: "Works with the platforms you already use",
+    integrationsLede:
+      "Native plugins and checkout connectors for major ecommerce and creator platforms — install, paste your wallet, and accept crypto at checkout.",
+    integrationsCta: "View all integrations",
     whyEyebrow: "Why shops switch",
     whyTitle: "From idea to paid invoice before your coffee cools.",
     whyLede:
@@ -416,6 +425,65 @@ export const en = {
     colSwept: "Swept",
     colFees: "Fees",
     noActivity: "No settlement activity yet.",
+  },
+
+  integrations: {
+    eyebrow: "Platform integrations",
+    title: "Accept crypto on your storefront",
+    lede:
+      "Trustless Commerce wraps hosted checkout and a one-shot invoice API with thin adapters for WooCommerce, Shopify, creator platforms, and more. Install a plugin or point your AI agent at a platform skill — orders update when payment lands on-chain.",
+    contractEyebrow: "Shared contract",
+    contractTitle: "One API for every platform",
+    contractBody:
+      "All integrations use POST /api/invoices, hosted /pay checkout, and optional webhooks. Platform adapters only handle order sync and fulfillment — not wallet UI or settlement logic.",
+    contractLink: "Integration contract (docs)",
+    sdkLink: "SDKs & plugins on GitHub",
+    wave1: "Ecommerce stores",
+    wave2: "Courses & memberships",
+    wave3: "More platforms",
+    statusAvailable: "Available",
+    statusPreview: "Coming soon",
+    docs: "Documentation",
+    aiSkill: "AI skill",
+    ctaTitle: "Start with any platform",
+    ctaLede: "Create a test invoice now, or open the integration docs and AI skill for your storefront.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress payment gateway — Pay with crypto at checkout, redirect to hosted /pay, auto-mark orders paid via webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Offsite checkout app — redirect buyers to crypto checkout and sync paid status back to Shopify orders.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "External Buy with crypto button for courses and memberships — grant access automatically after payment.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "External checkout for course sellers — enroll students automatically when the invoice reaches paid.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "Mid-market ecommerce app with checkout SDK and webhook-backed order sync (roadmap).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "SaaS and digital-download checkout via hosted pay links (roadmap).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Indie creator checkout with lightweight embed and fulfillment hooks (roadmap).",
+      },
+    },
   },
 };
 

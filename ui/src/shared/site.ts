@@ -1,7 +1,9 @@
 /** Public site / docs / social links (dummy TG until live). */
 export const SITE = {
   docsUrl: "https://naiemk.github.io/onchain-invoice/",
+  platformIntegrationDocsUrl: "https://naiemk.github.io/onchain-invoice/platform-integration/",
   agentsDocsUrl: "https://naiemk.github.io/onchain-invoice/agents/",
+  githubPlatformsUrl: "https://github.com/naiemk/onchain-invoice/tree/main/platforms",
   /** Raw Cursor skill — agents/bots should fetch this URL. */
   agentSkillUrl:
     "https://raw.githubusercontent.com/naiemk/onchain-invoice/main/.cursor/skills/trustless-commerce-invoice/SKILL.md",

@@ -5,6 +5,7 @@ export const ar = {
 
   nav: {
     product: "المنتج",
+    integrations: "التكاملات",
     create: "إنشاء فاتورة",
     merchant: "التاجر",
     docs: "التوثيق",
@@ -33,6 +34,9 @@ export const ar = {
     payDescription: "ادفع فاتورة Trustless Commerce بالعملات الرقمية على السلسلة.",
     merchantTitle: "التاجر · Trustless Commerce",
     merchantDescription: "اعرض فواتير Trustless Commerce وأدرها.",
+    integrationsTitle: "التكاملات · Trustless Commerce",
+    integrationsDescription:
+      "اقبل USDC وUSDT على WooCommerce وShopify وKajabi وTeachable وغيرها عبر checkout مُستضاف للعملات الرقمية.",
     adminTitle: "الإدارة · Trustless Commerce",
     adminDescription: "نظرة عامة على إدارة المنصة.",
   },
@@ -127,6 +131,11 @@ export const ar = {
       "تستطيع البوتات والمساعدات إنشاء روابط دفع ومتابعة حالتها عبر مهارة Cursor المنشورة — دون الحاجة إلى لوحة تحكم للتاجر.",
     agentsSkillLink: "مهارة وكيل الذكاء الاصطناعي (SKILL.md)",
     agentsDocs: "توثيق الوكلاء",
+    integrationsEyebrow: "التكاملات",
+    integrationsTitle: "يعمل مع المنصات التي تستخدمها بالفعل",
+    integrationsLede:
+      "إضافات أصلية وموصلات checkout لأبرز منصات التجارة الإلكترونية وصنّاع المحتوى — ثبّت الإضافة، ألصق محفظتك، واقبل العملات الرقمية عند الدفع.",
+    integrationsCta: "عرض كل التكاملات",
     whyEyebrow: "لماذا تتحوّل المتاجر إلينا",
     whyTitle: "من الفكرة إلى فاتورة مدفوعة قبل أن تبرد قهوتك.",
     whyLede:
@@ -412,5 +421,64 @@ export const ar = {
     colSwept: "المُحوَّل",
     colFees: "الرسوم",
     noActivity: "لا يوجد نشاط تسوية بعد.",
+  },
+
+  integrations: {
+    eyebrow: "تكاملات المنصات",
+    title: "اقبل العملات الرقمية في متجرك",
+    lede:
+      "تغلّف Trustless Commerce checkout مُستضافًا وواجهة فواتير بنقرة واحدة بمحوّلات خفيفة لـ WooCommerce وShopify ومنصات المبدعين وغيرها. ثبّت إضافة أو وجّه وكيل الذكاء الاصطناعي إلى مهارة منصة — تُحدَّث الطلبات عند وصول الدفع على السلسلة.",
+    contractEyebrow: "عقد مشترك",
+    contractTitle: "واجهة API واحدة لكل المنصات",
+    contractBody:
+      "تستخدم كل التكاملات POST /api/invoices وcheckout مُستضاف على /pay وwebhooks اختيارية. محوّلات المنصات تتولى فقط مزامنة الطلبات والتنفيذ — لا واجهة المحفظة ولا منطق التسوية.",
+    contractLink: "عقد التكامل (التوثيق)",
+    sdkLink: "حزم SDK والإضافات على GitHub",
+    wave1: "متاجر التجارة الإلكترونية",
+    wave2: "الدورات والعضويات",
+    wave3: "منصات أخرى",
+    statusAvailable: "متاح",
+    statusPreview: "قريبًا",
+    docs: "التوثيق",
+    aiSkill: "مهارة الذكاء الاصطناعي",
+    ctaTitle: "ابدأ من أي منصة",
+    ctaLede: "أنشئ فاتورة تجريبية الآن، أو افتح توثيق التكامل ومهارة الذكاء الاصطناعي لمتجرك.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "بوابة دفع لـ WordPress — ادفع بالعملات الرقمية عند checkout، أعد التوجيه إلى /pay المُستضاف، وعلّم الطلبات كمدفوعة تلقائيًا عبر webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "تطبيق checkout خارجي — أعد توجيه المشترين إلى checkout العملات الرقمية ومزامنة حالة الدفع مع طلبات Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "زر خارجي «اشترِ بالعملات الرقمية» للدورات والعضويات — امنح الوصول تلقائيًا بعد الدفع.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "checkout خارجي لبائعي الدورات — سجّل الطلاب تلقائيًا عندما تصبح الفاتورة مدفوعة.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "تطبيق تجارة إلكترونية للسوق المتوسط مع SDK للـ checkout ومزامنة طلبات عبر webhook (قيد التخطيط).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "checkout لـ SaaS والتنزيلات الرقمية عبر روابط دفع مُستضافة (قيد التخطيط).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "checkout للمبدعين المستقلين مع تضمين خفيف وخطافات تنفيذ (قيد التخطيط).",
+      },
+    },
   },
 } satisfies Messages;

@@ -5,6 +5,7 @@ export const vi = {
 
   nav: {
     product: "Sản phẩm",
+    integrations: "Tích hợp",
     create: "Tạo hóa đơn",
     merchant: "Người bán",
     docs: "Tài liệu",
@@ -33,6 +34,9 @@ export const vi = {
     payDescription: "Thanh toán hóa đơn crypto Trustless Commerce ngay trên chuỗi.",
     merchantTitle: "Người bán · Trustless Commerce",
     merchantDescription: "Xem và quản lý hóa đơn Trustless Commerce của bạn.",
+    integrationsTitle: "Tích hợp · Trustless Commerce",
+    integrationsDescription:
+      "Chấp nhận USDC và USDT trên WooCommerce, Shopify, Kajabi, Teachable và nhiều nền tảng khác với checkout crypto được lưu trữ.",
     adminTitle: "Quản trị · Trustless Commerce",
     adminDescription: "Tổng quan dành cho quản trị nền tảng.",
   },
@@ -127,6 +131,11 @@ export const vi = {
       "Bot và trợ lý có thể tạo liên kết thanh toán và theo dõi trạng thái từ kỹ năng Cursor đã phát hành — không cần bảng điều khiển người bán.",
     agentsSkillLink: "Kỹ năng tác nhân AI (SKILL.md)",
     agentsDocs: "Tài liệu cho tác nhân",
+    integrationsEyebrow: "Tích hợp",
+    integrationsTitle: "Hoạt động với các nền tảng bạn đang dùng",
+    integrationsLede:
+      "Plugin gốc và bộ kết nối checkout cho các nền tảng thương mại điện tử và creator hàng đầu — cài đặt, dán ví và chấp nhận crypto khi thanh toán.",
+    integrationsCta: "Xem tất cả tích hợp",
     whyEyebrow: "Vì sao các shop chuyển sang",
     whyTitle: "Từ ý tưởng đến hóa đơn đã thanh toán, trước khi ly cà phê nguội.",
     whyLede:
@@ -413,5 +422,64 @@ export const vi = {
     colSwept: "Đã gom",
     colFees: "Phí",
     noActivity: "Chưa có hoạt động nhận tiền nào.",
+  },
+
+  integrations: {
+    eyebrow: "Tích hợp nền tảng",
+    title: "Chấp nhận crypto trên cửa hàng của bạn",
+    lede:
+      "Trustless Commerce gói checkout được lưu trữ và API hóa đơn một lần với các adapter mỏng cho WooCommerce, Shopify, nền tảng creator và hơn thế nữa. Cài plugin hoặc hướng tác nhân AI tới skill nền tảng — đơn hàng cập nhật khi thanh toán vào on-chain.",
+    contractEyebrow: "Hợp đồng dùng chung",
+    contractTitle: "Một API cho mọi nền tảng",
+    contractBody:
+      "Mọi tích hợp dùng POST /api/invoices, checkout /pay được lưu trữ và webhook tùy chọn. Adapter nền tảng chỉ xử lý đồng bộ đơn hàng và fulfillment — không phải giao diện ví hay logic thanh toán.",
+    contractLink: "Hợp đồng tích hợp (docs)",
+    sdkLink: "SDK & plugin trên GitHub",
+    wave1: "Cửa hàng thương mại điện tử",
+    wave2: "Khóa học & thành viên",
+    wave3: "Nền tảng khác",
+    statusAvailable: "Đã có",
+    statusPreview: "Sắp ra mắt",
+    docs: "Tài liệu",
+    aiSkill: "Kỹ năng AI",
+    ctaTitle: "Bắt đầu với bất kỳ nền tảng nào",
+    ctaLede: "Tạo hóa đơn thử ngay, hoặc mở tài liệu tích hợp và kỹ năng AI cho cửa hàng của bạn.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "Cổng thanh toán WordPress — Thanh toán bằng crypto tại checkout, chuyển hướng tới /pay được lưu trữ, tự động đánh dấu đơn đã thanh toán qua webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Ứng dụng checkout ngoài site — chuyển người mua tới checkout crypto và đồng bộ trạng thái đã thanh toán về đơn Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Nút Mua bằng crypto bên ngoài cho khóa học và thành viên — cấp quyền truy cập tự động sau thanh toán.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Checkout ngoài cho người bán khóa học — tự động ghi danh học viên khi hóa đơn đã thanh toán.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "Ứng dụng thương mại điện tử mid-market với SDK checkout và đồng bộ đơn qua webhook (lộ trình).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Checkout SaaS và tải xuống kỹ thuật số qua liên kết thanh toán được lưu trữ (lộ trình).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout cho creator độc lập với embed nhẹ và hook fulfillment (lộ trình).",
+      },
+    },
   },
 } satisfies Messages;

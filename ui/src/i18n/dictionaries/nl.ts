@@ -5,6 +5,7 @@ export const nl = {
 
   nav: {
     product: "Product",
+    integrations: "Integraties",
     create: "Factuur maken",
     merchant: "Verkoper",
     docs: "Documentatie",
@@ -33,6 +34,9 @@ export const nl = {
     payDescription: "Betaal een cryptofactuur van Trustless Commerce on-chain.",
     merchantTitle: "Verkoper · Trustless Commerce",
     merchantDescription: "Bekijk en beheer je facturen bij Trustless Commerce.",
+    integrationsTitle: "Integraties · Trustless Commerce",
+    integrationsDescription:
+      "Accepteer USDC en USDT op WooCommerce, Shopify, Kajabi, Teachable en meer met gehoste crypto-checkout.",
     adminTitle: "Beheer · Trustless Commerce",
     adminDescription: "Overzicht voor platformbeheerders.",
   },
@@ -127,6 +131,11 @@ export const nl = {
       "Bots en assistenten maken betaallinks en volgen de status via de gepubliceerde Cursor-skill — een verkopersdashboard is niet nodig.",
     agentsSkillLink: "Skill voor AI-agents (SKILL.md)",
     agentsDocs: "Documentatie voor agents",
+    integrationsEyebrow: "Integraties",
+    integrationsTitle: "Werkt met de platforms die je al gebruikt",
+    integrationsLede:
+      "Native plugins en checkout-connectors voor grote e-commerce- en creatorplatforms — installeer, plak je wallet en accepteer crypto bij checkout.",
+    integrationsCta: "Alle integraties bekijken",
     whyEyebrow: "Waarom winkels overstappen",
     whyTitle: "Van idee naar betaalde factuur voordat je koffie koud is.",
     whyLede:
@@ -423,5 +432,64 @@ export const nl = {
     colSwept: "Uitgekeerd",
     colFees: "Kosten",
     noActivity: "Nog geen uitbetalingen.",
+  },
+
+  integrations: {
+    eyebrow: "Platformintegraties",
+    title: "Accepteer crypto in je webshop",
+    lede:
+      "Trustless Commerce verpakt gehoste checkout en een one-shot factuur-API met lichte adapters voor WooCommerce, Shopify, creatorplatforms en meer. Installeer een plugin of richt je AI-agent op een platformskill — bestellingen worden bijgewerkt zodra de betaling on-chain binnenkomt.",
+    contractEyebrow: "Gedeeld contract",
+    contractTitle: "Eén API voor elk platform",
+    contractBody:
+      "Alle integraties gebruiken POST /api/invoices, gehoste /pay-checkout en optionele webhooks. Platformadapters regelen alleen ordersync en fulfillment — niet de wallet-UI of afrekenlogica.",
+    contractLink: "Integratiecontract (docs)",
+    sdkLink: "SDK’s en plugins op GitHub",
+    wave1: "E-commercewinkels",
+    wave2: "Cursussen en lidmaatschappen",
+    wave3: "Meer platforms",
+    statusAvailable: "Beschikbaar",
+    statusPreview: "Binnenkort",
+    docs: "Documentatie",
+    aiSkill: "AI-skill",
+    ctaTitle: "Begin met elk platform",
+    ctaLede: "Maak nu een testfactuur of open de integratiedocs en AI-skill voor je webshop.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress-betalingsgateway — Betaal met crypto bij checkout, doorsturen naar gehoste /pay, bestellingen automatisch als betaald markeren via webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Offsite-checkoutapp — stuur kopers naar crypto-checkout en synchroniseer betaalstatus terug naar Shopify-bestellingen.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Externe Koop met crypto-knop voor cursussen en lidmaatschappen — geef na betaling automatisch toegang.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Externe checkout voor cursusverkopers — schrijf studenten automatisch in wanneer de factuur betaald is.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "E-commerceapp voor de middenmarkt met checkout-SDK en ordersync via webhook (roadmap).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "SaaS- en digitale-downloadcheckout via gehoste betaallinks (roadmap).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout voor indie-creators met lichte embed en fulfillment-hooks (roadmap).",
+      },
+    },
   },
 } satisfies Messages;

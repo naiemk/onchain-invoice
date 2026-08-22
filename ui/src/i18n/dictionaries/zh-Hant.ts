@@ -8,6 +8,7 @@ export const zhHant = {
 
   nav: {
     product: "產品",
+    integrations: "整合",
     create: "建立發票",
     merchant: "商家",
     docs: "文件",
@@ -36,6 +37,9 @@ export const zhHant = {
     payDescription: "在鏈上支付 Trustless Commerce 加密貨幣發票。",
     merchantTitle: "商家 · Trustless Commerce",
     merchantDescription: "檢視並管理你的 Trustless Commerce 發票。",
+    integrationsTitle: "整合 · Trustless Commerce",
+    integrationsDescription:
+      "透過託管加密結帳，在 WooCommerce、Shopify、Kajabi、Teachable 等平台接受 USDC 與 USDT。",
     adminTitle: "管理後台 · Trustless Commerce",
     adminDescription: "平台管理總覽。",
   },
@@ -130,6 +134,11 @@ export const zhHant = {
       "機器人與助理可以直接透過已發布的 Cursor 技能建立付款連結並輪詢狀態——完全不需要商家後台。",
     agentsSkillLink: "AI 代理技能（SKILL.md）",
     agentsDocs: "代理文件",
+    integrationsEyebrow: "整合",
+    integrationsTitle: "支援您已在使用的平台",
+    integrationsLede:
+      "面向主流電商與創作者平台的原生外掛與結帳連接器——安裝後貼上錢包地址，即可在結帳時接受加密貨幣。",
+    integrationsCta: "查看所有整合",
     whyEyebrow: "店家為什麼換過來",
     whyTitle: "咖啡還沒涼，發票就已經收到款。",
     whyLede:
@@ -416,5 +425,64 @@ export const zhHant = {
     colSwept: "已歸集",
     colFees: "手續費",
     noActivity: "尚無結算活動。",
+  },
+
+  integrations: {
+    eyebrow: "平台整合",
+    title: "在您的商店接受加密貨幣",
+    lede:
+      "Trustless Commerce 將託管結帳與一次性發票 API 結合，透過輕量適配器對接 WooCommerce、Shopify、創作者平台等。安裝外掛或將 AI 代理指向平台技能——鏈上到帳後訂單自動更新。",
+    contractEyebrow: "共用合約",
+    contractTitle: "一個 API，涵蓋所有平台",
+    contractBody:
+      "所有整合均使用 POST /api/invoices、託管 /pay 結帳與可選 webhook。平台適配器僅處理訂單同步與履約——不涉及錢包介面或結算邏輯。",
+    contractLink: "整合合約（文件）",
+    sdkLink: "GitHub 上的 SDK 與外掛",
+    wave1: "電商商店",
+    wave2: "課程與會員",
+    wave3: "更多平台",
+    statusAvailable: "已上線",
+    statusPreview: "即將推出",
+    docs: "文件",
+    aiSkill: "AI 技能",
+    ctaTitle: "從任一平台開始",
+    ctaLede: "立即建立測試發票，或開啟整合文件與 AI 技能，為您的商店接入付款。",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress 付款閘道——結帳時以加密貨幣付款，導向託管 /pay，透過 webhook 自動標記訂單已付款。",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "站外結帳應用——將買家導向加密結帳，並將付款狀態同步回 Shopify 訂單。",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "課程與會員的外部「以加密貨幣購買」按鈕——付款後自動開通存取權限。",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "課程賣家的外部結帳——發票狀態變為已付款時自動為學員註冊。",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "面向中型市場的電商應用，含結帳 SDK 與 webhook 訂單同步（規劃中）。",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "透過託管付款連結實現 SaaS 與數位下載結帳（規劃中）。",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "獨立創作者結帳，輕量嵌入與履約鉤子（規劃中）。",
+      },
+    },
   },
 } satisfies Messages;

@@ -5,6 +5,7 @@ export const he = {
 
   nav: {
     product: "מוצר",
+    integrations: "אינטגרציות",
     create: "יצירת חשבונית",
     merchant: "סוחר",
     docs: "תיעוד",
@@ -33,6 +34,9 @@ export const he = {
     payDescription: "שלמו חשבונית קריפטו של Trustless Commerce ישירות בשרשרת.",
     merchantTitle: "סוחר · Trustless Commerce",
     merchantDescription: "צפייה וניהול של חשבוניות Trustless Commerce שלכם.",
+    integrationsTitle: "אינטגרציות · Trustless Commerce",
+    integrationsDescription:
+      "קבלו USDC ו-USDT ב-WooCommerce, Shopify, Kajabi, Teachable ועוד עם checkout קריפטו מתארח.",
     adminTitle: "ניהול · Trustless Commerce",
     adminDescription: "סקירת ניהול הפלטפורמה.",
   },
@@ -127,6 +131,11 @@ export const he = {
       "בוטים ועוזרים חכמים יכולים ליצור קישורי תשלום ולעקוב אחר הסטטוס דרך מיומנות Cursor שפורסמה — בלי שום לוח בקרה לסוחר.",
     agentsSkillLink: "מיומנות לסוכן AI (SKILL.md)",
     agentsDocs: "תיעוד לסוכנים",
+    integrationsEyebrow: "אינטגרציות",
+    integrationsTitle: "עובד עם הפלטפורמות שכבר בשימוש שלכם",
+    integrationsLede:
+      "תוספים מקוריים ומחברי checkout לפלטפורמות מסחר אלקטרוני ויוצרים מובילות — התקינו, הדביקו את הארנק וקבלו קריפטו ב-checkout.",
+    integrationsCta: "לכל האינטגרציות",
     whyEyebrow: "למה חנויות עוברות אלינו",
     whyTitle: "מרעיון לחשבונית משולמת עוד לפני שהקפה מתקרר.",
     whyLede:
@@ -412,5 +421,64 @@ export const he = {
     colSwept: "הועבר",
     colFees: "עמלות",
     noActivity: "עדיין אין פעילות סליקה.",
+  },
+
+  integrations: {
+    eyebrow: "אינטגרציות פלטפורמה",
+    title: "קבלו קריפטו בחנות שלכם",
+    lede:
+      "Trustless Commerce עוטף checkout מתארח ו-API חשבונית בלחיצה אחת עם מתאמים דקים ל-WooCommerce, Shopify, פלטפורמות יוצרים ועוד. התקינו תוסף או הפנו את סוכן ה-AI למיומנות פלטפורמה — ההזמנות מתעדכנות כשהתשלום נכנס on-chain.",
+    contractEyebrow: "חוזה משותף",
+    contractTitle: "API אחד לכל פלטפורמה",
+    contractBody:
+      "כל האינטגרציות משתמשות ב-POST /api/invoices, checkout מתארח ב-/pay ו-webhooks אופציונליים. מתאמי פלטפורמה מטפלים רק בסנכרון הזמנות ו-fulfillment — לא בממשק הארנק או בלוגיקת הסליקה.",
+    contractLink: "חוזה אינטגרציה (docs)",
+    sdkLink: "SDK ותוספים ב-GitHub",
+    wave1: "חנויות מסחר אלקטרוני",
+    wave2: "קורסים ומנויים",
+    wave3: "פלטפורמות נוספות",
+    statusAvailable: "זמין",
+    statusPreview: "בקרוב",
+    docs: "תיעוד",
+    aiSkill: "מיומנות AI",
+    ctaTitle: "התחילו מכל פלטפורמה",
+    ctaLede: "צרו חשבונית בדיקה עכשיו, או פתחו את תיעוד האינטגרציה ומיומנות ה-AI לחנות שלכם.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "שער תשלום ל-WordPress — שלמו בקריפטו ב-checkout, הפניה ל-/pay מתארח, סימון הזמנות כשולמו אוטומטית דרך webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "אפליקציית checkout חיצונית — הפנו קונים ל-checkout קריפטו וסנכרנו סטטוס תשלום להזמנות Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "כפתור חיצוני קנה בקריפטו לקורסים ומנויים — מתן גישה אוטומטית לאחר תשלום.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "checkout חיצוני למוכרי קורסים — רישום סטודנטים אוטומטי כשהחשבונית שולמה.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "אפליקציית מסחר אלקטרוני לשוק הביניים עם SDK ל-checkout וסנכרון הזמנות דרך webhook (מפת דרכים).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "checkout ל-SaaS והורדות דיגיטליות דרך קישורי תשלום מתארחים (מפת דרכים).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "checkout ליוצרים עצמאיים עם embed קל ו-hooks ל-fulfillment (מפת דרכים).",
+      },
+    },
   },
 } satisfies Messages;

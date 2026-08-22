@@ -8,6 +8,7 @@ export const ms = {
 
   nav: {
     product: "Produk",
+    integrations: "Integrasi",
     create: "Cipta invois",
     merchant: "Peniaga",
     docs: "Dokumentasi",
@@ -37,6 +38,9 @@ export const ms = {
     payDescription: "Bayar invois kripto Trustless Commerce terus atas rangkaian.",
     merchantTitle: "Peniaga · Trustless Commerce",
     merchantDescription: "Lihat dan urus invois Trustless Commerce anda.",
+    integrationsTitle: "Integrasi · Trustless Commerce",
+    integrationsDescription:
+      "Terima USDC dan USDT di WooCommerce, Shopify, Kajabi, Teachable dan banyak lagi dengan checkout kripto yang dihoskan.",
     adminTitle: "Admin · Trustless Commerce",
     adminDescription: "Ringkasan admin platform.",
   },
@@ -132,6 +136,11 @@ export const ms = {
       "Bot dan pembantu boleh mencipta pautan bayaran serta menyemak status melalui kemahiran Cursor yang diterbitkan — tanpa perlu papan pemuka peniaga.",
     agentsSkillLink: "Kemahiran ejen AI (SKILL.md)",
     agentsDocs: "Dokumentasi ejen",
+    integrationsEyebrow: "Integrasi",
+    integrationsTitle: "Berfungsi dengan platform yang anda sudah gunakan",
+    integrationsLede:
+      "Pemalam asli dan penyambung checkout untuk platform e-dagang dan pencipta utama — pasang, tampal dompet anda, dan terima kripto semasa checkout.",
+    integrationsCta: "Lihat semua integrasi",
     whyEyebrow: "Sebab kedai berpindah",
     whyTitle: "Daripada idea kepada invois berbayar sebelum kopi anda sejuk.",
     whyLede:
@@ -430,5 +439,64 @@ export const ms = {
     colSwept: "Dihantar",
     colFees: "Fi",
     noActivity: "Belum ada aktiviti penghantaran dana.",
+  },
+
+  integrations: {
+    eyebrow: "Integrasi platform",
+    title: "Terima kripto di kedai anda",
+    lede:
+      "Trustless Commerce membungkus checkout yang dihoskan dan API invois sekali jalan dengan penyesuai ringan untuk WooCommerce, Shopify, platform pencipta dan banyak lagi. Pasang pemalam atau arahkan ejen AI ke kemahiran platform — pesanan dikemas kini apabila bayaran masuk on-chain.",
+    contractEyebrow: "Kontrak dikongsi",
+    contractTitle: "Satu API untuk setiap platform",
+    contractBody:
+      "Semua integrasi menggunakan POST /api/invoices, checkout /pay yang dihoskan, dan webhook pilihan. Penyesuai platform hanya mengurus penyegerakan pesanan dan fulfillment — bukan UI dompet atau logik penyelesaian.",
+    contractLink: "Kontrak integrasi (docs)",
+    sdkLink: "SDK & pemalam di GitHub",
+    wave1: "Kedai e-dagang",
+    wave2: "Kursus & keahlian",
+    wave3: "Lebih banyak platform",
+    statusAvailable: "Tersedia",
+    statusPreview: "Akan datang",
+    docs: "Dokumentasi",
+    aiSkill: "Kemahiran AI",
+    ctaTitle: "Mulakan dengan mana-mana platform",
+    ctaLede: "Cipta invois ujian sekarang, atau buka docs integrasi dan kemahiran AI untuk kedai anda.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "Get laluan pembayaran WordPress — Bayar dengan kripto semasa checkout, lencong ke /pay yang dihoskan, tandakan pesanan dibayar secara automatik melalui webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Apl checkout luar tapak — lencong pembeli ke checkout kripto dan segerakkan status bayaran ke pesanan Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Butang luar Beli dengan kripto untuk kursus dan keahlian — beri akses secara automatik selepas bayaran.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Checkout luar untuk penjual kursus — daftarkan pelajar secara automatik apabila invois dibayar.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "Apl e-dagang pasaran pertengahan dengan SDK checkout dan penyegerakan pesanan melalui webhook (pelan hala tuju).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Checkout SaaS dan muat turun digital melalui pautan bayar yang dihoskan (pelan hala tuju).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout pencipta indie dengan embed ringan dan hook fulfillment (pelan hala tuju).",
+      },
+    },
   },
 } satisfies Messages;
