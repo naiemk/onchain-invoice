@@ -32,3 +32,10 @@ Headers: `x-sweeper-address`, `x-sweeper-timestamp`, `x-sweeper-nonce`, `x-sweep
 Track/claim use optimistic `expectedVersion`; conflicts return **409**.
 
 Rate limit create returns **429** with `Retry-After`. Public create is unauthenticated (spam risk accepted at launch).
+
+## Platform integrations
+
+Ecommerce and creator platform adapters (WooCommerce, Shopify, Kajabi, Teachable) build on the same contract:
+
+- [Platform integration contract](platform-integration.md)
+- SDKs and plugins: [`platforms/`](../platforms/)
