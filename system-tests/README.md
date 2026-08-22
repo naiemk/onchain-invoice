@@ -26,6 +26,16 @@ Installer e2e only:
 npm run system-test:install
 ```
 
+**Infra packager full-stack e2e** (Hardhat Sepolia fork + separate api/nodes/gateway install dirs + local `:local` images):
+
+```bash
+npm run system-test:infra-deploy
+# skip image rebuild when :local tags already exist:
+BUILD_LOCAL=0 npm run system-test:infra-deploy
+```
+
+Deploys `CommerceInvoiceSweeper` to a forked Hardhat RPC, wget-installs all three infra profiles into temp dirs, starts API → sweepers → gateway (UI smoke + `/api/health` via nginx).
+
 Override image tag:
 
 ```bash
@@ -49,6 +59,7 @@ PULL=0 IMAGE_TAG=system-test-local npm run system-test
 | `.env.example` | Keys + throwaway Hardhat #0 sweeper wallet |
 | `tests/*.sh` | Assertions via `docker compose exec` |
 | `scripts/run-install-e2e.sh` | wget\|bash installer path for API + sweeper |
+| `scripts/run-infra-deploy-e2e.sh` | Hardhat fork + infra packager api/nodes/gateway dirs |
 
 Host ports: **18080** / **18443** (compose). Installer e2e publishes API on **8080**. Tests prefer in-container checks.
 

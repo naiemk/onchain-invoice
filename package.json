@@ -49,6 +49,7 @@
     "docker:domains:down": "docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains down",
     "system-test": "bash system-tests/scripts/run.sh",
     "system-test:install": "bash system-tests/scripts/run-install-e2e.sh",
+    "system-test:infra-deploy": "bash system-tests/scripts/run-infra-deploy-e2e.sh",
     "test:live-testnet": "LIVE_TESTNET=1 hardhat test test/live/LiveTestnetInvoicePay.ts",
     "solana:build": "cd solana/programs/commerce-invoice && cargo-build-sbf",
     "solana:test": "bash solana/e2e/scripts/run-success.sh",

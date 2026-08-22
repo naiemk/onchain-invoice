@@ -1,0 +1,25 @@
+# Standalone HTTPS gateway: nginx + optional UI containers on shared edge network.
+# Prefer product-specific start script when nginx image bundles domains; this template uses mounted conf.
+
+services:
+  gateway:
+    image: ${NGINX_IMAGE:-nginx:alpine}
+    container_name: ${GATEWAY_NAME:-app-gateway}
+    restart: unless-stopped
+    mem_limit: ${GATEWAY_MEMORY_LIMIT:-64m}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./gateway/conf.d:/etc/nginx/conf.d:ro
+      - ${TLS_FULLCHAIN:-/etc/letsencrypt/live/example.com/fullchain.pem}:/etc/nginx/certs/fullchain.pem:ro
+      - ${TLS_PRIVKEY:-/etc/letsencrypt/live/example.com/privkey.pem}:/etc/nginx/certs/privkey.pem:ro
+      - ${CERTBOT_WWW:-/var/www/certbot}:/var/www/certbot:ro
+    networks:
+      - edge
+
+networks:
+  edge:
+    name: ${DOCKER_NETWORK:-app-edge}
+    external: true
