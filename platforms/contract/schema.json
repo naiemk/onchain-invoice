@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trustless-commerce.dev/schemas/platform-integration/v1.json",
+  "title": "Trustless Commerce Platform Integration v1",
+  "description": "Stable request/response shapes for POST /api/invoices and callback webhooks.",
+  "definitions": {
+    "CreateInvoiceRequest": {
+      "type": "object",
+      "required": ["price", "to", "chains", "tokens"],
+      "additionalProperties": true,
+      "properties": {
+        "price": { "type": "string", "pattern": "^\\d+(\\.\\d{1,2})?$", "description": "USD price decimal string" },
+        "to": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "chains": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "tokens": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "chainId": { "type": "string" },
+        "token": { "type": "string" },
+        "selectedTo": { "type": "string" },
+        "clientInvoiceId": { "type": "string" },
+        "callback": { "type": "string", "format": "uri" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "allowPartial": { "type": "boolean", "default": false }
+      }
+    },
+    "InvoiceStatus": {
+      "type": "string",
+      "enum": ["created", "awaiting_payment", "paid", "paid_partial", "swept"]
+    },
+    "InvoiceRecord": {
+      "type": "object",
+      "required": ["id", "status", "priceUsd"],
+      "properties": {
+        "id": { "type": "string" },
+        "clientInvoiceId": { "type": "string" },
+        "priceUsd": { "type": "string" },
+        "toAddresses": { "type": "array", "items": { "type": "string" } },
+        "selectedTo": { "type": ["string", "null"] },
+        "chainId": { "type": ["string", "null"] },
+        "token": { "type": ["string", "null"] },
+        "invoiceAddress": { "type": ["string", "null"] },
+        "callbackUrl": { "type": ["string", "null"] },
+        "allowPartial": { "type": "boolean" },
+        "status": { "$ref": "#/definitions/InvoiceStatus" },
+        "amountPaid": { "type": "string" },
+        "amountSwept": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "paidAt": { "type": ["string", "null"], "format": "date-time" },
+        "sweptAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "CreateInvoiceResponse": {
+      "type": "object",
+      "required": ["invoice", "created", "payLink", "checkoutLink"],
+      "properties": {
+        "invoice": { "$ref": "#/definitions/InvoiceRecord" },
+        "created": { "type": "boolean" },
+        "payLink": { "type": "string" },
+        "checkoutLink": { "type": "string" }
+      }
+    },
+    "CallbackPayload": {
+      "type": "object",
+      "required": ["type", "invoice"],
+      "properties": {
+        "type": { "const": "invoice.updated" },
+        "invoice": { "$ref": "#/definitions/InvoiceRecord" }
+      }
+    }
+  }
+}

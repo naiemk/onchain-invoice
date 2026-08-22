@@ -1,0 +1,15 @@
+{
+  "name": "trustless-commerce-shopify-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shopify offsite checkout app for Trustless Commerce crypto payments",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@trustless-commerce/platform-sdk": "file:../sdk/node"
+  }
+}
