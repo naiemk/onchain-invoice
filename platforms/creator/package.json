@@ -1,0 +1,13 @@
+{
+  "name": "trustless-commerce-creator-connector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "kajabi": "PLATFORM=kajabi node shared/fulfillment-server.js",
+    "teachable": "PLATFORM=teachable node shared/fulfillment-server.js"
+  },
+  "dependencies": {
+    "@trustless-commerce/platform-sdk": "file:../sdk/node"
+  }
+}
