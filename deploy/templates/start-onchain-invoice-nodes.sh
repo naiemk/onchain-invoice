@@ -191,9 +191,6 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
   DOCKER_NETWORK="${DOCKER_NETWORK:-trustless-commerce-edge}"
   docker network create "$DOCKER_NETWORK" >/dev/null 2>&1 || true
   export DOCKER_NETWORK
-  DOCKER_NETWORK="${DOCKER_NETWORK:-trustless-commerce-edge}"
-  docker network create "$DOCKER_NETWORK" >/dev/null 2>&1 || true
-  export DOCKER_NETWORK
   if [[ "$solana_enabled" -eq 1 ]]; then
     echo "  (Solana profile enabled)"
   fi
