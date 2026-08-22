@@ -9,6 +9,7 @@ export const it = {
 
   nav: {
     product: "Prodotto",
+    integrations: "Integrazioni",
     create: "Crea fattura",
     merchant: "Esercente",
     docs: "Documentazione",
@@ -38,6 +39,9 @@ export const it = {
     payDescription: "Paga una fattura cripto di Trustless Commerce sulla blockchain.",
     merchantTitle: "Esercente · Trustless Commerce",
     merchantDescription: "Consulta e gestisci le tue fatture Trustless Commerce.",
+    integrationsTitle: "Integrazioni · Trustless Commerce",
+    integrationsDescription:
+      "Accetta USDC e USDT su WooCommerce, Shopify, Kajabi, Teachable e altro con checkout crypto ospitato.",
     adminTitle: "Admin · Trustless Commerce",
     adminDescription: "Panoramica di amministrazione della piattaforma.",
   },
@@ -132,6 +136,11 @@ export const it = {
       "Bot e assistenti possono creare link di pagamento e controllare lo stato tramite la skill Cursor pubblicata, senza bisogno di una dashboard per esercenti.",
     agentsSkillLink: "Skill per agenti IA (SKILL.md)",
     agentsDocs: "Documentazione per agenti",
+    integrationsEyebrow: "Integrazioni",
+    integrationsTitle: "Funziona con le piattaforme che usi già",
+    integrationsLede:
+      "Plugin nativi e connettori di checkout per le principali piattaforme e-commerce e creator — installa, incolla il wallet e accetta crypto al pagamento.",
+    integrationsCta: "Vedi tutte le integrazioni",
     whyEyebrow: "Perché i negozi cambiano",
     whyTitle: "Dall’idea alla fattura pagata prima che il caffè si raffreddi.",
     whyLede:
@@ -425,5 +434,64 @@ export const it = {
     colSwept: "Trasferito",
     colFees: "Commissioni",
     noActivity: "Nessuna attività di incasso al momento.",
+  },
+
+  integrations: {
+    eyebrow: "Integrazioni piattaforma",
+    title: "Accetta crypto nel tuo negozio",
+    lede:
+      "Trustless Commerce avvolge checkout ospitato e API fatture one-shot con adapter leggeri per WooCommerce, Shopify, piattaforme creator e altro. Installa un plugin o punta il tuo agente IA a uno skill di piattaforma — gli ordini si aggiornano quando il pagamento arriva on-chain.",
+    contractEyebrow: "Contratto condiviso",
+    contractTitle: "Un’API per ogni piattaforma",
+    contractBody:
+      "Tutte le integrazioni usano POST /api/invoices, checkout ospitato /pay e webhook opzionali. Gli adapter di piattaforma gestiscono solo sync ordini e fulfillment — non l’UI del wallet né la logica di settlement.",
+    contractLink: "Contratto di integrazione (docs)",
+    sdkLink: "SDK e plugin su GitHub",
+    wave1: "Negozi e-commerce",
+    wave2: "Corsi e abbonamenti",
+    wave3: "Altre piattaforme",
+    statusAvailable: "Disponibile",
+    statusPreview: "In arrivo",
+    docs: "Documentazione",
+    aiSkill: "Skill IA",
+    ctaTitle: "Inizia con qualsiasi piattaforma",
+    ctaLede: "Crea subito una fattura di prova oppure apri la documentazione di integrazione e lo skill IA per il tuo negozio.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "Gateway di pagamento WordPress — Paga in crypto al checkout, reindirizza a /pay ospitato, segna gli ordini come pagati automaticamente via webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "App di checkout esterno — reindirizza gli acquirenti al checkout crypto e sincronizza lo stato pagato con gli ordini Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Pulsante esterno Acquista in crypto per corsi e abbonamenti — accesso automatico dopo il pagamento.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Checkout esterno per venditori di corsi — iscrizione automatica degli studenti quando la fattura risulta pagata.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "App e-commerce mid-market con SDK checkout e sync ordini via webhook (roadmap).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Checkout SaaS e download digitali tramite link di pagamento ospitati (roadmap).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout per creator indie con embed leggero e hook di fulfillment (roadmap).",
+      },
+    },
   },
 } satisfies Messages;

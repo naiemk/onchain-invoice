@@ -8,6 +8,7 @@ export const tr = {
 
   nav: {
     product: "Ürün",
+    integrations: "Entegrasyonlar",
     create: "Fatura oluştur",
     merchant: "Satıcı",
     docs: "Dokümanlar",
@@ -37,6 +38,9 @@ export const tr = {
     payDescription: "Trustless Commerce kripto faturasını zincir üzerinde ödeyin.",
     merchantTitle: "Satıcı · Trustless Commerce",
     merchantDescription: "Trustless Commerce faturalarınızı görüntüleyin ve yönetin.",
+    integrationsTitle: "Entegrasyonlar · Trustless Commerce",
+    integrationsDescription:
+      "WooCommerce, Shopify, Kajabi, Teachable ve daha fazlasında barındırılan kripto checkout ile USDC ve USDT kabul edin.",
     adminTitle: "Yönetim · Trustless Commerce",
     adminDescription: "Platform yönetim özeti.",
   },
@@ -132,6 +136,11 @@ export const tr = {
       "Botlar ve asistanlar, yayımlanmış Cursor becerisiyle ödeme bağlantısı oluşturup durumu sorgulayabilir — satıcı paneli gerekmez.",
     agentsSkillLink: "Yapay zekâ ajanı becerisi (SKILL.md)",
     agentsDocs: "Ajan dokümanları",
+    integrationsEyebrow: "Entegrasyonlar",
+    integrationsTitle: "Zaten kullandığınız platformlarla çalışır",
+    integrationsLede:
+      "Büyük e-ticaret ve içerik üretici platformları için yerel eklentiler ve checkout bağlayıcıları — kurun, cüzdanınızı yapıştırın, checkout’ta kripto kabul edin.",
+    integrationsCta: "Tüm entegrasyonları gör",
     whyEyebrow: "Mağazalar neden geçiyor",
     whyTitle: "Kahveniz soğumadan fikirden ödenmiş faturaya.",
     whyLede:
@@ -429,5 +438,64 @@ export const tr = {
     colSwept: "Aktarılan",
     colFees: "Komisyonlar",
     noActivity: "Henüz ödeme hareketi yok.",
+  },
+
+  integrations: {
+    eyebrow: "Platform entegrasyonları",
+    title: "Mağazanızda kripto kabul edin",
+    lede:
+      "Trustless Commerce, barındırılan checkout ve tek adımlık fatura API’sini WooCommerce, Shopify, içerik üretici platformları ve daha fazlası için ince bağdaştırıcılarla sarar. Bir eklenti kurun veya yapay zekâ ajanınızı bir platform becerisine yönlendirin — ödeme on-chain düştüğünde siparişler güncellenir.",
+    contractEyebrow: "Paylaşılan sözleşme",
+    contractTitle: "Her platform için tek API",
+    contractBody:
+      "Tüm entegrasyonlar POST /api/invoices, barındırılan /pay checkout ve isteğe bağlı webhook’lar kullanır. Platform bağdaştırıcıları yalnızca sipariş senkronizasyonu ve fulfillment’ı yönetir — cüzdan arayüzü veya ödeme mantığı değil.",
+    contractLink: "Entegrasyon sözleşmesi (docs)",
+    sdkLink: "GitHub’da SDK’lar ve eklentiler",
+    wave1: "E-ticaret mağazaları",
+    wave2: "Kurslar ve üyelikler",
+    wave3: "Diğer platformlar",
+    statusAvailable: "Kullanılabilir",
+    statusPreview: "Yakında",
+    docs: "Dokümantasyon",
+    aiSkill: "Yapay zekâ becerisi",
+    ctaTitle: "Herhangi bir platformla başlayın",
+    ctaLede: "Şimdi bir test faturası oluşturun veya mağazanız için entegrasyon belgelerini ve yapay zekâ becerisini açın.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress ödeme ağ geçidi — Checkout’ta kripto ile öde, barındırılan /pay’e yönlendir, webhook ile siparişleri otomatik ödendi işaretle.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Harici checkout uygulaması — alıcıları kripto checkout’a yönlendir ve ödeme durumunu Shopify siparişleriyle senkronize et.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Kurs ve üyelikler için harici Kripto ile satın al düğmesi — ödeme sonrası erişimi otomatik ver.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Kurs satıcıları için harici checkout — fatura ödendiğinde öğrencileri otomatik kaydet.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "Orta ölçekli e-ticaret uygulaması, checkout SDK ve webhook destekli sipariş senkronizasyonu (yol haritası).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Barındırılan ödeme bağlantılarıyla SaaS ve dijital indirme checkout’u (yol haritası).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Bağımsız içerik üreticileri için hafif embed ve fulfillment kancalarıyla checkout (yol haritası).",
+      },
+    },
   },
 } satisfies Messages;

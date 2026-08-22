@@ -5,6 +5,7 @@ export const bn = {
 
   nav: {
     product: "প্রোডাক্ট",
+    integrations: "ইন্টিগ্রেশন",
     create: "ইনভয়েস তৈরি করুন",
     merchant: "মার্চেন্ট",
     docs: "ডকুমেন্টেশন",
@@ -33,6 +34,9 @@ export const bn = {
     payDescription: "Trustless Commerce ক্রিপ্টো ইনভয়েস অন-চেইনে পরিশোধ করুন।",
     merchantTitle: "মার্চেন্ট · Trustless Commerce",
     merchantDescription: "আপনার Trustless Commerce ইনভয়েস দেখুন ও পরিচালনা করুন।",
+    integrationsTitle: "ইন্টিগ্রেশন · Trustless Commerce",
+    integrationsDescription:
+      "হোস্টেড ক্রিপ্টো checkout-এর মাধ্যমে WooCommerce, Shopify, Kajabi, Teachable আরও অনেক প্ল্যাটফর্মে USDC ও USDT গ্রহণ করুন।",
     adminTitle: "অ্যাডমিন · Trustless Commerce",
     adminDescription: "প্ল্যাটফর্ম অ্যাডমিন ওভারভিউ।",
   },
@@ -127,6 +131,11 @@ export const bn = {
       "বট ও অ্যাসিস্ট্যান্ট প্রকাশিত Cursor স্কিল থেকে পেমেন্ট লিংক তৈরি করতে ও স্টেটাস পোল করতে পারে — কোনো মার্চেন্ট ড্যাশবোর্ড লাগে না।",
     agentsSkillLink: "AI এজেন্ট স্কিল (SKILL.md)",
     agentsDocs: "এজেন্ট ডকুমেন্টেশন",
+    integrationsEyebrow: "ইন্টিগ্রেশন",
+    integrationsTitle: "আপনি যে প্ল্যাটফর্মগুলো ইতিমধ্যে ব্যবহার করেন, সেগুলোর সাথেই কাজ করে",
+    integrationsLede:
+      "বড় ই-কমার্স ও ক্রিয়েটর প্ল্যাটফর্মের জন্য নেটিভ প্লাগইন ও checkout কানেক্টর — ইনস্টল করুন, ওয়ালেট পেস্ট করুন, checkout-এ ক্রিপ্টো গ্রহণ করুন।",
+    integrationsCta: "সব ইন্টিগ্রেশন দেখুন",
     whyEyebrow: "দোকানগুলো কেন বদলায়",
     whyTitle: "কফি ঠান্ডা হওয়ার আগেই আইডিয়া থেকে পরিশোধিত ইনভয়েস।",
     whyLede:
@@ -413,5 +422,64 @@ export const bn = {
     colSwept: "সুইপ",
     colFees: "ফি",
     noActivity: "এখনো কোনো সেটলমেন্ট কার্যক্রম নেই।",
+  },
+
+  integrations: {
+    eyebrow: "প্ল্যাটফর্ম ইন্টিগ্রেশন",
+    title: "আপনার স্টোরফ্রন্টে ক্রিপ্টো গ্রহণ করুন",
+    lede:
+      "Trustless Commerce হোস্টেড checkout ও one-shot ইনভয়েস API-কে WooCommerce, Shopify, ক্রিয়েটর প্ল্যাটফর্ম আরও অনেকের জন্য হালকা অ্যাডাপ্টার দিয়ে মোড়ানো। প্লাগইন ইনস্টল করুন বা AI এজেন্টকে প্ল্যাটফর্ম স্কিলে নির্দেশ দিন — on-chain পেমেন্ট পড়লেই অর্ডার আপডেট হয়।",
+    contractEyebrow: "শেয়ার্ড কন্ট্রাক্ট",
+    contractTitle: "প্রতিটি প্ল্যাটফর্মের জন্য একটি API",
+    contractBody:
+      "সব ইন্টিগ্রেশন POST /api/invoices, হোস্টেড /pay checkout ও ঐচ্ছিক webhook ব্যবহার করে। প্ল্যাটফর্ম অ্যাডাপ্টার শুধু অর্ডার সিঙ্ক ও ফুলফিলমেন্ট সামলায় — ওয়ালেট UI বা সেটলমেন্ট লজিক নয়।",
+    contractLink: "ইন্টিগ্রেশন কন্ট্রাক্ট (docs)",
+    sdkLink: "GitHub-এ SDK ও প্লাগইন",
+    wave1: "ই-কমার্স স্টোর",
+    wave2: "কোর্স ও মেম্বারশিপ",
+    wave3: "আরও প্ল্যাটফর্ম",
+    statusAvailable: "উপলব্ধ",
+    statusPreview: "শীঘ্রই আসছে",
+    docs: "ডকুমেন্টেশন",
+    aiSkill: "AI স্কিল",
+    ctaTitle: "যেকোনো প্ল্যাটফর্ম দিয়ে শুরু করুন",
+    ctaLede: "এখনই একটি টেস্ট ইনভয়েস তৈরি করুন, অথবা আপনার স্টোরফ্রন্টের জন্য ইন্টিগ্রেশন docs ও AI স্কিল খুলুন।",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress পেমেন্ট গেটওয়ে — checkout-এ ক্রিপ্টো দিয়ে পে করুন, হোস্টেড /pay-এ রিডাইরেক্ট করুন, webhook দিয়ে অর্ডার স্বয়ংক্রিয়ভাবে paid চিহ্নিত করুন।",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "অফসাইট checkout অ্যাপ — ক্রেতাদের ক্রিপ্টো checkout-এ পাঠান এবং paid স্ট্যাটাস Shopify অর্ডারে সিঙ্ক করুন।",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "কোর্স ও মেম্বারশিপের জন্য বাহ্যিক Buy with crypto বাটন — পেমেন্টের পর স্বয়ংক্রিয়ভাবে অ্যাক্সেস দিন।",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "কোর্স বিক্রেতাদের জন্য বাহ্যিক checkout — ইনভয়েস paid হলে শিক্ষার্থীদের স্বয়ংক্রিয়ভাবে এনরোল করুন।",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "মিড-মার্কেট ই-কমার্স অ্যাপ, checkout SDK ও webhook-ভিত্তিক অর্ডার সিঙ্ক (roadmap)।",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "হোস্টেড pay লিংকের মাধ্যমে SaaS ও ডিজিটাল ডাউনলোড checkout (roadmap)।",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "ইন্ডি ক্রিয়েটর checkout, হালকা embed ও fulfillment hooks (roadmap)।",
+      },
+    },
   },
 } satisfies Messages;
