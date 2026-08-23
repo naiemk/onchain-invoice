@@ -75,10 +75,17 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         const onramper = context.config.onramper;
         sendJson(res, 200, {
           enabled: onramper.enabled,
-          sandbox: onramper.enabled && isOnramperSandboxOrigin(onramper.widgetOrigin),
+          sandbox: onramper.enabled && (onramper.demo || isOnramperSandboxOrigin(onramper.widgetOrigin)),
+          demo: onramper.enabled && onramper.demo,
           fiats: onramper.enabled ? onramper.fiats : [],
           supportedPairs: onramper.enabled ? [...ONRAMPER_SUPPORTED_PAIRS] : [],
         });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/public/onramp-demo") {
+        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
+        sendOnrampDemoHtml(res, url);
         return;
       }
 
@@ -342,7 +349,7 @@ async function createOnrampSession(
   { config, db }: RouteContext,
   invoiceId: string
 ): Promise<void> {
-  if (!config.onramper.enabled || !config.onramper.apiKey || !config.onramper.signingKey) {
+  if (!config.onramper.enabled) {
     throw Object.assign(new Error("Card and bank payments are not enabled on this instance"), {
       statusCode: 503,
     });
@@ -373,6 +380,28 @@ async function createOnrampSession(
     throw Object.assign(new Error(`Unsupported fiat currency: ${fiat}`), { statusCode: 400 });
   }
 
+  db.setPayerFiat(invoice.id, fiat);
+
+  // Testnet demo: no Onramper keys — serve a local stub page so create/pay UX can be exercised.
+  if (config.onramper.demo || !config.onramper.apiKey || !config.onramper.signingKey) {
+    const demo = new URLSearchParams({
+      invoiceId: invoice.id,
+      fiat,
+      price: invoice.priceUsd,
+      token: invoice.token,
+      chainId: invoice.chainId,
+    });
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    sendJson(res, 200, {
+      // Relative so browser uses the same API origin (gateway or Vite proxy).
+      widgetUrl: `/api/public/onramp-demo?${demo.toString()}`,
+      expiresAt,
+      fiat,
+      demo: true,
+    });
+    return;
+  }
+
   const resumePath = `/pay?${encodeInvoiceResumeLink(invoice.id)}`;
   const successRedirectUrl = new URL(resumePath, config.baseUrl).toString();
   const session = buildOnrampWidgetSession({
@@ -390,7 +419,6 @@ async function createOnrampSession(
     failureRedirectUrl: successRedirectUrl,
   });
 
-  db.setPayerFiat(invoice.id, fiat);
   sendJson(res, 200, {
     widgetUrl: session.widgetUrl,
     expiresAt: session.expiresAt,
@@ -706,6 +734,55 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   }
   if (chunks.length === 0) return {};
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+}
+
+function sendOnrampDemoHtml(res: ServerResponse, url: URL): void {
+  const fiat = escapeHtmlAttr(url.searchParams.get("fiat") ?? "USD");
+  const price = escapeHtmlAttr(url.searchParams.get("price") ?? "");
+  const token = escapeHtmlAttr(url.searchParams.get("token") ?? "USDC");
+  const chainId = escapeHtmlAttr(url.searchParams.get("chainId") ?? "");
+  const invoiceId = escapeHtmlAttr(url.searchParams.get("invoiceId") ?? "");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sandbox card checkout</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    body { margin: 0; padding: 1.5rem; background: #f6f9fc; color: #0a2540; }
+    .panel { background: #fff; border: 1px solid #e3e8ee; border-radius: 12px; padding: 1.25rem 1.35rem; max-width: 28rem; }
+    h1 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+    p { margin: 0.4rem 0; line-height: 1.45; color: #425466; font-size: 0.95rem; }
+    .amount { font-size: 1.5rem; font-weight: 650; color: #0a2540; margin: 0.75rem 0; }
+    .badge { display: inline-block; background: #eef3ff; color: #0a6cff; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 999px; }
+    code { font-size: 0.8rem; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <span class="badge">Sandbox demo</span>
+    <h1>Card or bank checkout</h1>
+    <p class="amount">$${price} · ${fiat}</p>
+    <p>Settles as <strong>${token}</strong> on chain <code>${chainId}</code>.</p>
+    <p>This is a local stub — no real card charge and no on-chain funding. On mainnet, set Onramper API + signing keys to load the live widget.</p>
+    <p>Invoice <code>${invoiceId}</code></p>
+  </div>
+</body>
+</html>`;
+  res.writeHead(200, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  res.end(html);
+}
+
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {
