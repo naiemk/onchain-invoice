@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -41,6 +42,7 @@ jobs:
           images: ${{ env.IMAGE_API }}
           tags: |
             type=raw,value=main,enable={{is_default_branch}}
+            type=ref,event=pr
             type=sha,prefix=main-,format=short
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -63,6 +65,7 @@ jobs:
           images: ${{ env.IMAGE_SWEEPER }}
           tags: |
             type=raw,value=main,enable={{is_default_branch}}
+            type=ref,event=pr
             type=sha,prefix=main-,format=short
             type=semver,pattern={{version}}
 
@@ -84,6 +87,7 @@ jobs:
           images: ${{ env.IMAGE_UI }}
           tags: |
             type=raw,value=main,enable={{is_default_branch}}
+            type=ref,event=pr
             type=sha,prefix=main-,format=short
             type=semver,pattern={{version}}
 
@@ -105,6 +109,7 @@ jobs:
           images: ${{ env.IMAGE_NGINX }}
           tags: |
             type=raw,value=main,enable={{is_default_branch}}
+            type=ref,event=pr
             type=sha,prefix=main-,format=short
             type=semver,pattern={{version}}
 
@@ -130,12 +135,20 @@ jobs:
           docker compose -f deploy/docker-compose.yml down -v
 
       # Exercise the images that were just pushed (latest :main on default branch).
+      - name: Set up Node
+        if: github.ref == 'refs/heads/main'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
       - name: System tests against published images
         if: github.ref == 'refs/heads/main'
         env:
           IMAGE_TAG: main
           PULL: "1"
         run: |
+          npm ci
           chmod +x system-tests/scripts/*.sh system-tests/tests/*.sh deploy/gen-dev-certs.sh
           cp system-tests/.env.example system-tests/.env
           sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" system-tests/.env

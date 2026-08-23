@@ -2,7 +2,7 @@
 
 Bootstrap API, HTTPS gateway (nginx + UI), and sweeper nodes on any host with Docker.
 
-Uses the **[vibed-infra](https://github.com/naiemk/vibed-infra)** packager (`npm install vibed-infra` or `file:../vibed-infra`) with Trustless Commerce [`packageconfig.yaml`](../packageconfig.yaml) and [`templates/`](../templates/).
+Uses the **[vibed-infra](https://www.npmjs.com/package/vibed-infra)** packager (`npm install vibed-infra`) with Trustless Commerce [`packageconfig.yaml`](../packageconfig.yaml) and [`templates/`](../templates/).
 
 ## HTTPS domains (recommended)
 
@@ -187,7 +187,7 @@ Stages: `invoice-paid`, `sweep-submitted`, `sweep-confirmed`, `sweep-failed`, `t
 - Empty env vars are **not** passed as `docker -e KEY=` (so they cannot wipe config).
 - Quote `0x…` values in YAML (installer templates already do) — unquoted YAML 1.1 corrupts private keys.
 - For HTTPS, API containers must be named `testnet-api` / `mainnet-api` on `DOCKER_NETWORK=trustless-commerce-edge` (set via `.env`).
-- **Card/bank (Onramper):** optional. **Mainnet:** `pk_prod` + `https://buy.onramper.com`. **Testnet sandbox UX:** `pk_test` + signing key (defaults to `https://buy.onramper.dev`). On by default when both keys are set; set `ONRAMPER_ENABLED=0` to disable. Sandbox checkout does **not** fund Sepolia/Nile. UI reads `GET /api/public/onramp` at runtime.
+- **Card/bank (Onramper):** **Testnet:** `ONRAMPER_ENABLED=1` alone enables demo UX (local stub; no keys). **Mainnet:** set `ONRAMPER_API_KEY` + `ONRAMPER_SIGNING_KEY` (`pk_prod` / `buy.onramper.com`). With `pk_test` keys, widget defaults to `buy.onramper.dev`. Demo/sandbox never funds Sepolia/Nile. UI reads `GET /api/public/onramp` at runtime.
 - Certs live on the host under `/etc/letsencrypt` (never committed). Gateway mounts them read-only.
 - Linux: start-nodes adds `host.docker.internal`. Prefer `SERVER_URL=https://testnet.trustless-commerce.com` once the gateway is up.
 - `INSTALL_DIR=/opt/tc bash install-api.sh` installs into another directory.

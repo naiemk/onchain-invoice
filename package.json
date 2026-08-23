@@ -100,7 +100,7 @@
     "onchain-invoice": "file:.",
     "qrcode": "^1.5.4",
     "tronweb": "^6.3.0",
-    "yaml": "^2.9.0",
-    "vibed-infra": "file:../vibed-infra"
+    "vibed-infra": "^0.5.0",
+    "yaml": "^2.9.0"
   }
 }
