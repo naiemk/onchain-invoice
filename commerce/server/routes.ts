@@ -31,6 +31,7 @@ import {
   onramperSupportedPair,
   parsePaymentMode,
   paymentModeAllowsFiat,
+  verifyOnramperWebhookSignature,
 } from "../shared/onramper.js";
 import { requireApiKey, requireMerchant } from "./auth.js";
 import { verifyCaptcha } from "./captcha.js";
@@ -86,6 +87,12 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       if (req.method === "GET" && url.pathname === "/api/public/onramp-demo") {
         rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         sendOnrampDemoHtml(res, url);
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/public/onramp-webhook") {
+        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
+        await handleOnrampWebhook(req, res, context);
         return;
       }
 
@@ -721,19 +728,43 @@ function rateLimitOrThrow(ip: string, bucket: string, perSecond: number): void {
   }
 }
 
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readRawBody(req: IncomingMessage, maxBytes = 64_000): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > 64_000) {
+    if (size > maxBytes) {
       throw Object.assign(new Error("Request body too large"), { statusCode: 413 });
     }
     chunks.push(buffer);
   }
-  if (chunks.length === 0) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+  return Buffer.concat(chunks);
+}
+
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const raw = await readRawBody(req);
+  if (raw.length === 0) return {};
+  return JSON.parse(raw.toString("utf8")) as Record<string, unknown>;
+}
+
+async function handleOnrampWebhook(
+  req: IncomingMessage,
+  res: ServerResponse,
+  { config }: RouteContext
+): Promise<void> {
+  const secret = config.onramper.webhookSecret;
+  if (!secret) {
+    throw Object.assign(new Error("Onramper webhooks are not configured"), { statusCode: 503 });
+  }
+  const raw = await readRawBody(req);
+  const signature = String(
+    req.headers["x-onramper-webhook-signature"] ?? req.headers["x-onramper-signature"] ?? ""
+  );
+  if (!verifyOnramperWebhookSignature(secret, signature, raw.toString("utf8"))) {
+    throw Object.assign(new Error("Invalid Onramper webhook signature"), { statusCode: 401 });
+  }
+  sendJson(res, 200, { received: true });
 }
 
 function sendOnrampDemoHtml(res: ServerResponse, url: URL): void {
@@ -773,6 +804,8 @@ function sendOnrampDemoHtml(res: ServerResponse, url: URL): void {
   res.writeHead(200, {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
+    "x-frame-options": "SAMEORIGIN",
+    "content-security-policy": "frame-ancestors 'self'",
   });
   res.end(html);
 }

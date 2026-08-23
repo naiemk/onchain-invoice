@@ -593,13 +593,21 @@ async function mountOnrampPanel(
       const body = (await res.json()) as { widgetUrl?: string; error?: string };
       if (!res.ok || !body.widgetUrl) throw new Error(body.error ?? t("pay.checkoutFailed"));
       if (host) {
-        host.innerHTML = `<iframe
-          class="onramp-iframe"
-          title="${escapeHtml(t("pay.onrampIframeTitle"))}"
-          src="${escapeHtml(body.widgetUrl)}"
-          allow="payment"
-          loading="lazy"
-        ></iframe>`;
+        const iframe = document.createElement("iframe");
+        iframe.className = "onramp-iframe";
+        iframe.title = t("pay.onrampIframeTitle");
+        iframe.allow = "accelerometer; autoplay; camera; gyroscope; payment; microphone; clipboard-write";
+        // Same-origin demo HTML is blocked by gateway X-Frame-Options: DENY if
+        // loaded via src=. Fetch + srcdoc is not an embed of that response.
+        if (isSameOriginWidgetUrl(body.widgetUrl)) {
+          const demo = await fetch(body.widgetUrl);
+          if (!demo.ok) throw new Error(t("pay.checkoutFailed"));
+          iframe.srcdoc = await demo.text();
+        } else {
+          iframe.src = body.widgetUrl;
+          iframe.loading = "lazy";
+        }
+        host.replaceChildren(iframe);
       }
     } catch (error) {
       if (host) host.hidden = true;
@@ -844,4 +852,13 @@ function short(value: string): string {
 function maskMerchant(address: string): string {
   if (!address || address.length < 10) return address;
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
+
+function isSameOriginWidgetUrl(url: string): boolean {
+  if (url.startsWith("/")) return true;
+  try {
+    return new URL(url, window.location.href).origin === window.location.origin;
+  } catch {
+    return false;
+  }
 }

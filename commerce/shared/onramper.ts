@@ -3,7 +3,7 @@
  * @see https://docs.onramper.com/docs/widget-sign-a-url-v2
  */
 
-import { createHash, createPrivateKey, randomUUID, sign } from "node:crypto";
+import { createHash, createHmac, createPrivateKey, randomUUID, sign, timingSafeEqual } from "node:crypto";
 
 export type PaymentMode = "crypto" | "crypto_or_fiat" | "fiat";
 
@@ -99,6 +99,56 @@ export function onramperSupportedPair(chainId: string, token: string): boolean {
   return resolveOnramperAsset(chainId, token) != null;
 }
 
+/** True when the signing secret is an Ed25519 PEM (Signature V2), not a dashboard HMAC hex (V1). */
+export function isOnramperPemSigningKey(key: string): boolean {
+  return /BEGIN [A-Z ]*PRIVATE KEY/.test(key);
+}
+
+const V1_SIGN_PARAMS = ["networkWallets", "walletAddressTags", "wallets"] as const;
+
+export interface SignWidgetUrlV1Options {
+  baseUrl: string;
+  hmacSecret: string;
+  fields: Record<string, string>;
+}
+
+/**
+ * Onramper dashboard "signing secret" is HMAC-SHA256 (V1).
+ * Sign unencoded `wallets` / `networkWallets` / `walletAddressTags` only.
+ * @see https://docs.onramper.com/docs/signing-widget-url
+ */
+export function signWidgetUrlV1(options: SignWidgetUrlV1Options): { url: string; expiresAt: string } {
+  const { baseUrl, hmacSecret, fields } = options;
+  if (!fields.apiKey) {
+    throw new Error("apiKey is required in signed widget fields");
+  }
+
+  const signParts: string[] = [];
+  for (const key of V1_SIGN_PARAMS) {
+    const value = fields[key];
+    if (value) signParts.push(`${key}=${value}`);
+  }
+  const signContent = signParts.join("&");
+  const signature = createHmac("sha256", hmacSecret).update(signContent).digest("hex");
+
+  const url = new URL(baseUrl);
+  for (const [key, value] of Object.entries(fields)) {
+    url.searchParams.set(key, value);
+  }
+  url.searchParams.set("signature", signature);
+
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  return { url: url.toString(), expiresAt };
+}
+
+export function verifyOnramperWebhookSignature(secret: string, signature: string, body: string): boolean {
+  if (!secret || !signature) return false;
+  const expected = createHmac("sha256", secret).update(body).digest("hex");
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export interface SignWidgetUrlV2Options {
   baseUrl: string;
   privateKeyPem: string;
@@ -149,6 +199,7 @@ export function signWidgetUrlV2(options: SignWidgetUrlV2Options): { url: string;
 
 export interface BuildOnrampSessionInput {
   apiKey: string;
+  /** Ed25519 PEM (V2) or dashboard HMAC hex (V1). */
   signingKeyPem: string;
   widgetOrigin: string;
   invoiceId: string;
@@ -206,12 +257,18 @@ export function buildOnrampWidgetSession(input: BuildOnrampSessionInput): {
     fields.failureRedirectUrl = input.failureRedirectUrl;
   }
 
-  const signed = signWidgetUrlV2({
-    baseUrl: input.widgetOrigin,
-    privateKeyPem: input.signingKeyPem,
-    fields,
-    expiryMinutes: 15,
-  });
+  const signed = isOnramperPemSigningKey(input.signingKeyPem)
+    ? signWidgetUrlV2({
+        baseUrl: input.widgetOrigin,
+        privateKeyPem: input.signingKeyPem,
+        fields,
+        expiryMinutes: 15,
+      })
+    : signWidgetUrlV1({
+        baseUrl: input.widgetOrigin,
+        hmacSecret: input.signingKeyPem,
+        fields,
+      });
   return { widgetUrl: signed.url, expiresAt: signed.expiresAt };
 }
 
