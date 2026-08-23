@@ -2,7 +2,7 @@
 
 Bootstrap API, HTTPS gateway (nginx + UI), and sweeper nodes on any host with Docker.
 
-Uses the **[infra packager](../../infra/README.md)** (`infra/install.sh`) with Trustless Commerce [`packageconfig.yaml`](../packageconfig.yaml) and [`templates/`](../templates/).
+Uses the **[vibed-infra](https://github.com/naiemk/vibed-infra)** packager (`npm install vibed-infra` or `file:../vibed-infra`) with Trustless Commerce [`packageconfig.yaml`](../packageconfig.yaml) and [`templates/`](../templates/).
 
 ## HTTPS domains (recommended)
 

@@ -1,8 +1,11 @@
 # shellcheck shell=bash
-# Repo checkout: source infra/lib/env.sh. VPS install dir: lib-env.sh is a full copy from infra install.
-_REPO_INFRA="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/infra/lib/env.sh"
-if [[ -f "$_REPO_INFRA" ]]; then
-  # shellcheck source=../../infra/lib/env.sh
-  source "$_REPO_INFRA"
+# Repo checkout: source vibed-infra lib/env.sh from node_modules.
+_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if [[ -f "$_REPO_ROOT/scripts/packager-root.mjs" ]]; then
+  _VIBED_ROOT="$(node "$_REPO_ROOT/scripts/packager-root.mjs" 2>/dev/null)" || true
+  if [[ -n "$_VIBED_ROOT" && -f "$_VIBED_ROOT/lib/env.sh" ]]; then
+    # shellcheck source=../../node_modules/vibed-infra/lib/env.sh
+    source "$_VIBED_ROOT/lib/env.sh"
+  fi
 fi
-# If not sourced from repo (VPS install), this file is replaced by infra install with full env.sh body.
+# VPS install dir: lib-env.sh is a full copy from infra install.

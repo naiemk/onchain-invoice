@@ -7,6 +7,10 @@
 		{
 			"name": "fastswap",
 			"path": "../fastswap"
+		},
+		{
+			"name": "vibed-infra",
+			"path": "../vibed-infra"
 		}
 	],
 	"settings": {}

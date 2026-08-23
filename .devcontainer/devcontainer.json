@@ -5,11 +5,11 @@
 	"build": {
 		"dockerfile": "./Dockerfile"
 	},
-	// Default workspace is onchain-invoice; explicitly bind the sibling fastswap repo.
-	// Host layout: ~/nk/onchain-invoice and ~/nk/fastswap
+	// Default workspace is onchain-invoice; bind sibling repos from the host.
+	// Host layout: ~/nk/onchain-invoice, ~/nk/fastswap, ~/nk/vibed-infra
 	"workspaceFolder": "/workspaces/onchain-invoice",
 	"mounts": [
-		"source=${localWorkspaceFolder}/../fastswap,target=/workspaces/fastswap,type=bind"
+		"source=${localWorkspaceFolder}/../vibed-infra,target=/workspaces/vibed-infra,type=bind"
 	],
 	"forwardPorts": [5173, 8080],
 	"portsAttributes": {

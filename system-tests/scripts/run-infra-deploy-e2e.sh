@@ -13,6 +13,8 @@ REPO_ROOT="$(cd "$ST_ROOT/.." && pwd)"
 
 # shellcheck disable=SC1091
 source "$ST_ROOT/scripts/lib.sh"
+# shellcheck disable=SC1091
+source "$ST_ROOT/scripts/packager-http.sh"
 
 # Always use :local tags here (deploy/docker-compose.yml); ignore system-tests/.env IMAGE_TAG.
 IMAGE_TAG=local
@@ -45,24 +47,10 @@ NODES_DIR="${DEPLOY_ROOT}/nodes"
 GATEWAY_DIR="${DEPLOY_ROOT}/gateway"
 
 HARDHAT_PID=""
-HTTP_PID=""
-
-pick_port() {
-  python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
-}
-HTTP_PORT="$(pick_port)"
-HTTP_ROOT="http://127.0.0.1:${HTTP_PORT}"
-PACKAGER_RAW="${HTTP_ROOT}/infra"
-PACKAGECONFIG_URL="${HTTP_ROOT}/deploy/packageconfig.yaml"
-PRODUCT_RAW="${HTTP_ROOT}/deploy/templates"
-INSTALL_WRAPPER="${HTTP_ROOT}/deploy/install"
 
 cleanup() {
   local code=$?
-  if [[ -n "$HTTP_PID" ]]; then
-    kill "$HTTP_PID" >/dev/null 2>&1 || true
-    wait "$HTTP_PID" 2>/dev/null || true
-  fi
+  packager_http_stop
   if [[ -n "$HARDHAT_PID" ]]; then
     kill "$HARDHAT_PID" >/dev/null 2>&1 || true
     wait "$HARDHAT_PID" 2>/dev/null || true
@@ -183,15 +171,8 @@ if [[ ! -f "$CERT_DIR/fullchain.pem" ]]; then
   CERT_DIR="$REPO_ROOT/deploy/certs"
 fi
 
-(
-  cd "$REPO_ROOT"
-  exec python3 -m http.server "$HTTP_PORT" --bind 127.0.0.1
-) >/dev/null 2>&1 &
-HTTP_PID=$!
-for _ in $(seq 1 30); do
-  wget -qO- "${PACKAGER_RAW}/install.sh" >/dev/null 2>&1 && break
-  sleep 0.2
-done
+packager_http_start "$REPO_ROOT"
+INSTALL_WRAPPER="$RAW_BASE"
 
 docker rm -f "$API_CONTAINER" "$GATEWAY_NAME" "$TESTNET_UI" mainnet-ui \
   onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana \

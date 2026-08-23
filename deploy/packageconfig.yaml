@@ -5,7 +5,7 @@ name: trustless-commerce
 version: 1
 
 rawBase: https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/templates
-packagerRaw: https://raw.githubusercontent.com/naiemk/onchain-invoice/main/infra
+packagerRaw: https://raw.githubusercontent.com/naiemk/vibed-infra/main
 
 network:
   edge: trustless-commerce-edge
