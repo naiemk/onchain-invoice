@@ -12,7 +12,7 @@ Checks HTTPS health, HTTP→HTTPS redirect, HSTS, and create rate limit (via com
 
 ## Images (GHCR)
 
-Built on every push to `main` by [`.github/workflows/docker.yml`](../.github/workflows/docker.yml). Reusable pattern: [`infra/github/workflows/docker-build-reusable.yml`](../infra/github/workflows/docker-build-reusable.yml).
+Built on every push to `main` by [`.github/workflows/docker.yml`](../.github/workflows/docker.yml). Reusable GHCR build: [`vibed-infra`](https://github.com/naiemk/vibed-infra) [`github/workflows/docker-build-reusable.yml`](https://github.com/naiemk/vibed-infra/blob/main/github/workflows/docker-build-reusable.yml).
 
 - `ghcr.io/naiemk/trustless-commerce-api`
 - `ghcr.io/naiemk/trustless-commerce-sweeper`
@@ -93,7 +93,7 @@ Prefer the wget installers on worker hosts ([`install/README.md`](install/README
 
 Preferred path for a VPS: API(s) + **install-gateway** (nginx + UI + Let's Encrypt mounts) + sweeper nodes.
 
-**Infra packager:** generic installer under [`infra/`](../infra/README.md). Product config: [`packageconfig.yaml`](packageconfig.yaml). Templates: [`templates/`](templates/).
+**Infra packager:** npm package [`vibed-infra`](https://github.com/naiemk/vibed-infra) (`file:../vibed-infra` in dev). Product config: [`packageconfig.yaml`](packageconfig.yaml). Templates: [`templates/`](templates/).
 
 See [`install/README.md`](install/README.md):
 
