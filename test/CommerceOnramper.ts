@@ -97,6 +97,54 @@ describe("commerce Onramper / fiat invoices", function () {
     );
   });
 
+  it("enables demo mode with ONRAMPER_ENABLED=1 and no keys", async function () {
+    await withApp({ ONRAMPER_ENABLED: "1" }, async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/public/onramp`);
+      const body = (await res.json()) as {
+        enabled?: boolean;
+        sandbox?: boolean;
+        demo?: boolean;
+      };
+      expect(body.enabled).to.equal(true);
+      expect(body.sandbox).to.equal(true);
+      expect(body.demo).to.equal(true);
+
+      const merchant = getAddress(Wallet.createRandom().address);
+      const createRes = await fetch(`${baseUrl}/api/invoices`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          price: "5.00",
+          to: [merchant],
+          chains: ["11155111"],
+          tokens: ["USDC"],
+          chainId: "11155111",
+          token: "USDC",
+          selectedTo: merchant,
+          paymentMode: "fiat",
+        }),
+      });
+      expect(createRes.status).to.equal(201);
+      const created = (await createRes.json()) as { invoice: { id: string } };
+      const sessionRes = await fetch(
+        `${baseUrl}/api/invoices/${encodeURIComponent(created.invoice.id)}/onramp-session`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ fiat: "EUR" }),
+        }
+      );
+      expect(sessionRes.status).to.equal(200);
+      const session = (await sessionRes.json()) as { widgetUrl?: string; demo?: boolean };
+      expect(session.demo).to.equal(true);
+      expect(session.widgetUrl).to.match(/^\/api\/public\/onramp-demo\?/);
+      const demoPage = await fetch(`${baseUrl}${session.widgetUrl}`);
+      expect(demoPage.status).to.equal(200);
+      const html = await demoPage.text();
+      expect(html).to.match(/Sandbox demo/i);
+    });
+  });
+
   it("stays disabled when ONRAMPER_ENABLED=0 despite keys", async function () {
     await withApp(
       {

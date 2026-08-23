@@ -71,6 +71,11 @@ export interface AppConfig {
 
 export interface OnramperConfig {
   enabled: boolean;
+  /**
+   * True when card/bank UX is on without live Onramper keys (testnet).
+   * Session returns a local demo page instead of buy.onramper.com/.dev.
+   */
+  demo: boolean;
   apiKey?: string;
   /** Ed25519 private key PEM for Signature V2. Never expose publicly. */
   signingKey?: string;
@@ -204,22 +209,29 @@ function loadOnramperConfig(
     enabledRaw.toLowerCase() === "false" ||
     enabledRaw.toLowerCase() === "no";
 
-  const flagOn =
-    !explicitlyOff &&
-    (enabledRaw === "1" ||
-      enabledRaw.toLowerCase() === "true" ||
-      enabledRaw.toLowerCase() === "yes" ||
-      file?.enabled === true ||
-      (enabledRaw === "" && file?.enabled !== false && Boolean(apiKey && signingKey)));
+  const explicitlyOn =
+    enabledRaw === "1" ||
+    enabledRaw.toLowerCase() === "true" ||
+    enabledRaw.toLowerCase() === "yes" ||
+    file?.enabled === true;
 
-  // Enabled when flag is on and both keys are set (defaults on if keys exist unless ONRAMPER_ENABLED=0).
-  const enabled = flagOn && Boolean(apiKey && signingKey);
+  const hasLiveKeys = Boolean(apiKey && signingKey);
+
+  // Live keys → on by default. Explicit ONRAMPER_ENABLED=1 → on even without keys (testnet demo).
+  const flagOn =
+    !explicitlyOff && (explicitlyOn || (enabledRaw === "" && file?.enabled !== false && hasLiveKeys));
+
+  const enabled = flagOn && (hasLiveKeys || explicitlyOn);
+  const demo = enabled && !hasLiveKeys;
 
   return {
     enabled,
+    demo,
     apiKey,
     signingKey,
-    widgetOrigin,
+    widgetOrigin: demo
+      ? widgetOriginExplicit ?? "https://buy.onramper.dev"
+      : widgetOrigin,
     fiats,
   };
 }
