@@ -6,8 +6,10 @@ import type {
   InvoiceRecord,
   InvoiceStatus,
   PayLinkFields,
+  PaymentMode,
   SweeperRecord,
 } from "../shared/types.js";
+import { parsePaymentMode } from "../shared/onramper.js";
 
 interface InvoiceRow {
   id: string;
@@ -23,6 +25,8 @@ interface InvoiceRow {
   description: string | null;
   callback_url: string | null;
   allow_partial: 0 | 1;
+  payment_mode: string | null;
+  payer_fiat: string | null;
   status: InvoiceStatus;
   amount_paid: string;
   amount_swept: string;
@@ -124,13 +128,13 @@ export class CommerceDb {
           .prepare(
             `INSERT INTO invoices (
               id, invoice_seed, client_invoice_id, price_usd, to_addresses, selected_to, chain_id, token,
-              invoice_address, title, description, callback_url, allow_partial, status,
+              invoice_address, title, description, callback_url, allow_partial, payment_mode, payer_fiat, status,
               amount_paid, amount_swept, fee_collected, gas_spent_wei, sweep_tx,
               pay_session_id, version, claimed_by, claimed_until,
               created_at, updated_at, paid_at, swept_at
             ) VALUES (
               @id, @invoiceSeed, @clientInvoiceId, @priceUsd, @toAddresses, @selectedTo, @chainId, @token,
-              @invoiceAddress, @title, @description, @callbackUrl, @allowPartial, 'awaiting_payment',
+              @invoiceAddress, @title, @description, @callbackUrl, @allowPartial, @paymentMode, NULL, 'awaiting_payment',
               '0', '0', '0', '0', NULL,
               @paySessionId, 1, NULL, NULL,
               @now, @now, NULL, NULL
@@ -150,6 +154,7 @@ export class CommerceDb {
             description: input.fields.description ?? null,
             callbackUrl: input.fields.callback ?? null,
             allowPartial: input.fields.allowPartial ? 1 : 0,
+            paymentMode: input.fields.paymentMode ?? "crypto",
             paySessionId: input.paySessionId ?? null,
             now,
           });
@@ -597,6 +602,18 @@ export class CommerceDb {
     this.ensureColumn("invoices", "claimed_by", "TEXT");
     this.ensureColumn("invoices", "claimed_until", "TEXT");
     this.ensureColumn("invoices", "invoice_seed", "TEXT NOT NULL DEFAULT ''");
+    this.ensureColumn("invoices", "payment_mode", "TEXT NOT NULL DEFAULT 'crypto'");
+    this.ensureColumn("invoices", "payer_fiat", "TEXT");
+  }
+
+  setPayerFiat(invoiceId: string, fiat: string): InvoiceRecord {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(`UPDATE invoices SET payer_fiat = ?, updated_at = ? WHERE id = ?`)
+      .run(fiat.trim().toUpperCase(), now, invoiceId);
+    const invoice = this.getInvoice(invoiceId);
+    if (!invoice) throw Object.assign(new Error("Invoice not found"), { statusCode: 404 });
+    return invoice;
   }
 
   private ensureColumn(table: string, column: string, definition: string): void {
@@ -608,6 +625,12 @@ export class CommerceDb {
 }
 
 function mapInvoice(row: InvoiceRow): InvoiceRecord {
+  let paymentMode: PaymentMode = "crypto";
+  try {
+    paymentMode = parsePaymentMode(row.payment_mode);
+  } catch {
+    paymentMode = "crypto";
+  }
   return {
     id: row.id,
     invoiceSeed: row.invoice_seed ?? "",
@@ -622,6 +645,8 @@ function mapInvoice(row: InvoiceRow): InvoiceRecord {
     description: row.description,
     callbackUrl: row.callback_url,
     allowPartial: row.allow_partial === 1,
+    paymentMode,
+    payerFiat: row.payer_fiat ?? null,
     status: row.status,
     amountPaid: row.amount_paid,
     amountSwept: row.amount_swept,

@@ -93,6 +93,14 @@ Content-Type: application/json
 
 Stablecoins only for now (`USDC`/`USDT` on Solana, `USDC` on EVM, `USDT` on Nile). Token–chain pairs are enforced. Rate limit: ~1 create/s per IP (429 if exceeded).
 
+### Optional `paymentMode` (card/bank)
+
+When the operator enables Onramper (`ONRAMPER_ENABLED` + keys), create may set:
+
+- `paymentMode`: `"crypto"` (default) | `"crypto_or_fiat"` | `"fiat"`
+- Fiat-only requires **exactly one** chain and token on a supported mainnet rail (Base USDC, Tron USDT, BNB USDC/USDT).
+- Paid still means the invoice address was funded on-chain (existing poll / sweeper). Card checkout is only a funding source via `POST /api/invoices/:id/onramp-session` with `{ "fiat": "EUR" }`.
+
 ## Pay link (browser)
 
 ```text

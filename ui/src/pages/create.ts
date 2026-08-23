@@ -14,7 +14,31 @@ import {
   type ChainKind,
   type NetworkOption,
 } from "../shared/networks.js";
-import type { PayLinkFields } from "../shared/types.js";
+import { apiUrl } from "../shared/site.js";
+import type { PayLinkFields, PaymentMode } from "../shared/types.js";
+
+interface OnrampPublicConfig {
+  enabled: boolean;
+  sandbox?: boolean;
+  fiats: string[];
+  supportedPairs: Array<{ chainId: string; token: string }>;
+}
+
+function onrampSupportedSet(root: HTMLElement): Set<string> {
+  const raw = root.dataset.onrampPairs;
+  if (!raw) return new Set();
+  try {
+    const pairs = JSON.parse(raw) as Array<{ chainId: string; token: string }>;
+    return new Set(pairs.map((p) => `${p.chainId}:${p.token.toUpperCase()}`));
+  } catch {
+    return new Set();
+  }
+}
+
+function chainHasOnrampSupport(root: HTMLElement, chainId: string): boolean {
+  const supported = onrampSupportedSet(root);
+  return supported.has(`${chainId}:USDC`) || supported.has(`${chainId}:USDT`);
+}
 
 export function renderCreate(root: HTMLElement): void {
   const mode = deploymentMode();
@@ -61,9 +85,19 @@ export function renderCreate(root: HTMLElement): void {
             <input id="price" name="price" required inputmode="decimal" placeholder="128.00" value="10.00" />
           </div>
 
+          <div class="field" id="payment-mode-field" hidden>
+            <label>${t("create.paymentModeLabel")}</label>
+            <p class="field-hint">${t("create.paymentModeHint")}</p>
+            <div class="choice-card-row" id="payment-mode" role="radiogroup" aria-label="${escapeHtml(t("create.paymentModeAria"))}">
+              ${paymentModeCardHtml("crypto", true)}
+              ${paymentModeCardHtml("crypto_or_fiat", false)}
+              ${paymentModeCardHtml("fiat", false)}
+            </div>
+          </div>
+
           <div class="field">
-            <label>${t("create.networksLabel")} <span class="required">${t("common.required")}</span></label>
-            <p class="field-hint">${t("create.networksHint")}</p>
+            <label id="networks-label">${t("create.networksLabel")} <span class="required">${t("common.required")}</span></label>
+            <p class="field-hint" id="networks-hint">${t("create.networksHint")}</p>
             <div class="chain-pill-row" id="chains" role="group" aria-label="${escapeHtml(t("create.networksAria"))}">
               ${
                 networks.length === 0
@@ -168,7 +202,8 @@ Content-Type: application/json
   "callback": "https://shop.example/hooks",
   "title": "Invoice",
   "description": "Optional",
-  "allowPartial": false
+  "allowPartial": false,
+  "paymentMode": "crypto"
 }</pre>
         <p class="field-hint">${t("create.docsCreateHint")}</p>
 
@@ -332,10 +367,125 @@ ${t("create.docsStatusLine")}</pre>
     });
   }
 
+  root.querySelector("#payment-mode")?.addEventListener("change", () => {
+    applyPaymentModeUi(root);
+    refresh();
+  });
+
+  void loadOnrampConfig(root).then(() => {
+    applyPaymentModeUi(root);
+    refresh();
+  });
+
   refresh();
 
   if (location.hash === "#docs") {
     root.querySelector("#docs")?.scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+function paymentModeCardHtml(mode: PaymentMode, selected: boolean): string {
+  const titles: Record<PaymentMode, string> = {
+    crypto: t("create.paymentModeCryptoTitle"),
+    crypto_or_fiat: t("create.paymentModeBothTitle"),
+    fiat: t("create.paymentModeFiatTitle"),
+  };
+  const hints: Record<PaymentMode, string> = {
+    crypto: t("create.paymentModeCryptoHint"),
+    crypto_or_fiat: t("create.paymentModeBothHint"),
+    fiat: t("create.paymentModeFiatHint"),
+  };
+  return `
+    <label class="choice-card ${selected ? "is-selected" : ""}">
+      <input type="radio" name="paymentMode" value="${mode}" ${selected ? "checked" : ""} />
+      <span class="choice-card-face">
+        <span class="choice-card-title">${escapeHtml(titles[mode])}</span>
+        <span class="choice-card-hint">${escapeHtml(hints[mode])}</span>
+      </span>
+    </label>`;
+}
+
+async function loadOnrampConfig(root: HTMLElement): Promise<void> {
+  const field = root.querySelector<HTMLElement>("#payment-mode-field");
+  if (!field) return;
+  try {
+    const res = await fetch(apiUrl("/api/public/onramp"));
+    if (!res.ok) {
+      field.hidden = true;
+      return;
+    }
+    const body = (await res.json()) as OnrampPublicConfig;
+    field.hidden = !body.enabled;
+    root.dataset.onrampEnabled = body.enabled ? "1" : "0";
+    root.dataset.onrampSandbox = body.sandbox ? "1" : "0";
+    root.dataset.onrampPairs = JSON.stringify(body.supportedPairs ?? []);
+    if (body.enabled) {
+      const cryptoOrFiat = root.querySelector<HTMLInputElement>(
+        'input[name="paymentMode"][value="crypto_or_fiat"]'
+      );
+      const crypto = root.querySelector<HTMLInputElement>('input[name="paymentMode"][value="crypto"]');
+      if (cryptoOrFiat && crypto?.checked) {
+        cryptoOrFiat.checked = true;
+        crypto.checked = false;
+      }
+    }
+  } catch {
+    field.hidden = true;
+  }
+}
+
+function selectedPaymentMode(root: HTMLElement): PaymentMode {
+  if (root.dataset.onrampEnabled !== "1") return "crypto";
+  const value = root.querySelector<HTMLInputElement>('input[name="paymentMode"]:checked')?.value;
+  if (value === "crypto" || value === "crypto_or_fiat" || value === "fiat") return value;
+  return "crypto_or_fiat";
+}
+
+function applyPaymentModeUi(root: HTMLElement): void {
+  const mode = selectedPaymentMode(root);
+  for (const card of root.querySelectorAll<HTMLElement>(".choice-card")) {
+    const input = card.querySelector<HTMLInputElement>('input[name="paymentMode"]');
+    card.classList.toggle("is-selected", Boolean(input?.checked));
+  }
+
+  const networksLabel = root.querySelector<HTMLElement>("#networks-label");
+  const networksHint = root.querySelector<HTMLElement>("#networks-hint");
+  if (networksLabel) {
+    networksLabel.innerHTML =
+      mode === "fiat"
+        ? `${t("create.settlementNetworkLabel")} <span class="required">${t("common.required")}</span>`
+        : `${t("create.networksLabel")} <span class="required">${t("common.required")}</span>`;
+  }
+  if (networksHint) {
+    networksHint.textContent = mode === "fiat" ? t("create.settlementNetworkHint") : t("create.networksHint");
+  }
+
+  const chainInputs = [...root.querySelectorAll<HTMLInputElement>('input[name="chains"]')];
+  if (mode === "fiat") {
+    const checkedChains = chainInputs.filter((el) => el.checked);
+    let keep = checkedChains.find((el) => chainHasOnrampSupport(root, el.value));
+    if (!keep) {
+      keep =
+        chainInputs.find((el) => chainHasOnrampSupport(root, el.value)) ??
+        chainInputs.find((el) => el.value === "8453" || el.value === "11155111" || el.value === "tron" || el.value === "nile" || el.value === "56") ??
+        chainInputs[0];
+    }
+    for (const el of chainInputs) {
+      const chainSupported = chainHasOnrampSupport(root, el.value);
+      el.checked = keep ? el === keep : false;
+      el.disabled = !chainSupported;
+      el.type = "radio";
+      el.name = "chains";
+    }
+  } else {
+    for (const el of chainInputs) {
+      el.disabled = false;
+      el.type = "checkbox";
+      el.name = "chains";
+    }
+    if (chainInputs.every((el) => !el.checked) && chainInputs[0]) {
+      chainInputs[0].checked = true;
+    }
   }
 }
 
@@ -409,26 +559,38 @@ function renderTokenOptions(root: HTMLElement, chains: string[]): void {
   const previous = new Set(
     [...root.querySelectorAll<HTMLInputElement>('input[name="tokens"]:checked')].map((el) => el.value)
   );
-  const tokens = tokensForChains(chains);
+  const fiatMode = selectedPaymentMode(root) === "fiat";
+  const supported = onrampSupportedSet(root);
+  let tokens = tokensForChains(chains);
+  if (fiatMode && supported.size > 0) {
+    tokens = tokens.filter((token) =>
+      chains.some((chainId) => supported.has(`${chainId}:${token.id}`))
+    );
+  }
   const needsTron = chains.some((id) => networkKind(id) === "tron");
   if (tokens.length === 0) {
     host.innerHTML = `<p class="field-hint">${t("create.selectNetworkForTokens")}</p>`;
     return;
   }
+  const inputType = fiatMode ? "radio" : "checkbox";
+  let keepToken =
+    tokens.find((token) => previous.has(token.id)) ??
+    tokens.find((token) => needsTron && token.id === "USDT") ??
+    tokens[0];
   host.innerHTML = tokens
     .map((token) => {
-      const locked = needsTron && token.id === "USDT";
-      const selected = locked || (previous.size > 0 ? previous.has(token.id) : true);
+      const locked = !fiatMode && needsTron && token.id === "USDT";
+      const selected = fiatMode ? token.id === keepToken?.id : locked || (previous.size > 0 ? previous.has(token.id) : true);
       return `
         <label class="check">
-          <input type="checkbox" name="tokens" value="${escapeHtml(token.id)}"
+          <input type="${inputType}" name="tokens" value="${escapeHtml(token.id)}"
             ${selected ? "checked" : ""} ${locked ? "disabled" : ""} />
           ${escapeHtml(token.label)}${locked ? ` · ${t("create.usdtRequiredForTron")}` : ""}
         </label>`;
     })
     .join("");
 
-  if (needsTron) {
+  if (!fiatMode && needsTron) {
     host.insertAdjacentHTML(
       "beforeend",
       `<input type="hidden" name="tokens" value="USDT" data-tron-usdt-lock="1" />`
@@ -499,6 +661,7 @@ function readForm(root: HTMLElement): PayLinkFields {
     title: value("title") || undefined,
     description: value("description") || undefined,
     allowPartial: root.querySelector<HTMLInputElement>("#allowPartial")?.checked ?? false,
+    paymentMode: selectedPaymentMode(root),
   };
 }
 
@@ -527,5 +690,6 @@ function readFormLoose(root: HTMLElement): PayLinkFields {
     title: value("title") || undefined,
     description: value("description") || undefined,
     allowPartial: root.querySelector<HTMLInputElement>("#allowPartial")?.checked ?? false,
+    paymentMode: selectedPaymentMode(root),
   };
 }

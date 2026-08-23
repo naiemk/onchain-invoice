@@ -23,7 +23,15 @@ import {
   invoiceIdFromPayLink,
   normalizePayLinkFields,
 } from "../shared/invoice.js";
-import type { InvoiceStatus, PayLinkFields } from "../shared/types.js";
+import type { InvoiceStatus, PayLinkFields, PaymentMode } from "../shared/types.js";
+import {
+  buildOnrampWidgetSession,
+  isOnramperSandboxOrigin,
+  ONRAMPER_SUPPORTED_PAIRS,
+  onramperSupportedPair,
+  parsePaymentMode,
+  paymentModeAllowsFiat,
+} from "../shared/onramper.js";
 import { requireApiKey, requireMerchant } from "./auth.js";
 import { verifyCaptcha } from "./captcha.js";
 import { resolveEvmChain, type AppConfig } from "./config.js";
@@ -59,6 +67,18 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       if (req.method === "GET" && url.pathname === "/api/ready") {
         const ok = context.db.ready();
         sendJson(res, ok ? 200 : 503, { ok, db: ok });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/public/onramp") {
+        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
+        const onramper = context.config.onramper;
+        sendJson(res, 200, {
+          enabled: onramper.enabled,
+          sandbox: onramper.enabled && isOnramperSandboxOrigin(onramper.widgetOrigin),
+          fiats: onramper.enabled ? onramper.fiats : [],
+          supportedPairs: onramper.enabled ? [...ONRAMPER_SUPPORTED_PAIRS] : [],
+        });
         return;
       }
 
@@ -175,6 +195,13 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         return;
       }
 
+      const onrampMatch = url.pathname.match(/^\/api\/invoices\/([^/]+)\/onramp-session$/);
+      if (req.method === "POST" && onrampMatch) {
+        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
+        await createOnrampSession(req, res, context, decodeURIComponent(onrampMatch[1]));
+        return;
+      }
+
       const invoiceMatch = url.pathname.match(/^\/api\/invoices\/([^/]+)$/);
       if (req.method === "GET" && invoiceMatch) {
         rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
@@ -216,11 +243,19 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
   }
 
   const baseFields = normalizePayLinkFields(body);
+  const paymentMode = parsePaymentMode(body.paymentMode ?? body.payment_mode ?? baseFields.paymentMode);
+  assertPaymentModeAllowed(paymentMode, baseFields, config);
   const invoiceSeed = randomInvoiceSeed();
-  const fields: PayLinkFields = { ...baseFields, invoiceSeed };
+  const fields: PayLinkFields = { ...baseFields, invoiceSeed, paymentMode };
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
   assertTokenChainPair(chainId, token, config);
+  if (paymentModeAllowsFiat(paymentMode) && !onramperSupportedPair(chainId, token)) {
+    throw Object.assign(
+      new Error(`Card/bank payments are not available for ${token} on chain ${chainId}`),
+      { statusCode: 400 }
+    );
+  }
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
   const invoiceAddress = await getInvoiceAddress(config, selectedTo, invoiceId, chainId, token);
@@ -241,7 +276,7 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
     invoice,
     created,
     payLink: `/pay?${encodeInvoiceResumeLink(invoice.id)}`,
-    checkoutLink: `/pay?${encodePayLink(baseFields)}`,
+    checkoutLink: `/pay?${encodePayLink({ ...baseFields, paymentMode })}`,
   });
 }
 
@@ -263,13 +298,21 @@ async function createSessionDeprecated(
     });
   }
   const baseFields = normalizePayLinkFields(body);
+  const paymentMode = parsePaymentMode(body.paymentMode ?? body.payment_mode ?? baseFields.paymentMode);
+  assertPaymentModeAllowed(paymentMode, baseFields, context.config);
   const invoiceSeed = randomInvoiceSeed();
-  const fields: PayLinkFields = { ...baseFields, invoiceSeed };
+  const fields: PayLinkFields = { ...baseFields, invoiceSeed, paymentMode };
   const paySessionId = randomUUID();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
   assertTokenChainPair(chainId, token, context.config);
+  if (paymentModeAllowsFiat(paymentMode) && !onramperSupportedPair(chainId, token)) {
+    throw Object.assign(
+      new Error(`Card/bank payments are not available for ${token} on chain ${chainId}`),
+      { statusCode: 400 }
+    );
+  }
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
   const invoiceAddress = await getInvoiceAddress(context.config, selectedTo, invoiceId, chainId, token);
@@ -291,6 +334,89 @@ async function createSessionDeprecated(
     deprecated: true,
     notice: "Use POST /api/invoices instead of /api/sessions",
   });
+}
+
+async function createOnrampSession(
+  req: IncomingMessage,
+  res: ServerResponse,
+  { config, db }: RouteContext,
+  invoiceId: string
+): Promise<void> {
+  if (!config.onramper.enabled || !config.onramper.apiKey || !config.onramper.signingKey) {
+    throw Object.assign(new Error("Card and bank payments are not enabled on this instance"), {
+      statusCode: 503,
+    });
+  }
+
+  const invoice = db.getInvoice(invoiceId);
+  if (!invoice) {
+    throw Object.assign(new Error("Invoice not found"), { statusCode: 404 });
+  }
+  if (!paymentModeAllowsFiat(invoice.paymentMode)) {
+    throw Object.assign(new Error("This invoice does not accept card or bank payment"), {
+      statusCode: 400,
+    });
+  }
+  if (!invoice.invoiceAddress || !invoice.chainId || !invoice.token) {
+    throw Object.assign(new Error("Invoice is not ready for payment"), { statusCode: 409 });
+  }
+  if (isPaidLikeStatus(invoice.status)) {
+    throw Object.assign(new Error("Invoice is already paid"), { statusCode: 409 });
+  }
+
+  const body = await readJson(req);
+  const fiat = String(body.fiat ?? body.currency ?? "").trim().toUpperCase();
+  if (!fiat) {
+    throw Object.assign(new Error("fiat is required"), { statusCode: 400 });
+  }
+  if (!config.onramper.fiats.includes(fiat)) {
+    throw Object.assign(new Error(`Unsupported fiat currency: ${fiat}`), { statusCode: 400 });
+  }
+
+  const resumePath = `/pay?${encodeInvoiceResumeLink(invoice.id)}`;
+  const successRedirectUrl = new URL(resumePath, config.baseUrl).toString();
+  const session = buildOnrampWidgetSession({
+    apiKey: config.onramper.apiKey,
+    signingKeyPem: config.onramper.signingKey,
+    widgetOrigin: config.onramper.widgetOrigin,
+    invoiceId: invoice.id,
+    invoiceAddress: invoice.invoiceAddress,
+    chainId: invoice.chainId,
+    token: invoice.token,
+    priceUsd: invoice.priceUsd,
+    fiat,
+    lockFiat: invoice.paymentMode === "fiat",
+    successRedirectUrl,
+    failureRedirectUrl: successRedirectUrl,
+  });
+
+  db.setPayerFiat(invoice.id, fiat);
+  sendJson(res, 200, {
+    widgetUrl: session.widgetUrl,
+    expiresAt: session.expiresAt,
+    fiat,
+  });
+}
+
+function assertPaymentModeAllowed(
+  paymentMode: PaymentMode,
+  fields: PayLinkFields,
+  config: AppConfig
+): void {
+  if (paymentMode === "crypto") return;
+  if (!config.onramper.enabled) {
+    throw Object.assign(new Error("Card and bank payments are not enabled on this instance"), {
+      statusCode: 400,
+    });
+  }
+  if (paymentMode === "fiat") {
+    if (fields.chains.length !== 1 || fields.tokens.length !== 1) {
+      throw Object.assign(
+        new Error("Fiat-only invoices require exactly one chain and one token"),
+        { statusCode: 400 }
+      );
+    }
+  }
 }
 
 function listMerchantInvoices(req: IncomingMessage, res: ServerResponse, { db }: RouteContext, url: URL): void {

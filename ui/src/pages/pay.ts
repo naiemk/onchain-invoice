@@ -138,7 +138,26 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
       if (kind === "solana") return looksLikeSolanaAddress(addr);
       return !looksLikeTronAddress(addr) && !looksLikeSolanaAddress(addr);
     });
+  const tokensFor = (chainId: string) => fields.tokens.filter((t) => tokenAllowedOnChain(chainId, t));
+  const initialTokens = tokensFor(initialChain);
   const initialRecipients = recipientsForChain(initialChain);
+
+  // Fiat-only invoices settle on a single rail — skip network/token picker when unique.
+  if (fields.paymentMode === "fiat" && fields.chains.length === 1 && initialTokens.length === 1) {
+    const selectedTo = initialRecipients[0] ?? fields.to[0];
+    root.innerHTML = `
+      <div class="invoice-shell">
+        <section class="invoice-doc">
+          <p class="eyebrow">${t("pay.eyebrow")}</p>
+          <h1>${escapeHtml(fields.title ?? t("pay.defaultTitle"))}</h1>
+          <div id="pay-status" class="status">${t("pay.creatingAddress")}</div>
+        </section>
+      </div>
+    `;
+    void activateInvoice(root, fields, initialChain, initialTokens[0]!, selectedTo);
+    return;
+  }
+
   const toField =
     fields.to.length > 1
       ? `<div class="field">
@@ -150,8 +169,6 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
         </div>`
       : `<input type="hidden" id="to" value="${escapeHtml(initialRecipients[0] ?? fields.to[0] ?? "")}" />`;
 
-  const tokensFor = (chainId: string) => fields.tokens.filter((t) => tokenAllowedOnChain(chainId, t));
-  const initialTokens = tokensFor(initialChain);
   const merchantHint = maskMerchant(initialRecipients[0] ?? fields.to[0] ?? "");
 
   root.innerHTML = `
@@ -241,28 +258,40 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
     const toEl = root.querySelector<HTMLSelectElement | HTMLInputElement>("#to");
     const selectedTo = toEl?.value ?? recipientsForChain(chainId)[0] ?? fields.to[0];
     if (status) status.textContent = t("pay.creatingAddress");
-    try {
-      const response = await fetch(apiUrl("/api/invoices"), {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          ...fieldsToBody(fields),
-          chainId,
-          token,
-          selectedTo,
-        }),
-      });
-      const body = (await response.json()) as CreateInvoiceResponse & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? t("errors.createFailed"));
-      const invoiceId = body.invoice.id;
-      sessionStorage.setItem(ACTIVATION_KEY(invoiceId), JSON.stringify(body));
-      sessionStorage.setItem(CHECKOUT_KEY(checkoutFingerprint(fields)), invoiceId);
-      replaceResumeUrl(invoiceId);
-      renderPay(root);
-    } catch (error) {
-      if (status) status.textContent = error instanceof Error ? localizeError(error) : t("errors.createFailed");
-    }
+    await activateInvoice(root, fields, chainId, token, selectedTo, status);
   });
+}
+
+async function activateInvoice(
+  root: HTMLElement,
+  fields: PayLinkFields,
+  chainId: string,
+  token: string,
+  selectedTo: string,
+  statusEl?: HTMLElement | null
+): Promise<void> {
+  const status = statusEl ?? root.querySelector<HTMLElement>("#pay-status");
+  try {
+    const response = await fetch(apiUrl("/api/invoices"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...fieldsToBody(fields),
+        chainId,
+        token,
+        selectedTo,
+      }),
+    });
+    const body = (await response.json()) as CreateInvoiceResponse & { error?: string };
+    if (!response.ok) throw new Error(body.error ?? t("errors.createFailed"));
+    const invoiceId = body.invoice.id;
+    sessionStorage.setItem(ACTIVATION_KEY(invoiceId), JSON.stringify(body));
+    sessionStorage.setItem(CHECKOUT_KEY(checkoutFingerprint(fields)), invoiceId);
+    replaceResumeUrl(invoiceId);
+    renderPay(root);
+  } catch (error) {
+    if (status) status.textContent = error instanceof Error ? localizeError(error) : t("errors.createFailed");
+  }
 }
 
 async function renderInvoiceStage(
@@ -271,10 +300,18 @@ async function renderInvoiceStage(
   invoiceId: string,
   invoice: InvoiceRecord
 ): Promise<void> {
+  const paymentMode = invoice.paymentMode ?? fields.paymentMode ?? "crypto";
   const address = invoice.invoiceAddress ?? "";
   const chainId = invoice.chainId ?? fields.chains[0];
   const token = invoice.token ?? fields.tokens[0];
   const statusClass = invoice.status ?? "awaiting_payment";
+
+  if (paymentMode === "fiat") {
+    renderFiatInvoiceStage(root, fields, invoiceId, invoice);
+    startPolling(root, invoiceId, fields);
+    return;
+  }
+
   let qrDataUrl = "";
   if (address) {
     try {
@@ -283,6 +320,26 @@ async function renderInvoiceStage(
       qrDataUrl = "";
     }
   }
+
+  const showMethodSwitch = paymentMode === "crypto_or_fiat";
+  const methodSwitcher = showMethodSwitch
+    ? `<div class="choice-card-row pay-method-row" role="radiogroup" aria-label="${escapeHtml(t("pay.paymentMethod"))}">
+        <label class="choice-card is-selected">
+          <input type="radio" name="payMethod" value="wallet" checked />
+          <span class="choice-card-face">
+            <span class="choice-card-title">${escapeHtml(t("pay.methodWalletTitle"))}</span>
+            <span class="choice-card-hint">${escapeHtml(t("pay.methodWalletHint"))}</span>
+          </span>
+        </label>
+        <label class="choice-card">
+          <input type="radio" name="payMethod" value="card" />
+          <span class="choice-card-face">
+            <span class="choice-card-title">${escapeHtml(t("pay.methodCardTitle"))}</span>
+            <span class="choice-card-hint">${escapeHtml(t("pay.methodCardHint", { token: token ?? "USDC" }))}</span>
+          </span>
+        </label>
+      </div>`
+    : "";
 
   root.innerHTML = `
     <div class="invoice-shell">
@@ -321,34 +378,38 @@ async function renderInvoiceStage(
             ? `<p style="margin:0 0 1rem">${escapeHtml(fields.description)}</p>`
             : ""
         }
-        ${
-          qrDataUrl
-            ? `<div class="qr-wrap"><img src="${qrDataUrl}" alt="${escapeHtml(t("pay.qrAlt"))}" /></div>`
-            : ""
-        }
-        <p class="field-hint" style="text-align:start">${t("pay.sendExactly")}</p>
-        <div class="address-box" id="invoice-address">${escapeHtml(address || t("pay.addressPending"))}</div>
-        <div class="btn-row pay-copy-row">
-          <button type="button" id="copy-address" ${address ? "" : "disabled"}>${t("pay.copyAddress")}</button>
-        </div>
-        <div class="callout warn">
-          <strong class="callout-chain">${chainLogoSvg(chainId, 22)}${escapeHtml(t("pay.networkOnly", { network: networkLabel(chainId) }))}</strong>
-          ${t("pay.lostFundsWarn")}
+        ${methodSwitcher}
+        <div id="pay-wallet-panel">
           ${
-            networkKind(chainId) === "tron"
-              ? isTestnet(chainId)
-                ? t("pay.tronNileHint")
-                : t("pay.tronMainnetHint")
-              : networkKind(chainId) === "solana"
-                ? t("pay.solanaHint")
-                : ""
+            qrDataUrl
+              ? `<div class="qr-wrap"><img src="${qrDataUrl}" alt="${escapeHtml(t("pay.qrAlt"))}" /></div>`
+              : ""
           }
+          <p class="field-hint" style="text-align:start">${t("pay.sendExactly")}</p>
+          <div class="address-box" id="invoice-address">${escapeHtml(address || t("pay.addressPending"))}</div>
+          <div class="btn-row pay-copy-row">
+            <button type="button" id="copy-address" ${address ? "" : "disabled"}>${t("pay.copyAddress")}</button>
+          </div>
+          <div class="callout warn">
+            <strong class="callout-chain">${chainLogoSvg(chainId, 22)}${escapeHtml(t("pay.networkOnly", { network: networkLabel(chainId) }))}</strong>
+            ${t("pay.lostFundsWarn")}
+            ${
+              networkKind(chainId) === "tron"
+                ? isTestnet(chainId)
+                  ? t("pay.tronNileHint")
+                  : t("pay.tronMainnetHint")
+                : networkKind(chainId) === "solana"
+                  ? t("pay.solanaHint")
+                  : ""
+            }
+          </div>
+          <div class="callout info">
+            ${t("pay.payWithToken", { token: token ?? t("pay.token") })}
+            ${t("pay.keepPageOpen")}
+            ${fields.allowPartial ? t("pay.partialAllowed") : t("pay.partialNotAllowed")}
+          </div>
         </div>
-        <div class="callout info">
-          ${t("pay.payWithToken", { token: token ?? t("pay.token") })}
-          ${t("pay.keepPageOpen")}
-          ${fields.allowPartial ? t("pay.partialAllowed") : t("pay.partialNotAllowed")}
-        </div>
+        <div id="pay-card-panel" hidden></div>
         <div id="pay-status" class="status">
           <p>${escapeHtml(t("pay.statusLine", { status: statusLabel(statusClass) }))}</p>
           <p class="field-hint" style="margin:0.35rem 0 0">${t("pay.invoiceShort", { id: short(invoiceId) })}</p>
@@ -381,8 +442,178 @@ async function renderInvoiceStage(
     renderPay(root);
   });
 
+  if (showMethodSwitch) {
+    const walletPanel = root.querySelector<HTMLElement>("#pay-wallet-panel");
+    const cardPanel = root.querySelector<HTMLElement>("#pay-card-panel");
+    const syncMethod = () => {
+      const method = root.querySelector<HTMLInputElement>('input[name="payMethod"]:checked')?.value ?? "wallet";
+      for (const card of root.querySelectorAll<HTMLElement>(".pay-method-row .choice-card")) {
+        const input = card.querySelector<HTMLInputElement>('input[name="payMethod"]');
+        card.classList.toggle("is-selected", Boolean(input?.checked));
+      }
+      if (walletPanel) walletPanel.hidden = method !== "wallet";
+      if (cardPanel) {
+        cardPanel.hidden = method !== "card";
+        if (method === "card" && !cardPanel.dataset.ready) {
+          void mountOnrampPanel(cardPanel, invoiceId, invoice, fields, true);
+          cardPanel.dataset.ready = "1";
+        }
+      }
+    };
+    root.querySelector(".pay-method-row")?.addEventListener("change", syncMethod);
+  }
+
   bindPayMoreMenu(root);
   startPolling(root, invoiceId, fields);
+}
+
+function renderFiatInvoiceStage(
+  root: HTMLElement,
+  fields: PayLinkFields,
+  invoiceId: string,
+  invoice: InvoiceRecord
+): void {
+  const chainId = invoice.chainId ?? fields.chains[0];
+  const token = invoice.token ?? fields.tokens[0];
+  const statusClass = invoice.status ?? "awaiting_payment";
+
+  root.innerHTML = `
+    <div class="invoice-shell">
+      <section class="invoice-doc">
+        <p class="eyebrow">${t("pay.invoiceEyebrow")}</p>
+        ${testnetPillHtml(chainId)}
+        <h1>${escapeHtml(fields.title ?? t("pay.paymentDue"))}</h1>
+        <p class="amount-due">$${escapeHtml(fields.price)}</p>
+        <span class="status-badge ${escapeHtml(statusClass)}" id="status-badge">${escapeHtml(statusLabel(statusClass))}</span>
+        <p class="settlement-line">${escapeHtml(
+          t("pay.settlesAs", { token: token ?? "USDC", network: networkLabel(chainId) })
+        )}</p>
+        ${
+          fields.description
+            ? `<p style="margin:0 0 1rem">${escapeHtml(fields.description)}</p>`
+            : ""
+        }
+        <div id="pay-card-panel"></div>
+        <div id="pay-status" class="status">
+          <p>${escapeHtml(t("pay.waitingPayment"))}</p>
+          <p class="field-hint" style="margin:0.35rem 0 0">${t("pay.invoiceShort", { id: short(invoiceId) })}</p>
+        </div>
+        <p class="merchant-hint">${escapeHtml(maskMerchant(invoice.selectedTo ?? fields.to[0] ?? ""))}</p>
+      </section>
+    </div>
+  `;
+
+  const panel = root.querySelector<HTMLElement>("#pay-card-panel");
+  if (panel) void mountOnrampPanel(panel, invoiceId, invoice, fields, true);
+}
+
+const FIAT_LABELS: Record<string, string> = {
+  USD: "US Dollar",
+  EUR: "Euro",
+  GBP: "British pound",
+  SEK: "Swedish krona",
+  NOK: "Norwegian krone",
+  DKK: "Danish krone",
+  CHF: "Swiss franc",
+  CAD: "Canadian dollar",
+  AUD: "Australian dollar",
+  JPY: "Japanese yen",
+  PLN: "Polish złoty",
+  CZK: "Czech koruna",
+};
+
+async function mountOnrampPanel(
+  panel: HTMLElement,
+  invoiceId: string,
+  invoice: InvoiceRecord,
+  fields: PayLinkFields,
+  lockFiat: boolean
+): Promise<void> {
+  const token = invoice.token ?? fields.tokens[0] ?? "USDC";
+  let fiats = ["USD", "EUR", "GBP", "SEK"];
+  let sandbox = false;
+  try {
+    const res = await fetch(apiUrl("/api/public/onramp"));
+    if (res.ok) {
+      const body = (await res.json()) as { enabled?: boolean; fiats?: string[]; sandbox?: boolean };
+      if (!body.enabled) {
+        panel.innerHTML = `<p class="danger">${escapeHtml(t("pay.checkoutFailed"))}</p>`;
+        return;
+      }
+      if (body.fiats?.length) fiats = body.fiats;
+      sandbox = Boolean(body.sandbox);
+    }
+  } catch {
+    /* use defaults */
+  }
+
+  const defaultFiat = invoice.payerFiat && fiats.includes(invoice.payerFiat) ? invoice.payerFiat : fiats[0] ?? "USD";
+  panel.innerHTML = `
+    <div class="field">
+      <label for="payer-fiat">${t("pay.payWithLabel")}</label>
+      <p class="field-hint">${t("pay.payWithHint", { price: fields.price })}</p>
+      <select id="payer-fiat">${fiats
+        .map(
+          (code) =>
+            `<option value="${escapeHtml(code)}" ${code === defaultFiat ? "selected" : ""}>${escapeHtml(
+              `${code} · ${FIAT_LABELS[code] ?? code}`
+            )}</option>`
+        )
+        .join("")}</select>
+    </div>
+    <div class="btn-row">
+      <button type="button" id="start-onramp">${t("pay.continueCard")}</button>
+    </div>
+    <p class="field-hint">${escapeHtml(t("pay.cardFeeNote", { token }))}</p>
+    ${sandbox ? `<p class="callout info">${escapeHtml(t("pay.sandboxNote"))}</p>` : ""}
+    <div id="onramp-frame-host" class="onramp-frame-host" hidden></div>
+    <p id="onramp-error" class="danger" hidden></p>
+  `;
+
+  const start = async () => {
+    const fiat = panel.querySelector<HTMLSelectElement>("#payer-fiat")?.value ?? defaultFiat;
+    const host = panel.querySelector<HTMLElement>("#onramp-frame-host");
+    const err = panel.querySelector<HTMLElement>("#onramp-error");
+    const btn = panel.querySelector<HTMLButtonElement>("#start-onramp");
+    if (err) {
+      err.hidden = true;
+      err.textContent = "";
+    }
+    if (btn) btn.disabled = true;
+    if (host) {
+      host.hidden = false;
+      host.innerHTML = `<div class="onramp-skeleton" aria-busy="true">${escapeHtml(t("pay.loadingCheckout"))}</div>`;
+    }
+    try {
+      const res = await fetch(apiUrl(`/api/invoices/${encodeURIComponent(invoiceId)}/onramp-session`), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fiat }),
+      });
+      const body = (await res.json()) as { widgetUrl?: string; error?: string };
+      if (!res.ok || !body.widgetUrl) throw new Error(body.error ?? t("pay.checkoutFailed"));
+      if (host) {
+        host.innerHTML = `<iframe
+          class="onramp-iframe"
+          title="${escapeHtml(t("pay.onrampIframeTitle"))}"
+          src="${escapeHtml(body.widgetUrl)}"
+          allow="payment"
+          loading="lazy"
+        ></iframe>`;
+      }
+    } catch (error) {
+      if (host) host.hidden = true;
+      if (err) {
+        err.hidden = false;
+        err.textContent = error instanceof Error ? localizeError(error) : t("pay.checkoutFailed");
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  panel.querySelector<HTMLButtonElement>("#start-onramp")?.addEventListener("click", () => void start());
+  void lockFiat;
 }
 
 function renderPaidStage(
@@ -398,6 +629,7 @@ function renderPaidStage(
   const chainId = invoice.chainId ?? fields.chains[0];
   const addressUrl = invoice.invoiceAddress ? explorerAddressUrl(chainId, invoice.invoiceAddress) : null;
   const paidDisplay = formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId);
+  const isFiatForward = (invoice.paymentMode ?? fields.paymentMode) === "fiat";
 
   root.innerHTML = `
     <div class="invoice-shell">
@@ -405,9 +637,12 @@ function renderPaidStage(
         <p class="eyebrow">${t("pay.invoiceEyebrow")}</p>
         ${testnetPillHtml(chainId)}
         <h1>${escapeHtml(fields.title ?? t("pay.defaultTitle"))}</h1>
-        <p class="amount-due">$${escapeHtml(fields.price)}</p>
+        <p class="amount-due">${escapeHtml(t("pay.paidAmount", { price: fields.price }))}</p>
         <span class="status-badge ${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span>
-        <div class="pay-asset-banner">
+        ${
+          isFiatForward
+            ? ""
+            : `<div class="pay-asset-banner">
           <div class="pay-asset-item">
             <span class="pay-asset-label">${t("pay.network")}</span>
             ${chainChipHtml(chainId, { size: "lg" })}
@@ -416,28 +651,32 @@ function renderPaidStage(
             <span class="pay-asset-label">${t("pay.token")}</span>
             ${tokenChipHtml(invoice.token, { size: "lg" })}
           </div>
-        </div>
+        </div>`
+        }
         <div class="callout ok">
           <strong>${escapeHtml(title)}.</strong>
           ${status === "swept" ? t("pay.confirmed") : t("pay.confirming")}
         </div>
-        <div class="address-box" style="text-align:start">
-          <div><strong>${t("pay.invoiceId")}</strong><br /><span class="mono">${escapeHtml(invoiceId)}</span></div>
-          ${
-            invoice.invoiceAddress
-              ? `<div style="margin-top:0.75rem"><strong>${t("pay.paymentAddress")}</strong><br />${
-                  addressUrl
-                    ? `<a class="mono" href="${escapeHtml(addressUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(invoice.invoiceAddress)}</a>`
-                    : `<span class="mono">${escapeHtml(invoice.invoiceAddress)}</span>`
-                }</div>`
-              : ""
-          }
-          ${
-            invoice.amountPaid && invoice.amountPaid !== "0"
-              ? `<div style="margin-top:0.75rem"><strong>${t("pay.amountPaid")}</strong><br /><span class="mono">${escapeHtml(paidDisplay)}</span></div>`
-              : ""
-          }
-        </div>
+        <details class="onchain-receipt" ${isFiatForward ? "" : "open"}>
+          <summary>${t("pay.onchainReceipt")}</summary>
+          <div class="address-box" style="text-align:start;margin-top:0.75rem">
+            <div><strong>${t("pay.invoiceId")}</strong><br /><span class="mono">${escapeHtml(invoiceId)}</span></div>
+            ${
+              invoice.invoiceAddress
+                ? `<div style="margin-top:0.75rem"><strong>${t("pay.paymentAddress")}</strong><br />${
+                    addressUrl
+                      ? `<a class="mono" href="${escapeHtml(addressUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(invoice.invoiceAddress)}</a>`
+                      : `<span class="mono">${escapeHtml(invoice.invoiceAddress)}</span>`
+                  }</div>`
+                : ""
+            }
+            ${
+              invoice.amountPaid && invoice.amountPaid !== "0"
+                ? `<div style="margin-top:0.75rem"><strong>${t("pay.amountPaid")}</strong><br /><span class="mono">${escapeHtml(paidDisplay)}</span></div>`
+                : ""
+            }
+          </div>
+        </details>
         <div id="pay-status" class="status"></div>
         <p class="merchant-hint">${escapeHtml(maskMerchant(invoice.selectedTo ?? fields.to[0] ?? ""))}</p>
       </section>
@@ -558,6 +797,7 @@ function fieldsToBody(fields: PayLinkFields): Record<string, unknown> {
     title: fields.title,
     description: fields.description,
     allowPartial: fields.allowPartial,
+    paymentMode: fields.paymentMode ?? "crypto",
   };
 }
 
@@ -573,6 +813,7 @@ function fieldsFromInvoice(invoice: InvoiceRecord, fallback?: PayLinkFields): Pa
     title: invoice.title ?? fallback?.title,
     description: invoice.description ?? fallback?.description,
     allowPartial: invoice.allowPartial ?? fallback?.allowPartial ?? false,
+    paymentMode: invoice.paymentMode ?? fallback?.paymentMode ?? "crypto",
   };
 }
 
@@ -587,6 +828,7 @@ function checkoutFingerprint(fields: PayLinkFields): string {
     fields.title ?? "",
     fields.description ?? "",
     fields.allowPartial ? "1" : "0",
+    fields.paymentMode ?? "crypto",
   ].join("|");
 }
 

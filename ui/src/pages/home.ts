@@ -33,6 +33,7 @@ export function renderHome(root: HTMLElement): void {
     title: t("home.demoTitle"),
     description: mode === "testnet" ? t("home.demoDescriptionTestnet") : t("home.demoDescriptionMainnet"),
     allowPartial: false,
+    paymentMode: "crypto" as const,
   };
   const demoLink = `/pay?${encodePayLink(demo)}`;
 

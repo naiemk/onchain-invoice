@@ -2065,3 +2065,135 @@ html[dir="rtl"] pre {
   text-align: left;
 }
 
+/* ── Payment mode / method choice cards ── */
+.choice-card-row {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr));
+  margin: 0.35rem 0 0.25rem;
+}
+
+.choice-card {
+  cursor: pointer;
+  display: block;
+  margin: 0;
+  position: relative;
+}
+
+.choice-card input {
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.choice-card-face {
+  background: var(--bg-elevated, var(--panel));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 0.85rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 4.75rem;
+  padding: 0.9rem 1rem;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.choice-card:hover .choice-card-face {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.choice-card.is-selected .choice-card-face,
+.choice-card input:checked + .choice-card-face {
+  background: var(--accent-soft, color-mix(in srgb, var(--accent) 12%, var(--panel)));
+  border-color: var(--accent);
+  border-width: 2px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+  padding: calc(0.9rem - 1px) calc(1rem - 1px);
+}
+
+.choice-card input:focus-visible + .choice-card-face {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.choice-card-title {
+  color: var(--ink);
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.choice-card-hint {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.pay-method-row {
+  margin: 0 0 1.15rem;
+}
+
+.settlement-line {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin: 0 0 1.15rem;
+}
+
+.onchain-receipt {
+  margin: 1rem 0 0;
+}
+
+.onchain-receipt > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  list-style: none;
+}
+
+.onchain-receipt > summary::-webkit-details-marker {
+  display: none;
+}
+
+.onramp-frame-host {
+  margin-top: 1rem;
+}
+
+.onramp-skeleton {
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 0.85rem);
+  color: var(--muted);
+  display: flex;
+  justify-content: center;
+  min-height: 630px;
+}
+
+.onramp-iframe {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 0.85rem);
+  display: block;
+  min-height: 630px;
+  width: 100%;
+}
+
+html[data-theme="dark"] .onramp-iframe,
+html.theme-dark .onramp-iframe {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+@media (max-width: 640px) {
+  .choice-card-row {
+    grid-template-columns: 1fr;
+  }
+
+  .onramp-skeleton,
+  .onramp-iframe {
+    min-height: 560px;
+  }
+}
+

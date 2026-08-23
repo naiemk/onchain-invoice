@@ -6,10 +6,15 @@ import {
   looksLikeTronAddress,
   normalizeAddress,
 } from "./networks.js";
-import type { PayLinkFields } from "./types.js";
+import type { PayLinkFields, PaymentMode } from "./types.js";
 
 const DEFAULT_CHAIN = "11155111";
 const DEFAULT_TOKEN = "USDC";
+
+export function parsePaymentMode(value: string | null | undefined): PaymentMode {
+  if (value === "crypto" || value === "crypto_or_fiat" || value === "fiat") return value;
+  return "crypto";
+}
 
 export function decodePayLink(input: string | URLSearchParams | Record<string, unknown>): PayLinkFields {
   const params =
@@ -42,6 +47,7 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
     title: optionalParam(params, "title"),
     description: optionalParam(params, "description"),
     allowPartial: parseBoolean(params.get("allow_partial")),
+    paymentMode: parsePaymentMode(optionalParam(params, "payment_mode") ?? optionalParam(params, "paymentMode")),
   };
 }
 
@@ -57,6 +63,9 @@ export function encodePayLink(fields: PayLinkFields): string {
   if (fields.title) params.set("title", fields.title);
   if (fields.description) params.set("description", fields.description);
   params.set("allow_partial", fields.allowPartial ? "1" : "0");
+  if (fields.paymentMode && fields.paymentMode !== "crypto") {
+    params.set("payment_mode", fields.paymentMode);
+  }
   return params.toString();
 }
 
@@ -104,6 +113,7 @@ export function normalizePayLinkFields(input: Partial<PayLinkFields> & Record<st
     title: input.title,
     description: input.description,
     allow_partial: input.allowPartial ?? input.allow_partial,
+    payment_mode: input.paymentMode ?? input.payment_mode,
   });
 }
 

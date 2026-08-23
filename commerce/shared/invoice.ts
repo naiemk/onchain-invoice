@@ -5,6 +5,7 @@ import {
   normalizeMerchantAddress,
   type CommerceInvoiceParams,
 } from "onchain-invoice";
+import { parsePaymentMode, type PaymentMode } from "./onramper.js";
 import type { PayLinkFields } from "./types.js";
 
 const DEFAULT_CHAIN = "11155111";
@@ -31,6 +32,9 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
   });
 
   const seed = optionalParam(params, "invoice_seed");
+  const paymentMode = parsePaymentMode(
+    optionalParam(params, "payment_mode") ?? optionalParam(params, "paymentMode")
+  );
   return {
     price: requiredParam(params, "price"),
     to,
@@ -43,6 +47,7 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
     title: optionalParam(params, "title"),
     description: optionalParam(params, "description"),
     allowPartial: parseBoolean(params.get("allow_partial")),
+    paymentMode,
   };
 }
 
@@ -58,6 +63,9 @@ export function encodePayLink(fields: PayLinkFields): string {
   if (fields.title) params.set("title", fields.title);
   if (fields.description) params.set("description", fields.description);
   params.set("allow_partial", fields.allowPartial ? "1" : "0");
+  if (fields.paymentMode && fields.paymentMode !== "crypto") {
+    params.set("payment_mode", fields.paymentMode);
+  }
   return params.toString();
 }
 
@@ -95,6 +103,7 @@ export function invoiceIdFromPayLink(fields: PayLinkFields): string {
 }
 
 export function normalizePayLinkFields(input: Partial<PayLinkFields> & Record<string, unknown>): PayLinkFields {
+  const paymentMode = (input.paymentMode ?? input.payment_mode) as PaymentMode | undefined;
   return decodePayLink({
     price: input.price,
     to: Array.isArray(input.to) ? input.to.join(",") : input.to,
@@ -105,6 +114,7 @@ export function normalizePayLinkFields(input: Partial<PayLinkFields> & Record<st
     title: input.title,
     description: input.description,
     allow_partial: input.allowPartial ?? input.allow_partial,
+    payment_mode: paymentMode,
   });
 }
 
