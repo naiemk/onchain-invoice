@@ -77,8 +77,10 @@ export interface OnramperConfig {
    */
   demo: boolean;
   apiKey?: string;
-  /** Ed25519 private key PEM for Signature V2. Never expose publicly. */
+  /** Ed25519 PEM (V2) or dashboard HMAC hex (V1). Never expose publicly. */
   signingKey?: string;
+  /** HMAC secret for `X-Onramper-Webhook-Signature`. Optional. */
+  webhookSecret?: string;
   widgetOrigin: string;
   fiats: string[];
 }
@@ -120,6 +122,7 @@ interface YamlFile {
     enabled?: boolean;
     apiKey?: string;
     signingKey?: string;
+    webhookSecret?: string;
     widgetOrigin?: string;
     fiats?: string[];
   };
@@ -191,6 +194,7 @@ function loadOnramperConfig(
   const enabledRaw = (env.ONRAMPER_ENABLED ?? "").trim();
   const apiKey = blankToUndefined(expand(env.ONRAMPER_API_KEY ?? file?.apiKey ?? ""));
   const signingKey = blankToUndefined(expand(env.ONRAMPER_SIGNING_KEY ?? file?.signingKey ?? ""));
+  const webhookSecret = blankToUndefined(expand(env.ONRAMPER_WEBHOOK_SECRET ?? file?.webhookSecret ?? ""));
   const widgetOriginExplicit = blankToUndefined(
     expand(env.ONRAMPER_WIDGET_ORIGIN ?? file?.widgetOrigin ?? "")
   );
@@ -229,6 +233,7 @@ function loadOnramperConfig(
     demo,
     apiKey,
     signingKey,
+    webhookSecret,
     widgetOrigin: demo
       ? widgetOriginExplicit ?? "https://buy.onramper.dev"
       : widgetOrigin,

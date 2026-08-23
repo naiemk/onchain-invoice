@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { generateKeyPairSync } from "node:crypto";
+import { createHmac, generateKeyPairSync } from "node:crypto";
 import { getAddress, Wallet } from "ethers";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,6 +11,7 @@ import {
   isOnramperSandboxOrigin,
   ONRAMPER_SUPPORTED_PAIRS,
   resolveOnramperAsset,
+  signWidgetUrlV1,
 } from "../commerce/shared/onramper.js";
 
 const { privateKey } = generateKeyPairSync("ed25519");
@@ -397,5 +398,36 @@ describe("commerce Onramper / fiat invoices", function () {
     expect(url.searchParams.get("defaultAmount")).to.equal("10.5");
     expect(url.searchParams.get("sigV2Fields")).to.include("apiKey");
     expect(url.searchParams.has("onlyFiats")).to.equal(false);
+  });
+
+  it("signs widget URLs with HMAC V1 when the secret is not a PEM", function () {
+    const hmacSecret = "0".repeat(64);
+    const session = buildOnrampWidgetSession({
+      apiKey: API_KEY,
+      signingKeyPem: hmacSecret,
+      widgetOrigin: "https://buy.onramper.dev",
+      invoiceId: "inv_hmac",
+      invoiceAddress: "0x1111111111111111111111111111111111111111",
+      chainId: "8453",
+      token: "USDC",
+      priceUsd: "25",
+      fiat: "EUR",
+      lockFiat: true,
+    });
+    const url = new URL(session.widgetUrl);
+    expect(url.origin).to.equal("https://buy.onramper.dev");
+    expect(url.searchParams.has("sigV2")).to.equal(false);
+    const wallets = url.searchParams.get("wallets");
+    const networkWallets = url.searchParams.get("networkWallets");
+    expect(wallets).to.equal("usdc_base:0x1111111111111111111111111111111111111111");
+    const signContent = `networkWallets=${networkWallets}&wallets=${wallets}`;
+    const expected = createHmac("sha256", hmacSecret).update(signContent).digest("hex");
+    expect(url.searchParams.get("signature")).to.equal(expected);
+    const signed = signWidgetUrlV1({
+      baseUrl: "https://buy.onramper.dev",
+      hmacSecret,
+      fields: { apiKey: API_KEY, wallets: wallets!, networkWallets: networkWallets! },
+    });
+    expect(new URL(signed.url).searchParams.get("signature")).to.equal(expected);
   });
 });
