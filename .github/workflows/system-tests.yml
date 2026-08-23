@@ -28,6 +28,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -50,6 +56,7 @@ jobs:
           IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
           PULL: "1"
         run: |
+          npm ci
           chmod +x system-tests/scripts/*.sh system-tests/tests/*.sh deploy/gen-dev-certs.sh
           cp system-tests/.env.example system-tests/.env
           sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" system-tests/.env
