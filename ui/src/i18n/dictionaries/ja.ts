@@ -8,6 +8,7 @@ export const ja = {
 
   nav: {
     product: "プロダクト",
+    integrations: "連携",
     create: "請求書を作成",
     merchant: "販売者",
     docs: "ドキュメント",
@@ -36,6 +37,9 @@ export const ja = {
     payDescription: "Trustless Commerce の暗号資産請求書をオンチェーンで支払います。",
     merchantTitle: "販売者 · Trustless Commerce",
     merchantDescription: "Trustless Commerce の請求書を確認・管理します。",
+    integrationsTitle: "連携 · Trustless Commerce",
+    integrationsDescription:
+      "WooCommerce、Shopify、Kajabi、Teachable などで、ホスト型の暗号資産 checkout により USDC と USDT を受け付けます。",
     adminTitle: "管理 · Trustless Commerce",
     adminDescription: "プラットフォーム管理の概要。",
   },
@@ -130,6 +134,11 @@ export const ja = {
       "ボットやアシスタントは、公開済みの Cursor スキルから支払いリンクを作成し、ステータスを取得できます。販売者ダッシュボードは必要ありません。",
     agentsSkillLink: "AI エージェント用スキル（SKILL.md）",
     agentsDocs: "エージェント向けドキュメント",
+    integrationsEyebrow: "連携",
+    integrationsTitle: "すでにお使いのプラットフォームに対応",
+    integrationsLede:
+      "主要な EC サイトやクリエイター向けプラットフォーム向けのネイティブプラグインと checkout コネクター — インストールしてウォレットを貼り付けるだけで、checkout で暗号資産を受け付けられます。",
+    integrationsCta: "すべての連携を見る",
     whyEyebrow: "ショップが乗り換える理由",
     whyTitle: "コーヒーが冷めるより早く、入金まで完了。",
     whyLede:
@@ -416,5 +425,64 @@ export const ja = {
     colSwept: "スイープ済み",
     colFees: "手数料",
     noActivity: "着金の実績はまだありません。",
+  },
+
+  integrations: {
+    eyebrow: "プラットフォーム連携",
+    title: "ストアフロントで暗号資産を受け付ける",
+    lede:
+      "Trustless Commerce は、ホスト型 checkout とワンショットの請求書 API を、WooCommerce、Shopify、クリエイター向けプラットフォームなど向けの薄いアダプターで包みます。プラグインを入れるか、AI エージェントをプラットフォームスキルに向けるだけ — on-chain で入金されると注文が更新されます。",
+    contractEyebrow: "共通コントラクト",
+    contractTitle: "すべてのプラットフォームにひとつの API",
+    contractBody:
+      "すべての連携は POST /api/invoices、ホスト型 /pay checkout、任意の webhook を使用します。プラットフォームアダプターは注文同期とフルフィルメントのみを担当し、ウォレット UI や決済ロジックは扱いません。",
+    contractLink: "連携コントラクト（ドキュメント）",
+    sdkLink: "GitHub の SDK とプラグイン",
+    wave1: "EC ストア",
+    wave2: "コースとメンバーシップ",
+    wave3: "その他のプラットフォーム",
+    statusAvailable: "利用可能",
+    statusPreview: "近日公開",
+    docs: "ドキュメント",
+    aiSkill: "AI スキル",
+    ctaTitle: "どのプラットフォームからでも始められる",
+    ctaLede: "今すぐテスト請求書を作成するか、ストアフロント向けの連携ドキュメントと AI スキルを開いてください。",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress 決済ゲートウェイ — checkout で暗号資産払い、ホスト型 /pay へリダイレクト、webhook で注文を自動的に支払い済みにマーク。",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "オフサイト checkout アプリ — 購入者を暗号資産 checkout へ誘導し、支払い状態を Shopify 注文に同期。",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "コースとメンバーシップ向けの外部「暗号資産で購入」ボタン — 支払い後に自動でアクセスを付与。",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "コース販売者向けの外部 checkout — 請求書が支払い済みになると受講生を自動登録。",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "ミッドマーケット向け EC アプリ。checkout SDK と webhook による注文同期（ロードマップ）。",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "ホスト型 pay リンクによる SaaS とデジタルダウンロード checkout（ロードマップ）。",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "インディークリエイター向け checkout。軽量 embed とフルフィルメント hooks（ロードマップ）。",
+      },
+    },
   },
 } satisfies Messages;

@@ -5,6 +5,7 @@ export const th = {
 
   nav: {
     product: "ผลิตภัณฑ์",
+    integrations: "การเชื่อมต่อ",
     create: "สร้างใบแจ้งหนี้",
     merchant: "ร้านค้า",
     docs: "เอกสาร",
@@ -33,6 +34,9 @@ export const th = {
     payDescription: "ชำระใบแจ้งหนี้คริปโตของ Trustless Commerce บนเชน",
     merchantTitle: "ร้านค้า · Trustless Commerce",
     merchantDescription: "ดูและจัดการใบแจ้งหนี้ Trustless Commerce ของคุณ",
+    integrationsTitle: "การเชื่อมต่อ · Trustless Commerce",
+    integrationsDescription:
+      "รับ USDC และ USDT บน WooCommerce, Shopify, Kajabi, Teachable และอื่นๆ ด้วย checkout คริปโตที่โฮสต์ไว้",
     adminTitle: "ผู้ดูแลระบบ · Trustless Commerce",
     adminDescription: "ภาพรวมสำหรับผู้ดูแลแพลตฟอร์ม",
   },
@@ -127,6 +131,11 @@ export const th = {
       "บอตและผู้ช่วยสร้างลิงก์ชำระเงินและตรวจสถานะได้จากสกิล Cursor ที่เผยแพร่ไว้ ไม่ต้องมีแดชบอร์ดร้านค้า",
     agentsSkillLink: "สกิลเอเจนต์ AI (SKILL.md)",
     agentsDocs: "เอกสารสำหรับเอเจนต์",
+    integrationsEyebrow: "การเชื่อมต่อ",
+    integrationsTitle: "ใช้งานกับแพลตฟอร์มที่คุณใช้อยู่แล้ว",
+    integrationsLede:
+      "ปลั๊กอินแท้และตัวเชื่อม checkout สำหรับแพลตฟอร์มอีคอมเมิร์ซและครีเอเตอร์ชั้นนำ — ติดตั้ง วางกระเป๋าเงิน แล้วรับคริปโตตอน checkout",
+    integrationsCta: "ดูการเชื่อมต่อทั้งหมด",
     whyEyebrow: "ทำไมร้านค้าจึงย้ายมา",
     whyTitle: "จากไอเดียถึงใบแจ้งหนี้ที่ชำระแล้ว ก่อนกาแฟจะเย็น",
     whyLede:
@@ -413,5 +422,64 @@ export const th = {
     colSwept: "กวาดแล้ว",
     colFees: "ค่าธรรมเนียม",
     noActivity: "ยังไม่มีการรับเงิน",
+  },
+
+  integrations: {
+    eyebrow: "การเชื่อมต่อแพลตฟอร์ม",
+    title: "รับคริปโตบนหน้าร้านของคุณ",
+    lede:
+      "Trustless Commerce ห่อ checkout ที่โฮสต์ไว้และ API ใบแจ้งหนี้แบบครั้งเดียวด้วยอะแดปเตอร์บางๆ สำหรับ WooCommerce, Shopify, แพลตฟอร์มครีเอเตอร์ และอื่นๆ ติดตั้งปลั๊กอินหรือชี้เอเจนต์ AI ไปที่สกิลแพลตฟอร์ม — ออเดอร์อัปเดตเมื่อการชำระเงินเข้า on-chain",
+    contractEyebrow: "สัญญาร่วม",
+    contractTitle: "API เดียวสำหรับทุกแพลตฟอร์ม",
+    contractBody:
+      "การเชื่อมต่อทั้งหมดใช้ POST /api/invoices, checkout /pay ที่โฮสต์ไว้ และ webhook แบบเลือกได้ อะแดปเตอร์แพลตฟอร์มจัดการเฉพาะการซิงก์ออเดอร์และ fulfillment — ไม่ใช่ UI กระเป๋าเงินหรือตรรกะการชำระเงิน",
+    contractLink: "สัญญาการเชื่อมต่อ (docs)",
+    sdkLink: "SDK และปลั๊กอินบน GitHub",
+    wave1: "ร้านอีคอมเมิร์ซ",
+    wave2: "คอร์สและสมาชิก",
+    wave3: "แพลตฟอร์มอื่นๆ",
+    statusAvailable: "พร้อมใช้งาน",
+    statusPreview: "เร็วๆ นี้",
+    docs: "เอกสาร",
+    aiSkill: "สกิล AI",
+    ctaTitle: "เริ่มจากแพลตฟอร์มใดก็ได้",
+    ctaLede: "สร้างใบแจ้งหนี้ทดสอบตอนนี้ หรือเปิดเอกสารการเชื่อมต่อและสกิล AI สำหรับหน้าร้านของคุณ",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "เกตเวย์ชำระเงิน WordPress — ชำระด้วยคริปโตตอน checkout เปลี่ยนเส้นทางไป /pay ที่โฮสต์ไว้ ทำเครื่องหมายออเดอร์ว่าชำระแล้วอัตโนมัติผ่าน webhook",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "แอป checkout นอกไซต์ — เปลี่ยนเส้นทางผู้ซื้อไป checkout คริปโตและซิงก์สถานะชำระเงินกลับไปยังออเดอร์ Shopify",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "ปุ่มซื้อด้วยคริปโตภายนอกสำหรับคอร์สและสมาชิก — ให้สิทธิ์เข้าถึงอัตโนมัติหลังชำระเงิน",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "checkout ภายนอกสำหรับผู้ขายคอร์ส — ลงทะเบียนนักเรียนอัตโนมัติเมื่อใบแจ้งหนี้ชำระแล้ว",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "แอปอีคอมเมิร์ซตลาดกลางพร้อม SDK checkout และซิงก์ออเดอร์ผ่าน webhook (แผนงาน)",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "checkout SaaS และดาวน์โหลดดิจิทัลผ่านลิงก์ชำระเงินที่โฮสต์ไว้ (แผนงาน)",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "checkout สำหรับครีเอเตอร์อินดี้พร้อม embed เบาๆ และ fulfillment hooks (แผนงาน)",
+      },
+    },
   },
 } satisfies Messages;

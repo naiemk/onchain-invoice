@@ -5,6 +5,7 @@ export const pl = {
 
   nav: {
     product: "Produkt",
+    integrations: "Integracje",
     create: "Utwórz fakturę",
     merchant: "Sprzedawca",
     docs: "Dokumentacja",
@@ -34,6 +35,9 @@ export const pl = {
     payDescription: "Zapłać fakturę kryptowalutową Trustless Commerce on-chain.",
     merchantTitle: "Sprzedawca · Trustless Commerce",
     merchantDescription: "Przeglądaj faktury Trustless Commerce i zarządzaj nimi.",
+    integrationsTitle: "Integracje · Trustless Commerce",
+    integrationsDescription:
+      "Przyjmuj USDC i USDT w WooCommerce, Shopify, Kajabi, Teachable i innych dzięki hostowanemu checkoutowi krypto.",
     adminTitle: "Administracja · Trustless Commerce",
     adminDescription: "Przegląd platformy dla administratora.",
   },
@@ -128,6 +132,11 @@ export const pl = {
       "Boty i asystenci tworzą linki do płatności i sprawdzają status dzięki opublikowanemu skillowi Cursor — panel sprzedawcy nie jest potrzebny.",
     agentsSkillLink: "Skill dla agentów AI (SKILL.md)",
     agentsDocs: "Dokumentacja dla agentów",
+    integrationsEyebrow: "Integracje",
+    integrationsTitle: "Działa z platformami, których już używasz",
+    integrationsLede:
+      "Natywne wtyczki i łączniki checkout dla głównych platform e-commerce i twórców — zainstaluj, wklej portfel i przyjmuj krypto przy płatności.",
+    integrationsCta: "Zobacz wszystkie integracje",
     whyEyebrow: "Dlaczego sklepy się przenoszą",
     whyTitle: "Od pomysłu do zapłaconej faktury, zanim wystygnie kawa.",
     whyLede:
@@ -420,5 +429,64 @@ export const pl = {
     colSwept: "Wypłacono",
     colFees: "Opłaty",
     noActivity: "Brak rozliczeń.",
+  },
+
+  integrations: {
+    eyebrow: "Integracje platform",
+    title: "Przyjmuj krypto w swoim sklepie",
+    lede:
+      "Trustless Commerce łączy hostowany checkout i jednorazowe API faktur z lekkimi adapterami dla WooCommerce, Shopify, platform twórców i innych. Zainstaluj wtyczkę lub skieruj agenta AI na skill platformy — zamówienia aktualizują się, gdy płatność trafi on-chain.",
+    contractEyebrow: "Wspólny kontrakt",
+    contractTitle: "Jedno API dla każdej platformy",
+    contractBody:
+      "Wszystkie integracje korzystają z POST /api/invoices, hostowanego checkoutu /pay i opcjonalnych webhooków. Adaptery platform obsługują tylko synchronizację zamówień i fulfillment — nie UI portfela ani logikę rozliczeń.",
+    contractLink: "Kontrakt integracji (docs)",
+    sdkLink: "SDK i wtyczki na GitHub",
+    wave1: "Sklepy e-commerce",
+    wave2: "Kursy i członkostwa",
+    wave3: "Więcej platform",
+    statusAvailable: "Dostępne",
+    statusPreview: "Wkrótce",
+    docs: "Dokumentacja",
+    aiSkill: "Skill AI",
+    ctaTitle: "Zacznij od dowolnej platformy",
+    ctaLede: "Utwórz fakturę testową teraz albo otwórz dokumentację integracji i skill AI dla swojego sklepu.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "Bramka płatności WordPress — Płać krypto przy checkout, przekieruj do hostowanego /pay, automatycznie oznaczaj zamówienia jako opłacone przez webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Aplikacja checkout poza sklepem — przekieruj kupujących do checkoutu krypto i synchronizuj status opłacenia z zamówieniami Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Zewnętrzny przycisk Kup za krypto dla kursów i członkostw — automatyczny dostęp po płatności.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Zewnętrzny checkout dla sprzedawców kursów — automatyczna rejestracja studentów, gdy faktura zostanie opłacona.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "Aplikacja e-commerce dla rynku średniego z SDK checkout i synchronizacją zamówień przez webhook (mapa drogowa).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Checkout SaaS i pobierania cyfrowego przez hostowane linki płatności (mapa drogowa).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout dla niezależnych twórców z lekkim embedem i hookami fulfillment (mapa drogowa).",
+      },
+    },
   },
 } satisfies Messages;

@@ -1,4 +1,5 @@
 import { encodePayLink } from "../shared/invoice.js";
+import { integrationLogoStrip } from "./integrations.js";
 import { howCreateArt, howPayArt, howSettleArt } from "../shared/how-graphics.js";
 import { deploymentMode, networkKind, networksForDeployment } from "../shared/networks.js";
 import { SITE } from "../shared/site.js";
@@ -97,6 +98,18 @@ export function renderHome(root: HTMLElement): void {
         <a href="${SITE.agentsDocsUrl}" target="_blank" rel="noopener noreferrer">${t("home.agentsDocs")}</a>
       </p>
       <p class="field-hint mono">${SITE.agentSkillPath}</p>
+    </section>
+
+    <section class="section" id="integrations">
+      <p class="eyebrow">${t("home.integrationsEyebrow")}</p>
+      <h2>${t("home.integrationsTitle")}</h2>
+      <p class="section-lede">${t("home.integrationsLede")}</p>
+      <div class="integration-logo-strip" role="list">
+        ${integrationLogoStrip()}
+      </div>
+      <p class="integration-home-cta">
+        <a class="tc-btn secondary" href="/integrations" data-route>${t("home.integrationsCta")}</a>
+      </p>
     </section>
 
     <section class="section">

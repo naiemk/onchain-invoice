@@ -5,6 +5,7 @@ export const ur = {
 
   nav: {
     product: "پروڈکٹ",
+    integrations: "انٹیگریشنز",
     create: "انوائس بنائیں",
     merchant: "مرچنٹ",
     docs: "دستاویزات",
@@ -33,6 +34,9 @@ export const ur = {
     payDescription: "کوئی بھی Trustless Commerce کرپٹو انوائس آن چین ادا کریں۔",
     merchantTitle: "مرچنٹ · Trustless Commerce",
     merchantDescription: "اپنی Trustless Commerce انوائسز دیکھیں اور ان کا انتظام کریں۔",
+    integrationsTitle: "انٹیگریشنز · Trustless Commerce",
+    integrationsDescription:
+      "ہوسٹڈ کریپٹو checkout کے ساتھ WooCommerce، Shopify، Kajabi، Teachable اور مزید پر USDC اور USDT قبول کریں۔",
     adminTitle: "ایڈمن · Trustless Commerce",
     adminDescription: "پلیٹ فارم ایڈمن کا مجموعی جائزہ۔",
   },
@@ -127,6 +131,11 @@ export const ur = {
       "بوٹس اور اسسٹنٹس شائع شدہ Cursor مہارت کے ذریعے ادائیگی کے لنک بنا سکتے ہیں اور اسٹیٹس دیکھ سکتے ہیں — کسی مرچنٹ ڈیش بورڈ کی ضرورت نہیں۔",
     agentsSkillLink: "AI ایجنٹ مہارت (SKILL.md)",
     agentsDocs: "ایجنٹ دستاویزات",
+    integrationsEyebrow: "انٹیگریشنز",
+    integrationsTitle: "ان پلیٹ فارمز کے ساتھ کام کرتا ہے جو آپ پہلے سے استعمال کرتے ہیں",
+    integrationsLede:
+      "بڑے ای کامرس اور کریئیٹر پلیٹ فارمز کے لیے نیٹیو پلگ اِنز اور checkout کنیکٹرز — انسٹال کریں، والیٹ پیسٹ کریں، اور checkout پر کریپٹو قبول کریں۔",
+    integrationsCta: "تمام انٹیگریشنز دیکھیں",
     whyEyebrow: "دکانیں کیوں منتقل ہوتی ہیں",
     whyTitle: "خیال سے ادا شدہ انوائس تک، آپ کی کافی ٹھنڈی ہونے سے پہلے۔",
     whyLede:
@@ -412,5 +421,64 @@ export const ur = {
     colSwept: "منتقل شدہ",
     colFees: "فیس",
     noActivity: "ابھی تک کوئی تصفیہ سرگرمی نہیں۔",
+  },
+
+  integrations: {
+    eyebrow: "پلیٹ فارم انٹیگریشنز",
+    title: "اپنے اسٹور فرنٹ پر کریپٹو قبول کریں",
+    lede:
+      "Trustless Commerce ہوسٹڈ checkout اور one-shot انوائس API کو WooCommerce، Shopify، کریئیٹر پلیٹ فارمز اور مزید کے لیے ہلکے ایڈاپٹرز کے ساتھ لپیٹتا ہے۔ پلگ اِن انسٹال کریں یا AI ایجنٹ کو پلیٹ فارم اسکل پر رکھیں — on-chain ادائیگی آتے ہی آرڈرز اپ ڈیٹ ہو جاتے ہیں۔",
+    contractEyebrow: "مشترکہ کنٹریکٹ",
+    contractTitle: "ہر پلیٹ فارم کے لیے ایک API",
+    contractBody:
+      "تمام انٹیگریشنز POST /api/invoices، ہوسٹڈ /pay checkout اور اختیاری webhooks استعمال کرتے ہیں۔ پلیٹ فارم ایڈاپٹرز صرف آرڈر سنک اور fulfillment سنبھالتے ہیں — والیٹ UI یا سیٹلمنٹ لاجک نہیں۔",
+    contractLink: "انٹیگریشن کنٹریکٹ (docs)",
+    sdkLink: "GitHub پر SDK اور پلگ اِنز",
+    wave1: "ای کامرس اسٹورز",
+    wave2: "کورسز اور ممبرشپس",
+    wave3: "مزید پلیٹ فارمز",
+    statusAvailable: "دستیاب",
+    statusPreview: "جلد آرہا ہے",
+    docs: "دستاویزات",
+    aiSkill: "AI مہارت",
+    ctaTitle: "کسی بھی پلیٹ فارم سے شروع کریں",
+    ctaLede: "ابھی ایک ٹیسٹ انوائس بنائیں، یا اپنے اسٹور فرنٹ کے لیے انٹیگریشن docs اور AI مہارت کھولیں۔",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress پیمنٹ گیٹ وے — checkout پر کریپٹو سے ادائیگی، ہوسٹڈ /pay پر ری ڈائریکٹ، webhook کے ذریعے آرڈرز خودکار طور پر paid نشان زد کریں۔",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "آف سائٹ checkout ایپ — خریداروں کو کریپٹو checkout پر بھیجیں اور paid حالت Shopify آرڈرز میں سنک کریں۔",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "کورسز اور ممبرشپس کے لیے بیرونی Buy with crypto بٹن — ادائیگی کے بعد خودکار رسائی دیں۔",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "کورس فروخت کنندگان کے لیے بیرونی checkout — انوائس paid ہونے پر طلباء خودکار داخل کریں۔",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "مڈ مارکیٹ ای کامرس ایپ، checkout SDK اور webhook پر مبنی آرڈر سنک (roadmap)۔",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "ہوسٹڈ pay لنکس کے ذریعے SaaS اور ڈیجیٹل ڈاؤن لوڈ checkout (roadmap)۔",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "انڈی کریئیٹر checkout، ہلکا embed اور fulfillment hooks (roadmap)۔",
+      },
+    },
   },
 } satisfies Messages;

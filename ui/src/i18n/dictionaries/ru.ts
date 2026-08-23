@@ -8,6 +8,7 @@ export const ru = {
 
   nav: {
     product: "Продукт",
+    integrations: "Интеграции",
     create: "Создать счёт",
     merchant: "Продавцу",
     docs: "Документация",
@@ -37,6 +38,9 @@ export const ru = {
     payDescription: "Оплатите криптосчёт Trustless Commerce напрямую в блокчейне.",
     merchantTitle: "Продавцу · Trustless Commerce",
     merchantDescription: "Просматривайте счета Trustless Commerce и управляйте ими.",
+    integrationsTitle: "Интеграции · Trustless Commerce",
+    integrationsDescription:
+      "Принимайте USDC и USDT в WooCommerce, Shopify, Kajabi, Teachable и других платформах через хостинговый крипто-checkout.",
     adminTitle: "Администрирование · Trustless Commerce",
     adminDescription: "Сводка по платформе для администратора.",
   },
@@ -132,6 +136,11 @@ export const ru = {
       "Боты и ассистенты создают ссылки на оплату и опрашивают статус через опубликованный навык Cursor — панель продавца не нужна.",
     agentsSkillLink: "Навык для ИИ-агента (SKILL.md)",
     agentsDocs: "Документация для агентов",
+    integrationsEyebrow: "Интеграции",
+    integrationsTitle: "Работает с платформами, которые вы уже используете",
+    integrationsLede:
+      "Нативные плагины и коннекторы checkout для крупных e-commerce и creator-платформ — установите, вставьте кошелёк и принимайте крипто при оплате.",
+    integrationsCta: "Все интеграции",
     whyEyebrow: "Почему магазины переходят",
     whyTitle: "От идеи до оплаченного счёта — пока не остыл кофе.",
     whyLede:
@@ -429,5 +438,64 @@ export const ru = {
     colSwept: "Переведено",
     colFees: "Комиссии",
     noActivity: "Выплат пока не было.",
+  },
+
+  integrations: {
+    eyebrow: "Интеграции с платформами",
+    title: "Принимайте крипто в своём магазине",
+    lede:
+      "Trustless Commerce объединяет хостинговый checkout и одношаговый invoice API с лёгкими адаптерами для WooCommerce, Shopify, creator-платформ и других. Установите плагин или направьте ИИ-агента на platform skill — заказы обновляются, когда платёж поступает on-chain.",
+    contractEyebrow: "Общий контракт",
+    contractTitle: "Один API для всех платформ",
+    contractBody:
+      "Все интеграции используют POST /api/invoices, хостинговый /pay checkout и опциональные webhooks. Адаптеры платформ отвечают только за синхронизацию заказов и fulfillment — не за UI кошелька и логику расчётов.",
+    contractLink: "Контракт интеграции (docs)",
+    sdkLink: "SDK и плагины на GitHub",
+    wave1: "Интернет-магазины",
+    wave2: "Курсы и подписки",
+    wave3: "Другие платформы",
+    statusAvailable: "Доступно",
+    statusPreview: "Скоро",
+    docs: "Документация",
+    aiSkill: "ИИ-навык",
+    ctaTitle: "Начните с любой платформы",
+    ctaLede: "Создайте тестовый счёт сейчас или откройте документацию по интеграции и ИИ-навык для вашего магазина.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "Платёжный шлюз WordPress — оплата крипто на checkout, редирект на хостинговый /pay, автоматическая отметка заказов как оплаченных через webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Внешнее checkout-приложение — перенаправляйте покупателей на крипто-checkout и синхронизируйте статус оплаты с заказами Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Внешняя кнопка «Купить за крипто» для курсов и подписок — автоматический доступ после оплаты.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Внешний checkout для продавцов курсов — автоматическая запись студентов, когда счёт оплачен.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "E-commerce-приложение для среднего сегмента с checkout SDK и синхронизацией заказов через webhook (в планах).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Checkout для SaaS и цифровых загрузок через хостинговые pay-ссылки (в планах).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout для независимых авторов с лёгким embed и fulfillment hooks (в планах).",
+      },
+    },
   },
 } satisfies Messages;

@@ -8,6 +8,7 @@ export const zhHans = {
 
   nav: {
     product: "产品",
+    integrations: "集成",
     create: "创建发票",
     merchant: "商户",
     docs: "文档",
@@ -36,6 +37,9 @@ export const zhHans = {
     payDescription: "在链上支付 Trustless Commerce 加密货币发票。",
     merchantTitle: "商户 · Trustless Commerce",
     merchantDescription: "查看并管理你的 Trustless Commerce 发票。",
+    integrationsTitle: "集成 · Trustless Commerce",
+    integrationsDescription:
+      "通过托管加密结账在 WooCommerce、Shopify、Kajabi、Teachable 等平台上接受 USDC 和 USDT。",
     adminTitle: "管理后台 · Trustless Commerce",
     adminDescription: "平台管理总览。",
   },
@@ -130,6 +134,11 @@ export const zhHans = {
       "机器人和助手可以直接用已发布的 Cursor 技能生成支付链接并轮询状态——完全不需要商户后台。",
     agentsSkillLink: "AI 智能体技能（SKILL.md）",
     agentsDocs: "智能体文档",
+    integrationsEyebrow: "集成",
+    integrationsTitle: "支持您已在使用的平台",
+    integrationsLede:
+      "面向主流电商和创作者平台的原生插件与结账连接器——安装后粘贴钱包地址，即可在结账时接受加密货币。",
+    integrationsCta: "查看所有集成",
     whyEyebrow: "商家为何转过来",
     whyTitle: "咖啡还没凉，发票已经收到款。",
     whyLede:
@@ -416,5 +425,64 @@ export const zhHans = {
     colSwept: "已归集",
     colFees: "手续费",
     noActivity: "暂无结算活动。",
+  },
+
+  integrations: {
+    eyebrow: "平台集成",
+    title: "在您的店铺接受加密货币",
+    lede:
+      "Trustless Commerce 将托管结账与一次性发票 API 结合，通过轻量适配器对接 WooCommerce、Shopify、创作者平台等。安装插件或将 AI 智能体指向平台技能——链上到账后订单自动更新。",
+    contractEyebrow: "共享合约",
+    contractTitle: "一个 API，覆盖所有平台",
+    contractBody:
+      "所有集成均使用 POST /api/invoices、托管 /pay 结账和可选 webhook。平台适配器仅处理订单同步与履约——不涉及钱包界面或结算逻辑。",
+    contractLink: "集成合约（文档）",
+    sdkLink: "GitHub 上的 SDK 与插件",
+    wave1: "电商店铺",
+    wave2: "课程与会员",
+    wave3: "更多平台",
+    statusAvailable: "已上线",
+    statusPreview: "即将推出",
+    docs: "文档",
+    aiSkill: "AI 技能",
+    ctaTitle: "从任意平台开始",
+    ctaLede: "立即创建测试发票，或打开集成文档和 AI 技能，为您的店铺接入支付。",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress 支付网关——结账时使用加密货币支付，跳转至托管 /pay，通过 webhook 自动标记订单已付款。",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "站外结账应用——将买家引导至加密结账，并将付款状态同步回 Shopify 订单。",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "课程与会员的外部「用加密货币购买」按钮——付款后自动开通访问权限。",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "课程卖家的外部结账——发票状态变为已付款时自动为学员注册。",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "面向中型市场的电商应用，含结账 SDK 与 webhook 订单同步（规划中）。",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "通过托管支付链接实现 SaaS 与数字下载结账（规划中）。",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "独立创作者结账，轻量嵌入与履约钩子（规划中）。",
+      },
+    },
   },
 } satisfies Messages;

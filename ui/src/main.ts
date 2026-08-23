@@ -1,4 +1,5 @@
 import "./styles.css";
+import { renderIntegrations } from "./pages/integrations.js";
 import { renderAdmin } from "./pages/admin.js";
 import { renderCreate } from "./pages/create.js";
 import { renderHome } from "./pages/home.js";
@@ -14,6 +15,7 @@ export type PageRenderer = (root: HTMLElement) => void | Promise<void>;
 
 const routes: Record<string, PageRenderer> = {
   "/": renderHome,
+  "/integrations": renderIntegrations,
   "/create": renderCreate,
   "/pay": renderPay,
   "/merchant": renderMerchant,
@@ -69,6 +71,8 @@ function pageMeta(path: string): { title: string; description: string } {
       return { title: t("meta.payTitle"), description: t("meta.payDescription") };
     case "/merchant":
       return { title: t("meta.merchantTitle"), description: t("meta.merchantDescription") };
+    case "/integrations":
+      return { title: t("meta.integrationsTitle"), description: t("meta.integrationsDescription") };
     case "/admin":
       return { title: t("meta.adminTitle"), description: t("meta.adminDescription") };
     default:
@@ -113,6 +117,7 @@ function shell(pathname: string): string {
       </a>
       <nav>
         ${link("/", t("nav.product"))}
+        ${link("/integrations", t("nav.integrations"))}
         ${link("/create", t("nav.create"))}
         ${link("/merchant", t("nav.merchant"))}
         <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">${t("nav.docs")}</a>

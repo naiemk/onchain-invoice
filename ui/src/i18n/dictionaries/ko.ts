@@ -8,6 +8,7 @@ export const ko = {
 
   nav: {
     product: "제품",
+    integrations: "연동",
     create: "인보이스 만들기",
     merchant: "판매자",
     docs: "문서",
@@ -36,6 +37,9 @@ export const ko = {
     payDescription: "Trustless Commerce 암호화폐 인보이스를 온체인으로 결제합니다.",
     merchantTitle: "판매자 · Trustless Commerce",
     merchantDescription: "Trustless Commerce 인보이스를 확인하고 관리합니다.",
+    integrationsTitle: "연동 · Trustless Commerce",
+    integrationsDescription:
+      "WooCommerce, Shopify, Kajabi, Teachable 등에서 호스팅된 암호화폐 checkout으로 USDC와 USDT를 받으세요.",
     adminTitle: "관리자 · Trustless Commerce",
     adminDescription: "플랫폼 관리자 개요.",
   },
@@ -130,6 +134,11 @@ export const ko = {
       "봇과 어시스턴트는 공개된 Cursor 스킬로 결제 링크를 만들고 상태를 조회할 수 있습니다. 판매자 대시보드는 필요하지 않습니다.",
     agentsSkillLink: "AI 에이전트 스킬(SKILL.md)",
     agentsDocs: "에이전트 문서",
+    integrationsEyebrow: "연동",
+    integrationsTitle: "이미 쓰는 플랫폼과 함께 작동합니다",
+    integrationsLede:
+      "주요 이커머스·크리에이터 플랫폼용 네이티브 플러그인과 checkout 커넥터 — 설치하고 지갑을 붙여넣으면 checkout에서 암호화폐를 받을 수 있습니다.",
+    integrationsCta: "모든 연동 보기",
     whyEyebrow: "상점들이 옮겨오는 이유",
     whyTitle: "커피가 식기 전에 결제까지 끝납니다.",
     whyLede:
@@ -416,5 +425,64 @@ export const ko = {
     colSwept: "스윕됨",
     colFees: "수수료",
     noActivity: "아직 정산 내역이 없습니다.",
+  },
+
+  integrations: {
+    eyebrow: "플랫폼 연동",
+    title: "스토어프론트에서 암호화폐 받기",
+    lede:
+      "Trustless Commerce는 호스팅 checkout과 원샷 인보이스 API를 WooCommerce, Shopify, 크리에이터 플랫폼 등을 위한 가벼운 어댑터로 감쌉니다. 플러그인을 설치하거나 AI 에이전트를 플랫폼 스킬에 연결하세요 — on-chain 결제가 들어오면 주문이 업데이트됩니다.",
+    contractEyebrow: "공유 계약",
+    contractTitle: "모든 플랫폼을 위한 하나의 API",
+    contractBody:
+      "모든 연동은 POST /api/invoices, 호스팅 /pay checkout, 선택적 webhook을 사용합니다. 플랫폼 어댑터는 주문 동기화와 이행만 담당하며 지갑 UI나 정산 로직은 다루지 않습니다.",
+    contractLink: "연동 계약 (docs)",
+    sdkLink: "GitHub의 SDK 및 플러그인",
+    wave1: "이커머스 스토어",
+    wave2: "강의 및 멤버십",
+    wave3: "더 많은 플랫폼",
+    statusAvailable: "이용 가능",
+    statusPreview: "출시 예정",
+    docs: "문서",
+    aiSkill: "AI 스킬",
+    ctaTitle: "어떤 플랫폼이든 시작하세요",
+    ctaLede: "지금 테스트 인보이스를 만들거나, 스토어프론트용 연동 문서와 AI 스킬을 열어보세요.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress 결제 게이트웨이 — checkout에서 암호화폐로 결제, 호스팅 /pay로 리디렉션, webhook으로 주문을 자동으로 결제 완료 처리.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "외부 checkout 앱 — 구매자를 암호화폐 checkout으로 보내고 결제 상태를 Shopify 주문에 동기화.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "강의·멤버십용 외부 암호화폐 구매 버튼 — 결제 후 자동으로 액세스 부여.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "강의 판매자용 외부 checkout — 인보이스가 결제되면 수강생을 자동 등록.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "미드마켓 이커머스 앱, checkout SDK 및 webhook 주문 동기화 (로드맵).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "호스팅 pay 링크를 통한 SaaS·디지털 다운로드 checkout (로드맵).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "인디 크리에이터 checkout, 경량 embed 및 fulfillment hooks (로드맵).",
+      },
+    },
   },
 } satisfies Messages;

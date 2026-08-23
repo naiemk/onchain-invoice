@@ -5,6 +5,7 @@ export const hi = {
 
   nav: {
     product: "उत्पाद",
+    integrations: "इंटीग्रेशन",
     create: "इनवॉइस बनाएँ",
     merchant: "मर्चेंट",
     docs: "दस्तावेज़",
@@ -33,6 +34,9 @@ export const hi = {
     payDescription: "Trustless Commerce क्रिप्टो इनवॉइस का ऑन-चेन भुगतान करें।",
     merchantTitle: "मर्चेंट · Trustless Commerce",
     merchantDescription: "अपने Trustless Commerce इनवॉइस देखें और प्रबंधित करें।",
+    integrationsTitle: "इंटीग्रेशन · Trustless Commerce",
+    integrationsDescription:
+      "WooCommerce, Shopify, Kajabi, Teachable आदि पर होस्टेड क्रिप्टो checkout के साथ USDC और USDT स्वीकार करें।",
     adminTitle: "एडमिन · Trustless Commerce",
     adminDescription: "प्लैटफ़ॉर्म एडमिन ओवरव्यू।",
   },
@@ -127,6 +131,11 @@ export const hi = {
       "बॉट और असिस्टेंट पब्लिश की गई Cursor स्किल से पेमेंट लिंक बना सकते हैं और स्टेटस पोल कर सकते हैं — किसी मर्चेंट डैशबोर्ड की ज़रूरत नहीं।",
     agentsSkillLink: "AI एजेंट स्किल (SKILL.md)",
     agentsDocs: "एजेंट दस्तावेज़",
+    integrationsEyebrow: "इंटीग्रेशन",
+    integrationsTitle: "उन प्लेटफ़ॉर्म के साथ काम करता है जो आप पहले से इस्तेमाल करते हैं",
+    integrationsLede:
+      "प्रमुख ई-कॉमर्स और क्रिएटर प्लेटफ़ॉर्म के लिए नेटिव प्लगइन और checkout कनेक्टर — इंस्टॉल करें, वॉलेट पेस्ट करें, और checkout पर क्रिप्टो स्वीकार करें।",
+    integrationsCta: "सभी इंटीग्रेशन देखें",
     whyEyebrow: "दुकानें क्यों बदलती हैं",
     whyTitle: "आपकी कॉफ़ी ठंडी होने से पहले आइडिया से भुगतान तक।",
     whyLede:
@@ -413,5 +422,64 @@ export const hi = {
     colSwept: "स्वीप",
     colFees: "शुल्क",
     noActivity: "अभी कोई सेटलमेंट गतिविधि नहीं।",
+  },
+
+  integrations: {
+    eyebrow: "प्लेटफ़ॉर्म इंटीग्रेशन",
+    title: "अपने स्टोरफ़्रंट पर क्रिप्टो स्वीकार करें",
+    lede:
+      "Trustless Commerce होस्टेड checkout और one-shot इनवॉइस API को WooCommerce, Shopify, क्रिएटर प्लेटफ़ॉर्म आदि के लिए हल्के एडाप्टर के साथ जोड़ता है। प्लगइन इंस्टॉल करें या AI एजेंट को प्लेटफ़ॉर्म स्किल पर इंगित करें — on-chain भुगतान आते ही ऑर्डर अपडेट हो जाते हैं।",
+    contractEyebrow: "साझा कॉन्ट्रैक्ट",
+    contractTitle: "हर प्लेटफ़ॉर्म के लिए एक API",
+    contractBody:
+      "सभी इंटीग्रेशन POST /api/invoices, होस्टेड /pay checkout और वैकल्पिक webhooks का उपयोग करते हैं। प्लेटफ़ॉर्म एडाप्टर केवल ऑर्डर सिंक और फ़ुलफ़िलमेंट संभालते हैं — वॉलेट UI या सेटलमेंट लॉजिक नहीं।",
+    contractLink: "इंटीग्रेशन कॉन्ट्रैक्ट (docs)",
+    sdkLink: "GitHub पर SDK और प्लगइन",
+    wave1: "ई-कॉमर्स स्टोर",
+    wave2: "कोर्स और मेंबरशिप",
+    wave3: "और प्लेटफ़ॉर्म",
+    statusAvailable: "उपलब्ध",
+    statusPreview: "जल्द आ रहा है",
+    docs: "दस्तावेज़",
+    aiSkill: "AI स्किल",
+    ctaTitle: "किसी भी प्लेटफ़ॉर्म से शुरू करें",
+    ctaLede: "अभी एक टेस्ट इनवॉइस बनाएँ, या अपने स्टोरफ़्रंट के लिए इंटीग्रेशन docs और AI स्किल खोलें।",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "WordPress पेमेंट गेटवे — checkout पर क्रिप्टो से भुगतान, होस्टेड /pay पर रीडायरेक्ट, webhook के ज़रिए ऑर्डर स्वतः paid मार्क करें।",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "ऑफ़साइट checkout ऐप — खरीदारों को क्रिप्टो checkout पर भेजें और paid स्थिति Shopify ऑर्डर में सिंक करें।",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "कोर्स और मेंबरशिप के लिए बाहरी Buy with crypto बटन — भुगतान के बाद स्वतः एक्सेस दें।",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "कोर्स विक्रेताओं के लिए बाहरी checkout — इनवॉइस paid होने पर छात्रों को स्वतः नामांकित करें।",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "मिड-मार्केट ई-कॉमर्स ऐप, checkout SDK और webhook-आधारित ऑर्डर सिंक (roadmap)।",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "होस्टेड pay लिंक के ज़रिए SaaS और डिजिटल-डाउनलोड checkout (roadmap)।",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "इंडी क्रिएटर checkout, हल्का embed और फ़ुलफ़िलमेंट hooks (roadmap)।",
+      },
+    },
   },
 } satisfies Messages;

@@ -192,6 +192,22 @@ Platform plugins store the **hosted API base URL** and merchant wallet addresses
 
 See [`platforms/README.md`](../platforms/README.md) for the full integration roadmap.
 
+## AI agent skills
+
+Each platform has a Cursor skill for fast integration:
+
+| Platform | Skill path |
+|----------|------------|
+| WooCommerce | `.cursor/skills/trustless-commerce-woocommerce/SKILL.md` |
+| Shopify | `.cursor/skills/trustless-commerce-shopify/SKILL.md` |
+| Kajabi | `.cursor/skills/trustless-commerce-kajabi/SKILL.md` |
+| Teachable | `.cursor/skills/trustless-commerce-teachable/SKILL.md` |
+| BigCommerce | `.cursor/skills/trustless-commerce-bigcommerce/SKILL.md` |
+| Lemon Squeezy | `.cursor/skills/trustless-commerce-lemonsqueezy/SKILL.md` |
+| Gumroad | `.cursor/skills/trustless-commerce-gumroad/SKILL.md` |
+
+Product UI: `/integrations` on the hosted site lists all platforms with docs and skill links.
+
 ## Versioning
 
 This document describes the **v1** integration contract aligned with `POST /api/invoices`. Breaking changes will bump a documented version and preserve backward-compatible fields where possible.

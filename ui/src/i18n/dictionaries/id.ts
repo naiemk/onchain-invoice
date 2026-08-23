@@ -8,6 +8,7 @@ export const id = {
 
   nav: {
     product: "Produk",
+    integrations: "Integrasi",
     create: "Buat faktur",
     merchant: "Penjual",
     docs: "Dokumentasi",
@@ -37,6 +38,9 @@ export const id = {
     payDescription: "Bayar faktur kripto Trustless Commerce langsung di blockchain.",
     merchantTitle: "Penjual · Trustless Commerce",
     merchantDescription: "Lihat dan kelola faktur Trustless Commerce Anda.",
+    integrationsTitle: "Integrasi · Trustless Commerce",
+    integrationsDescription:
+      "Terima USDC dan USDT di WooCommerce, Shopify, Kajabi, Teachable, dan lainnya dengan checkout kripto yang di-host.",
     adminTitle: "Admin · Trustless Commerce",
     adminDescription: "Ringkasan admin platform.",
   },
@@ -132,6 +136,11 @@ export const id = {
       "Bot dan asisten dapat membuat tautan pembayaran serta memeriksa status lewat keahlian Cursor yang sudah dipublikasikan — tanpa perlu dasbor penjual.",
     agentsSkillLink: "Keahlian agen AI (SKILL.md)",
     agentsDocs: "Dokumentasi agen",
+    integrationsEyebrow: "Integrasi",
+    integrationsTitle: "Bekerja dengan platform yang sudah Anda pakai",
+    integrationsLede:
+      "Plugin native dan konektor checkout untuk platform e-commerce dan kreator utama — pasang, tempel dompet Anda, dan terima kripto saat checkout.",
+    integrationsCta: "Lihat semua integrasi",
     whyEyebrow: "Alasan toko beralih",
     whyTitle: "Dari ide ke faktur terbayar sebelum kopi Anda dingin.",
     whyLede:
@@ -430,5 +439,64 @@ export const id = {
     colSwept: "Diteruskan",
     colFees: "Biaya",
     noActivity: "Belum ada aktivitas penerusan dana.",
+  },
+
+  integrations: {
+    eyebrow: "Integrasi platform",
+    title: "Terima kripto di toko Anda",
+    lede:
+      "Trustless Commerce membungkus checkout yang di-host dan API faktur sekali jalan dengan adaptor ringan untuk WooCommerce, Shopify, platform kreator, dan lainnya. Pasang plugin atau arahkan agen AI ke skill platform — pesanan diperbarui saat pembayaran masuk on-chain.",
+    contractEyebrow: "Kontrak bersama",
+    contractTitle: "Satu API untuk setiap platform",
+    contractBody:
+      "Semua integrasi memakai POST /api/invoices, checkout /pay yang di-host, dan webhook opsional. Adaptor platform hanya menangani sinkronisasi pesanan dan fulfillment — bukan UI dompet atau logika penyelesaian.",
+    contractLink: "Kontrak integrasi (docs)",
+    sdkLink: "SDK & plugin di GitHub",
+    wave1: "Toko e-commerce",
+    wave2: "Kursus & keanggotaan",
+    wave3: "Platform lainnya",
+    statusAvailable: "Tersedia",
+    statusPreview: "Segera hadir",
+    docs: "Dokumentasi",
+    aiSkill: "Keahlian AI",
+    ctaTitle: "Mulai dari platform mana pun",
+    ctaLede: "Buat faktur uji coba sekarang, atau buka docs integrasi dan keahlian AI untuk toko Anda.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "Gateway pembayaran WordPress — Bayar dengan kripto saat checkout, arahkan ke /pay yang di-host, tandai pesanan lunas otomatis via webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Aplikasi checkout eksternal — arahkan pembeli ke checkout kripto dan sinkronkan status lunas ke pesanan Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Tombol eksternal Beli dengan kripto untuk kursus dan keanggotaan — beri akses otomatis setelah pembayaran.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Checkout eksternal untuk penjual kursus — daftarkan siswa otomatis saat faktur lunas.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "Aplikasi e-commerce mid-market dengan SDK checkout dan sinkronisasi pesanan via webhook (roadmap).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Checkout SaaS dan unduhan digital via tautan bayar yang di-host (roadmap).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout kreator indie dengan embed ringan dan hook fulfillment (roadmap).",
+      },
+    },
   },
 } satisfies Messages;

@@ -5,6 +5,7 @@ export const fa = {
 
   nav: {
     product: "محصول",
+    integrations: "یکپارچه‌سازی‌ها",
     create: "ایجاد فاکتور",
     merchant: "فروشنده",
     docs: "مستندات",
@@ -33,6 +34,9 @@ export const fa = {
     payDescription: "یک فاکتور کریپتوی Trustless Commerce را روی زنجیره پرداخت کنید.",
     merchantTitle: "فروشنده · Trustless Commerce",
     merchantDescription: "فاکتورهای Trustless Commerce خود را ببینید و مدیریت کنید.",
+    integrationsTitle: "یکپارچه‌سازی‌ها · Trustless Commerce",
+    integrationsDescription:
+      "USDC و USDT را در WooCommerce، Shopify، Kajabi، Teachable و بیشتر با checkout رمزارز میزبانی‌شده بپذیرید.",
     adminTitle: "مدیریت · Trustless Commerce",
     adminDescription: "نمای کلی مدیریت پلتفرم.",
   },
@@ -127,6 +131,11 @@ export const fa = {
       "ربات‌ها و دستیارها می‌توانند با مهارت منتشرشدهٔ Cursor لینک پرداخت بسازند و وضعیت را پیگیری کنند — بدون نیاز به داشبورد فروشنده.",
     agentsSkillLink: "مهارت عامل هوش مصنوعی (SKILL.md)",
     agentsDocs: "مستندات عامل‌ها",
+    integrationsEyebrow: "یکپارچه‌سازی‌ها",
+    integrationsTitle: "با پلتفرم‌هایی که همین حالا استفاده می‌کنید کار می‌کند",
+    integrationsLede:
+      "افزونه‌های بومی و اتصال‌دهنده‌های checkout برای پلتفرم‌های بزرگ تجارت الکترونیک و خالقان — نصب کنید، کیف پول را بچسبانید و در checkout رمزارز بپذیرید.",
+    integrationsCta: "مشاهده همه یکپارچه‌سازی‌ها",
     whyEyebrow: "چرا فروشگاه‌ها مهاجرت می‌کنند",
     whyTitle: "از ایده تا فاکتور پرداخت‌شده، پیش از آنکه قهوه‌تان سرد شود.",
     whyLede:
@@ -412,5 +421,64 @@ export const fa = {
     colSwept: "منتقل‌شده",
     colFees: "کارمزدها",
     noActivity: "هنوز فعالیت تسویه‌ای ثبت نشده است.",
+  },
+
+  integrations: {
+    eyebrow: "یکپارچه‌سازی پلتفرم",
+    title: "رمزارز را در فروشگاه خود بپذیرید",
+    lede:
+      "Trustless Commerce checkout میزبانی‌شده و API فاکتور یک‌مرحله‌ای را با آداپتورهای سبک برای WooCommerce، Shopify، پلتفرم‌های خالق و بیشتر می‌پیچد. افزونه نصب کنید یا عامل هوش مصنوعی را به مهارت پلتفرم هدایت کنید — سفارش‌ها با رسیدن پرداخت on-chain به‌روز می‌شوند.",
+    contractEyebrow: "قرارداد مشترک",
+    contractTitle: "یک API برای هر پلتفرم",
+    contractBody:
+      "همه یکپارچه‌سازی‌ها از POST /api/invoices، checkout میزبانی‌شده /pay و webhookهای اختیاری استفاده می‌کنند. آداپتورهای پلتفرم فقط همگام‌سازی سفارش و fulfillment را انجام می‌دهند — نه رابط کیف پول یا منطق تسویه.",
+    contractLink: "قرارداد یکپارچه‌سازی (docs)",
+    sdkLink: "SDKها و افزونه‌ها در GitHub",
+    wave1: "فروشگاه‌های تجارت الکترونیک",
+    wave2: "دوره‌ها و عضویت‌ها",
+    wave3: "پلتفرم‌های بیشتر",
+    statusAvailable: "در دسترس",
+    statusPreview: "به‌زودی",
+    docs: "مستندات",
+    aiSkill: "مهارت هوش مصنوعی",
+    ctaTitle: "با هر پلتفرمی شروع کنید",
+    ctaLede: "همین حالا یک فاکتور آزمایشی بسازید، یا مستندات یکپارچه‌سازی و مهارت هوش مصنوعی را برای فروشگاه خود باز کنید.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "درگاه پرداخت WordPress — پرداخت با رمزارز در checkout، هدایت به /pay میزبانی‌شده، علامت‌گذاری خودکار سفارش‌ها به‌عنوان پرداخت‌شده از طریق webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "اپ checkout خارج از سایت — خریداران را به checkout رمزارز هدایت کنید و وضعیت پرداخت را با سفارش‌های Shopify همگام کنید.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "دکمه خارجی خرید با رمزارز برای دوره‌ها و عضویت‌ها — دسترسی خودکار پس از پرداخت.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "checkout خارجی برای فروشندگان دوره — ثبت‌نام خودکار دانشجویان وقتی فاکتور پرداخت شد.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "اپ تجارت الکترونیک بازار میانی با SDK checkout و همگام‌سازی سفارش از طریق webhook (نقشه راه).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "checkout SaaS و دانلود دیجیتال از طریق لینک‌های پرداخت میزبانی‌شده (نقشه راه).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "checkout خالقان مستقل با embed سبک و قلاب‌های fulfillment (نقشه راه).",
+      },
+    },
   },
 } satisfies Messages;

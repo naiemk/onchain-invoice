@@ -5,6 +5,7 @@ export const uk = {
 
   nav: {
     product: "Продукт",
+    integrations: "Інтеграції",
     create: "Створити рахунок",
     merchant: "Продавець",
     docs: "Документація",
@@ -34,6 +35,9 @@ export const uk = {
     payDescription: "Оплатіть криптовалютний рахунок Trustless Commerce у блокчейні.",
     merchantTitle: "Продавець · Trustless Commerce",
     merchantDescription: "Переглядайте свої рахунки Trustless Commerce і керуйте ними.",
+    integrationsTitle: "Інтеграції · Trustless Commerce",
+    integrationsDescription:
+      "Приймайте USDC і USDT у WooCommerce, Shopify, Kajabi, Teachable та інших платформах через хостинговий крипто-checkout.",
     adminTitle: "Адміністрування · Trustless Commerce",
     adminDescription: "Огляд платформи для адміністратора.",
   },
@@ -128,6 +132,11 @@ export const uk = {
       "Боти та асистенти створюють посилання на оплату й перевіряють статус через опублікований скіл Cursor — панель продавця не потрібна.",
     agentsSkillLink: "Скіл для ШІ-агентів (SKILL.md)",
     agentsDocs: "Документація для агентів",
+    integrationsEyebrow: "Інтеграції",
+    integrationsTitle: "Працює з платформами, які ви вже використовуєте",
+    integrationsLede:
+      "Нативні плагіни та конектори checkout для великих e-commerce і creator-платформ — встановіть, вставте гаманець і приймайте крипто під час оплати.",
+    integrationsCta: "Усі інтеграції",
     whyEyebrow: "Чому магазини переходять",
     whyTitle: "Від ідеї до оплаченого рахунку, поки кава не встигла охолонути.",
     whyLede:
@@ -423,5 +432,64 @@ export const uk = {
     colSwept: "Виведено",
     colFees: "Комісії",
     noActivity: "Виплат ще не було.",
+  },
+
+  integrations: {
+    eyebrow: "Інтеграції з платформами",
+    title: "Приймайте крипто у своєму магазині",
+    lede:
+      "Trustless Commerce поєднує хостинговий checkout і одноразовий invoice API з легкими адаптерами для WooCommerce, Shopify, creator-платформ та інших. Встановіть плагін або направте ШІ-агента на platform skill — замовлення оновлюються, коли платіж надходить on-chain.",
+    contractEyebrow: "Спільний контракт",
+    contractTitle: "Один API для кожної платформи",
+    contractBody:
+      "Усі інтеграції використовують POST /api/invoices, хостинговий /pay checkout і опційні webhooks. Адаптери платформ відповідають лише за синхронізацію замовлень і fulfillment — не за UI гаманця чи логіку розрахунків.",
+    contractLink: "Контракт інтеграції (docs)",
+    sdkLink: "SDK і плагіни на GitHub",
+    wave1: "Інтернет-магазини",
+    wave2: "Курси та підписки",
+    wave3: "Інші платформи",
+    statusAvailable: "Доступно",
+    statusPreview: "Незабаром",
+    docs: "Документація",
+    aiSkill: "Скіл для ШІ",
+    ctaTitle: "Почніть з будь-якої платформи",
+    ctaLede: "Створіть тестовий рахунок зараз або відкрийте документацію з інтеграції та ШІ-скіл для вашого магазину.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "Платіжний шлюз WordPress — оплата крипто на checkout, редирект на хостинговий /pay, автоматична позначка замовлень як оплачених через webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "Зовнішній checkout-додаток — перенаправляйте покупців на крипто-checkout і синхронізуйте статус оплати з замовленнями Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Зовнішня кнопка «Купити за крипто» для курсів і підписок — автоматичний доступ після оплати.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Зовнішній checkout для продавців курсів — автоматичне зарахування студентів, коли рахунок оплачено.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "E-commerce-додаток для середнього сегмента з checkout SDK і синхронізацією замовлень через webhook (у планах).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Checkout для SaaS і цифрових завантажень через хостингові pay-посилання (у планах).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout для незалежних авторів з легким embed і fulfillment hooks (у планах).",
+      },
+    },
   },
 } satisfies Messages;

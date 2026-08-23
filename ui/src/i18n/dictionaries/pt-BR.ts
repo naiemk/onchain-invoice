@@ -9,6 +9,7 @@ export const ptBR = {
 
   nav: {
     product: "Produto",
+    integrations: "Integrações",
     create: "Criar cobrança",
     merchant: "Lojista",
     docs: "Documentação",
@@ -37,6 +38,9 @@ export const ptBR = {
     payDescription: "Pague uma cobrança em cripto da Trustless Commerce na blockchain.",
     merchantTitle: "Lojista · Trustless Commerce",
     merchantDescription: "Veja e gerencie suas cobranças da Trustless Commerce.",
+    integrationsTitle: "Integrações · Trustless Commerce",
+    integrationsDescription:
+      "Aceite USDC e USDT no WooCommerce, Shopify, Kajabi, Teachable e mais com checkout cripto hospedado.",
     adminTitle: "Admin · Trustless Commerce",
     adminDescription: "Visão geral da administração da plataforma.",
   },
@@ -131,6 +135,11 @@ export const ptBR = {
       "Bots e assistentes podem criar links de pagamento e consultar o status pela skill publicada do Cursor — sem precisar de painel do lojista.",
     agentsSkillLink: "Skill para agentes de IA (SKILL.md)",
     agentsDocs: "Documentação para agentes",
+    integrationsEyebrow: "Integrações",
+    integrationsTitle: "Funciona com as plataformas que você já usa",
+    integrationsLede:
+      "Plugins nativos e conectores de checkout para as principais plataformas de e-commerce e criadores — instale, cole sua carteira e aceite cripto no checkout.",
+    integrationsCta: "Ver todas as integrações",
     whyEyebrow: "Por que as lojas migram",
     whyTitle: "Da ideia à cobrança paga antes de o café esfriar.",
     whyLede:
@@ -424,5 +433,64 @@ export const ptBR = {
     colSwept: "Repassado",
     colFees: "Taxas",
     noActivity: "Ainda não há atividade de recebimento.",
+  },
+
+  integrations: {
+    eyebrow: "Integrações de plataforma",
+    title: "Aceite cripto na sua loja",
+    lede:
+      "O Trustless Commerce combina checkout hospedado e uma API de cobrança em um passo com adaptadores leves para WooCommerce, Shopify, plataformas de criadores e mais. Instale um plugin ou aponte seu agente de IA para um skill de plataforma — os pedidos atualizam quando o pagamento chega on-chain.",
+    contractEyebrow: "Contrato compartilhado",
+    contractTitle: "Uma API para cada plataforma",
+    contractBody:
+      "Todas as integrações usam POST /api/invoices, checkout hospedado em /pay e webhooks opcionais. Adaptadores de plataforma só cuidam de sincronização de pedidos e fulfillment — não da interface da carteira nem da lógica de liquidação.",
+    contractLink: "Contrato de integração (docs)",
+    sdkLink: "SDKs e plugins no GitHub",
+    wave1: "Lojas de e-commerce",
+    wave2: "Cursos e assinaturas",
+    wave3: "Mais plataformas",
+    statusAvailable: "Disponível",
+    statusPreview: "Em breve",
+    docs: "Documentação",
+    aiSkill: "Skill de IA",
+    ctaTitle: "Comece com qualquer plataforma",
+    ctaLede: "Crie uma cobrança de teste agora ou abra a documentação de integração e o skill de IA para sua loja.",
+    platforms: {
+      woocommerce: {
+        name: "WooCommerce",
+        description:
+          "Gateway de pagamento WordPress — Pague com cripto no checkout, redirecione para o /pay hospedado e marque pedidos como pagos automaticamente via webhook.",
+      },
+      shopify: {
+        name: "Shopify",
+        description:
+          "App de checkout externo — redirecione compradores para o checkout cripto e sincronize o status de pagamento com os pedidos da Shopify.",
+      },
+      kajabi: {
+        name: "Kajabi",
+        description:
+          "Botão externo Comprar com cripto para cursos e assinaturas — libere acesso automaticamente após o pagamento.",
+      },
+      teachable: {
+        name: "Teachable",
+        description:
+          "Checkout externo para vendedores de cursos — matricule alunos automaticamente quando a cobrança for paga.",
+      },
+      bigcommerce: {
+        name: "BigCommerce",
+        description:
+          "App de e-commerce para o mercado intermediário com SDK de checkout e sincronização de pedidos via webhook (roadmap).",
+      },
+      lemonsqueezy: {
+        name: "Lemon Squeezy",
+        description:
+          "Checkout para SaaS e downloads digitais via links de pagamento hospedados (roadmap).",
+      },
+      gumroad: {
+        name: "Gumroad",
+        description:
+          "Checkout para criadores independentes com embed leve e hooks de fulfillment (roadmap).",
+      },
+    },
   },
 } satisfies Messages;

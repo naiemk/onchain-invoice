@@ -1892,6 +1892,140 @@ nav a[aria-current="page"] {
   font-weight: 600;
 }
 
+/* ── Integrations page & logo strip ── */
+.integrations-hero {
+  padding-top: 2rem;
+}
+
+.integration-contract-inner {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1.75rem 2rem;
+}
+
+.integration-wave h2 {
+  font-size: 1.35rem;
+  margin-bottom: 1.25rem;
+}
+
+.integration-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+}
+
+.integration-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  scroll-margin-top: 5rem;
+}
+
+.integration-logo-wrap {
+  align-items: center;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  min-height: 5.5rem;
+  padding: 1rem 1.25rem;
+}
+
+.integration-logo {
+  display: block;
+  height: auto;
+  max-height: 3.25rem;
+  max-width: min(100%, 14rem);
+  object-fit: contain;
+  width: auto;
+}
+
+.integration-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.25rem 1.35rem 1.35rem;
+}
+
+.integration-card-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  justify-content: space-between;
+}
+
+.integration-card-head h3 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.integration-card-body p {
+  color: var(--muted);
+  flex: 1;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.integration-card-links {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.integration-card-links a {
+  font-weight: 500;
+}
+
+.integration-logo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  justify-content: center;
+  margin: 1.5rem 0 0;
+}
+
+.integration-logo-tile {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  display: flex;
+  justify-content: center;
+  min-height: 3.75rem;
+  min-width: 9.5rem;
+  padding: 0.65rem 1rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.integration-logo-tile:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.08);
+  transform: translateY(-2px);
+}
+
+.integration-logo-tile img {
+  display: block;
+  height: auto;
+  max-height: 2.25rem;
+  max-width: 9rem;
+  object-fit: contain;
+  width: auto;
+}
+
+.integration-home-cta {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.integration-cta {
+  padding-bottom: 3rem;
+  text-align: center;
+}
+
 @media (max-width: 900px) {
   .landing-hero,
   .create-layout,
