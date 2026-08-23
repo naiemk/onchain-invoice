@@ -187,6 +187,7 @@ Stages: `invoice-paid`, `sweep-submitted`, `sweep-confirmed`, `sweep-failed`, `t
 - Empty env vars are **not** passed as `docker -e KEY=` (so they cannot wipe config).
 - Quote `0x…` values in YAML (installer templates already do) — unquoted YAML 1.1 corrupts private keys.
 - For HTTPS, API containers must be named `testnet-api` / `mainnet-api` on `DOCKER_NETWORK=trustless-commerce-edge` (set via `.env`).
+- **Card/bank (Onramper):** optional. **Mainnet:** `pk_prod` + `https://buy.onramper.com`. **Testnet sandbox UX:** `pk_test` + signing key (defaults to `https://buy.onramper.dev`). On by default when both keys are set; set `ONRAMPER_ENABLED=0` to disable. Sandbox checkout does **not** fund Sepolia/Nile. UI reads `GET /api/public/onramp` at runtime.
 - Certs live on the host under `/etc/letsencrypt` (never committed). Gateway mounts them read-only.
 - Linux: start-nodes adds `host.docker.internal`. Prefer `SERVER_URL=https://testnet.trustless-commerce.com` once the gateway is up.
 - `INSTALL_DIR=/opt/tc bash install-api.sh` installs into another directory.

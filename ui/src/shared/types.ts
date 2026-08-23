@@ -2,6 +2,8 @@ export type InvoiceStatus = "created" | "awaiting_payment" | "paid" | "paid_part
 
 export type InvoiceEventKind = "created" | "paid" | "swept" | "callback" | "error" | "force_sweep" | "claimed";
 
+export type PaymentMode = "crypto" | "crypto_or_fiat" | "fiat";
+
 export interface PayLinkFields {
   price: string;
   to: string[];
@@ -15,6 +17,7 @@ export interface PayLinkFields {
   title?: string;
   description?: string;
   allowPartial: boolean;
+  paymentMode: PaymentMode;
 }
 
 export interface InvoiceRecord {
@@ -31,6 +34,8 @@ export interface InvoiceRecord {
   description: string | null;
   callbackUrl: string | null;
   allowPartial: boolean;
+  paymentMode: PaymentMode;
+  payerFiat: string | null;
   status: InvoiceStatus;
   amountPaid: string;
   amountSwept: string;

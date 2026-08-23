@@ -2,6 +2,9 @@ export type InvoiceStatus = "created" | "awaiting_payment" | "paid" | "paid_part
 
 export type InvoiceEventKind = "created" | "paid" | "swept" | "callback" | "error" | "force_sweep" | "claimed";
 
+/** How the payer may fund the on-chain invoice address. */
+export type PaymentMode = "crypto" | "crypto_or_fiat" | "fiat";
+
 export interface PayLinkFields {
   price: string;
   to: string[];
@@ -14,6 +17,8 @@ export interface PayLinkFields {
   title?: string;
   description?: string;
   allowPartial: boolean;
+  /** Default crypto. Fiat modes require Onramper enabled on the operator instance. */
+  paymentMode: PaymentMode;
 }
 
 export interface InvoiceRecord {
@@ -30,6 +35,9 @@ export interface InvoiceRecord {
   description: string | null;
   callbackUrl: string | null;
   allowPartial: boolean;
+  paymentMode: PaymentMode;
+  /** Last payer-selected fiat currency for Onramper (pay-time). */
+  payerFiat: string | null;
   status: InvoiceStatus;
   amountPaid: string;
   amountSwept: string;

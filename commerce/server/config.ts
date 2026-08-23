@@ -7,7 +7,7 @@ import {
   type SolanaChainConfig,
   type SolanaNetworksConfig,
 } from "onchain-invoice";
-
+import { DEFAULT_ONRAMPER_FIATS } from "../shared/onramper.js";
 export interface RateLimitConfig {
   /** Max invoice creates per IP per second (default 1). */
   createPerSecond: number;
@@ -65,6 +65,17 @@ export interface AppConfig {
   rateLimit: RateLimitConfig;
   claimLeaseMs: number;
   configPath?: string;
+  /** Operator-gated Onramper card/bank onramp. Default off. */
+  onramper: OnramperConfig;
+}
+
+export interface OnramperConfig {
+  enabled: boolean;
+  apiKey?: string;
+  /** Ed25519 private key PEM for Signature V2. Never expose publicly. */
+  signingKey?: string;
+  widgetOrigin: string;
+  fiats: string[];
 }
 
 interface YamlFile {
@@ -100,6 +111,13 @@ interface YamlFile {
   cors?: { origins?: string[] };
   rateLimit?: Partial<RateLimitConfig>;
   claimLeaseMs?: number;
+  onramper?: {
+    enabled?: boolean;
+    apiKey?: string;
+    signingKey?: string;
+    widgetOrigin?: string;
+    fiats?: string[];
+  };
 }
 
 /** Sepolia product chainId used when synthesizing legacy flat EVM env. */
@@ -157,6 +175,52 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     claimLeaseMs: Number(env.CLAIM_LEASE_MS ?? file.claimLeaseMs ?? 180_000),
     configPath,
+    onramper: loadOnramperConfig(env, file.onramper),
+  };
+}
+
+function loadOnramperConfig(
+  env: NodeJS.ProcessEnv,
+  file: YamlFile["onramper"] | undefined
+): OnramperConfig {
+  const enabledRaw = (env.ONRAMPER_ENABLED ?? "").trim();
+  const apiKey = blankToUndefined(expand(env.ONRAMPER_API_KEY ?? file?.apiKey ?? ""));
+  const signingKey = blankToUndefined(expand(env.ONRAMPER_SIGNING_KEY ?? file?.signingKey ?? ""));
+  const widgetOriginExplicit = blankToUndefined(
+    expand(env.ONRAMPER_WIDGET_ORIGIN ?? file?.widgetOrigin ?? "")
+  );
+  const widgetOrigin =
+    widgetOriginExplicit ??
+    (apiKey?.startsWith("pk_test") ? "https://buy.onramper.dev" : "https://buy.onramper.com");
+  const fiatsFromEnv = env.ONRAMPER_FIATS?.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+  const fiats =
+    fiatsFromEnv && fiatsFromEnv.length > 0
+      ? fiatsFromEnv
+      : file?.fiats?.map((s) => String(s).trim().toUpperCase()).filter(Boolean) ??
+        [...DEFAULT_ONRAMPER_FIATS];
+
+  const explicitlyOff =
+    enabledRaw === "0" ||
+    enabledRaw.toLowerCase() === "false" ||
+    enabledRaw.toLowerCase() === "no";
+
+  const flagOn =
+    !explicitlyOff &&
+    (enabledRaw === "1" ||
+      enabledRaw.toLowerCase() === "true" ||
+      enabledRaw.toLowerCase() === "yes" ||
+      file?.enabled === true ||
+      (enabledRaw === "" && file?.enabled !== false && Boolean(apiKey && signingKey)));
+
+  // Enabled when flag is on and both keys are set (defaults on if keys exist unless ONRAMPER_ENABLED=0).
+  const enabled = flagOn && Boolean(apiKey && signingKey);
+
+  return {
+    enabled,
+    apiKey,
+    signingKey,
+    widgetOrigin,
+    fiats,
   };
 }
 
