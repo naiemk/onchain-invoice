@@ -26,6 +26,9 @@ export interface OnrampQuoteResult {
   direction: QuoteDirection;
   quotes: OnrampQuoteRow[];
   recommended: OnrampQuoteRow;
+  /** Settlement pair used for this quote (set when multi-pair / auto). */
+  chainId?: string;
+  token?: string;
   demo?: boolean;
 }
 
@@ -33,6 +36,8 @@ export interface OnrampPaymentMethod {
   id: string;
   name: string;
   icon?: string;
+  /** Chain/token pairs where this method was offered. */
+  pairs?: Array<{ chainId: string; token: string }>;
 }
 
 const CACHE_MS = 30_000;
@@ -402,6 +407,97 @@ export async function fetchOnrampQuote(options: {
   return result;
 }
 
+/** Union payment methods across several Onramper destination pairs. */
+export async function fetchOnrampPaymentMethodsAcrossPairs(options: {
+  apiKey: string;
+  demo: boolean;
+  widgetOrigin: string;
+  fiat: string;
+  country: string;
+  pairs: Array<{ chainId: string; token: string }>;
+  fetchImpl?: typeof fetch;
+}): Promise<OnrampPaymentMethod[]> {
+  const byId = new Map<string, OnrampPaymentMethod>();
+  for (const pair of options.pairs) {
+    if (!resolveOnramperAsset(pair.chainId, pair.token)) continue;
+    try {
+      const methods = await fetchOnrampPaymentMethods({
+        ...options,
+        chainId: pair.chainId,
+        token: pair.token,
+      });
+      for (const method of methods) {
+        const existing = byId.get(method.id);
+        if (existing) {
+          const pairs = existing.pairs ?? [];
+          if (!pairs.some((p) => p.chainId === pair.chainId && p.token === pair.token)) {
+            pairs.push({ chainId: pair.chainId, token: pair.token.toUpperCase() });
+          }
+          existing.pairs = pairs;
+        } else {
+          byId.set(method.id, {
+            ...method,
+            pairs: [{ chainId: pair.chainId, token: pair.token.toUpperCase() }],
+          });
+        }
+      }
+    } catch {
+      /* skip unavailable pair */
+    }
+  }
+  return [...byId.values()];
+}
+
+/**
+ * Quote across candidate pairs (Ethereum first so Revolut Pay / Apple Pay can appear).
+ * Returns the first successful quote for the payment method, tagged with chainId/token.
+ */
+export async function fetchOnrampQuoteAcrossPairs(options: {
+  apiKey: string;
+  demo: boolean;
+  widgetOrigin: string;
+  fiat: string;
+  country: string;
+  paymentMethod?: string;
+  provider?: string;
+  direction: QuoteDirection;
+  cryptoAmount?: string;
+  fiatAmount?: string;
+  pairs: Array<{ chainId: string; token: string }>;
+  skipCache?: boolean;
+  fetchImpl?: typeof fetch;
+}): Promise<OnrampQuoteResult> {
+  const errors: string[] = [];
+  for (const pair of options.pairs) {
+    if (!resolveOnramperAsset(pair.chainId, pair.token)) continue;
+    try {
+      const quote = await fetchOnrampQuote({
+        ...options,
+        chainId: pair.chainId,
+        token: pair.token,
+      });
+      return {
+        ...quote,
+        chainId: pair.chainId,
+        token: pair.token.toUpperCase(),
+        quotes: quote.quotes.map((q) => q),
+      };
+    } catch (error) {
+      errors.push(
+        `${pair.chainId}/${pair.token}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  throw Object.assign(
+    new Error(
+      errors.length
+        ? `No Onramper quotes available (${errors.slice(0, 3).join("; ")})`
+        : "No Onramper quotes available for the selected pairs"
+    ),
+    { statusCode: 502 }
+  );
+}
+
 export async function fetchOnrampPaymentMethods(options: {
   apiKey: string;
   demo: boolean;
@@ -436,6 +532,10 @@ export async function fetchOnrampPaymentMethods(options: {
   const demoMethods: OnrampPaymentMethod[] = [
     { id: "creditcard", name: "Credit Card" },
     { id: "debitcard", name: "Debit Card" },
+    { id: "applepay", name: "Apple Pay" },
+    { id: "googlepay", name: "Google Pay" },
+    { id: "paypal", name: "PayPal" },
+    { id: "revolutpay", name: "Revolut Pay" },
     { id: "banktransfer", name: "Bank Transfer" },
   ];
 

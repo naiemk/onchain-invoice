@@ -31,6 +31,9 @@ const BASE_ENV = {
   EVM_8453_RPC_URL: "https://base.example",
   EVM_8453_SWEEPER_ADDRESS: "0x5bcbEF31E3DcE37235CF8B2900ca7a1439e46cB9",
   EVM_8453_FORWARDER_IMPLEMENTATION: "0x0bA4bb324eB41d9c0f1c4Ac7a3876dEfcc4d72b9",
+  EVM_1_RPC_URL: "https://ethereum.example",
+  EVM_1_SWEEPER_ADDRESS: "0x5bcbEF31E3DcE37235CF8B2900ca7a1439e46cB9",
+  EVM_1_FORWARDER_IMPLEMENTATION: "0x0bA4bb324eB41d9c0f1c4Ac7a3876dEfcc4d72b9",
 } as const;
 
 /** Stable Onramper /quotes responses so create+session tests do not hit the live API. */
@@ -225,7 +228,7 @@ describe("commerce Onramper / fiat invoices", function () {
     });
   });
 
-  it("rejects fiat create with multiple chains", async function () {
+  it("allows fiat create with multiple Onramper-supported chains", async function () {
     await withApp(
       {
         ONRAMPER_ENABLED: "1",
@@ -233,26 +236,54 @@ describe("commerce Onramper / fiat invoices", function () {
         ONRAMPER_SIGNING_KEY: SIGNING_KEY_PEM,
       },
       async (baseUrl) => {
-        const merchant = getAddress(Wallet.createRandom().address);
-        const res = await fetch(`${baseUrl}/api/invoices`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            price: "12.00",
-            to: [merchant],
-            chains: ["8453", "56"],
-            tokens: ["USDC"],
-            chainId: "8453",
-            token: "USDC",
-            selectedTo: merchant,
-          displayFiat: "USD",
-          displayAmount: "12.00",
-            paymentMode: "fiat",
-          }),
-        });
-        expect(res.status).to.equal(400);
-        const body = (await res.json()) as { error?: string };
-        expect(body.error ?? "").to.match(/single|one/i);
+        clearOnrampQuoteCaches();
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = async (input, init) => {
+          const url = String(input);
+          if (url.includes("/quotes/")) {
+            return new Response(
+              JSON.stringify([
+                {
+                  ramp: "revolut",
+                  paymentMethod: "revolutpay",
+                  rate: 1,
+                  payout: 12,
+                  inAmount: 12,
+                  recommendations: ["BestPrice"],
+                  quoteId: "q-multi",
+                },
+              ]),
+              { status: 200, headers: { "content-type": "application/json" } }
+            );
+          }
+          return originalFetch(input, init);
+        };
+        try {
+          const merchant = getAddress(Wallet.createRandom().address);
+          const tron = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf";
+          const res = await fetch(`${baseUrl}/api/invoices`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              to: [merchant, tron],
+              chains: ["1", "8453", "tron"],
+              tokens: ["USDC", "USDT"],
+              chainId: "1",
+              token: "USDC",
+              selectedTo: merchant,
+              displayFiat: "USD",
+              displayAmount: "12.00",
+              quotePaymentMethod: "revolutpay",
+              paymentMode: "fiat",
+            }),
+          });
+          expect(res.status).to.equal(201);
+          const body = (await res.json()) as { invoice: { chainId: string; token: string } };
+          expect(body.invoice.chainId).to.equal("1");
+          expect(body.invoice.token).to.equal("USDC");
+        } finally {
+          globalThis.fetch = originalFetch;
+        }
       }
     );
   });

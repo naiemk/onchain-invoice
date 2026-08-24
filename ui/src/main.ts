@@ -9,7 +9,7 @@ import { SITE } from "./shared/site.js";
 import { applyTheme, initThemeToggle, preferredTheme } from "./shared/theme.js";
 import { isLocale, LOCALES, LOCALE_NATIVE_NAMES } from "./i18n/locales.js";
 import { applyLocale, getLocale, setLocale, t } from "./i18n/t.js";
-import { preferredLocale } from "./i18n/detect.js";
+import { resolvePageLocale } from "./i18n/detect.js";
 
 export type PageRenderer = (root: HTMLElement) => void | Promise<void>;
 
@@ -23,7 +23,7 @@ const routes: Record<string, PageRenderer> = {
 };
 
 applyTheme(preferredTheme());
-applyLocale(preferredLocale());
+applyLocale(resolvePageLocale());
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app");
@@ -42,6 +42,7 @@ document.addEventListener("click", (event) => {
 void render();
 
 async function render(): Promise<void> {
+  applyLocale(resolvePageLocale());
   const pathname = location.pathname;
   applyMeta(pathname);
   const route =

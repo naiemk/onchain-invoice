@@ -287,7 +287,7 @@ async function activateInvoice(
     const invoiceId = body.invoice.id;
     sessionStorage.setItem(ACTIVATION_KEY(invoiceId), JSON.stringify(body));
     sessionStorage.setItem(CHECKOUT_KEY(checkoutFingerprint(fields)), invoiceId);
-    replaceResumeUrl(invoiceId);
+    replaceResumeUrl(invoiceId, fields.lang ?? body.invoice.lang);
     renderPay(root);
   } catch (error) {
     if (status) status.textContent = error instanceof Error ? localizeError(error) : t("errors.createFailed");
@@ -908,6 +908,7 @@ function fieldsToBody(fields: PayLinkFields): Record<string, unknown> {
     quotePaymentMethod: fields.quotePaymentMethod,
     quoteProvider: fields.quoteProvider,
     quoteSlippageBps: fields.quoteSlippageBps,
+    ...(fields.lang ? { lang: fields.lang } : {}),
   };
 }
 
@@ -930,6 +931,7 @@ function fieldsFromInvoice(invoice: InvoiceRecord, fallback?: PayLinkFields): Pa
     quotePaymentMethod: invoice.quotePaymentMethod ?? fallback?.quotePaymentMethod,
     quoteProvider: invoice.quoteProvider ?? fallback?.quoteProvider,
     quoteSlippageBps: invoice.quoteSlippageBps ?? fallback?.quoteSlippageBps,
+    ...(invoice.lang || fallback?.lang ? { lang: invoice.lang ?? fallback?.lang } : {}),
   };
 }
 
@@ -948,8 +950,8 @@ function checkoutFingerprint(fields: PayLinkFields): string {
   ].join("|");
 }
 
-function replaceResumeUrl(invoiceId: string): void {
-  history.replaceState(null, "", `/pay?${encodeInvoiceResumeLink(invoiceId)}`);
+function replaceResumeUrl(invoiceId: string, lang?: string | null): void {
+  history.replaceState(null, "", `/pay?${encodeInvoiceResumeLink(invoiceId, { lang })}`);
 }
 
 function short(value: string): string {

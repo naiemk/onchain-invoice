@@ -115,6 +115,26 @@ export function preferredLocale(
   return matchLocale(languages);
 }
 
+/** Prefer `lang` / `locale` query on shareable or resume pay links. */
+export function localeFromSearch(search: string | URLSearchParams | null | undefined): Locale | null {
+  if (search == null || search === "") return null;
+  const params =
+    typeof search === "string"
+      ? new URLSearchParams(search.startsWith("?") ? search.slice(1) : search)
+      : search;
+  const raw = (params.get("lang") ?? params.get("locale") ?? "").trim();
+  if (!raw) return null;
+  return matchLocale(raw);
+}
+
+/** Page locale: forced link lang → stored preference → browser. */
+export function resolvePageLocale(
+  search: string | URLSearchParams | null | undefined =
+    typeof location !== "undefined" ? location.search : undefined
+): Locale {
+  return localeFromSearch(search) ?? preferredLocale();
+}
+
 export function applyDocumentLocale(locale: Locale): void {
   if (typeof document === "undefined") return;
   document.documentElement.lang = LOCALE_BCP47[locale];

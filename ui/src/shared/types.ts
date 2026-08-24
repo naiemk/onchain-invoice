@@ -24,6 +24,8 @@ export interface PayLinkFields {
   quotePaymentMethod?: string;
   quoteProvider?: string;
   quoteSlippageBps?: number;
+  /** Forced checkout UI language (product locale). Omit = browser/default. */
+  lang?: string;
 }
 
 export interface InvoiceRecord {
@@ -48,6 +50,7 @@ export interface InvoiceRecord {
   quotePaymentMethod: string | null;
   quoteProvider: string | null;
   quoteSlippageBps: number | null;
+  lang: string | null;
   status: InvoiceStatus;
   amountPaid: string;
   amountSwept: string;

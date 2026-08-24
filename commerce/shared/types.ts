@@ -31,6 +31,8 @@ export interface PayLinkFields {
   quoteProvider?: string;
   /** Max settlement drift in basis points (100 = 1%). Pay-time requote must stay within this. */
   quoteSlippageBps?: number;
+  /** Forced checkout UI language (product locale id, e.g. en, sv→en via aliases, fa). Omit = browser/default. */
+  lang?: string;
 }
 
 export interface InvoiceRecord {
@@ -58,6 +60,8 @@ export interface InvoiceRecord {
   quotePaymentMethod: string | null;
   quoteProvider: string | null;
   quoteSlippageBps: number | null;
+  /** Forced checkout UI language when set at create. */
+  lang: string | null;
   status: InvoiceStatus;
   amountPaid: string;
   amountSwept: string;
