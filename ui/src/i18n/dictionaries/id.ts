@@ -2,6 +2,7 @@
  * Indonesian (id) UI copy for Trustless Commerce.
  */
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const id = {
   brand: "Trustless Commerce",
@@ -15,6 +16,7 @@ export const id = {
     aiSkill: "Keahlian AI",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "Bantuan",
   },
 
@@ -36,6 +38,8 @@ export const id = {
     createDescription: "Susun tautan pembayaran kripto dan bagikan ke pelanggan Anda.",
     payTitle: "Bayar faktur · Trustless Commerce",
     payDescription: "Bayar faktur kripto Trustless Commerce langsung di blockchain.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "Penjual · Trustless Commerce",
     merchantDescription: "Lihat dan kelola faktur Trustless Commerce Anda.",
     integrationsTitle: "Integrasi · Trustless Commerce",
@@ -545,4 +549,5 @@ export const id = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

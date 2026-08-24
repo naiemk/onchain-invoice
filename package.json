@@ -36,6 +36,7 @@
     "commerce:build": "tsc -p commerce/tsconfig.json",
     "commerce:server": "node commerce-dist/server/index.js",
     "commerce:sweeper": "node commerce-dist/sweeper/index.js",
+    "commerce:bundler": "node commerce-dist/bundler/index.js",
     "ui": "vite --config ui/vite.config.ts",
     "ui:build": "vite build --config ui/vite.config.ts",
     "ui:verify": "bash ui/scripts/verify-ui-steps.sh",
@@ -57,7 +58,9 @@
     "solana:smoke:devnet": "bash solana/e2e/scripts/run-devnet-smoke.sh",
     "deploy:console:api": "node --experimental-strip-types --experimental-transform-types deploy/operator/server.ts",
     "deploy:console:ui": "vite --config deploy/operator/ui/vite.config.ts",
-    "deploy:console": "node --experimental-strip-types --experimental-transform-types deploy/operator/scripts/dev.mts"
+    "deploy:console": "node --experimental-strip-types --experimental-transform-types deploy/operator/scripts/dev.mts",
+    "wallet:deploy:sepolia": "hardhat run scripts/deploy-wallet.ts --network sepolia",
+    "wallet:verify:sepolia": "hardhat run scripts/verify-wallet.ts --network sepolia"
   },
   "repository": {
     "type": "git",

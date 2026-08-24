@@ -12,6 +12,15 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
+# GitHub CLI (https://github.com/cli/cli)
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update && apt-get install -y gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create and activate a Python virtual environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -30,6 +39,6 @@ RUN echo 'alias nht="clear && npx hardhat test"' >> /home/node/.bashrc
 RUN echo 'alias c="clear"' >> /home/node/.bashrc
 
 # Set working directory
-WORKDIR /workspace
+WORKDIR /workspaces
 
 # Switch to node user

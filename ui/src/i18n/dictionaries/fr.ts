@@ -3,6 +3,7 @@
  * Same keys as `en` — see `./en.ts` for the source of truth.
  */
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const fr = {
   brand: "Trustless Commerce",
@@ -16,6 +17,7 @@ export const fr = {
     aiSkill: "Skill IA",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "Assistance",
   },
 
@@ -37,6 +39,8 @@ export const fr = {
     createDescription: "Créez un lien de paiement en crypto et partagez-le avec votre client.",
     payTitle: "Payer une facture · Trustless Commerce",
     payDescription: "Payez une facture crypto Trustless Commerce sur la blockchain.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "Marchand · Trustless Commerce",
     merchantDescription: "Consultez et gérez vos factures Trustless Commerce.",
     integrationsTitle: "Intégrations · Trustless Commerce",
@@ -544,4 +548,5 @@ export const fr = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

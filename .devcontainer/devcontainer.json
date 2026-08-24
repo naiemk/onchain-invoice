@@ -8,8 +8,11 @@
 	// Default workspace is onchain-invoice; bind sibling repos from the host.
 	// Host layout: ~/nk/onchain-invoice, ~/nk/fastswap, ~/nk/vibed-infra
 	"workspaceFolder": "/workspaces/onchain-invoice",
+	// Keep this container running when the Agents window (or any other
+	// attached client) disconnects. Default is stopContainer, which was
+	// SIGTERM-restarting the box every few minutes.
+	"shutdownAction": "none",
 	"mounts": [
-		"source=${localWorkspaceFolder}/../vibed-infra,target=/workspaces/vibed-infra,type=bind"
 	],
 	"forwardPorts": [5173, 8080],
 	"portsAttributes": {
@@ -28,6 +31,9 @@
 	},
 	"customizations": {
 		"vscode": {
+			"settings": {
+				"remote.autoShutdown": false
+			},
 			"extensions": [
 				"ms-azuretools.vscode-containers",
 				"ms-azuretools.vscode-docker",

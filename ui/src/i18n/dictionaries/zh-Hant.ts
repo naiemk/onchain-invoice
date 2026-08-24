@@ -2,6 +2,7 @@
  * Traditional Chinese (Taiwan) copy for Trustless Commerce UI.
  */
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const zhHant = {
   brand: "Trustless Commerce",
@@ -15,6 +16,7 @@ export const zhHant = {
     aiSkill: "AI 技能",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "技術支援",
   },
 
@@ -35,6 +37,8 @@ export const zhHant = {
     createDescription: "產生加密貨幣付款連結，直接分享給你的客戶。",
     payTitle: "支付發票 · Trustless Commerce",
     payDescription: "在鏈上支付 Trustless Commerce 加密貨幣發票。",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "商家 · Trustless Commerce",
     merchantDescription: "檢視並管理你的 Trustless Commerce 發票。",
     integrationsTitle: "整合 · Trustless Commerce",
@@ -531,4 +535,5 @@ export const zhHant = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

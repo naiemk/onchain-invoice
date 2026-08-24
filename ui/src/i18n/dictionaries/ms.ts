@@ -2,6 +2,7 @@
  * Malay (ms, Malaysia) UI copy for Trustless Commerce.
  */
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const ms = {
   brand: "Trustless Commerce",
@@ -15,6 +16,7 @@ export const ms = {
     aiSkill: "Kemahiran AI",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "Sokongan",
   },
 
@@ -36,6 +38,8 @@ export const ms = {
     createDescription: "Bina pautan bayaran kripto dan kongsikan dengan pelanggan anda.",
     payTitle: "Bayar invois · Trustless Commerce",
     payDescription: "Bayar invois kripto Trustless Commerce terus atas rangkaian.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "Peniaga · Trustless Commerce",
     merchantDescription: "Lihat dan urus invois Trustless Commerce anda.",
     integrationsTitle: "Integrasi · Trustless Commerce",
@@ -545,4 +549,5 @@ export const ms = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

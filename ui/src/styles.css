@@ -2197,3 +2197,94 @@ html.theme-dark .onramp-iframe {
   }
 }
 
+.wallet-panel {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.wallet-subnav {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.wallet-device-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.wallet-device-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.wallet-address {
+  word-break: break-all;
+  margin-bottom: 1rem;
+}
+
+.pair-qr-box textarea {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.pair-qr-box.hidden {
+  display: none;
+}
+
+.tc-btn.small {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.faint {
+  color: var(--ink-faint);
+  font-size: 0.85rem;
+  display: block;
+}
+
+.banner.warn {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-ink);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
+.wallet-balance {
+  font-size: 1.1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.wallet-fee-summary {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.wallet-fee-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0;
+}
+
+.wallet-fee-summary dt {
+  margin: 0;
+  color: var(--ink-faint);
+}
+
+.wallet-fee-summary dd {
+  margin: 0;
+  font-weight: 600;
+}
+

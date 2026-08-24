@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { randomUUID } from "node:crypto";
 import type {
   AdminStats,
   InvoiceEvent,
@@ -9,6 +10,8 @@ import type {
   PaymentMode,
   SweeperRecord,
 } from "../shared/types.js";
+import type { WalletDeviceRecord, WalletPairingRecord, BundlerRecord } from "../shared/wallet.js";
+import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
 import { parsePaymentMode } from "../shared/onramper.js";
 
 interface InvoiceRow {
@@ -59,6 +62,55 @@ interface EventRow {
 }
 
 interface SweeperRow {
+  address: string;
+  label: string;
+  chains: string;
+  enabled: 0 | 1;
+  created_at: string;
+  last_seen_at: string | null;
+}
+
+interface WalletDeviceRow {
+  wallet_address: string;
+  chain_id: string;
+  owner_qx: string;
+  owner_qy: string;
+  label: string;
+  credential_id: string | null;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+interface WalletPairingRow {
+  nonce: string;
+  wallet_address: string;
+  chain_id: string;
+  new_owner_qx: string | null;
+  new_owner_qy: string | null;
+  device_label: string | null;
+  status: WalletPairingRecord["status"];
+  expires_at: string;
+  created_at: string;
+}
+
+interface WalletUserOpRow {
+  id: string;
+  wallet_address: string;
+  chain_id: string;
+  user_op_hash: string;
+  user_op_json: string;
+  status: UserOpStatus;
+  claimed_by: string | null;
+  claimed_until: string | null;
+  version: number;
+  tx_hash: string | null;
+  reject_reason: string | null;
+  gas_spent_wei: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface BundlerRow {
   address: string;
   label: string;
   chains: string;
@@ -615,6 +667,67 @@ export class CommerceDb {
       CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
       CREATE INDEX IF NOT EXISTS idx_invoices_selected_to ON invoices(selected_to);
       CREATE INDEX IF NOT EXISTS idx_events_invoice_id ON events(invoice_id);
+
+      CREATE TABLE IF NOT EXISTS wallet_devices (
+        wallet_address TEXT NOT NULL,
+        chain_id TEXT NOT NULL,
+        owner_qx TEXT NOT NULL,
+        owner_qy TEXT NOT NULL,
+        label TEXT NOT NULL,
+        credential_id TEXT,
+        created_at TEXT NOT NULL,
+        last_used_at TEXT,
+        PRIMARY KEY (wallet_address, chain_id, owner_qx, owner_qy)
+      );
+
+      CREATE TABLE IF NOT EXISTS wallet_pairings (
+        nonce TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        chain_id TEXT NOT NULL,
+        new_owner_qx TEXT,
+        new_owner_qy TEXT,
+        device_label TEXT,
+        status TEXT NOT NULL CHECK (status IN ('pending','approved','consumed','expired')),
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_pairings_wallet ON wallet_pairings(wallet_address, chain_id);
+
+      CREATE TABLE IF NOT EXISTS wallet_user_ops (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        chain_id TEXT NOT NULL,
+        user_op_hash TEXT NOT NULL UNIQUE,
+        user_op_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending','claimed','submitted','included','failed','rejected')),
+        claimed_by TEXT,
+        claimed_until TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
+        tx_hash TEXT,
+        reject_reason TEXT,
+        gas_spent_wei TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_user_ops_status ON wallet_user_ops(status, chain_id);
+
+      CREATE TABLE IF NOT EXISTS bundlers (
+        address TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        chains TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        last_seen_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS bundler_nonces (
+        address TEXT NOT NULL,
+        nonce TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        PRIMARY KEY (address, nonce)
+      );
     `);
 
     this.ensureColumn("invoices", "version", "INTEGER NOT NULL DEFAULT 1");
@@ -630,6 +743,268 @@ export class CommerceDb {
     this.ensureColumn("invoices", "quote_provider", "TEXT");
     this.ensureColumn("invoices", "quote_slippage_bps", "INTEGER");
     this.ensureColumn("invoices", "lang", "TEXT");
+  }
+
+  listWalletDevices(walletAddress: string, chainId: string): WalletDeviceRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM wallet_devices WHERE wallet_address = ? AND chain_id = ? ORDER BY created_at ASC`
+      )
+      .all(walletAddress.toLowerCase(), chainId) as WalletDeviceRow[];
+    return rows.map(mapWalletDevice);
+  }
+
+  upsertWalletDevice(input: {
+    walletAddress: string;
+    chainId: string;
+    ownerQx: string;
+    ownerQy: string;
+    label: string;
+    credentialId: string | null;
+  }): WalletDeviceRecord {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_devices (wallet_address, chain_id, owner_qx, owner_qy, label, credential_id, created_at, last_used_at)
+         VALUES (@walletAddress, @chainId, @ownerQx, @ownerQy, @label, @credentialId, @now, @now)
+         ON CONFLICT(wallet_address, chain_id, owner_qx, owner_qy) DO UPDATE SET
+           label = excluded.label,
+           credential_id = COALESCE(excluded.credential_id, credential_id),
+           last_used_at = @now`
+      )
+      .run({
+        walletAddress: input.walletAddress.toLowerCase(),
+        chainId: input.chainId,
+        ownerQx: input.ownerQx,
+        ownerQy: input.ownerQy,
+        label: input.label,
+        credentialId: input.credentialId,
+        now,
+      });
+    return this.listWalletDevices(input.walletAddress, input.chainId).find(
+      (d) => d.ownerQx === input.ownerQx && d.ownerQy === input.ownerQy
+    )!;
+  }
+
+  deleteWalletDevice(walletAddress: string, chainId: string, ownerQx: string, ownerQy: string): void {
+    this.db
+      .prepare(
+        `DELETE FROM wallet_devices WHERE wallet_address = ? AND chain_id = ? AND owner_qx = ? AND owner_qy = ?`
+      )
+      .run(walletAddress.toLowerCase(), chainId, ownerQx, ownerQy);
+  }
+
+  createWalletPairing(walletAddress: string, chainId: string): WalletPairingRecord {
+    const now = new Date();
+    const expires = new Date(now.getTime() + 5 * 60 * 1000);
+    const nonce = randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_pairings (nonce, wallet_address, chain_id, status, expires_at, created_at)
+         VALUES (?, ?, ?, 'pending', ?, ?)`
+      )
+      .run(nonce, walletAddress.toLowerCase(), chainId, expires.toISOString(), now.toISOString());
+    return this.getWalletPairing(nonce)!;
+  }
+
+  submitWalletPairing(
+    nonce: string,
+    newOwnerQx: string,
+    newOwnerQy: string,
+    deviceLabel: string | null
+  ): WalletPairingRecord | null {
+    const row = this.getWalletPairing(nonce);
+    if (!row || row.status !== "pending") return null;
+    if (new Date(row.expiresAt).getTime() < Date.now()) {
+      this.db.prepare(`UPDATE wallet_pairings SET status = 'expired' WHERE nonce = ?`).run(nonce);
+      return null;
+    }
+    this.db
+      .prepare(
+        `UPDATE wallet_pairings SET new_owner_qx = ?, new_owner_qy = ?, device_label = ?, status = 'approved' WHERE nonce = ?`
+      )
+      .run(newOwnerQx, newOwnerQy, deviceLabel, nonce);
+    return this.getWalletPairing(nonce);
+  }
+
+  getWalletPairing(nonce: string): WalletPairingRecord | null {
+    const row = this.db.prepare(`SELECT * FROM wallet_pairings WHERE nonce = ?`).get(nonce) as
+      | WalletPairingRow
+      | undefined;
+    return row ? mapWalletPairing(row) : null;
+  }
+
+  createWalletUserOp(input: {
+    walletAddress: string;
+    chainId: string;
+    userOpHash: string;
+    userOp: PackedUserOperationJson;
+  }): WalletUserOpRecord {
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_user_ops (
+           id, wallet_address, chain_id, user_op_hash, user_op_json, status,
+           version, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, 'pending', 1, ?, ?)`
+      )
+      .run(
+        id,
+        input.walletAddress.toLowerCase(),
+        input.chainId,
+        input.userOpHash.toLowerCase(),
+        JSON.stringify(input.userOp),
+        now,
+        now
+      );
+    return this.getWalletUserOpByHash(input.userOpHash)!;
+  }
+
+  getWalletUserOpByHash(userOpHash: string): WalletUserOpRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_user_ops WHERE user_op_hash = ?`)
+      .get(userOpHash.toLowerCase()) as WalletUserOpRow | undefined;
+    return row ? mapWalletUserOp(row) : null;
+  }
+
+  listBundlerUserOps(statuses: UserOpStatus[] = ["pending"], chains?: string[]): WalletUserOpRecord[] {
+    let sql = `SELECT * FROM wallet_user_ops WHERE status IN (${statuses.map(() => "?").join(",")})`;
+    const params: unknown[] = [...statuses];
+    if (chains?.length) {
+      sql += ` AND chain_id IN (${chains.map(() => "?").join(",")})`;
+      params.push(...chains);
+    }
+    sql += " ORDER BY created_at ASC LIMIT 100";
+    return (this.db.prepare(sql).all(...params) as WalletUserOpRow[]).map(mapWalletUserOp);
+  }
+
+  claimWalletUserOp(input: {
+    userOpHash: string;
+    bundlerAddress: string;
+    expectedVersion: number;
+    leaseMs: number;
+  }): WalletUserOpRecord {
+    const now = new Date();
+    const until = new Date(now.getTime() + input.leaseMs).toISOString();
+    const nowIso = now.toISOString();
+    const result = this.db
+      .prepare(
+        `UPDATE wallet_user_ops SET
+           claimed_by = @bundler,
+           claimed_until = @until,
+           status = 'claimed',
+           version = version + 1,
+           updated_at = @now
+         WHERE user_op_hash = @hash
+           AND version = @version
+           AND status IN ('pending', 'claimed')
+           AND (claimed_by IS NULL OR claimed_by = @bundler OR claimed_until < @now)`
+      )
+      .run({
+        bundler: input.bundlerAddress.toLowerCase(),
+        until,
+        now: nowIso,
+        hash: input.userOpHash.toLowerCase(),
+        version: input.expectedVersion,
+      });
+    if (result.changes === 0) {
+      const current = this.getWalletUserOpByHash(input.userOpHash);
+      throw Object.assign(new Error("UserOp claim conflict"), { statusCode: 409, userOp: current });
+    }
+    return this.getWalletUserOpByHash(input.userOpHash)!;
+  }
+
+  trackWalletUserOp(input: {
+    userOpHash: string;
+    status?: UserOpStatus;
+    txHash?: string | null;
+    rejectReason?: string | null;
+    gasSpentWei?: string | null;
+    expectedVersion?: number;
+    bundlerAddress?: string;
+  }): WalletUserOpRecord {
+    const current = this.getWalletUserOpByHash(input.userOpHash);
+    if (!current) throw Object.assign(new Error("UserOp not found"), { statusCode: 404 });
+    if (input.expectedVersion !== undefined && current.version !== input.expectedVersion) {
+      throw Object.assign(new Error("UserOp version conflict"), { statusCode: 409, userOp: current });
+    }
+    if (input.bundlerAddress && current.claimedBy && current.claimedBy !== input.bundlerAddress.toLowerCase()) {
+      throw Object.assign(new Error("UserOp claimed by another bundler"), { statusCode: 409, userOp: current });
+    }
+    const now = new Date().toISOString();
+    const terminal = input.status === "included" || input.status === "failed" || input.status === "rejected";
+    this.db
+      .prepare(
+        `UPDATE wallet_user_ops SET
+           status = COALESCE(@status, status),
+           tx_hash = COALESCE(@txHash, tx_hash),
+           reject_reason = COALESCE(@rejectReason, reject_reason),
+           gas_spent_wei = COALESCE(@gasSpentWei, gas_spent_wei),
+           version = version + 1,
+           claimed_by = CASE WHEN @clearClaim = 1 THEN NULL ELSE claimed_by END,
+           claimed_until = CASE WHEN @clearClaim = 1 THEN NULL ELSE claimed_until END,
+           updated_at = @now
+         WHERE user_op_hash = @hash`
+      )
+      .run({
+        status: input.status ?? null,
+        txHash: input.txHash ?? null,
+        rejectReason: input.rejectReason ?? null,
+        gasSpentWei: input.gasSpentWei ?? null,
+        clearClaim: terminal ? 1 : 0,
+        now,
+        hash: input.userOpHash.toLowerCase(),
+      });
+    return this.getWalletUserOpByHash(input.userOpHash)!;
+  }
+
+  upsertBundler(input: { address: string; label: string; chains: string[]; enabled?: boolean }): BundlerRecord {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO bundlers (address, label, chains, enabled, created_at, last_seen_at)
+         VALUES (@address, @label, @chains, @enabled, @now, NULL)
+         ON CONFLICT(address) DO UPDATE SET
+           label = excluded.label,
+           chains = excluded.chains,
+           enabled = excluded.enabled`
+      )
+      .run({
+        address: input.address.toLowerCase(),
+        label: input.label,
+        chains: JSON.stringify(input.chains),
+        enabled: input.enabled === false ? 0 : 1,
+        now,
+      });
+    const row = this.db.prepare("SELECT * FROM bundlers WHERE address = ?").get(input.address.toLowerCase()) as BundlerRow;
+    return mapBundler(row);
+  }
+
+  getBundler(address: string): BundlerRecord | null {
+    const row = this.db.prepare("SELECT * FROM bundlers WHERE address = ?").get(address.toLowerCase()) as
+      | BundlerRow
+      | undefined;
+    return row ? mapBundler(row) : null;
+  }
+
+  touchBundler(address: string): void {
+    this.db
+      .prepare("UPDATE bundlers SET last_seen_at = ? WHERE address = ?")
+      .run(new Date().toISOString(), address.toLowerCase());
+  }
+
+  consumeBundlerNonce(address: string, nonce: string, ttlMs: number): boolean {
+    const now = Date.now();
+    this.db.prepare("DELETE FROM bundler_nonces WHERE expires_at < ?").run(now);
+    try {
+      this.db
+        .prepare("INSERT INTO bundler_nonces (address, nonce, expires_at) VALUES (?, ?, ?)")
+        .run(address.toLowerCase(), nonce, now + ttlMs);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   setPayerFiat(invoiceId: string, fiat: string): InvoiceRecord {
@@ -708,6 +1083,63 @@ function mapEvent(row: EventRow): InvoiceEvent {
 }
 
 function mapSweeper(row: SweeperRow): SweeperRecord {
+  return {
+    address: row.address,
+    label: row.label,
+    chains: JSON.parse(row.chains) as string[],
+    enabled: row.enabled === 1,
+    createdAt: row.created_at,
+    lastSeenAt: row.last_seen_at,
+  };
+}
+
+function mapWalletDevice(row: WalletDeviceRow): WalletDeviceRecord {
+  return {
+    walletAddress: row.wallet_address,
+    chainId: row.chain_id,
+    ownerQx: row.owner_qx,
+    ownerQy: row.owner_qy,
+    label: row.label,
+    credentialId: row.credential_id,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+  };
+}
+
+function mapWalletPairing(row: WalletPairingRow): WalletPairingRecord {
+  return {
+    nonce: row.nonce,
+    walletAddress: row.wallet_address,
+    chainId: row.chain_id,
+    newOwnerQx: row.new_owner_qx,
+    newOwnerQy: row.new_owner_qy,
+    deviceLabel: row.device_label,
+    status: row.status,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+  };
+}
+
+function mapWalletUserOp(row: WalletUserOpRow): WalletUserOpRecord {
+  return {
+    id: row.id,
+    walletAddress: row.wallet_address,
+    chainId: row.chain_id,
+    userOpHash: row.user_op_hash,
+    userOp: JSON.parse(row.user_op_json) as PackedUserOperationJson,
+    status: row.status,
+    claimedBy: row.claimed_by,
+    claimedUntil: row.claimed_until,
+    version: row.version,
+    txHash: row.tx_hash,
+    rejectReason: row.reject_reason,
+    gasSpentWei: row.gas_spent_wei,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapBundler(row: BundlerRow): BundlerRecord {
   return {
     address: row.address,
     label: row.label,

@@ -1,4 +1,5 @@
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const uk = {
   brand: "Trustless Commerce",
@@ -12,6 +13,7 @@ export const uk = {
     aiSkill: "Скіл для ШІ",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "Підтримка",
   },
 
@@ -33,6 +35,8 @@ export const uk = {
     createDescription: "Створіть посилання на оплату в криптовалюті й надішліть його клієнту.",
     payTitle: "Оплатити рахунок · Trustless Commerce",
     payDescription: "Оплатіть криптовалютний рахунок Trustless Commerce у блокчейні.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "Продавець · Trustless Commerce",
     merchantDescription: "Переглядайте свої рахунки Trustless Commerce і керуйте ними.",
     integrationsTitle: "Інтеграції · Trustless Commerce",
@@ -538,4 +542,5 @@ export const uk = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;
