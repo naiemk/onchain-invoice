@@ -13,6 +13,7 @@ import {
   resolveOnramperAsset,
   signWidgetUrlV1,
 } from "../commerce/shared/onramper.js";
+import { clearOnrampQuoteCaches } from "../commerce/shared/onramper-quotes.js";
 
 const { privateKey } = generateKeyPairSync("ed25519");
 const SIGNING_KEY_PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
@@ -31,6 +32,42 @@ const BASE_ENV = {
   EVM_8453_SWEEPER_ADDRESS: "0x5bcbEF31E3DcE37235CF8B2900ca7a1439e46cB9",
   EVM_8453_FORWARDER_IMPLEMENTATION: "0x0bA4bb324eB41d9c0f1c4Ac7a3876dEfcc4d72b9",
 } as const;
+
+/** Stable Onramper /quotes responses so create+session tests do not hit the live API. */
+function withMockedOnramperQuotes<T>(fn: () => Promise<T>, payoutForAmount?: (amount: number) => number): Promise<T> {
+  clearOnrampQuoteCaches();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes("/quotes/")) {
+      const u = new URL(url);
+      const amount = Number(u.searchParams.get("amount") || "0");
+      const inputSide = u.searchParams.get("input") || "source";
+      const payout = (payoutForAmount ?? ((n) => n))(amount);
+      const inAmount = inputSide === "source" ? amount : payout * (amount > 0 ? amount / payout : 1);
+      const fiatIn = inputSide === "source" ? amount : inAmount;
+      const cryptoOut = inputSide === "destination" ? amount : payout;
+      return new Response(
+        JSON.stringify([
+          {
+            ramp: "moonpay",
+            paymentMethod: "creditcard",
+            rate: fiatIn / (cryptoOut || 1),
+            payout: cryptoOut,
+            inAmount: fiatIn,
+            recommendations: ["BestPrice"],
+            quoteId: "q-mock",
+          },
+        ]),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    }
+    return originalFetch(input, init);
+  };
+  return fn().finally(() => {
+    globalThis.fetch = originalFetch;
+  });
+}
 
 describe("commerce Onramper / fiat invoices", function () {
   async function withApp(
@@ -123,6 +160,8 @@ describe("commerce Onramper / fiat invoices", function () {
           token: "USDC",
           selectedTo: merchant,
           paymentMode: "fiat",
+          displayFiat: "USD",
+          displayAmount: "5.00",
         }),
       });
       expect(createRes.status).to.equal(201);
@@ -175,6 +214,8 @@ describe("commerce Onramper / fiat invoices", function () {
           chainId: "8453",
           token: "USDC",
           selectedTo: merchant,
+          displayFiat: "USD",
+          displayAmount: "12.00",
           paymentMode: "fiat",
         }),
       });
@@ -204,6 +245,8 @@ describe("commerce Onramper / fiat invoices", function () {
             chainId: "8453",
             token: "USDC",
             selectedTo: merchant,
+          displayFiat: "USD",
+          displayAmount: "12.00",
             paymentMode: "fiat",
           }),
         });
@@ -215,6 +258,7 @@ describe("commerce Onramper / fiat invoices", function () {
   });
 
   it("creates a fiat invoice and returns a signed onramp session", async function () {
+    await withMockedOnramperQuotes(async () => {
     await withApp(
       {
         ONRAMPER_ENABLED: "1",
@@ -239,6 +283,8 @@ describe("commerce Onramper / fiat invoices", function () {
             chainId: "8453",
             token: "USDC",
             selectedTo: merchant,
+          displayFiat: "USD",
+          displayAmount: "12.00",
             paymentMode: "fiat",
           }),
         });
@@ -269,12 +315,14 @@ describe("commerce Onramper / fiat invoices", function () {
         expect(url.searchParams.get("isAddressEditable")).to.equal("false");
         expect(url.searchParams.get("onlyCryptos")).to.equal("usdc_base");
         expect(url.searchParams.get("onlyCryptoNetworks")).to.equal("base");
-        expect(url.searchParams.get("onlyFiats")).to.equal("EUR");
+        expect(url.searchParams.get("onlyFiats")).to.equal("USD");
+        expect(url.searchParams.get("defaultAmount")).to.equal("12");
         expect(url.searchParams.get("partnerContext")).to.equal(created.invoice.id);
         expect(url.searchParams.get("sigV2")).to.match(/^v2:/);
         expect(session.expiresAt).to.be.a("string");
       }
     );
+    });
   });
 
   it("rejects onramp-session for crypto-only invoices", async function () {
@@ -317,6 +365,7 @@ describe("commerce Onramper / fiat invoices", function () {
   });
 
   it("creates a Sepolia fiat invoice and returns sandbox onramp session", async function () {
+    await withMockedOnramperQuotes(async () => {
     await withApp(
       {
         ONRAMPER_ENABLED: "1",
@@ -336,6 +385,8 @@ describe("commerce Onramper / fiat invoices", function () {
             chainId: "11155111",
             token: "USDC",
             selectedTo: merchant,
+          displayFiat: "USD",
+          displayAmount: "12.00",
             paymentMode: "fiat",
           }),
         });
@@ -364,6 +415,7 @@ describe("commerce Onramper / fiat invoices", function () {
         );
       }
     );
+    });
   });
 
   it("maps Base USDC and signs widget URLs", function () {
@@ -378,6 +430,10 @@ describe("commerce Onramper / fiat invoices", function () {
     expect(resolveOnramperAsset("nile", "USDT")).to.deep.equal({
       cryptoId: "usdt_tron",
       networkId: "tron",
+    });
+    expect(resolveOnramperAsset("1", "USDC")).to.deep.equal({
+      cryptoId: "usdc_ethereum",
+      networkId: "ethereum",
     });
     expect(ONRAMPER_SUPPORTED_PAIRS.length).to.be.at.least(6);
     expect(isOnramperSandboxOrigin("https://buy.onramper.dev")).to.equal(true);
@@ -412,6 +468,7 @@ describe("commerce Onramper / fiat invoices", function () {
       token: "USDC",
       priceUsd: "25",
       fiat: "EUR",
+      displayAmount: "230",
       lockFiat: true,
     });
     const url = new URL(session.widgetUrl);
@@ -429,5 +486,331 @@ describe("commerce Onramper / fiat invoices", function () {
       fields: { apiKey: API_KEY, wallets: wallets!, networkWallets: networkWallets! },
     });
     expect(new URL(signed.url).searchParams.get("signature")).to.equal(expected);
+  });
+
+  it("returns demo onramp quotes when enabled without keys", async function () {
+    clearOnrampQuoteCaches();
+    await withApp({ ONRAMPER_ENABLED: "1" }, async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/public/onramp-quote?fiat=SEK&chainId=8453&token=USDC&country=se&paymentMethod=creditcard&direction=receive&cryptoAmount=100`
+      );
+      expect(res.status).to.equal(200);
+      const body = (await res.json()) as {
+        demo?: boolean;
+        fiat?: string;
+        fiatAmount?: string;
+        cryptoAmount?: string;
+        recommended?: { fiatAmount: string };
+      };
+      expect(body.demo).to.equal(true);
+      expect(body.fiat).to.equal("SEK");
+      expect(body.cryptoAmount).to.equal("100");
+      expect(Number(body.fiatAmount)).to.be.greaterThan(1000);
+      expect(body.recommended?.fiatAmount).to.equal(body.fiatAmount);
+    });
+  });
+
+  it("persists display fiat fields on fiat invoice create", async function () {
+    clearOnrampQuoteCaches();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes("/quotes/")) {
+        return new Response(
+          JSON.stringify([
+            {
+              ramp: "moonpay",
+              paymentMethod: "creditcard",
+              rate: 14.875,
+              payout: 100,
+              inAmount: 1487.5,
+              recommendations: ["BestPrice"],
+              quoteId: "q-stable",
+            },
+          ]),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return originalFetch(input, init);
+    };
+    try {
+    await withApp(
+      {
+        ONRAMPER_ENABLED: "1",
+        ONRAMPER_API_KEY: API_KEY,
+        ONRAMPER_SIGNING_KEY: SIGNING_KEY_PEM,
+      },
+      async (baseUrl) => {
+      const merchant = getAddress(Wallet.createRandom().address);
+      const createRes = await fetch(`${baseUrl}/api/invoices`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          price: "100",
+          to: [merchant],
+          chains: ["8453"],
+          tokens: ["USDC"],
+          chainId: "8453",
+          token: "USDC",
+          selectedTo: merchant,
+          paymentMode: "fiat",
+          displayFiat: "SEK",
+          displayAmount: "1487.50",
+          quoteCountry: "se",
+          quotePaymentMethod: "creditcard",
+          quoteProvider: "moonpay",
+          quoteSlippageBps: 100,
+        }),
+      });
+      expect(createRes.status).to.equal(201);
+      const created = (await createRes.json()) as {
+        invoice: {
+          id: string;
+          displayFiat: string | null;
+          displayAmount: string | null;
+          quoteCountry: string | null;
+          quotePaymentMethod: string | null;
+          quoteProvider: string | null;
+          priceUsd: string;
+        };
+      };
+      expect(created.invoice.displayFiat).to.equal("SEK");
+      expect(created.invoice.displayAmount).to.equal("1487.5");
+      expect(created.invoice.quoteCountry).to.equal("se");
+      expect(created.invoice.quotePaymentMethod).to.equal("creditcard");
+      expect(created.invoice.quoteProvider).to.equal("moonpay");
+      // Settlement is quote crypto with a small buffer so fee variance cannot strand payment.
+      expect(created.invoice.priceUsd).to.equal("99.9");
+
+      const getRes = await fetch(`${baseUrl}/api/invoices/${encodeURIComponent(created.invoice.id)}`);
+      const fetched = (await getRes.json()) as { displayFiat: string };
+      expect(fetched.displayFiat).to.equal("SEK");
+
+      const sessionRes = await fetch(
+        `${baseUrl}/api/invoices/${encodeURIComponent(created.invoice.id)}/onramp-session`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ fiat: "EUR", theme: "dark" }),
+        }
+      );
+      expect(sessionRes.status).to.equal(200);
+      const session = (await sessionRes.json()) as { widgetUrl?: string };
+      const url = new URL(session.widgetUrl!);
+      expect(url.searchParams.get("onlyFiats")).to.equal("SEK");
+      expect(url.searchParams.get("defaultAmount")).to.equal("1487.5");
+      expect(url.searchParams.get("defaultPaymentMethod")).to.equal("creditcard");
+      expect(url.searchParams.get("onlyOnramps")).to.equal("moonpay");
+      expect(url.searchParams.get("themeName")).to.equal("dark");
+      expect(url.searchParams.get("isAmountEditable")).to.equal("true");
+      }
+    );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("expires onramp session when settlement drifts past slippage", async function () {
+    clearOnrampQuoteCaches();
+    const originalFetch = globalThis.fetch;
+    let quoteCalls = 0;
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes("/quotes/")) {
+        quoteCalls += 1;
+        const crypto = quoteCalls === 1 ? 100 : 90; // 10% worse on requote
+        return new Response(
+          JSON.stringify([
+            {
+              ramp: "moonpay",
+              paymentMethod: "creditcard",
+              rate: 10.5,
+              payout: crypto,
+              inAmount: 1487.5,
+              recommendations: ["BestPrice"],
+              quoteId: `q${quoteCalls}`,
+            },
+          ]),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return originalFetch(input, init);
+    };
+    try {
+      await withApp(
+        {
+          ONRAMPER_ENABLED: "1",
+          ONRAMPER_API_KEY: API_KEY,
+          ONRAMPER_SIGNING_KEY: SIGNING_KEY_PEM,
+        },
+        async (baseUrl) => {
+          const merchant = getAddress(Wallet.createRandom().address);
+          const createRes = await fetch(`${baseUrl}/api/invoices`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              to: [merchant],
+              chains: ["8453"],
+              tokens: ["USDC"],
+              chainId: "8453",
+              token: "USDC",
+              selectedTo: merchant,
+              paymentMode: "fiat",
+              displayFiat: "SEK",
+              displayAmount: "1487.50",
+              quoteCountry: "se",
+              quotePaymentMethod: "creditcard",
+              quoteProvider: "moonpay",
+              quoteSlippageBps: 100, // 1%
+            }),
+          });
+          expect(createRes.status).to.equal(201);
+          const created = (await createRes.json()) as {
+            invoice: { id: string; priceUsd: string; quoteProvider: string | null; quoteSlippageBps: number | null };
+          };
+          expect(created.invoice.quoteProvider).to.equal("moonpay");
+          expect(created.invoice.quoteSlippageBps).to.equal(100);
+
+          const sessionRes = await fetch(
+            `${baseUrl}/api/invoices/${encodeURIComponent(created.invoice.id)}/onramp-session`,
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ fiat: "SEK" }),
+            }
+          );
+          expect(sessionRes.status).to.equal(410);
+          const body = (await sessionRes.json()) as { code?: string; error?: string };
+          expect(body.code).to.equal("quote_expired");
+          expect(body.error ?? "").to.match(/expired|try again/i);
+        }
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("locks onlyOnramps to the create-time provider when within slippage", async function () {
+    clearOnrampQuoteCaches();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes("/quotes/")) {
+        return new Response(
+          JSON.stringify([
+            {
+              ramp: "moonpay",
+              paymentMethod: "creditcard",
+              rate: 1,
+              payout: 100,
+              inAmount: 100,
+              recommendations: ["BestPrice"],
+              quoteId: "q-lock",
+            },
+          ]),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return originalFetch(input, init);
+    };
+    try {
+      await withApp(
+        {
+          ONRAMPER_ENABLED: "1",
+          ONRAMPER_API_KEY: API_KEY,
+          ONRAMPER_SIGNING_KEY: SIGNING_KEY_PEM,
+        },
+        async (baseUrl) => {
+          const merchant = getAddress(Wallet.createRandom().address);
+          const createRes = await fetch(`${baseUrl}/api/invoices`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              price: "100",
+              to: [merchant],
+              chains: ["8453"],
+              tokens: ["USDC"],
+              chainId: "8453",
+              token: "USDC",
+              selectedTo: merchant,
+              paymentMode: "fiat",
+              displayFiat: "USD",
+              displayAmount: "100",
+              quoteCountry: "us",
+              quotePaymentMethod: "creditcard",
+              quoteProvider: "moonpay",
+              quoteSlippageBps: 500,
+            }),
+          });
+          expect(createRes.status).to.equal(201);
+          const created = (await createRes.json()) as { invoice: { id: string; quoteProvider: string | null } };
+          expect(created.invoice.quoteProvider).to.equal("moonpay");
+
+          const sessionRes = await fetch(
+            `${baseUrl}/api/invoices/${encodeURIComponent(created.invoice.id)}/onramp-session`,
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ fiat: "USD" }),
+            }
+          );
+          expect(sessionRes.status).to.equal(200);
+          const session = (await sessionRes.json()) as { widgetUrl?: string };
+          const url = new URL(session.widgetUrl!);
+          expect(url.searchParams.get("onlyOnramps")).to.equal("moonpay");
+          expect(url.searchParams.get("defaultAmount")).to.equal("100");
+        }
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("proxies live Onramper quote responses", async function () {
+    clearOnrampQuoteCaches();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/quotes/sek/usdc_base")) {
+        return new Response(
+          JSON.stringify([
+            {
+              ramp: "moonpay",
+              paymentMethod: "creditcard",
+              rate: 10.5,
+              payout: 100,
+              recommendations: ["BestPrice"],
+              quoteId: "q1",
+            },
+          ]),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return originalFetch(input);
+    };
+    try {
+      await withApp(
+        {
+          ONRAMPER_ENABLED: "1",
+          ONRAMPER_API_KEY: API_KEY,
+          ONRAMPER_SIGNING_KEY: SIGNING_KEY_PEM,
+        },
+        async (baseUrl) => {
+          const res = await fetch(
+            `${baseUrl}/api/public/onramp-quote?fiat=SEK&chainId=8453&token=USDC&country=se&paymentMethod=creditcard&direction=receive&cryptoAmount=100`
+          );
+          expect(res.status).to.equal(200);
+          const body = (await res.json()) as {
+            demo?: boolean;
+            recommended?: { provider: string; cryptoAmount: string };
+          };
+          expect(body.demo).to.not.equal(true);
+          expect(body.recommended?.provider).to.equal("moonpay");
+          expect(body.recommended?.cryptoAmount).to.equal("100");
+        }
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

@@ -24,11 +24,11 @@ export const NETWORKS: NetworkOption[] = [
   { id: "nile", label: "TRON Nile", short: "Nile", kind: "tron", testnet: true },
   // Kept for explorer/label helpers; re-enable when Solana settle ships in the UI.
   { id: "devnet", label: "Solana Devnet", short: "Sol Devnet", kind: "solana", testnet: true, enabled: false },
-  // Mainnet rails: Tron + Base + BNB (ETH / Arbitrum disabled until settlement is ready).
+  // Mainnet rails: Tron + Base + BNB + Ethereum USDC.
   { id: "tron", label: "TRON", short: "TRON", kind: "tron" },
   { id: "8453", label: "Base", short: "Base", kind: "evm" },
   { id: "56", label: "BNB Smart Chain", short: "BNB", kind: "evm" },
-  { id: "1", label: "Ethereum Mainnet", short: "Ethereum", kind: "evm", enabled: false },
+  { id: "1", label: "Ethereum Mainnet", short: "Ethereum", kind: "evm" },
   { id: "42161", label: "Arbitrum One", short: "Arbitrum", kind: "evm", enabled: false },
   { id: "mainnet-beta", label: "Solana", short: "Solana", kind: "solana", enabled: false },
 ];
@@ -44,6 +44,15 @@ export const SUPPORTED_TOKENS = new Set(TOKENS.map((t) => t.id.toUpperCase()));
 const TRON_BASE58_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 const SOLANA_BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+/** Strip bidi/ZW chars and map Persian/Arabic-Indic digits → Latin (mobile FA paste). */
+export function sanitizeAddressInput(value: string): string {
+  let out = value.normalize("NFKC");
+  out = out.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00A0\s]/g, "");
+  out = out.replace(/[\u06F0-\u06F9]/g, (ch) => String(ch.charCodeAt(0) - 0x06f0));
+  out = out.replace(/[\u0660-\u0669]/g, (ch) => String(ch.charCodeAt(0) - 0x0660));
+  return out;
+}
 
 function decodeBase58(input: string): Uint8Array {
   const bytes = [0];
@@ -68,12 +77,13 @@ function decodeBase58(input: string): Uint8Array {
   return Uint8Array.from(bytes.reverse());
 }
 
-/** EIP-55 checksummed EVM address only (rejects all-lowercase / all-uppercase). */
+/** Valid EVM address (any casing); returns true if getAddress accepts it. */
 export function isChecksummedEvmAddress(value: string): boolean {
-  const trimmed = value.trim();
+  const trimmed = sanitizeAddressInput(value);
   if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) return false;
   try {
-    return getAddress(trimmed) === trimmed;
+    getAddress(trimmed);
+    return true;
   } catch {
     return false;
   }
@@ -81,7 +91,7 @@ export function isChecksummedEvmAddress(value: string): boolean {
 
 /** Tron base58check (version 0x41) — rejects lookalike strings with a bad checksum. */
 export function isChecksummedTronAddress(value: string): boolean {
-  const trimmed = value.trim();
+  const trimmed = sanitizeAddressInput(value);
   if (!TRON_BASE58_RE.test(trimmed)) return false;
   try {
     const decoded = decodeBase58(trimmed);
@@ -101,11 +111,11 @@ export function isChecksummedTronAddress(value: string): boolean {
 }
 
 export function looksLikeTronAddress(value: string): boolean {
-  return TRON_BASE58_RE.test(value.trim());
+  return TRON_BASE58_RE.test(sanitizeAddressInput(value));
 }
 
 export function looksLikeSolanaAddress(value: string): boolean {
-  const trimmed = value.trim();
+  const trimmed = sanitizeAddressInput(value);
   if (!SOLANA_BASE58_RE.test(trimmed)) return false;
   if (trimmed.startsWith("T") && trimmed.length === 34) return false;
   try {
@@ -125,7 +135,7 @@ export function isValidAddress(value: string, kind: ChainKind): boolean {
 }
 
 export function normalizeAddress(value: string, kind: ChainKind): string {
-  const trimmed = value.trim();
+  const trimmed = sanitizeAddressInput(value);
   if (!trimmed) throw new Error("Address is required");
   if (kind === "tron") {
     if (!isChecksummedTronAddress(trimmed)) {
@@ -141,13 +151,9 @@ export function normalizeAddress(value: string, kind: ChainKind): string {
     throw new Error("EVM address must be a 0x-prefixed 40-hex-character address");
   }
   try {
-    const checksummed = getAddress(trimmed);
-    if (checksummed !== trimmed) {
-      throw new Error(`EVM address must be EIP-55 checksummed (expected ${checksummed})`);
-    }
-    return checksummed;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("EIP-55")) throw error;
+    // Accept lowercase / mixed paste (common on mobile) and normalize to EIP-55.
+    return getAddress(trimmed);
+  } catch {
     throw new Error("Invalid EVM address checksum");
   }
 }
@@ -178,6 +184,8 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   if (kind === "solana") return symbol === "USDC";
   // Base: USDC only
   if (id === "8453") return symbol === "USDC";
+  // Ethereum mainnet: USDC only (Onramper + settlement)
+  if (id === "1") return symbol === "USDC";
   // BNB Smart Chain: USDC + USDT
   if (id === "56") return symbol === "USDC" || symbol === "USDT";
   // Other EVM (Sepolia): USDC and USDT when the sweeper lists a contract.

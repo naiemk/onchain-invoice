@@ -27,6 +27,12 @@ interface InvoiceRow {
   allow_partial: 0 | 1;
   payment_mode: string | null;
   payer_fiat: string | null;
+  display_fiat: string | null;
+  display_amount: string | null;
+  quote_country: string | null;
+  quote_payment_method: string | null;
+  quote_provider: string | null;
+  quote_slippage_bps: number | null;
   status: InvoiceStatus;
   amount_paid: string;
   amount_swept: string;
@@ -128,13 +134,15 @@ export class CommerceDb {
           .prepare(
             `INSERT INTO invoices (
               id, invoice_seed, client_invoice_id, price_usd, to_addresses, selected_to, chain_id, token,
-              invoice_address, title, description, callback_url, allow_partial, payment_mode, payer_fiat, status,
+              invoice_address, title, description, callback_url, allow_partial, payment_mode, payer_fiat,
+              display_fiat, display_amount, quote_country, quote_payment_method, quote_provider, quote_slippage_bps, status,
               amount_paid, amount_swept, fee_collected, gas_spent_wei, sweep_tx,
               pay_session_id, version, claimed_by, claimed_until,
               created_at, updated_at, paid_at, swept_at
             ) VALUES (
               @id, @invoiceSeed, @clientInvoiceId, @priceUsd, @toAddresses, @selectedTo, @chainId, @token,
-              @invoiceAddress, @title, @description, @callbackUrl, @allowPartial, @paymentMode, NULL, 'awaiting_payment',
+              @invoiceAddress, @title, @description, @callbackUrl, @allowPartial, @paymentMode, NULL,
+              @displayFiat, @displayAmount, @quoteCountry, @quotePaymentMethod, @quoteProvider, @quoteSlippageBps, 'awaiting_payment',
               '0', '0', '0', '0', NULL,
               @paySessionId, 1, NULL, NULL,
               @now, @now, NULL, NULL
@@ -155,6 +163,15 @@ export class CommerceDb {
             callbackUrl: input.fields.callback ?? null,
             allowPartial: input.fields.allowPartial ? 1 : 0,
             paymentMode: input.fields.paymentMode ?? "crypto",
+            displayFiat: input.fields.displayFiat?.trim().toUpperCase() ?? null,
+            displayAmount: input.fields.displayAmount?.trim() ?? null,
+            quoteCountry: input.fields.quoteCountry?.trim().toLowerCase() ?? null,
+            quotePaymentMethod: input.fields.quotePaymentMethod?.trim().toLowerCase() ?? null,
+            quoteProvider: input.fields.quoteProvider?.trim().toLowerCase() ?? null,
+            quoteSlippageBps:
+              typeof input.fields.quoteSlippageBps === "number" && Number.isFinite(input.fields.quoteSlippageBps)
+                ? Math.round(input.fields.quoteSlippageBps)
+                : null,
             paySessionId: input.paySessionId ?? null,
             now,
           });
@@ -604,6 +621,12 @@ export class CommerceDb {
     this.ensureColumn("invoices", "invoice_seed", "TEXT NOT NULL DEFAULT ''");
     this.ensureColumn("invoices", "payment_mode", "TEXT NOT NULL DEFAULT 'crypto'");
     this.ensureColumn("invoices", "payer_fiat", "TEXT");
+    this.ensureColumn("invoices", "display_fiat", "TEXT");
+    this.ensureColumn("invoices", "display_amount", "TEXT");
+    this.ensureColumn("invoices", "quote_country", "TEXT");
+    this.ensureColumn("invoices", "quote_payment_method", "TEXT");
+    this.ensureColumn("invoices", "quote_provider", "TEXT");
+    this.ensureColumn("invoices", "quote_slippage_bps", "INTEGER");
   }
 
   setPayerFiat(invoiceId: string, fiat: string): InvoiceRecord {
@@ -647,6 +670,12 @@ function mapInvoice(row: InvoiceRow): InvoiceRecord {
     allowPartial: row.allow_partial === 1,
     paymentMode,
     payerFiat: row.payer_fiat ?? null,
+    displayFiat: row.display_fiat ?? null,
+    displayAmount: row.display_amount ?? null,
+    quoteCountry: row.quote_country ?? null,
+    quotePaymentMethod: row.quote_payment_method ?? null,
+    quoteProvider: row.quote_provider ?? null,
+    quoteSlippageBps: row.quote_slippage_bps ?? null,
     status: row.status,
     amountPaid: row.amount_paid,
     amountSwept: row.amount_swept,

@@ -17,14 +17,14 @@ const TRON_BASE58_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 const SOLANA_BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 function normalizeMerchantAddress(value: string): string {
-  const trimmed = value.trim();
+  const trimmed = value
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00A0\s]/g, "")
+    .replace(/[\u06F0-\u06F9]/g, (ch) => String(ch.charCodeAt(0) - 0x06f0))
+    .replace(/[\u0660-\u0669]/g, (ch) => String(ch.charCodeAt(0) - 0x0660));
   if (!trimmed) throw new Error("Merchant address is required");
   if (trimmed.startsWith("0x") || trimmed.startsWith("0X")) {
-    const checksummed = getAddress(trimmed);
-    if (checksummed !== trimmed) {
-      throw new Error(`EVM merchant address must be EIP-55 checksummed (expected ${checksummed})`);
-    }
-    return checksummed;
+    return getAddress(trimmed);
   }
   if (TRON_BASE58_RE.test(trimmed)) return trimmed;
   if (SOLANA_BASE58_RE.test(trimmed) && !(trimmed.startsWith("T") && trimmed.length === 34)) {

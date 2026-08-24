@@ -19,6 +19,18 @@ export interface PayLinkFields {
   allowPartial: boolean;
   /** Default crypto. Fiat modes require Onramper enabled on the operator instance. */
   paymentMode: PaymentMode;
+  /** Customer-facing fiat currency (e.g. SEK) for fiat-priced invoices. */
+  displayFiat?: string;
+  /** Customer-facing fiat amount charged at checkout. */
+  displayAmount?: string;
+  /** Country used when quoting display fiat (ISO-3166 alpha-2). */
+  quoteCountry?: string;
+  /** Onramper payment method id used when quoting (e.g. creditcard). */
+  quotePaymentMethod?: string;
+  /** Onramper provider/ramp id locked at create (e.g. moonpay). */
+  quoteProvider?: string;
+  /** Max settlement drift in basis points (100 = 1%). Pay-time requote must stay within this. */
+  quoteSlippageBps?: number;
 }
 
 export interface InvoiceRecord {
@@ -38,6 +50,14 @@ export interface InvoiceRecord {
   paymentMode: PaymentMode;
   /** Last payer-selected fiat currency for Onramper (pay-time). */
   payerFiat: string | null;
+  /** Locked customer-facing fiat currency for fiat invoices. */
+  displayFiat: string | null;
+  /** Locked customer-facing fiat amount for fiat invoices. */
+  displayAmount: string | null;
+  quoteCountry: string | null;
+  quotePaymentMethod: string | null;
+  quoteProvider: string | null;
+  quoteSlippageBps: number | null;
   status: InvoiceStatus;
   amountPaid: string;
   amountSwept: string;

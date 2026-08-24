@@ -16,6 +16,13 @@ import type { InvoiceRecord, InvoiceStatus, InvoiceWithEvents } from "../shared/
 
 const STORAGE_KEY = "tc.merchantAddress";
 
+function formatMerchantAmount(invoice: InvoiceRecord): string {
+  if (invoice.displayFiat && invoice.displayAmount) {
+    return `${invoice.displayAmount} ${invoice.displayFiat}`;
+  }
+  return `$${invoice.priceUsd}`;
+}
+
 type SortKey = "createdAt" | "updatedAt" | "priceUsd" | "status" | "amountPaid";
 type SortDir = "asc" | "desc";
 type TimeFilter = "all" | "24h" | "7d" | "30d";
@@ -221,7 +228,7 @@ export function renderMerchant(root: HTMLElement): void {
                     <div class="cell-muted mono">${escapeHtml(shortId(invoice.id))}</div>
                   </td>
                   <td>${escapeHtml(invoice.title ?? "—")}</td>
-                  <td class="mono">$${escapeHtml(invoice.priceUsd)}</td>
+                  <td class="mono">${escapeHtml(formatMerchantAmount(invoice))}</td>
                   <td class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId))}</td>
                   <td><span class="pill pill-${escapeHtml(invoice.status)}">${escapeHtml(statusLabel(invoice.status))}</span></td>
                   <td>${invoice.chainId ? chainChipHtml(invoice.chainId, { size: "sm", short: true }) : "—"}</td>
@@ -366,7 +373,11 @@ function detailFields(invoice: InvoiceWithEvents): string {
 
   return `
     <dl class="detail-list">
-      <div><dt>${t("merchant.amountDue")}</dt><dd class="mono">$${escapeHtml(invoice.priceUsd)}</dd></div>
+      <div><dt>${t("merchant.amountDue")}</dt><dd class="mono">${escapeHtml(formatMerchantAmount(invoice))}${
+        invoice.displayFiat && invoice.displayAmount
+          ? ` <span class="cell-muted">(${escapeHtml(invoice.priceUsd)} ${escapeHtml(invoice.token ?? "USDC")})</span>`
+          : ""
+      }</dd></div>
       <div><dt>${t("merchant.amountPaid")}</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountPaid, invoice.token, invoice.chainId))}</dd></div>
       <div><dt>${t("merchant.amountSwept")}</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.amountSwept, invoice.token, invoice.chainId))}</dd></div>
       <div><dt>${t("merchant.platformFee")}</dt><dd class="mono">${escapeHtml(formatTokenAmount(invoice.feeCollected, invoice.token, invoice.chainId))}</dd></div>
