@@ -1,10 +1,11 @@
 /**
  * English source of truth for Trustless Commerce UI copy.
- * Other locales must `satisfies Messages` (same keys).
  *
  * Do not translate: brand “Trustless Commerce”, USDC/USDT, chain ids, addresses,
  * tx/invoice ids, JSON API examples. Keep placeholders like `{price}` intact.
  */
+import { walletEn } from "./wallet-en.js";
+
 export const en = {
   brand: "Trustless Commerce",
 
@@ -18,6 +19,7 @@ export const en = {
     github: "GitHub",
     telegram: "Telegram",
     support: "Support",
+    wallet: "Wallet",
   },
 
   locale: {
@@ -37,6 +39,8 @@ export const en = {
     createDescription: "Build a crypto payment link and share it with your customer.",
     payTitle: "Pay invoice · Trustless Commerce",
     payDescription: "Pay a Trustless Commerce crypto invoice on-chain.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "Merchant · Trustless Commerce",
     merchantDescription: "View and manage your Trustless Commerce invoices.",
     integrationsTitle: "Integrations · Trustless Commerce",
@@ -532,6 +536,8 @@ export const en = {
       },
     },
   },
+
+  wallet: walletEn,
 };
 
 export type Messages = typeof en;

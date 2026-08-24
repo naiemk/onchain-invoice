@@ -1,4 +1,5 @@
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const vi = {
   brand: "Trustless Commerce",
@@ -12,6 +13,7 @@ export const vi = {
     aiSkill: "Kỹ năng AI",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "Hỗ trợ",
   },
 
@@ -32,6 +34,8 @@ export const vi = {
     createDescription: "Tạo liên kết thanh toán crypto và gửi cho khách hàng của bạn.",
     payTitle: "Thanh toán hóa đơn · Trustless Commerce",
     payDescription: "Thanh toán hóa đơn crypto Trustless Commerce ngay trên chuỗi.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "Người bán · Trustless Commerce",
     merchantDescription: "Xem và quản lý hóa đơn Trustless Commerce của bạn.",
     integrationsTitle: "Tích hợp · Trustless Commerce",
@@ -528,4 +532,5 @@ export const vi = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

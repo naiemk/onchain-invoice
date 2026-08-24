@@ -52,6 +52,10 @@ import type { CommerceDb } from "./db.js";
 import { log, newRequestId } from "./logger.js";
 import { clientIp, takeToken } from "./rate-limit.js";
 import { requireSweeper } from "./sweeper-auth.js";
+import { requireBundler } from "./bundler-auth.js";
+import { registerWalletRoutes } from "./wallet-routes.js";
+import { formatUsdFromUsdc } from "../shared/userop.js";
+import type { UserOpStatus } from "../shared/userop.js";
 
 interface RouteContext {
   config: AppConfig;
@@ -59,6 +63,14 @@ interface RouteContext {
 }
 
 export function createRouter(context: RouteContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+  const handleWalletRoute = registerWalletRoutes(context.db, context.config.wallet, {
+    rateLimit: rateLimitOrThrow,
+    sendJson,
+    readJson,
+    clientIp,
+    publicLimit: context.config.rateLimit.publicPerIpPerSecond,
+  });
+
   return async (req, res) => {
     const requestId = newRequestId();
     res.setHeader("x-request-id", requestId);
@@ -117,6 +129,30 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       if (req.method === "POST" && url.pathname === "/api/public/onramp-webhook") {
         rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         await handleOnrampWebhook(req, res, context);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/public/wallet-config") {
+        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
+        const w = context.config.wallet;
+        sendJson(res, 200, {
+          chainId: w.chainId,
+          factoryAddress: w.factoryAddress ?? null,
+          recoveryAddress: w.recoveryAddress ?? null,
+          rpcUrl: w.rpcUrl ?? null,
+          recoveryTimelockSeconds: w.recoveryTimelockSeconds,
+          entryPointAddress: w.entryPointAddress,
+          bundlerFeeUsdc: w.bundlerFeeUsdc.toString(),
+          bundlerFeeUsd: formatUsdFromUsdc(w.bundlerFeeUsdc, w.feeTokenDecimals),
+          bundlerBeneficiary: w.bundlerBeneficiary ?? null,
+          feeTokenAddress: w.feeTokenAddress ?? null,
+          feeTokenSymbol: w.feeTokenSymbol,
+          feeTokenDecimals: w.feeTokenDecimals,
+        });
+        return;
+      }
+
+      if (await handleWalletRoute(req, res, url, ip)) {
         return;
       }
 
@@ -189,6 +225,41 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         return;
       }
 
+      // Bundler signed API
+      if (req.method === "GET" && url.pathname === "/api/bundler/me") {
+        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
+        const auth = requireBundler(req, context.db);
+        const bundler = context.db.getBundler(auth.address)!;
+        sendJson(res, 200, { bundler });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/bundler/userops") {
+        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
+        const auth = requireBundler(req, context.db);
+        const bundler = context.db.getBundler(auth.address)!;
+        const requested = url.searchParams.get("status");
+        const statuses = requested
+          ? (requested.split(",").map((s) => s.trim()).filter(Boolean) as UserOpStatus[])
+          : (["pending", "claimed"] as UserOpStatus[]);
+        sendJson(res, 200, {
+          userOps: context.db.listBundlerUserOps(statuses, bundler.chains.length ? bundler.chains : undefined),
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/bundler/claim") {
+        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
+        await claimUserOp(req, res, context);
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/bundler/track") {
+        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
+        await trackUserOp(req, res, context);
+        return;
+      }
+
       // Legacy internal (API key) — kept for transition
       if (req.method === "GET" && url.pathname === "/api/internal/invoices") {
         requireApiKey(req, context.config.sweeperApiKey, "SWEEPER_API_KEY");
@@ -218,6 +289,22 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
           enabled: body.enabled !== false,
         });
         sendJson(res, 201, { sweeper });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/admin/bundlers") {
+        requireApiKey(req, context.config.adminApiKey, "ADMIN_API_KEY");
+        const body = await readJson(req);
+        const address = getAddress(String(body.address ?? ""));
+        const label = String(body.label ?? address);
+        const chains = Array.isArray(body.chains) ? body.chains.map(String) : [];
+        const bundler = context.db.upsertBundler({
+          address,
+          label,
+          chains,
+          enabled: body.enabled !== false,
+        });
+        sendJson(res, 201, { bundler });
         return;
       }
 
@@ -254,6 +341,13 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         sendJson(res, 409, {
           error: error instanceof Error ? error.message : "Conflict",
           invoice: (error as { invoice: unknown }).invoice,
+        });
+        return;
+      }
+      if (statusCode === 409 && typeof error === "object" && error && "userOp" in error) {
+        sendJson(res, 409, {
+          error: error instanceof Error ? error.message : "Conflict",
+          userOp: (error as { userOp: unknown }).userOp,
         });
         return;
       }
@@ -901,6 +995,50 @@ async function trackInvoiceSigned(req: IncomingMessage, res: ServerResponse, { d
   await applyTrack(db, body, auth.address);
   const invoice = db.getInvoice(String(body.invoiceId));
   sendJson(res, 200, { invoice });
+}
+
+async function claimUserOp(req: IncomingMessage, res: ServerResponse, { config, db }: RouteContext): Promise<void> {
+  const auth = requireBundler(req, db);
+  const body = await readJson(req);
+  if (typeof body.userOpHash !== "string") {
+    throw Object.assign(new Error("userOpHash is required"), { statusCode: 400 });
+  }
+  const expectedVersion = Number(body.expectedVersion);
+  if (!Number.isFinite(expectedVersion)) {
+    throw Object.assign(new Error("expectedVersion is required"), { statusCode: 400 });
+  }
+  const userOp = db.claimWalletUserOp({
+    userOpHash: body.userOpHash,
+    bundlerAddress: auth.address,
+    expectedVersion,
+    leaseMs: config.claimLeaseMs,
+  });
+  sendJson(res, 200, { userOp });
+}
+
+async function trackUserOp(req: IncomingMessage, res: ServerResponse, { db }: RouteContext): Promise<void> {
+  const auth = requireBundler(req, db);
+  const body = await readJson(req);
+  if (typeof body.userOpHash !== "string") {
+    throw Object.assign(new Error("userOpHash is required"), { statusCode: 400 });
+  }
+  const status = parseUserOpStatus(body.status);
+  const userOp = db.trackWalletUserOp({
+    userOpHash: body.userOpHash,
+    status,
+    txHash: optionalString(body.txHash),
+    rejectReason: optionalString(body.rejectReason),
+    gasSpentWei: optionalString(body.gasSpentWei),
+    expectedVersion: body.expectedVersion !== undefined ? Number(body.expectedVersion) : undefined,
+    bundlerAddress: auth.address,
+  });
+  sendJson(res, 200, { userOp });
+}
+
+function parseUserOpStatus(value: unknown): UserOpStatus | undefined {
+  if (typeof value !== "string") return undefined;
+  const allowed: UserOpStatus[] = ["pending", "claimed", "submitted", "included", "failed", "rejected"];
+  return allowed.includes(value as UserOpStatus) ? (value as UserOpStatus) : undefined;
 }
 
 async function trackInvoiceLegacy(req: IncomingMessage, res: ServerResponse, { config, db }: RouteContext): Promise<void> {

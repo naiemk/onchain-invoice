@@ -5,6 +5,7 @@ import { renderCreate } from "./pages/create.js";
 import { renderHome } from "./pages/home.js";
 import { renderMerchant } from "./pages/merchant.js";
 import { renderPay } from "./pages/pay.js";
+import { renderWallet } from "./pages/wallet.js";
 import { SITE } from "./shared/site.js";
 import { applyTheme, initThemeToggle, preferredTheme } from "./shared/theme.js";
 import { isLocale, LOCALES, LOCALE_NATIVE_NAMES } from "./i18n/locales.js";
@@ -20,6 +21,11 @@ const routes: Record<string, PageRenderer> = {
   "/pay": renderPay,
   "/merchant": renderMerchant,
   "/admin": renderAdmin,
+  "/wallet": renderWallet,
+  "/wallet/security": renderWallet,
+  "/wallet/create": renderWallet,
+  "/wallet/pair": renderWallet,
+  "/wallet/send": renderWallet,
 };
 
 applyTheme(preferredTheme());
@@ -47,7 +53,7 @@ async function render(): Promise<void> {
   applyMeta(pathname);
   const route =
     routes[pathname] ??
-    (pathname.startsWith("/merchant/") ? renderMerchant : renderHome);
+    (pathname.startsWith("/merchant/") ? renderMerchant : pathname.startsWith("/wallet") ? renderWallet : renderHome);
   appRoot.innerHTML = shell(pathname);
   const outlet = appRoot.querySelector<HTMLElement>("#outlet");
   if (!outlet) throw new Error("Missing outlet");
@@ -76,6 +82,11 @@ function pageMeta(path: string): { title: string; description: string } {
       return { title: t("meta.integrationsTitle"), description: t("meta.integrationsDescription") };
     case "/admin":
       return { title: t("meta.adminTitle"), description: t("meta.adminDescription") };
+    case "/wallet":
+    case "/wallet/security":
+    case "/wallet/create":
+    case "/wallet/pair":
+      return { title: t("meta.walletTitle"), description: t("meta.walletDescription") };
     default:
       return { title: t("meta.homeTitle"), description: t("meta.homeDescription") };
   }
@@ -120,6 +131,7 @@ function shell(pathname: string): string {
         ${link("/", t("nav.product"))}
         ${link("/integrations", t("nav.integrations"))}
         ${link("/create", t("nav.create"))}
+        ${link("/wallet", t("nav.wallet"))}
         ${link("/merchant", t("nav.merchant"))}
         <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">${t("nav.docs")}</a>
         ${localeSelectHtml()}

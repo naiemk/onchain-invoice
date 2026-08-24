@@ -2,6 +2,7 @@
  * Turkish (tr) UI copy for Trustless Commerce.
  */
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const tr = {
   brand: "Trustless Commerce",
@@ -15,6 +16,7 @@ export const tr = {
     aiSkill: "Yapay zekâ becerisi",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "Destek",
   },
 
@@ -36,6 +38,8 @@ export const tr = {
     createDescription: "Kripto ödeme bağlantısı hazırlayın ve müşterinizle paylaşın.",
     payTitle: "Fatura öde · Trustless Commerce",
     payDescription: "Trustless Commerce kripto faturasını zincir üzerinde ödeyin.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "Satıcı · Trustless Commerce",
     merchantDescription: "Trustless Commerce faturalarınızı görüntüleyin ve yönetin.",
     integrationsTitle: "Entegrasyonlar · Trustless Commerce",
@@ -544,4 +548,5 @@ export const tr = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

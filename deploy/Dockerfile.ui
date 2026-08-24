@@ -5,6 +5,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY ui ./ui
+COPY commerce/shared ./commerce/shared
 # Vite resolves the onchain-invoice browser alias inside ui/; no full package build needed.
 ENV VITE_API_BASE_URL=
 RUN npm ci && npm run ui:build

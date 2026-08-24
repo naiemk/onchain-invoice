@@ -2,6 +2,7 @@
  * Korean copy for Trustless Commerce UI.
  */
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const ko = {
   brand: "Trustless Commerce",
@@ -15,6 +16,7 @@ export const ko = {
     aiSkill: "AI 스킬",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "지원",
   },
 
@@ -35,6 +37,8 @@ export const ko = {
     createDescription: "암호화폐 결제 링크를 만들어 고객에게 바로 공유하세요.",
     payTitle: "인보이스 결제 · Trustless Commerce",
     payDescription: "Trustless Commerce 암호화폐 인보이스를 온체인으로 결제합니다.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "판매자 · Trustless Commerce",
     merchantDescription: "Trustless Commerce 인보이스를 확인하고 관리합니다.",
     integrationsTitle: "연동 · Trustless Commerce",
@@ -531,4 +535,5 @@ export const ko = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

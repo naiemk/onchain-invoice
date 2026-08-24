@@ -1,4 +1,5 @@
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const bn = {
   brand: "Trustless Commerce",
@@ -12,6 +13,7 @@ export const bn = {
     aiSkill: "AI স্কিল",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "সহায়তা",
   },
 
@@ -32,6 +34,8 @@ export const bn = {
     createDescription: "ক্রিপ্টো পেমেন্ট লিংক তৈরি করে গ্রাহকের সঙ্গে শেয়ার করুন।",
     payTitle: "ইনভয়েস পরিশোধ · Trustless Commerce",
     payDescription: "Trustless Commerce ক্রিপ্টো ইনভয়েস অন-চেইনে পরিশোধ করুন।",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "মার্চেন্ট · Trustless Commerce",
     merchantDescription: "আপনার Trustless Commerce ইনভয়েস দেখুন ও পরিচালনা করুন।",
     integrationsTitle: "ইন্টিগ্রেশন · Trustless Commerce",
@@ -528,4 +532,5 @@ export const bn = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

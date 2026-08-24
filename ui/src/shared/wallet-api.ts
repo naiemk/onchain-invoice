@@ -1,0 +1,150 @@
+import type { WalletDeviceRecord, WalletPublicConfig } from "../../../commerce/shared/wallet.js";
+import type { PackedUserOperationJson, WalletUserOpRecord } from "../../../commerce/shared/userop.js";
+
+const API = "";
+
+export async function fetchWalletConfig(): Promise<WalletPublicConfig> {
+  const res = await fetch(`${API}/api/public/wallet-config`);
+  if (!res.ok) throw new Error("wallet config unavailable");
+  return res.json() as Promise<WalletPublicConfig>;
+}
+
+export async function listDevices(wallet: string, chainId: string): Promise<WalletDeviceRecord[]> {
+  const q = new URLSearchParams({ wallet, chainId });
+  const res = await fetch(`${API}/api/wallet/devices?${q}`);
+  if (!res.ok) throw new Error("failed to load devices");
+  const body = (await res.json()) as { devices: WalletDeviceRecord[] };
+  return body.devices;
+}
+
+export async function registerDevice(input: {
+  walletAddress: string;
+  chainId: string;
+  ownerQx: string;
+  ownerQy: string;
+  label: string;
+  credentialId: string;
+}): Promise<WalletDeviceRecord> {
+  const res = await fetch(`${API}/api/wallet/devices`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error("failed to register device");
+  const body = (await res.json()) as { device: WalletDeviceRecord };
+  return body.device;
+}
+
+export async function deleteDevice(
+  wallet: string,
+  chainId: string,
+  ownerQx: string,
+  ownerQy: string
+): Promise<void> {
+  const path = `/api/wallet/devices/${wallet}/${ownerQx.slice(2)}/${ownerQy.slice(2)}?chainId=${encodeURIComponent(chainId)}`;
+  const res = await fetch(`${API}${path}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("failed to delete device");
+}
+
+export async function createPairing(walletAddress: string, chainId: string) {
+  const res = await fetch(`${API}/api/wallet/pairing`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "create", walletAddress, chainId }),
+  });
+  if (!res.ok) throw new Error("pairing create failed");
+  return (await res.json()) as { pairing: { nonce: string; walletAddress: string; chainId: string; expiresAt: string } };
+}
+
+export async function submitPairing(input: {
+  nonce: string;
+  newOwnerQx: string;
+  newOwnerQy: string;
+  deviceLabel: string;
+}) {
+  const res = await fetch(`${API}/api/wallet/pairing`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "submit", ...input }),
+  });
+  if (!res.ok) throw new Error("pairing submit failed");
+  return (await res.json()) as { pairing: { status: string } };
+}
+
+export async function pollPairing(nonce: string) {
+  const res = await fetch(`${API}/api/wallet/pairing`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "poll", nonce }),
+  });
+  if (!res.ok) throw new Error("pairing poll failed");
+  return (await res.json()) as {
+    pairing: {
+      status: string;
+      newOwnerQx: string | null;
+      newOwnerQy: string | null;
+      deviceLabel: string | null;
+    };
+  };
+}
+
+export function pairingQrPayload(input: {
+  walletAddress: string;
+  chainId: string;
+  nonce: string;
+  rpId: string;
+}): string {
+  return JSON.stringify(input);
+}
+
+export function parsePairingQr(raw: string): {
+  walletAddress: string;
+  chainId: string;
+  nonce: string;
+  rpId: string;
+} {
+  return JSON.parse(raw) as {
+    walletAddress: string;
+    chainId: string;
+    nonce: string;
+    rpId: string;
+  };
+}
+
+export async function submitUserOp(input: {
+  chainId: string;
+  walletAddress: string;
+  userOp: PackedUserOperationJson;
+  userOpHash: string;
+}): Promise<WalletUserOpRecord> {
+  const res = await fetch(`${API}/api/wallet/userops`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new Error(body.message ?? body.error ?? "userOp submit failed");
+  }
+  const body = (await res.json()) as { userOp: WalletUserOpRecord };
+  return body.userOp;
+}
+
+export async function pollUserOpStatus(userOpHash: string): Promise<WalletUserOpRecord> {
+  const res = await fetch(`${API}/api/wallet/userops/${userOpHash}`);
+  if (!res.ok) throw new Error("userOp status unavailable");
+  const body = (await res.json()) as { userOp: WalletUserOpRecord };
+  return body.userOp;
+}
+
+export async function waitForUserOp(userOpHash: string, timeoutMs = 120_000): Promise<WalletUserOpRecord> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const record = await pollUserOpStatus(userOpHash);
+    if (record.status === "included" || record.status === "failed" || record.status === "rejected") {
+      return record;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error("Timed out waiting for userOp");
+}

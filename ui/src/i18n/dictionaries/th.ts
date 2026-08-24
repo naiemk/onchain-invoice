@@ -1,4 +1,5 @@
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const th = {
   brand: "Trustless Commerce",
@@ -12,6 +13,7 @@ export const th = {
     aiSkill: "สกิล AI",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "ฝ่ายสนับสนุน",
   },
 
@@ -32,6 +34,8 @@ export const th = {
     createDescription: "สร้างลิงก์ชำระเงินคริปโตแล้วส่งให้ลูกค้าของคุณ",
     payTitle: "ชำระใบแจ้งหนี้ · Trustless Commerce",
     payDescription: "ชำระใบแจ้งหนี้คริปโตของ Trustless Commerce บนเชน",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "ร้านค้า · Trustless Commerce",
     merchantDescription: "ดูและจัดการใบแจ้งหนี้ Trustless Commerce ของคุณ",
     integrationsTitle: "การเชื่อมต่อ · Trustless Commerce",
@@ -528,4 +532,5 @@ export const th = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

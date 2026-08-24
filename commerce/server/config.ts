@@ -67,6 +67,23 @@ export interface AppConfig {
   configPath?: string;
   /** Operator-gated Onramper card/bank onramp. Default off. */
   onramper: OnramperConfig;
+  /** Passkey smart wallet factory (Sepolia / per-chain). */
+  wallet: WalletConfig;
+}
+
+export interface WalletConfig {
+  chainId: string;
+  factoryAddress?: string;
+  recoveryAddress?: string;
+  implementationAddress?: string;
+  recoveryTimelockSeconds: number;
+  rpcUrl?: string;
+  entryPointAddress: string;
+  bundlerFeeUsdc: bigint;
+  bundlerBeneficiary?: string;
+  feeTokenAddress?: string;
+  feeTokenSymbol: string;
+  feeTokenDecimals: number;
 }
 
 export interface OnramperConfig {
@@ -184,6 +201,32 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     claimLeaseMs: Number(env.CLAIM_LEASE_MS ?? file.claimLeaseMs ?? 180_000),
     configPath,
     onramper: loadOnramperConfig(env, file.onramper),
+    wallet: loadWalletConfig(env, legacy?.rpcUrl),
+  };
+}
+
+function loadWalletConfig(env: NodeJS.ProcessEnv, fallbackRpc?: string): WalletConfig {
+  const chainId = expand(env.WALLET_CHAIN_ID ?? "11155111");
+  const timelock = Number(env.WALLET_RECOVERY_TIMELOCK ?? "259200");
+  const feeOverride = env[`WALLET_${chainId}_BUNDLER_FEE_USDC`] ?? env.WALLET_BUNDLER_FEE_USDC ?? "100000";
+  const feeAtoms = BigInt(feeOverride);
+  const entryPoint =
+    blankToUndefined(expand(env.WALLET_ENTRYPOINT_ADDRESS ?? "")) ??
+    "0x433709009B8330FDa32311DF1C2AFA402eD8D009";
+  const sepoliaUsdc = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+  return {
+    chainId,
+    factoryAddress: blankToUndefined(expand(env.WALLET_FACTORY_ADDRESS ?? "")),
+    recoveryAddress: blankToUndefined(expand(env.WALLET_RECOVERY_ADDRESS ?? "")),
+    implementationAddress: blankToUndefined(expand(env.WALLET_IMPLEMENTATION_ADDRESS ?? "")),
+    recoveryTimelockSeconds: Number.isFinite(timelock) ? timelock : 259200,
+    rpcUrl: blankToUndefined(expand(env.WALLET_RPC_URL ?? env.EVM_RPC_URL ?? fallbackRpc ?? "")),
+    entryPointAddress: entryPoint,
+    bundlerFeeUsdc: feeAtoms,
+    bundlerBeneficiary: blankToUndefined(expand(env.WALLET_BUNDLER_BENEFICIARY ?? "")),
+    feeTokenAddress: blankToUndefined(expand(env.WALLET_BUNDLER_FEE_TOKEN ?? env.WALLET_FEE_TOKEN ?? sepoliaUsdc)),
+    feeTokenSymbol: expand(env.WALLET_FEE_TOKEN_SYMBOL ?? "USDC"),
+    feeTokenDecimals: Number(env.WALLET_FEE_TOKEN_DECIMALS ?? "6") || 6,
   };
 }
 

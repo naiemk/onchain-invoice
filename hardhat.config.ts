@@ -4,10 +4,12 @@ import hardhatEthers from "@nomicfoundation/hardhat-ethers";
 import hardhatMocha from "@nomicfoundation/hardhat-mocha";
 import hardhatVerify from "@nomicfoundation/hardhat-verify";
 
-const sepoliaRpcUrl = process.env.SEPOLIA_RPC_URL?.trim();
+const sepoliaRpcUrl =
+  process.env.SEPOLIA_RPC_URL?.trim() || process.env.EVM_RPC_URL?.trim();
 const baseRpcUrl = process.env.BASE_RPC_URL?.trim() || process.env.EVM_8453_RPC_URL?.trim();
 const bscRpcUrl = process.env.BSC_RPC_URL?.trim() || process.env.EVM_56_RPC_URL?.trim();
-const evmPrivateKey = process.env.EVM_PRIVATE_KEY?.trim();
+const evmPrivateKey =
+  process.env.EVM_PRIVATE_KEY?.trim() || process.env.SWEEPER_PRIVATE_KEY?.trim();
 // Etherscan API v2 key covers Ethereum / Base / BNB and other supported explorers.
 const etherscanApiKey = process.env.ETHERSCAN_API_KEY?.trim();
 
@@ -16,7 +18,7 @@ export default defineConfig({
   solidity: {
     profiles: {
       default: {
-        version: "0.8.24",
+        version: "0.8.26",
         settings: {
           optimizer: {
             enabled: true,
@@ -27,7 +29,7 @@ export default defineConfig({
       },
       // hardhat-verify defaults to this profile — keep identical to `default`.
       production: {
-        version: "0.8.24",
+        version: "0.8.26",
         settings: {
           optimizer: {
             enabled: true,
@@ -76,6 +78,9 @@ export default defineConfig({
     etherscan: {
       // Optional — Sourcify/Blockscout still run without it. Set ETHERSCAN_API_KEY in root .env.
       apiKey: etherscanApiKey || "",
+    },
+    sourcify: {
+      enabled: false,
     },
   },
 });

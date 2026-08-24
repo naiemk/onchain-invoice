@@ -2,6 +2,7 @@
  * Japanese copy for Trustless Commerce UI.
  */
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const ja = {
   brand: "Trustless Commerce",
@@ -15,6 +16,7 @@ export const ja = {
     aiSkill: "AI スキル",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "サポート",
   },
 
@@ -35,6 +37,8 @@ export const ja = {
     createDescription: "暗号資産の支払いリンクを作成して、お客様に共有できます。",
     payTitle: "請求書のお支払い · Trustless Commerce",
     payDescription: "Trustless Commerce の暗号資産請求書をオンチェーンで支払います。",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "販売者 · Trustless Commerce",
     merchantDescription: "Trustless Commerce の請求書を確認・管理します。",
     integrationsTitle: "連携 · Trustless Commerce",
@@ -531,4 +535,5 @@ export const ja = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;

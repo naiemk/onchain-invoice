@@ -2,6 +2,7 @@
  * Russian (ru) UI copy for Trustless Commerce.
  */
 import type { Messages } from "./en.js";
+import { walletEn } from "./wallet-en.js";
 
 export const ru = {
   brand: "Trustless Commerce",
@@ -15,6 +16,7 @@ export const ru = {
     aiSkill: "ИИ-навык",
     github: "GitHub",
     telegram: "Telegram",
+    wallet: "Wallet",
     support: "Поддержка",
   },
 
@@ -36,6 +38,8 @@ export const ru = {
     createDescription: "Соберите ссылку на оплату в криптовалюте и отправьте её покупателю.",
     payTitle: "Оплата счёта · Trustless Commerce",
     payDescription: "Оплатите криптосчёт Trustless Commerce напрямую в блокчейне.",
+    walletTitle: "Passkey wallet · Trustless Commerce",
+    walletDescription: "WebAuthn passkey wallet with pluggable recovery.",
     merchantTitle: "Продавцу · Trustless Commerce",
     merchantDescription: "Просматривайте счета Trustless Commerce и управляйте ими.",
     integrationsTitle: "Интеграции · Trustless Commerce",
@@ -544,4 +548,5 @@ export const ru = {
       },
     },
   },
+  wallet: walletEn,
 } satisfies Messages;
