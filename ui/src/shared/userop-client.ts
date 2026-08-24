@@ -12,7 +12,7 @@ import {
 } from "../../../commerce/shared/userop.js";
 import { encodeWebAuthnSignature } from "../../../commerce/shared/webauthn-signature.js";
 import { signUserOpHash } from "./webauthn.js";
-import { submitUserOp } from "./wallet-api.js";
+import { primaryChain, submitUserOp } from "./wallet-api.js";
 
 export async function buildSignedSendUserOp(input: {
   config: WalletPublicConfig;
@@ -23,16 +23,17 @@ export async function buildSignedSendUserOp(input: {
   credentialId?: string;
 }): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
   const { config, walletAddress, recipient, sendAmount, feeAmount } = input;
-  if (!config.feeTokenAddress || !config.bundlerBeneficiary) {
+  const chain = primaryChain(config);
+  if (!chain.feeTokenAddress || !config.bundlerBeneficiary) {
     throw new Error("Bundler fee not configured");
   }
-  if (!config.rpcUrl) throw new Error("RPC not configured");
-  const provider = new JsonRpcProvider(config.rpcUrl);
+  if (!chain.rpcUrl) throw new Error("RPC not configured");
+  const provider = new JsonRpcProvider(chain.rpcUrl);
   const entryPoint = new Contract(config.entryPointAddress, ENTRYPOINT_ABI, provider);
   const nonce = BigInt(await entryPoint.getNonce(walletAddress, 0));
   const callData = encodeExecuteCallData(
     buildSendBatchCalls({
-      feeToken: config.feeTokenAddress,
+      feeToken: chain.feeTokenAddress,
       beneficiary: config.bundlerBeneficiary,
       feeAmount,
       recipient,
@@ -54,16 +55,17 @@ export async function buildSignedAddOwnerUserOp(input: {
   feeAmount: bigint;
   credentialId?: string;
 }): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
-  if (!input.config.feeTokenAddress || !input.config.bundlerBeneficiary) {
+  const chain = primaryChain(input.config);
+  if (!chain.feeTokenAddress || !input.config.bundlerBeneficiary) {
     throw new Error("Bundler fee not configured");
   }
-  if (!input.config.rpcUrl) throw new Error("RPC not configured");
-  const provider = new JsonRpcProvider(input.config.rpcUrl);
+  if (!chain.rpcUrl) throw new Error("RPC not configured");
+  const provider = new JsonRpcProvider(chain.rpcUrl);
   const entryPoint = new Contract(input.config.entryPointAddress, ENTRYPOINT_ABI, provider);
   const nonce = BigInt(await entryPoint.getNonce(input.walletAddress, 0));
   const callData = encodeExecuteCallData(
     buildAddOwnerBatchCalls({
-      feeToken: input.config.feeTokenAddress,
+      feeToken: chain.feeTokenAddress,
       beneficiary: input.config.bundlerBeneficiary,
       feeAmount: input.feeAmount,
       wallet: input.walletAddress,
@@ -85,16 +87,17 @@ export async function buildSignedRemoveOwnerUserOp(input: {
   feeAmount: bigint;
   credentialId?: string;
 }): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
-  if (!input.config.feeTokenAddress || !input.config.bundlerBeneficiary) {
+  const chain = primaryChain(input.config);
+  if (!chain.feeTokenAddress || !input.config.bundlerBeneficiary) {
     throw new Error("Bundler fee not configured");
   }
-  if (!input.config.rpcUrl) throw new Error("RPC not configured");
-  const provider = new JsonRpcProvider(input.config.rpcUrl);
+  if (!chain.rpcUrl) throw new Error("RPC not configured");
+  const provider = new JsonRpcProvider(chain.rpcUrl);
   const entryPoint = new Contract(input.config.entryPointAddress, ENTRYPOINT_ABI, provider);
   const nonce = BigInt(await entryPoint.getNonce(input.walletAddress, 0));
   const callData = encodeExecuteCallData(
     buildRemoveOwnerBatchCalls({
-      feeToken: input.config.feeTokenAddress,
+      feeToken: chain.feeTokenAddress,
       beneficiary: input.config.bundlerBeneficiary,
       feeAmount: input.feeAmount,
       wallet: input.walletAddress,

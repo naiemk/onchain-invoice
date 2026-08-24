@@ -3,6 +3,8 @@ import { copyText, escapeHtml } from "../shared/dom.js";
 import { localizeError } from "../i18n/errors.js";
 import { LOCALES, LOCALE_NATIVE_NAMES } from "../i18n/locales.js";
 import { t } from "../i18n/t.js";
+import { createCounterfactualWallet } from "../shared/wallet-create.js";
+import { loadWalletSession } from "../shared/webauthn.js";
 import {
   chainLogoSvg,
   deploymentMode,
@@ -186,6 +188,11 @@ export function renderCreate(root: HTMLElement): void {
               <strong>${t("create.fundsSweptStrong")}</strong>
               ${t("create.evmWalletNote")}
             </div>
+            <div class="btn-row" style="margin-bottom:0.5rem">
+              <button type="button" class="secondary" id="use-passkey-wallet">${t("create.usePasskeyWallet")}</button>
+              <button type="button" class="secondary" id="clear-passkey-wallet" hidden>${t("create.changeWallet")}</button>
+            </div>
+            <p class="field-hint" id="passkey-wallet-chip" hidden></p>
             <p class="field-hint">${t("create.evmWalletHint")}</p>
             <input id="toEvm" name="toEvm" class="mono" placeholder="0x…" autocomplete="off" spellcheck="false" disabled />
             <p class="field-error" id="toEvm-error" hidden></p>
@@ -430,6 +437,64 @@ ${t("create.docsStatusLine")}</pre>
       note.textContent = t("create.payLinkCopied");
       note.classList.remove("danger");
     }
+  });
+
+  const applyPasskeyWalletToForm = (address: string): void => {
+    const toEvm = root.querySelector<HTMLInputElement>("#toEvm");
+    const chip = root.querySelector<HTMLElement>("#passkey-wallet-chip");
+    const clearBtn = root.querySelector<HTMLElement>("#clear-passkey-wallet");
+    if (!toEvm) return;
+    toEvm.value = address;
+    toEvm.readOnly = true;
+    if (chip) {
+      chip.hidden = false;
+      chip.textContent = t("create.passkeyWalletLinked", { address });
+    }
+    clearBtn?.removeAttribute("hidden");
+    refresh();
+  };
+
+  const session = loadWalletSession();
+  if (session?.address) {
+    applyPasskeyWalletToForm(session.address);
+  }
+
+  root.querySelector("#use-passkey-wallet")?.addEventListener("click", async () => {
+    const btn = root.querySelector<HTMLButtonElement>("#use-passkey-wallet");
+    const note = root.querySelector<HTMLElement>("#form-action-status");
+    if (btn) btn.disabled = true;
+    try {
+      const existing = loadWalletSession();
+      if (existing?.address) {
+        applyPasskeyWalletToForm(existing.address);
+        if (note) note.textContent = t("create.passkeyWalletFilled");
+        return;
+      }
+      const label = t("create.passkeyWalletDeviceLabel");
+      const { address } = await createCounterfactualWallet(label);
+      applyPasskeyWalletToForm(address);
+      if (note) note.textContent = t("create.passkeyWalletCreated");
+    } catch (error) {
+      if (note) {
+        note.textContent = error instanceof Error ? error.message : t("create.passkeyWalletFailed");
+        note.classList.add("danger");
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
+  root.querySelector("#clear-passkey-wallet")?.addEventListener("click", () => {
+    const toEvm = root.querySelector<HTMLInputElement>("#toEvm");
+    const chip = root.querySelector<HTMLElement>("#passkey-wallet-chip");
+    const clearBtn = root.querySelector<HTMLElement>("#clear-passkey-wallet");
+    if (toEvm) {
+      toEvm.value = "";
+      toEvm.readOnly = false;
+    }
+    if (chip) chip.hidden = true;
+    clearBtn?.setAttribute("hidden", "");
+    refresh();
   });
 
   for (const [id, kind] of [

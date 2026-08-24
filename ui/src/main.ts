@@ -5,7 +5,7 @@ import { renderCreate } from "./pages/create.js";
 import { renderHome } from "./pages/home.js";
 import { renderMerchant } from "./pages/merchant.js";
 import { renderPay } from "./pages/pay.js";
-import { renderWallet } from "./pages/wallet.js";
+import { renderWallet } from "./pages/wallet/index.js";
 import { SITE } from "./shared/site.js";
 import { applyTheme, initThemeToggle, preferredTheme } from "./shared/theme.js";
 import { isLocale, LOCALES, LOCALE_NATIVE_NAMES } from "./i18n/locales.js";

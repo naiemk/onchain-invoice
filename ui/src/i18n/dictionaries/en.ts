@@ -5,6 +5,7 @@
  * tx/invoice ids, JSON API examples. Keep placeholders like `{price}` intact.
  */
 import { walletEn } from "./wallet-en.js";
+import { createPasskeyEn } from "./create-passkey-en.js";
 
 export const en = {
   brand: "Trustless Commerce",
@@ -307,6 +308,7 @@ export const en = {
     docsAgentsBody:
       "Use the project Cursor skill to create invoices and poll status without a merchant dashboard. Full docs:",
     docsGithubPages: "GitHub Pages",
+    ...createPasskeyEn,
   },
 
   pay: {

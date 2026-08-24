@@ -1,4 +1,5 @@
-import type { WalletDeviceRecord, WalletPublicConfig } from "../../../commerce/shared/wallet.js";
+import type { WalletBalanceResponse } from "../../../commerce/shared/wallet.js";
+import type { WalletPublicConfig, WalletAccountRecord } from "../../../commerce/shared/wallet.js";
 import type { PackedUserOperationJson, WalletUserOpRecord } from "../../../commerce/shared/userop.js";
 
 const API = "";
@@ -9,11 +10,47 @@ export async function fetchWalletConfig(): Promise<WalletPublicConfig> {
   return res.json() as Promise<WalletPublicConfig>;
 }
 
-export async function listDevices(wallet: string, chainId: string): Promise<WalletDeviceRecord[]> {
+export async function fetchWalletBalance(wallet: string): Promise<WalletBalanceResponse> {
+  const q = new URLSearchParams({ wallet });
+  const res = await fetch(`${API}/api/wallet/balance?${q}`);
+  if (!res.ok) throw new Error("failed to load balance");
+  return res.json() as Promise<WalletBalanceResponse>;
+}
+
+export async function registerWalletAccount(input: {
+  address: string;
+  salt: string;
+  ownerQx: string;
+  ownerQy: string;
+  credentialId: string;
+  webauthnAttestation?: unknown;
+}): Promise<WalletAccountRecord> {
+  const res = await fetch(`${API}/api/wallet/accounts`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new Error(body.message ?? body.error ?? "failed to register account");
+  }
+  const body = (await res.json()) as { account: WalletAccountRecord };
+  return body.account;
+}
+
+export async function getWalletAccount(address: string): Promise<WalletAccountRecord | null> {
+  const res = await fetch(`${API}/api/wallet/accounts/${address}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("failed to load account");
+  const body = (await res.json()) as { account: WalletAccountRecord };
+  return body.account;
+}
+
+export async function listDevices(wallet: string, chainId: string): Promise<import("../../../commerce/shared/wallet.js").WalletDeviceRecord[]> {
   const q = new URLSearchParams({ wallet, chainId });
   const res = await fetch(`${API}/api/wallet/devices?${q}`);
   if (!res.ok) throw new Error("failed to load devices");
-  const body = (await res.json()) as { devices: WalletDeviceRecord[] };
+  const body = (await res.json()) as { devices: import("../../../commerce/shared/wallet.js").WalletDeviceRecord[] };
   return body.devices;
 }
 
@@ -24,14 +61,14 @@ export async function registerDevice(input: {
   ownerQy: string;
   label: string;
   credentialId: string;
-}): Promise<WalletDeviceRecord> {
+}): Promise<import("../../../commerce/shared/wallet.js").WalletDeviceRecord> {
   const res = await fetch(`${API}/api/wallet/devices`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error("failed to register device");
-  const body = (await res.json()) as { device: WalletDeviceRecord };
+  const body = (await res.json()) as { device: import("../../../commerce/shared/wallet.js").WalletDeviceRecord };
   return body.device;
 }
 
@@ -97,6 +134,11 @@ export function pairingQrPayload(input: {
   return JSON.stringify(input);
 }
 
+export function pairingDeepLink(payload: string): string {
+  const encoded = btoa(payload).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${location.origin}/wallet/pair?payload=${encoded}`;
+}
+
 export function parsePairingQr(raw: string): {
   walletAddress: string;
   chainId: string;
@@ -109,6 +151,18 @@ export function parsePairingQr(raw: string): {
     nonce: string;
     rpId: string;
   };
+}
+
+export function parsePairingFromUrl(): string | null {
+  const encoded = new URLSearchParams(location.search).get("payload");
+  if (!encoded) return null;
+  const padded = encoded.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = padded.length % 4 === 0 ? padded : padded + "=".repeat(4 - (padded.length % 4));
+  try {
+    return atob(pad);
+  } catch {
+    return null;
+  }
 }
 
 export async function submitUserOp(input: {
@@ -147,4 +201,15 @@ export async function waitForUserOp(userOpHash: string, timeoutMs = 120_000): Pr
     await new Promise((r) => setTimeout(r, 2000));
   }
   throw new Error("Timed out waiting for userOp");
+}
+
+/** Resolve primary chain RPC from multi-chain config. */
+export function primaryChain(config: WalletPublicConfig) {
+  const chain = config.chains?.find((c) => c.chainId === config.chainId) ?? config.chains?.[0];
+  return {
+    rpcUrl: chain?.rpcUrl ?? config.rpcUrl,
+    feeTokenAddress: chain?.feeTokenAddress ?? config.feeTokenAddress,
+    feeTokenSymbol: chain?.feeTokenSymbol ?? config.feeTokenSymbol,
+    feeTokenDecimals: chain?.feeTokenDecimals ?? config.feeTokenDecimals,
+  };
 }

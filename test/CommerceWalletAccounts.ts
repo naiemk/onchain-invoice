@@ -1,0 +1,151 @@
+import { expect } from "chai";
+import { ethers as ethersLib } from "ethers";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createApp } from "../commerce/server/app.js";
+import { loadConfig } from "../commerce/server/config.js";
+import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
+
+const FACTORY = "0x2b245a20589c745B11F8a69C677F891e8175a550";
+const IMPL = "0x297CF0F47e9f6dAd3903694dE531abaD83CE8AAA";
+const QX = ethersLib.zeroPadValue("0x0a", 32);
+const QY = ethersLib.zeroPadValue("0x0b", 32);
+
+const BASE_ENV = {
+  PORT: "0",
+  ADMIN_API_KEY: "admin-wallet-test",
+  SWEEPER_API_KEY: "sweeper-wallet-test",
+  WALLET_FACTORY_ADDRESS: FACTORY,
+  WALLET_IMPLEMENTATION_ADDRESS: IMPL,
+  WALLET_RECOVERY_ADDRESS: "0x87CB1c5eD04959A51A7CACe8eA2787791F9cE347",
+  WALLET_RPC_URL: "",
+  EVM_RPC_URL: "",
+} as const;
+
+async function withApp(fn: (baseUrl: string) => Promise<void>): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), "commerce-wallet-"));
+  const config = loadConfig({
+    ...process.env,
+    ...BASE_ENV,
+    DB_PATH: join(dir, "test.db"),
+  } as NodeJS.ProcessEnv);
+  const app = createApp(config);
+  await new Promise<void>((resolve) => {
+    app.server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const address = app.server.address();
+  if (!address || typeof address === "string") throw new Error("expected TCP address");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  try {
+    await fn(baseUrl);
+  } finally {
+    await app.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+describe("commerce wallet accounts API", function () {
+  it("registers counterfactual account and returns deploy status", async function () {
+    await withApp(async (baseUrl) => {
+      const salt = deriveWalletSalt(QX, QY);
+      const address = predictWalletAddress(FACTORY, IMPL, salt);
+      const res = await fetch(`${baseUrl}/api/wallet/accounts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          address,
+          salt,
+          ownerQx: QX,
+          ownerQy: QY,
+          credentialId: "cred-test",
+          webauthnAttestation: { clientDataJSON: "abc", attestationObject: "def" },
+        }),
+      });
+      expect(res.status).to.equal(201);
+      const body = (await res.json()) as { account: { address: string; deployedChains: string[] } };
+      expect(body.account.address).to.equal(address.toLowerCase());
+      expect(body.account.deployedChains).to.deep.equal([]);
+
+      const get = await fetch(`${baseUrl}/api/wallet/accounts/${address}`);
+      expect(get.status).to.equal(200);
+
+      const patch = await fetch(`${baseUrl}/api/wallet/accounts/${address}/deployed`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", "x-api-key": "sweeper-wallet-test" },
+        body: JSON.stringify({ chainId: "11155111" }),
+      });
+      expect(patch.status).to.equal(200);
+      const patched = (await patch.json()) as { account: { deployedChains: string[] } };
+      expect(patched.account.deployedChains).to.include("11155111");
+    });
+  });
+
+  it("wallet-config exposes chains and implementation", async function () {
+    await withApp(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/public/wallet-config`);
+      expect(res.status).to.equal(200);
+      const body = (await res.json()) as {
+        factoryAddress: string | null;
+        implementationAddress: string | null;
+        chains: unknown[];
+      };
+      expect(body.factoryAddress?.toLowerCase()).to.equal(FACTORY.toLowerCase());
+      expect(body.implementationAddress?.toLowerCase()).to.equal(IMPL.toLowerCase());
+      expect(body.chains.length).to.be.greaterThan(0);
+    });
+  });
+
+  it("balance endpoint returns aggregation shape", async function () {
+    await withApp(async (baseUrl) => {
+      const salt = deriveWalletSalt(QX, QY);
+      const address = predictWalletAddress(FACTORY, IMPL, salt);
+      await fetch(`${baseUrl}/api/wallet/accounts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address, salt, ownerQx: QX, ownerQy: QY, credentialId: "c" }),
+      });
+      const res = await fetch(`${baseUrl}/api/wallet/balance?wallet=${address}`);
+      expect(res.status).to.equal(200);
+      const body = (await res.json()) as { wallet: string; totalUsdc: string; chains: unknown[] };
+      expect(body.wallet.toLowerCase()).to.equal(address.toLowerCase());
+      expect(body.chains).to.be.an("array");
+    });
+  });
+});
+
+describe("commerce wallet pairing API", function () {
+  it("create → submit → poll approved", async function () {
+    await withApp(async (baseUrl) => {
+      const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
+      const create = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "create", walletAddress: wallet, chainId: "11155111" }),
+      });
+      expect(create.status).to.equal(200);
+      const { pairing } = (await create.json()) as { pairing: { nonce: string } };
+
+      const submit = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "submit",
+          nonce: pairing.nonce,
+          newOwnerQx: ethersLib.zeroPadValue("0x11", 32),
+          newOwnerQy: ethersLib.zeroPadValue("0x12", 32),
+          deviceLabel: "iPad",
+        }),
+      });
+      expect(submit.status).to.equal(200);
+
+      const poll = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "poll", nonce: pairing.nonce }),
+      });
+      const polled = (await poll.json()) as { pairing: { status: string } };
+      expect(polled.pairing.status).to.equal("approved");
+    });
+  });
+});

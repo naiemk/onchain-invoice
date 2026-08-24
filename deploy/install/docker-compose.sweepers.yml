@@ -90,3 +90,20 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - edge
+
+  wallet-deployer-evm:
+    image: ${WALLET_DEPLOYER_IMAGE:-ghcr.io/naiemk/trustless-commerce-wallet-deployer:main}
+    container_name: onchain-invoice-wallet-deployer-evm
+    restart: unless-stopped
+    mem_limit: ${WALLET_DEPLOYER_MEMORY_LIMIT:-192m}
+    env_file: .env
+    environment:
+      WALLET_DEPLOYER_CONFIG: /tmp/wallet-deployer.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-wallet-deployer.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./onchain-invoice-wallet-deployer.yaml:/tmp/wallet-deployer.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge

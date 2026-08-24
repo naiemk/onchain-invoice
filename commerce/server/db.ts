@@ -10,7 +10,7 @@ import type {
   PaymentMode,
   SweeperRecord,
 } from "../shared/types.js";
-import type { WalletDeviceRecord, WalletPairingRecord, BundlerRecord } from "../shared/wallet.js";
+import type { WalletDeviceRecord, WalletPairingRecord, WalletAccountRecord, BundlerRecord } from "../shared/wallet.js";
 import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
 import { parsePaymentMode } from "../shared/onramper.js";
 
@@ -79,6 +79,18 @@ interface WalletDeviceRow {
   credential_id: string | null;
   created_at: string;
   last_used_at: string | null;
+}
+
+interface WalletAccountRow {
+  address: string;
+  salt: string;
+  owner_qx: string;
+  owner_qy: string;
+  credential_id: string | null;
+  webauthn_attestation: string | null;
+  deployed_chains: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface WalletPairingRow {
@@ -694,6 +706,18 @@ export class CommerceDb {
 
       CREATE INDEX IF NOT EXISTS idx_wallet_pairings_wallet ON wallet_pairings(wallet_address, chain_id);
 
+      CREATE TABLE IF NOT EXISTS wallet_accounts (
+        address TEXT PRIMARY KEY,
+        salt TEXT NOT NULL,
+        owner_qx TEXT NOT NULL,
+        owner_qy TEXT NOT NULL,
+        credential_id TEXT,
+        webauthn_attestation TEXT,
+        deployed_chains TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS wallet_user_ops (
         id TEXT PRIMARY KEY,
         wallet_address TEXT NOT NULL,
@@ -743,6 +767,67 @@ export class CommerceDb {
     this.ensureColumn("invoices", "quote_provider", "TEXT");
     this.ensureColumn("invoices", "quote_slippage_bps", "INTEGER");
     this.ensureColumn("invoices", "lang", "TEXT");
+  }
+
+  upsertWalletAccount(input: {
+    address: string;
+    salt: string;
+    ownerQx: string;
+    ownerQy: string;
+    credentialId: string | null;
+    webauthnAttestation: string | null;
+  }): WalletAccountRecord {
+    const now = new Date().toISOString();
+    const addr = input.address.toLowerCase();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_accounts (
+           address, salt, owner_qx, owner_qy, credential_id, webauthn_attestation,
+           deployed_chains, created_at, updated_at
+         ) VALUES (@address, @salt, @ownerQx, @ownerQy, @credentialId, @webauthnAttestation, '[]', @now, @now)
+         ON CONFLICT(address) DO UPDATE SET
+           credential_id = COALESCE(excluded.credential_id, credential_id),
+           webauthn_attestation = COALESCE(excluded.webauthn_attestation, webauthn_attestation),
+           updated_at = @now`
+      )
+      .run({
+        address: addr,
+        salt: input.salt,
+        ownerQx: input.ownerQx,
+        ownerQy: input.ownerQy,
+        credentialId: input.credentialId,
+        webauthnAttestation: input.webauthnAttestation,
+        now,
+      });
+    return this.getWalletAccount(addr)!;
+  }
+
+  getWalletAccount(address: string): WalletAccountRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_accounts WHERE address = ?`)
+      .get(address.toLowerCase()) as WalletAccountRow | undefined;
+    return row ? mapWalletAccount(row) : null;
+  }
+
+  listUndeployedWalletAccounts(chainId: string): WalletAccountRecord[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM wallet_accounts ORDER BY created_at ASC LIMIT 500`)
+      .all() as WalletAccountRow[];
+    return rows
+      .map(mapWalletAccount)
+      .filter((a) => !a.deployedChains.includes(chainId));
+  }
+
+  markWalletDeployed(address: string, chainId: string): WalletAccountRecord | null {
+    const account = this.getWalletAccount(address);
+    if (!account) return null;
+    if (account.deployedChains.includes(chainId)) return account;
+    const deployed = [...account.deployedChains, chainId];
+    const now = new Date().toISOString();
+    this.db
+      .prepare(`UPDATE wallet_accounts SET deployed_chains = ?, updated_at = ? WHERE address = ?`)
+      .run(JSON.stringify(deployed), now, address.toLowerCase());
+    return this.getWalletAccount(address);
   }
 
   listWalletDevices(walletAddress: string, chainId: string): WalletDeviceRecord[] {
@@ -1090,6 +1175,26 @@ function mapSweeper(row: SweeperRow): SweeperRecord {
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     lastSeenAt: row.last_seen_at,
+  };
+}
+
+function mapWalletAccount(row: WalletAccountRow): WalletAccountRecord {
+  let deployedChains: string[] = [];
+  try {
+    deployedChains = JSON.parse(row.deployed_chains) as string[];
+  } catch {
+    deployedChains = [];
+  }
+  return {
+    address: row.address,
+    salt: row.salt,
+    ownerQx: row.owner_qx,
+    ownerQy: row.owner_qy,
+    credentialId: row.credential_id,
+    webauthnAttestation: row.webauthn_attestation,
+    deployedChains,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
