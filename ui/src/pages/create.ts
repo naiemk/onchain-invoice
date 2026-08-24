@@ -1,6 +1,7 @@
 import { encodePayLink, payPath } from "../shared/invoice.js";
 import { copyText, escapeHtml } from "../shared/dom.js";
 import { localizeError } from "../i18n/errors.js";
+import { LOCALES, LOCALE_NATIVE_NAMES } from "../i18n/locales.js";
 import { t } from "../i18n/t.js";
 import {
   chainLogoSvg,
@@ -51,6 +52,33 @@ function chainHasOnrampSupport(root: HTMLElement, chainId: string): boolean {
   return supported.has(`${chainId}:USDC`) || supported.has(`${chainId}:USDT`);
 }
 
+/** Locked minimum rails for fiat: Eth+Base+Tron (mainnet) or Sepolia+Nile (testnet). */
+function fiatMinimumChainIds(): string[] {
+  return deploymentMode() === "testnet" ? ["11155111", "nile"] : ["1", "8453", "tron"];
+}
+
+function fiatMinimumTokenForChain(chainId: string): string {
+  const kind = networkKind(chainId);
+  return kind === "tron" ? "USDT" : "USDC";
+}
+
+function selectedOnrampPairs(root: HTMLElement): Array<{ chainId: string; token: string }> {
+  const chains = checked(root, "chains");
+  const tokens = checked(root, "tokens");
+  const supported = onrampSupportedSet(root);
+  const pairs: Array<{ chainId: string; token: string }> = [];
+  for (const chainId of chains) {
+    for (const token of tokens) {
+      if (supported.size === 0) {
+        if (tokenAllowedOnChain(chainId, token)) pairs.push({ chainId, token });
+      } else if (supported.has(`${chainId}:${token}`)) {
+        pairs.push({ chainId, token });
+      }
+    }
+  }
+  return pairs;
+}
+
 export function renderCreate(root: HTMLElement): void {
   const mode = deploymentMode();
   const networks = networksForDeployment(mode);
@@ -88,6 +116,15 @@ export function renderCreate(root: HTMLElement): void {
             <label for="description">${t("create.descriptionLabel")}</label>
             <p class="field-hint">${t("create.descriptionHint")}</p>
             <textarea id="description" name="description" placeholder="${escapeHtml(t("create.descriptionPlaceholder"))}"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="lang">${t("create.langLabel")}</label>
+            <p class="field-hint">${t("create.langHint")}</p>
+            <select id="lang" name="lang">
+              <option value="">${escapeHtml(t("create.langDefault"))}</option>
+              ${localeOptionsHtml()}
+            </select>
           </div>
 
           <div class="field">
@@ -442,6 +479,12 @@ ${t("create.docsStatusLine")}</pre>
   }
 }
 
+function localeOptionsHtml(): string {
+  return LOCALES.map(
+    (locale) => `<option value="${locale}">${escapeHtml(LOCALE_NATIVE_NAMES[locale])}</option>`
+  ).join("");
+}
+
 function paymentModeCardHtml(mode: PaymentMode, selected: boolean): string {
   const titles: Record<PaymentMode, string> = {
     crypto: t("create.paymentModeCryptoTitle"),
@@ -515,17 +558,15 @@ function scheduleFiatQuote(root: HTMLElement): void {
 
 async function loadQuotePaymentMethods(root: HTMLElement): Promise<void> {
   if (selectedPaymentMode(root) !== "fiat") return;
-  const chains = checked(root, "chains");
-  const tokens = checked(root, "tokens");
-  const chainId = chains[0];
-  const token = tokens[0];
+  const pairs = selectedOnrampPairs(root);
   const fiat = root.querySelector<HTMLSelectElement>("#displayFiat")?.value ?? "SEK";
   const country = root.querySelector<HTMLInputElement>("#quoteCountry")?.value.trim().toLowerCase() ?? "us";
-  if (!chainId || !token) return;
+  if (pairs.length === 0) return;
   const select = root.querySelector<HTMLSelectElement>("#quotePaymentMethod");
   if (!select) return;
   try {
-    const params = new URLSearchParams({ fiat, chainId, token, country });
+    const params = new URLSearchParams({ fiat, country, expand: "1" });
+    params.set("pairs", pairs.map((p) => `${p.chainId}:${p.token}`).join(","));
     const res = await fetch(apiUrl(`/api/public/onramp-methods?${params}`));
     if (!res.ok) return;
     const body = (await res.json()) as { methods?: Array<{ id: string; name: string }> };
@@ -545,33 +586,34 @@ async function refreshFiatQuote(root: HTMLElement): Promise<void> {
   const preview = root.querySelector<HTMLElement>("#fiat-charge-preview");
   const status = root.querySelector<HTMLElement>("#fiat-quote-status");
   const providerSelect = root.querySelector<HTMLSelectElement>("#quoteProvider");
-  const chains = checked(root, "chains");
-  const tokens = checked(root, "tokens");
-  const chainId = chains[0];
-  const token = tokens[0] ?? "USDC";
-  // In fiat mode the amount field is the customer-facing fiat (e.g. SEK).
+  const pairs = selectedOnrampPairs(root);
   const fiatAmount = root.querySelector<HTMLInputElement>("#price")?.value.trim();
   const fiat = root.querySelector<HTMLSelectElement>("#displayFiat")?.value ?? "SEK";
   const country = root.querySelector<HTMLInputElement>("#quoteCountry")?.value.trim().toLowerCase() ?? "us";
   const paymentMethod = root.querySelector<HTMLSelectElement>("#quotePaymentMethod")?.value ?? "creditcard";
   const preferredProvider = providerSelect?.value.trim() || undefined;
-  if (!preview || !chainId || !token || !fiatAmount) return;
+  if (!preview || pairs.length === 0 || !fiatAmount) return;
   if (status) status.textContent = t("create.quoteLoading");
   preview.hidden = true;
   try {
     const params = new URLSearchParams({
       fiat,
-      chainId,
-      token,
       country,
       paymentMethod,
       direction: "pay",
       fiatAmount,
+      pairs: pairs.map((p) => `${p.chainId}:${p.token}`).join(","),
     });
     if (preferredProvider) params.set("provider", preferredProvider);
     const res = await fetch(apiUrl(`/api/public/onramp-quote?${params}`));
-    const body = (await res.json()) as OnrampQuoteResponse & { error?: string };
+    const body = (await res.json()) as OnrampQuoteResponse & {
+      error?: string;
+      chainId?: string;
+      token?: string;
+      demo?: boolean;
+    };
     if (!res.ok) throw new Error(body.error ?? t("create.quoteError"));
+    const settleToken = body.token ?? "USDC";
     const recommended = body.recommended ?? {
       provider: body.quotes?.[0]?.provider ?? "demo",
       paymentMethod,
@@ -584,7 +626,7 @@ async function refreshFiatQuote(root: HTMLElement): Promise<void> {
         .map(
           (q) =>
             `<option value="${escapeHtml(q.provider)}">${escapeHtml(
-              `${q.provider} · ${q.cryptoAmount} ${token}`
+              `${q.provider} · ${q.cryptoAmount} ${settleToken}`
             )}</option>`
         )
         .join("");
@@ -592,15 +634,18 @@ async function refreshFiatQuote(root: HTMLElement): Promise<void> {
       else providerSelect.value = recommended.provider;
     }
     const activeProvider = providerSelect?.value || recommended.provider;
-    const active =
-      body.quotes?.find((q) => q.provider === activeProvider) ?? recommended;
-    preview.textContent = t("create.settlePreview", { amount: active.cryptoAmount, token });
+    const active = body.quotes?.find((q) => q.provider === activeProvider) ?? recommended;
+    const settleChain = body.chainId ? ` · ${networkShort(body.chainId)}` : "";
+    preview.textContent =
+      t("create.settlePreview", { amount: active.cryptoAmount, token: settleToken }) + settleChain;
     preview.hidden = false;
     if (status) status.textContent = body.demo ? "Demo quote (no live Onramper keys)" : "";
     root.dataset.quotedDisplayAmount = active.fiatAmount;
     root.dataset.quotedDisplayFiat = body.fiat;
     root.dataset.quotedSettlement = active.cryptoAmount;
-    root.dataset.quotedProvider = active.provider;
+    root.dataset.quotedProvider = active.provider ?? activeProvider;
+    if (body.chainId) root.dataset.quotedChainId = body.chainId;
+    if (body.token) root.dataset.quotedToken = body.token;
   } catch (error) {
     if (status) {
       status.textContent = error instanceof Error ? localizeError(error) : t("create.quoteError");
@@ -649,26 +694,37 @@ function applyPaymentModeUi(root: HTMLElement): void {
 
   const chainInputs = [...root.querySelectorAll<HTMLInputElement>('input[name="chains"]')];
   if (mode === "fiat") {
-    const checkedChains = chainInputs.filter((el) => el.checked);
-    let keep = checkedChains.find((el) => chainHasOnrampSupport(root, el.value));
-    if (!keep) {
-      keep =
-        chainInputs.find((el) => chainHasOnrampSupport(root, el.value)) ??
-        chainInputs.find((el) => el.value === "8453" || el.value === "11155111" || el.value === "tron" || el.value === "nile" || el.value === "56") ??
-        chainInputs[0];
+    const minimum = new Set(
+      fiatMinimumChainIds().filter((id) => chainInputs.some((el) => el.value === id && chainHasOnrampSupport(root, id)))
+    );
+    // Fall back: any onramp-supported chain if minimum ids aren't in this deployment.
+    if (minimum.size === 0) {
+      for (const el of chainInputs) {
+        if (chainHasOnrampSupport(root, el.value)) minimum.add(el.value);
+      }
     }
     for (const el of chainInputs) {
       const chainSupported = chainHasOnrampSupport(root, el.value);
-      el.checked = keep ? el === keep : false;
-      el.disabled = !chainSupported;
-      el.type = "radio";
+      const locked = minimum.has(el.value);
+      el.type = "checkbox";
       el.name = "chains";
+      if (locked) {
+        el.checked = true;
+        el.disabled = true;
+        el.dataset.fiatLocked = "1";
+      } else {
+        el.disabled = !chainSupported;
+        delete el.dataset.fiatLocked;
+        if (!chainSupported) el.checked = false;
+      }
     }
+    void loadQuotePaymentMethods(root);
   } else {
     for (const el of chainInputs) {
       el.disabled = false;
       el.type = "checkbox";
       el.name = "chains";
+      delete el.dataset.fiatLocked;
     }
     if (chainInputs.every((el) => !el.checked) && chainInputs[0]) {
       chainInputs[0].checked = true;
@@ -759,20 +815,25 @@ function renderTokenOptions(root: HTMLElement, chains: string[]): void {
     host.innerHTML = `<p class="field-hint">${t("create.selectNetworkForTokens")}</p>`;
     return;
   }
-  const inputType = fiatMode ? "radio" : "checkbox";
-  let keepToken =
-    tokens.find((token) => previous.has(token.id)) ??
-    tokens.find((token) => needsTron && token.id === "USDT") ??
-    tokens[0];
+  const fiatLockedTokens = new Set<string>();
+  if (fiatMode) {
+    for (const chainId of chains) {
+      const required = fiatMinimumTokenForChain(chainId);
+      if (tokens.some((t) => t.id === required)) fiatLockedTokens.add(required);
+    }
+  }
   host.innerHTML = tokens
     .map((token) => {
-      const locked = !fiatMode && needsTron && token.id === "USDT";
-      const selected = fiatMode ? token.id === keepToken?.id : locked || (previous.size > 0 ? previous.has(token.id) : true);
+      const locked =
+        (fiatMode && fiatLockedTokens.has(token.id)) || (!fiatMode && needsTron && token.id === "USDT");
+      const selected =
+        locked ||
+        (previous.size > 0 ? previous.has(token.id) : fiatMode ? fiatLockedTokens.has(token.id) : true);
       return `
         <label class="check">
-          <input type="${inputType}" name="tokens" value="${escapeHtml(token.id)}"
+          <input type="checkbox" name="tokens" value="${escapeHtml(token.id)}"
             ${selected ? "checked" : ""} ${locked ? "disabled" : ""} />
-          ${escapeHtml(token.label)}${locked ? ` · ${t("create.usdtRequiredForTron")}` : ""}
+          ${escapeHtml(token.label)}${locked && needsTron && token.id === "USDT" ? ` · ${t("create.usdtRequiredForTron")}` : ""}
         </label>`;
     })
     .join("");
@@ -782,6 +843,14 @@ function renderTokenOptions(root: HTMLElement, chains: string[]): void {
       "beforeend",
       `<input type="hidden" name="tokens" value="USDT" data-tron-usdt-lock="1" />`
     );
+  }
+  if (fiatMode) {
+    for (const token of fiatLockedTokens) {
+      host.insertAdjacentHTML(
+        "beforeend",
+        `<input type="hidden" name="tokens" value="${escapeHtml(token)}" data-fiat-token-lock="1" />`
+      );
+    }
   }
 }
 
@@ -849,6 +918,7 @@ function readForm(root: HTMLElement): PayLinkFields {
     description: value("description") || undefined,
     allowPartial: root.querySelector<HTMLInputElement>("#allowPartial")?.checked ?? false,
     paymentMode: selectedPaymentMode(root),
+    ...(value("lang") ? { lang: value("lang") } : {}),
     ...(selectedPaymentMode(root) === "fiat"
       ? {
           // Amount field is customer fiat; settlement USDC comes from the quote.
@@ -882,37 +952,9 @@ async function submitFiatInvoice(root: HTMLElement): Promise<void> {
     if (!fields.displayAmount || !fields.displayFiat) throw new Error(t("create.quoteError"));
     if (!fields.price || fields.price === "0") throw new Error(t("create.quoteError"));
     if (!fields.quoteProvider) throw new Error(t("create.quoteError"));
-    const chainId = fields.chains[0];
-    const token = fields.tokens[0];
-    const selectedTo = fields.to[0];
-    const response = await fetch(apiUrl("/api/invoices"), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        price: fields.price,
-        to: fields.to,
-        chains: fields.chains,
-        tokens: fields.tokens,
-        clientInvoiceId: fields.clientInvoiceId,
-        callback: fields.callback,
-        title: fields.title,
-        description: fields.description,
-        allowPartial: fields.allowPartial,
-        paymentMode: "fiat",
-        displayFiat: fields.displayFiat,
-        displayAmount: fields.displayAmount,
-        quoteCountry: fields.quoteCountry,
-        quotePaymentMethod: fields.quotePaymentMethod,
-        quoteProvider: fields.quoteProvider,
-        quoteSlippageBps: fields.quoteSlippageBps,
-        chainId,
-        token,
-        selectedTo,
-      }),
-    });
-    const body = (await response.json()) as { payLink?: string; error?: string };
-    if (!response.ok || !body.payLink) throw new Error(body.error ?? t("errors.createFailed"));
-    window.open(body.payLink, "_blank", "noopener,noreferrer");
+    // Shareable multi-rail pay link (activate picks settlement network at pay time).
+    const link = `${location.origin}${payPath(fields)}`;
+    window.open(link, "_blank", "noopener,noreferrer");
     if (note) note.textContent = t("create.openedCheckout");
   } catch (error) {
     if (note) {
@@ -950,5 +992,6 @@ function readFormLoose(root: HTMLElement): PayLinkFields {
     description: value("description") || undefined,
     allowPartial: root.querySelector<HTMLInputElement>("#allowPartial")?.checked ?? false,
     paymentMode: selectedPaymentMode(root),
+    ...(value("lang") ? { lang: value("lang") } : {}),
   };
 }

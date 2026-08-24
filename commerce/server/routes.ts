@@ -8,6 +8,7 @@ import {
   defaultTronFullHost,
   deriveTronInvoiceAddress,
   looksLikeSolanaAddress,
+  looksLikeTronAddress,
   normalizeMerchantAddress,
   predictCommerceInvoiceAddress,
   predictCommerceSolanaInvoiceAta,
@@ -35,7 +36,9 @@ import {
 } from "../shared/onramper.js";
 import {
   fetchOnrampPaymentMethods,
+  fetchOnrampPaymentMethodsAcrossPairs,
   fetchOnrampQuote,
+  fetchOnrampQuoteAcrossPairs,
   isSettlementWithinSlippage,
   parseSlippageBps,
   settlementAmountFromQuote,
@@ -327,25 +330,32 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
     if (!config.onramper.fiats.includes(resolvedDisplayFiat)) {
       throw Object.assign(new Error(`Unsupported display fiat: ${resolvedDisplayFiat}`), { statusCode: 400 });
     }
-    const chainIdForQuote = String(body.chainId ?? body.chain_id ?? baseFields.chains[0]);
-    const tokenForQuote = String(body.token ?? baseFields.tokens[0]).toUpperCase();
+
+    const pairs = preferEthereumFirst(
+      baseFields.chains.flatMap((chainId) =>
+        baseFields.tokens
+          .filter((token) => onramperSupportedPair(chainId, token))
+          .map((token) => ({ chainId, token: token.toUpperCase() }))
+      )
+    );
+    if (pairs.length === 0) {
+      throw Object.assign(new Error("No Onramper-supported chain/token pairs selected"), { statusCode: 400 });
+    }
 
     const quoteBase = {
       apiKey: config.onramper.apiKey ?? "",
       demo: config.onramper.demo || !config.onramper.apiKey,
       widgetOrigin: config.onramper.widgetOrigin,
       fiat: resolvedDisplayFiat,
-      chainId: chainIdForQuote,
-      token: tokenForQuote,
       country: quoteCountry,
       paymentMethod: quotePaymentMethod,
       provider: quoteProvider,
+      pairs,
     };
 
     let quote;
     if (resolvedDisplayAmount) {
-      // Customer pays X fiat → lock settlement from quote (source of truth for slippage).
-      quote = await fetchOnrampQuote({
+      quote = await fetchOnrampQuoteAcrossPairs({
         ...quoteBase,
         direction: "pay",
         fiatAmount: resolvedDisplayAmount,
@@ -353,8 +363,7 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
       price = settlementAmountFromQuote(quote.cryptoAmount);
       resolvedDisplayAmount = quote.fiatAmount;
     } else if (price && price !== "0") {
-      // Merchant wants N USDC → derive charge fiat.
-      quote = await fetchOnrampQuote({
+      quote = await fetchOnrampQuoteAcrossPairs({
         ...quoteBase,
         direction: "receive",
         cryptoAmount: price,
@@ -371,6 +380,11 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
       );
     }
     quoteProvider = (quoteProvider || quote.recommended.provider).toLowerCase();
+    // Prefer body chain when valid; otherwise use the pair that produced the quote.
+    if (quote.chainId && quote.token) {
+      body.chainId = body.chainId ?? body.chain_id ?? quote.chainId;
+      body.token = body.token ?? quote.token;
+    }
   }
 
   if (!price || price === "0") {
@@ -388,6 +402,7 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
     ...(resolvedDisplayFiat || resolvedDisplayAmount
       ? { quoteCountry, quotePaymentMethod, quoteProvider, quoteSlippageBps }
       : {}),
+    ...(baseFields.lang ? { lang: baseFields.lang } : {}),
   };
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
@@ -417,8 +432,8 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
   sendJson(res, created ? 201 : 200, {
     invoice,
     created,
-    payLink: `/pay?${encodeInvoiceResumeLink(invoice.id)}`,
-    checkoutLink: `/pay?${encodePayLink({ ...baseFields, paymentMode })}`,
+    payLink: `/pay?${encodeInvoiceResumeLink(invoice.id, { lang: invoice.lang ?? fields.lang })}`,
+    checkoutLink: `/pay?${encodePayLink({ ...baseFields, paymentMode, ...(fields.lang ? { lang: fields.lang } : {}) })}`,
   });
 }
 
@@ -504,13 +519,41 @@ async function getOnrampQuote(
   }
   const cryptoAmount = url.searchParams.get("cryptoAmount") ?? url.searchParams.get("crypto_amount") ?? undefined;
   const fiatAmount = url.searchParams.get("fiatAmount") ?? url.searchParams.get("fiat_amount") ?? undefined;
+  const pairs = parseOnrampPairsQuery(url);
 
   if (!fiat) throw Object.assign(new Error("fiat is required"), { statusCode: 400 });
-  if (!chainId) throw Object.assign(new Error("chainId is required"), { statusCode: 400 });
-  if (!token) throw Object.assign(new Error("token is required"), { statusCode: 400 });
   if (!config.onramper.fiats.includes(fiat)) {
     throw Object.assign(new Error(`Unsupported fiat currency: ${fiat}`), { statusCode: 400 });
   }
+
+  const quoteBase = {
+    apiKey: config.onramper.apiKey ?? "",
+    demo: config.onramper.demo || !config.onramper.apiKey,
+    widgetOrigin: config.onramper.widgetOrigin,
+    fiat,
+    country,
+    paymentMethod,
+    provider,
+    direction,
+    cryptoAmount: cryptoAmount ?? undefined,
+    fiatAmount: fiatAmount ?? undefined,
+  };
+
+  if (pairs.length > 0 || (!chainId && !token)) {
+    const candidatePairs =
+      pairs.length > 0
+        ? pairs
+        : ONRAMPER_SUPPORTED_PAIRS.map((p) => ({ chainId: p.chainId, token: p.token }));
+    const quote = await fetchOnrampQuoteAcrossPairs({
+      ...quoteBase,
+      pairs: preferEthereumFirst(candidatePairs),
+    });
+    sendJson(res, 200, quote);
+    return;
+  }
+
+  if (!chainId) throw Object.assign(new Error("chainId is required"), { statusCode: 400 });
+  if (!token) throw Object.assign(new Error("token is required"), { statusCode: 400 });
   if (!onramperSupportedPair(chainId, token)) {
     throw Object.assign(new Error(`Card/bank payments are not available for ${token} on chain ${chainId}`), {
       statusCode: 400,
@@ -518,21 +561,12 @@ async function getOnrampQuote(
   }
 
   const quote = await fetchOnrampQuote({
-    apiKey: config.onramper.apiKey ?? "",
-    demo: config.onramper.demo || !config.onramper.apiKey,
-    widgetOrigin: config.onramper.widgetOrigin,
-    fiat,
+    ...quoteBase,
     chainId,
     token,
-    country,
-    paymentMethod,
-    provider,
-    direction,
-    cryptoAmount: cryptoAmount ?? undefined,
-    fiatAmount: fiatAmount ?? undefined,
   });
 
-  sendJson(res, 200, quote);
+  sendJson(res, 200, { ...quote, chainId, token });
 }
 
 async function getOnrampMethods(
@@ -550,8 +584,28 @@ async function getOnrampMethods(
   const chainId = String(url.searchParams.get("chainId") ?? url.searchParams.get("chain_id") ?? "").trim();
   const token = String(url.searchParams.get("token") ?? "").trim().toUpperCase();
   const country = String(url.searchParams.get("country") ?? "us").trim().toLowerCase();
+  const pairs = parseOnrampPairsQuery(url);
+  const expand = url.searchParams.get("expand") === "1" || url.searchParams.get("expand") === "true";
 
   if (!fiat) throw Object.assign(new Error("fiat is required"), { statusCode: 400 });
+
+  if (pairs.length > 0 || expand || (!chainId && !token)) {
+    const candidatePairs =
+      pairs.length > 0
+        ? pairs
+        : ONRAMPER_SUPPORTED_PAIRS.map((p) => ({ chainId: p.chainId, token: p.token }));
+    const methods = await fetchOnrampPaymentMethodsAcrossPairs({
+      apiKey: config.onramper.apiKey ?? "",
+      demo: config.onramper.demo || !config.onramper.apiKey,
+      widgetOrigin: config.onramper.widgetOrigin,
+      fiat,
+      country,
+      pairs: preferEthereumFirst(candidatePairs),
+    });
+    sendJson(res, 200, { fiat, country, pairs: candidatePairs, methods });
+    return;
+  }
+
   if (!chainId) throw Object.assign(new Error("chainId is required"), { statusCode: 400 });
   if (!token) throw Object.assign(new Error("token is required"), { statusCode: 400 });
 
@@ -566,6 +620,41 @@ async function getOnrampMethods(
   });
 
   sendJson(res, 200, { fiat, chainId, token, country, methods });
+}
+
+/** `pairs=1:USDC,8453:USDC,tron:USDT` or repeated pair params. */
+function parseOnrampPairsQuery(url: URL): Array<{ chainId: string; token: string }> {
+  const raw = [
+    ...url.searchParams.getAll("pairs"),
+    ...url.searchParams.getAll("pair"),
+  ]
+    .flatMap((s) => s.split(","))
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const out: Array<{ chainId: string; token: string }> = [];
+  for (const item of raw) {
+    const [chainId, token] = item.split(":");
+    if (!chainId || !token) continue;
+    out.push({ chainId: chainId.trim(), token: token.trim().toUpperCase() });
+  }
+  return out;
+}
+
+/** Prefer Ethereum USDC so Revolut / Apple Pay / Google Pay surface when available. */
+function preferEthereumFirst(
+  pairs: Array<{ chainId: string; token: string }>
+): Array<{ chainId: string; token: string }> {
+  const score = (p: { chainId: string; token: string }) => {
+    const id = String(p.chainId).toLowerCase();
+    const token = p.token.toUpperCase();
+    if ((id === "1" || id === "0x1") && token === "USDC") return 0;
+    if (id === "8453" && token === "USDC") return 1;
+    if ((id === "tron" || id === "0x2b6653dc") && token === "USDT") return 2;
+    if (id === "11155111" && token === "USDC") return 3;
+    if (id === "nile" && token === "USDT") return 4;
+    return 10;
+  };
+  return [...pairs].sort((a, b) => score(a) - score(b));
 }
 
 async function createOnrampSession(
@@ -738,11 +827,26 @@ function assertPaymentModeAllowed(
     });
   }
   if (paymentMode === "fiat") {
-    if (fields.chains.length !== 1 || fields.tokens.length !== 1) {
+    const hasOnrampPair = fields.chains.some((chainId) =>
+      fields.tokens.some((token) => onramperSupportedPair(chainId, token))
+    );
+    if (!hasOnrampPair) {
       throw Object.assign(
-        new Error("Fiat-only invoices require exactly one chain and one token"),
+        new Error("Fiat invoices require at least one Onramper-supported chain and token"),
         { statusCode: 400 }
       );
+    }
+    const needsEvm = fields.chains.some((id) => chainKind(id) === "evm");
+    const needsTron = fields.chains.some((id) => chainKind(id) === "tron");
+    if (needsEvm && !fields.to.some((a) => /^0x[0-9a-fA-F]{40}$/i.test(a))) {
+      throw Object.assign(new Error("Fiat invoices with EVM networks require an EVM merchant address"), {
+        statusCode: 400,
+      });
+    }
+    if (needsTron && !fields.to.some((a) => looksLikeTronAddress(a))) {
+      throw Object.assign(new Error("Fiat invoices with Tron networks require a Tron merchant address"), {
+        statusCode: 400,
+      });
     }
   }
 }

@@ -48,6 +48,39 @@ export function decodePayLink(input: string | URLSearchParams | Record<string, u
     description: optionalParam(params, "description"),
     allowPartial: parseBoolean(params.get("allow_partial")),
     paymentMode: parsePaymentMode(optionalParam(params, "payment_mode") ?? optionalParam(params, "paymentMode")),
+    ...(optionalParam(params, "display_fiat") || optionalParam(params, "displayFiat")
+      ? { displayFiat: (optionalParam(params, "display_fiat") ?? optionalParam(params, "displayFiat"))!.toUpperCase() }
+      : {}),
+    ...(optionalParam(params, "display_amount") || optionalParam(params, "displayAmount")
+      ? { displayAmount: optionalParam(params, "display_amount") ?? optionalParam(params, "displayAmount") }
+      : {}),
+    ...(optionalParam(params, "quote_country") || optionalParam(params, "quoteCountry")
+      ? { quoteCountry: (optionalParam(params, "quote_country") ?? optionalParam(params, "quoteCountry"))!.toLowerCase() }
+      : {}),
+    ...(optionalParam(params, "quote_payment_method") || optionalParam(params, "quotePaymentMethod")
+      ? {
+          quotePaymentMethod: (
+            optionalParam(params, "quote_payment_method") ?? optionalParam(params, "quotePaymentMethod")
+          )!.toLowerCase(),
+        }
+      : {}),
+    ...(optionalParam(params, "quote_provider") || optionalParam(params, "quoteProvider")
+      ? {
+          quoteProvider: (
+            optionalParam(params, "quote_provider") ?? optionalParam(params, "quoteProvider")
+          )!.toLowerCase(),
+        }
+      : {}),
+    ...(optionalParam(params, "quote_slippage_bps") || optionalParam(params, "quoteSlippageBps")
+      ? {
+          quoteSlippageBps: Number(
+            optionalParam(params, "quote_slippage_bps") ?? optionalParam(params, "quoteSlippageBps")
+          ),
+        }
+      : {}),
+    ...(optionalParam(params, "lang") ?? optionalParam(params, "locale")
+      ? { lang: (optionalParam(params, "lang") ?? optionalParam(params, "locale"))! }
+      : {}),
   };
 }
 
@@ -66,13 +99,23 @@ export function encodePayLink(fields: PayLinkFields): string {
   if (fields.paymentMode && fields.paymentMode !== "crypto") {
     params.set("payment_mode", fields.paymentMode);
   }
+  if (fields.displayFiat) params.set("display_fiat", fields.displayFiat);
+  if (fields.displayAmount) params.set("display_amount", fields.displayAmount);
+  if (fields.quoteCountry) params.set("quote_country", fields.quoteCountry);
+  if (fields.quotePaymentMethod) params.set("quote_payment_method", fields.quotePaymentMethod);
+  if (fields.quoteProvider) params.set("quote_provider", fields.quoteProvider);
+  if (typeof fields.quoteSlippageBps === "number" && Number.isFinite(fields.quoteSlippageBps)) {
+    params.set("quote_slippage_bps", String(Math.round(fields.quoteSlippageBps)));
+  }
+  if (fields.lang) params.set("lang", fields.lang);
   return params.toString();
 }
 
 /** Resume link for an already-created invoice. */
-export function encodeInvoiceResumeLink(invoiceId: string): string {
+export function encodeInvoiceResumeLink(invoiceId: string, options?: { lang?: string | null }): string {
   const params = new URLSearchParams();
   params.set("id", invoiceId);
+  if (options?.lang) params.set("lang", options.lang);
   return params.toString();
 }
 
@@ -114,6 +157,13 @@ export function normalizePayLinkFields(input: Partial<PayLinkFields> & Record<st
     description: input.description,
     allow_partial: input.allowPartial ?? input.allow_partial,
     payment_mode: input.paymentMode ?? input.payment_mode,
+    display_fiat: input.displayFiat ?? input.display_fiat,
+    display_amount: input.displayAmount ?? input.display_amount,
+    quote_country: input.quoteCountry ?? input.quote_country,
+    quote_payment_method: input.quotePaymentMethod ?? input.quote_payment_method,
+    quote_provider: input.quoteProvider ?? input.quote_provider,
+    quote_slippage_bps: input.quoteSlippageBps ?? input.quote_slippage_bps,
+    lang: input.lang,
   });
 }
 

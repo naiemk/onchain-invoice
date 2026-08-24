@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { matchLocale, preferredLocale } from "../ui/src/i18n/detect.js";
+import { localeFromSearch, matchLocale, preferredLocale, resolvePageLocale } from "../ui/src/i18n/detect.js";
 import { dictionaries } from "../ui/src/i18n/dictionaries/index.js";
 import { en } from "../ui/src/i18n/dictionaries/en.js";
 import { LOCALES, RTL_LOCALES, isLocale } from "../ui/src/i18n/locales.js";
@@ -34,6 +34,14 @@ describe("UI i18n", function () {
     expect(preferredLocale("ja", ["es-MX", "en-US"])).to.equal("ja");
     expect(preferredLocale(null, ["ar-EG"])).to.equal("ar");
     expect(preferredLocale("not-a-locale", ["de-DE"])).to.equal("de");
+  });
+
+  it("prefers URL lang over stored locale on pay links", function () {
+    expect(localeFromSearch("?lang=fa")).to.equal("fa");
+    expect(localeFromSearch("lang=pt-BR")).to.equal("pt-BR");
+    expect(localeFromSearch("?locale=zh-TW")).to.equal("zh-Hant");
+    expect(localeFromSearch("")).to.equal(null);
+    expect(resolvePageLocale("?lang=de")).to.equal("de");
   });
 
   it("keeps RTL locales aligned with html dir", function () {
