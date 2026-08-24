@@ -18,6 +18,12 @@ export interface PayLinkFields {
   description?: string;
   allowPartial: boolean;
   paymentMode: PaymentMode;
+  displayFiat?: string;
+  displayAmount?: string;
+  quoteCountry?: string;
+  quotePaymentMethod?: string;
+  quoteProvider?: string;
+  quoteSlippageBps?: number;
 }
 
 export interface InvoiceRecord {
@@ -36,6 +42,12 @@ export interface InvoiceRecord {
   allowPartial: boolean;
   paymentMode: PaymentMode;
   payerFiat: string | null;
+  displayFiat: string | null;
+  displayAmount: string | null;
+  quoteCountry: string | null;
+  quotePaymentMethod: string | null;
+  quoteProvider: string | null;
+  quoteSlippageBps: number | null;
   status: InvoiceStatus;
   amountPaid: string;
   amountSwept: string;

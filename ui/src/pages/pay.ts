@@ -476,6 +476,8 @@ function renderFiatInvoiceStage(
   const chainId = invoice.chainId ?? fields.chains[0];
   const token = invoice.token ?? fields.tokens[0];
   const statusClass = invoice.status ?? "awaiting_payment";
+  const headline = invoiceDisplayHeadline(invoice, fields);
+  const settlement = settlementLine(invoice, fields);
 
   root.innerHTML = `
     <div class="invoice-shell">
@@ -483,10 +485,11 @@ function renderFiatInvoiceStage(
         <p class="eyebrow">${t("pay.invoiceEyebrow")}</p>
         ${testnetPillHtml(chainId)}
         <h1>${escapeHtml(fields.title ?? t("pay.paymentDue"))}</h1>
-        <p class="amount-due">$${escapeHtml(fields.price)}</p>
+        <p class="amount-due" id="fiat-headline">${escapeHtml(headline)}</p>
         <span class="status-badge ${escapeHtml(statusClass)}" id="status-badge">${escapeHtml(statusLabel(statusClass))}</span>
         <p class="settlement-line">${escapeHtml(
-          t("pay.settlesAs", { token: token ?? "USDC", network: networkLabel(chainId) })
+          settlement ??
+            t("pay.settlesAs", { amount: fields.price, token: token ?? "USDC", network: networkLabel(chainId) })
         )}</p>
         ${
           fields.description
@@ -504,7 +507,80 @@ function renderFiatInvoiceStage(
   `;
 
   const panel = root.querySelector<HTMLElement>("#pay-card-panel");
-  if (panel) void mountOnrampPanel(panel, invoiceId, invoice, fields, true);
+  const headlineEl = root.querySelector<HTMLElement>("#fiat-headline");
+  if (headlineEl && invoice.displayFiat) {
+    attachOnramperHeadlineListener(headlineEl, invoice.displayFiat, root);
+  }
+  if (panel) void mountOnrampPanel(panel, invoiceId, invoice, fields, true, headlineEl);
+}
+
+function formatFiatDisplay(amount: string, fiat: string): string {
+  const n = Number(amount);
+  const formatted = Number.isFinite(n)
+    ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : amount;
+  return `${formatted} ${fiat}`;
+}
+
+function invoiceDisplayHeadline(invoice: InvoiceRecord, fields: PayLinkFields): string {
+  if (invoice.displayFiat && invoice.displayAmount) {
+    return formatFiatDisplay(invoice.displayAmount, invoice.displayFiat);
+  }
+  return `$${fields.price}`;
+}
+
+function settlementLine(invoice: InvoiceRecord, fields: PayLinkFields): string | null {
+  if (!invoice.displayFiat || !invoice.displayAmount) return null;
+  const chainId = invoice.chainId ?? fields.chains[0];
+  const token = invoice.token ?? fields.tokens[0] ?? "USDC";
+  return t("pay.settlesAs", {
+    amount: fields.price,
+    token: token ?? "USDC",
+    network: networkLabel(chainId),
+  });
+}
+
+function extractOnramperFiatAmount(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const record = data as Record<string, unknown>;
+  const candidates = [
+    record.fiatAmount,
+    record.amount,
+    record.fiat_amount,
+    (record.payload as Record<string, unknown> | undefined)?.fiatAmount,
+    (record.payload as Record<string, unknown> | undefined)?.amount,
+    (record.data as Record<string, unknown> | undefined)?.fiatAmount,
+  ];
+  for (const value of candidates) {
+    if (value == null) continue;
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return String(n);
+  }
+  return null;
+}
+
+function attachOnramperHeadlineListener(
+  headline: HTMLElement | null,
+  fiat: string,
+  panel: HTMLElement
+): void {
+  if (!headline) return;
+  const handler = (event: MessageEvent) => {
+    try {
+      const origin = event.origin ?? "";
+      if (!origin.includes("onramper.com") && !origin.includes("onramper.dev")) return;
+      const amount = extractOnramperFiatAmount(event.data);
+      if (amount) headline.textContent = formatFiatDisplay(amount, fiat);
+    } catch {
+      /* ignore malformed widget events */
+    }
+  };
+  panel.addEventListener("tc:onramp-cleanup", () => window.removeEventListener("message", handler), { once: true });
+  window.addEventListener("message", handler);
+}
+
+function currentUiTheme(): "light" | "dark" {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
 const FIAT_LABELS: Record<string, string> = {
@@ -527,9 +603,11 @@ async function mountOnrampPanel(
   invoiceId: string,
   invoice: InvoiceRecord,
   fields: PayLinkFields,
-  lockFiat: boolean
+  lockFiat: boolean,
+  headlineEl?: HTMLElement | null
 ): Promise<void> {
   const token = invoice.token ?? fields.tokens[0] ?? "USDC";
+  const lockedDisplayFiat = lockFiat && invoice.displayFiat ? invoice.displayFiat : null;
   let fiats = ["USD", "EUR", "GBP", "SEK"];
   let sandbox = false;
   try {
@@ -547,8 +625,18 @@ async function mountOnrampPanel(
     /* use defaults */
   }
 
-  const defaultFiat = invoice.payerFiat && fiats.includes(invoice.payerFiat) ? invoice.payerFiat : fiats[0] ?? "USD";
-  panel.innerHTML = `
+  const defaultFiat =
+    lockedDisplayFiat ??
+    (invoice.payerFiat && fiats.includes(invoice.payerFiat) ? invoice.payerFiat : fiats[0] ?? "USD");
+
+  if (lockedDisplayFiat) {
+    panel.innerHTML = `
+      <div id="onramp-frame-host" class="onramp-frame-host"></div>
+      <p id="onramp-error" class="danger" hidden></p>
+      ${sandbox ? `<p class="callout info">${escapeHtml(t("pay.sandboxNote"))}</p>` : ""}
+    `;
+  } else {
+    panel.innerHTML = `
     <div class="field">
       <label for="payer-fiat">${t("pay.payWithLabel")}</label>
       <p class="field-hint">${t("pay.payWithHint", { price: fields.price })}</p>
@@ -569,9 +657,11 @@ async function mountOnrampPanel(
     <div id="onramp-frame-host" class="onramp-frame-host" hidden></div>
     <p id="onramp-error" class="danger" hidden></p>
   `;
+  }
 
   const start = async () => {
-    const fiat = panel.querySelector<HTMLSelectElement>("#payer-fiat")?.value ?? defaultFiat;
+    const fiat =
+      lockedDisplayFiat ?? panel.querySelector<HTMLSelectElement>("#payer-fiat")?.value ?? defaultFiat;
     const host = panel.querySelector<HTMLElement>("#onramp-frame-host");
     const err = panel.querySelector<HTMLElement>("#onramp-error");
     const btn = panel.querySelector<HTMLButtonElement>("#start-onramp");
@@ -584,21 +674,27 @@ async function mountOnrampPanel(
       host.hidden = false;
       host.innerHTML = `<div class="onramp-skeleton" aria-busy="true">${escapeHtml(t("pay.loadingCheckout"))}</div>`;
     }
+    if (headlineEl && fiat) {
+      attachOnramperHeadlineListener(headlineEl, fiat, panel);
+    }
     try {
       const res = await fetch(apiUrl(`/api/invoices/${encodeURIComponent(invoiceId)}/onramp-session`), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fiat }),
+        body: JSON.stringify({ fiat, theme: currentUiTheme() }),
       });
-      const body = (await res.json()) as { widgetUrl?: string; error?: string };
-      if (!res.ok || !body.widgetUrl) throw new Error(body.error ?? t("pay.checkoutFailed"));
+      const body = (await res.json()) as { widgetUrl?: string; error?: string; code?: string };
+      if (!res.ok || !body.widgetUrl) {
+        if (res.status === 410 || body.code === "quote_expired") {
+          throw new Error(body.error ?? t("pay.quoteExpired"));
+        }
+        throw new Error(body.error ?? t("pay.checkoutFailed"));
+      }
       if (host) {
         const iframe = document.createElement("iframe");
         iframe.className = "onramp-iframe";
         iframe.title = t("pay.onrampIframeTitle");
         iframe.allow = "accelerometer; autoplay; camera; gyroscope; payment; microphone; clipboard-write";
-        // Same-origin demo HTML is blocked by gateway X-Frame-Options: DENY if
-        // loaded via src=. Fetch + srcdoc is not an embed of that response.
         if (isSameOriginWidgetUrl(body.widgetUrl)) {
           const demo = await fetch(body.widgetUrl);
           if (!demo.ok) throw new Error(t("pay.checkoutFailed"));
@@ -610,7 +706,7 @@ async function mountOnrampPanel(
         host.replaceChildren(iframe);
       }
     } catch (error) {
-      if (host) host.hidden = true;
+      if (host) host.hidden = !lockedDisplayFiat;
       if (err) {
         err.hidden = false;
         err.textContent = error instanceof Error ? localizeError(error) : t("pay.checkoutFailed");
@@ -621,7 +717,7 @@ async function mountOnrampPanel(
   };
 
   panel.querySelector<HTMLButtonElement>("#start-onramp")?.addEventListener("click", () => void start());
-  void lockFiat;
+  if (lockedDisplayFiat) void start();
 }
 
 function renderPaidStage(
@@ -806,6 +902,12 @@ function fieldsToBody(fields: PayLinkFields): Record<string, unknown> {
     description: fields.description,
     allowPartial: fields.allowPartial,
     paymentMode: fields.paymentMode ?? "crypto",
+    displayFiat: fields.displayFiat,
+    displayAmount: fields.displayAmount,
+    quoteCountry: fields.quoteCountry,
+    quotePaymentMethod: fields.quotePaymentMethod,
+    quoteProvider: fields.quoteProvider,
+    quoteSlippageBps: fields.quoteSlippageBps,
   };
 }
 
@@ -822,6 +924,12 @@ function fieldsFromInvoice(invoice: InvoiceRecord, fallback?: PayLinkFields): Pa
     description: invoice.description ?? fallback?.description,
     allowPartial: invoice.allowPartial ?? fallback?.allowPartial ?? false,
     paymentMode: invoice.paymentMode ?? fallback?.paymentMode ?? "crypto",
+    displayFiat: invoice.displayFiat ?? fallback?.displayFiat,
+    displayAmount: invoice.displayAmount ?? fallback?.displayAmount,
+    quoteCountry: invoice.quoteCountry ?? fallback?.quoteCountry,
+    quotePaymentMethod: invoice.quotePaymentMethod ?? fallback?.quotePaymentMethod,
+    quoteProvider: invoice.quoteProvider ?? fallback?.quoteProvider,
+    quoteSlippageBps: invoice.quoteSlippageBps ?? fallback?.quoteSlippageBps,
   };
 }
 

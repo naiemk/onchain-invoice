@@ -4,6 +4,7 @@
  */
 
 import { createHash, createHmac, createPrivateKey, randomUUID, sign, timingSafeEqual } from "node:crypto";
+import { buildOnramperThemeParams } from "./onramper-quotes.js";
 
 export type PaymentMode = "crypto" | "crypto_or_fiat" | "fiat";
 
@@ -44,6 +45,7 @@ export interface OnramperAssetIds {
 
 /** Product chain/token pairs that may use card/bank checkout (mainnet + testnet stand-ins). */
 export const ONRAMPER_SUPPORTED_PAIRS = [
+  { chainId: "1", token: "USDC" },
   { chainId: "8453", token: "USDC" },
   { chainId: "tron", token: "USDT" },
   { chainId: "56", token: "USDC" },
@@ -76,6 +78,9 @@ export function resolveOnramperAsset(chainId: string, token: string): OnramperAs
 
   if (id === "8453" && symbol === "USDC") {
     return { cryptoId: "usdc_base", networkId: "base" };
+  }
+  if ((id === "1" || id === "0x1") && symbol === "USDC") {
+    return { cryptoId: "usdc_ethereum", networkId: "ethereum" };
   }
   if ((id === "tron" || id === "0x2b6653dc") && symbol === "USDT") {
     return { cryptoId: "usdt_tron", networkId: "tron" };
@@ -208,6 +213,14 @@ export interface BuildOnrampSessionInput {
   token: string;
   priceUsd: string;
   fiat: string;
+  /** Customer-facing fiat amount when locked on fiat invoices. */
+  displayAmount?: string | null;
+  /** Onramper payment method id from quote metadata. */
+  defaultPaymentMethod?: string | null;
+  /** Onramper ramp/provider id — locks onlyOnramps. */
+  onlyOnramps?: string | null;
+  /** UI theme for unsigned widget styling params. */
+  theme?: "light" | "dark";
   /** When true, lock onlyFiats to the payer's choice (fiat-only invoices). */
   lockFiat: boolean;
   successRedirectUrl?: string;
@@ -231,6 +244,19 @@ export function buildOnrampWidgetSession(input: BuildOnrampSessionInput): {
     throw Object.assign(new Error("fiat must be a 3-letter currency code"), { statusCode: 400 });
   }
 
+  // Onramper defaultAmount is always FIAT. Never pass settlement USDC as SEK/EUR.
+  let defaultAmount: string;
+  if (input.displayAmount) {
+    defaultAmount = normalizeFiatAmount(input.displayAmount);
+  } else if (fiat === "USD") {
+    defaultAmount = normalizeUsdAmount(input.priceUsd);
+  } else {
+    throw Object.assign(
+      new Error("displayAmount is required when locking a non-USD fiat amount on the widget"),
+      { statusCode: 400 }
+    );
+  }
+
   const fields: Record<string, string> = {
     apiKey: input.apiKey,
     mode: "buy",
@@ -242,10 +268,24 @@ export function buildOnrampWidgetSession(input: BuildOnrampSessionInput): {
     defaultCrypto: asset.cryptoId,
     isAddressEditable: "false",
     defaultFiat: fiat,
-    defaultAmount: normalizeUsdAmount(input.priceUsd),
+    defaultAmount,
+    // Allow provider/method switches to reprice fiat; settlement stays invoice.priceUsd.
+    isAmountEditable: "true",
     hideTopBar: "true",
     redirectAtCheckout: "false",
   };
+
+  if (input.defaultPaymentMethod) {
+    fields.defaultPaymentMethod = input.defaultPaymentMethod.trim().toLowerCase();
+  }
+  if (input.onlyOnramps) {
+    fields.onlyOnramps = input.onlyOnramps.trim().toLowerCase();
+  }
+
+  const themeParams = buildOnramperThemeParams(input.theme ?? "light");
+  for (const [key, value] of Object.entries(themeParams)) {
+    fields[key] = value;
+  }
 
   if (input.lockFiat) {
     fields.onlyFiats = fiat;
@@ -281,6 +321,13 @@ function normalizeUsdAmount(priceUsd: string): string {
   if (!Number.isFinite(n) || n <= 0) {
     throw Object.assign(new Error("Invalid invoice price for onramp"), { statusCode: 400 });
   }
-  // Widget defaultAmount is fiat amount; invoice price is USD today.
+  return String(Math.round(n * 100) / 100);
+}
+
+function normalizeFiatAmount(amount: string): string {
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw Object.assign(new Error("Invalid display fiat amount for onramp"), { statusCode: 400 });
+  }
   return String(Math.round(n * 100) / 100);
 }
