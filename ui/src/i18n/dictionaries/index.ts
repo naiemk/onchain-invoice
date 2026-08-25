@@ -3,6 +3,7 @@ import type { Messages } from "./en.js";
 import { createPasskeyEn } from "./create-passkey-en.js";
 import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
+import { payFaucetEn } from "./pay-faucet-en.js";
 import { en } from "./en.js";
 import { ar } from "./ar.js";
 import { bn } from "./bn.js";
@@ -33,6 +34,7 @@ function withPasskeyCreate(messages: Messages): Messages {
   return {
     ...messages,
     create: { ...messages.create, ...createPasskeyEn, ...createWizardEn },
+    pay: { ...messages.pay, ...payFaucetEn },
     errors: { ...messages.errors, ...onrampErrorsEn },
   };
 }
