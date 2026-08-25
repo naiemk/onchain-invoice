@@ -1,15 +1,19 @@
 import { Html5Qrcode } from "html5-qrcode";
 import { t } from "../../i18n/t.js";
 import {
+  getWalletAccount,
   parsePairingFromUrl,
   parsePairingQr,
+  pollPairing,
+  registerDevice,
   submitPairing,
 } from "../../shared/wallet-api.js";
-import { createPasskey } from "../../shared/webauthn.js";
+import { createPasskey, saveWalletSession } from "../../shared/webauthn.js";
 import {
+  bindWalletAccountBar,
   setButtonLoading,
   showStatus,
-  walletSubnav,
+  walletFrame,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 
@@ -18,14 +22,11 @@ let scanner: Html5Qrcode | null = null;
 export async function renderWalletPair(root: HTMLElement): Promise<void> {
   const prefilled = parsePairingFromUrl();
 
-  root.innerHTML = `
-    <header class="page-header wallet-page-header">
-      <p class="eyebrow">${escapeHtml(t("wallet.eyebrow"))}</p>
-      <h1>${escapeHtml(t("wallet.pairTitle"))}</h1>
-      <p class="lede">${escapeHtml(t("wallet.pairLede"))}</p>
-    </header>
-    <section class="panel wallet-panel">
-      ${walletSubnav("pair" as "home")}
+  root.innerHTML = walletFrame({
+    current: "pair",
+    title: t("wallet.pairTitle"),
+    lede: t("wallet.pairLede"),
+    body: `
       <ol class="wallet-stepper">
         <li class="is-active">${escapeHtml(t("wallet.stepScan"))}</li>
         <li>${escapeHtml(t("wallet.stepPasskey"))}</li>
@@ -45,8 +46,9 @@ export async function renderWalletPair(root: HTMLElement): Promise<void> {
         <button type="button" class="tc-btn" id="pair-submit">${escapeHtml(t("wallet.pairSubmit"))}</button>
         <a class="tc-btn secondary" href="/wallet" data-route>${escapeHtml(t("wallet.cancel"))}</a>
       </div>
-      <p id="pair-status" class="status wallet-status" role="status"></p>
-    </section>`;
+      <p id="pair-status" class="status wallet-status" role="status"></p>`,
+  });
+  bindWalletAccountBar(root);
 
   void startScanner(root);
 
@@ -112,7 +114,42 @@ async function runPair(root: HTMLElement): Promise<void> {
       newOwnerQy: owner.qy,
       deviceLabel: label,
     });
+
+    const account = await getWalletAccount(payload.walletAddress);
+    if (!account) throw new Error(t("wallet.unlockNotFound"));
+
+    await registerDevice({
+      walletAddress: payload.walletAddress,
+      chainId: payload.chainId,
+      ownerQx: owner.qx,
+      ownerQy: owner.qy,
+      label,
+      credentialId: owner.credentialId,
+    });
+
+    saveWalletSession({
+      address: account.address,
+      chainId: payload.chainId,
+      salt: account.salt,
+      qx: owner.qx,
+      qy: owner.qy,
+      credentialId: owner.credentialId,
+      rawId: owner.rawId,
+      label,
+    });
+
     showStatus(status, t("wallet.pairWaiting"), "info");
+    const deadline = Date.now() + 5 * 60 * 1000;
+    while (Date.now() < deadline) {
+      const { pairing } = await pollPairing(payload.nonce);
+      if (pairing.status === "approved" || pairing.status === "consumed") {
+        location.href = "/wallet";
+        return;
+      }
+      if (pairing.status === "expired") throw new Error(t("wallet.signInFailed"));
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    location.href = "/wallet";
   } catch (error) {
     showStatus(status, error instanceof Error ? error.message : String(error), "error");
   } finally {

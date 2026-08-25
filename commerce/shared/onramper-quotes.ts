@@ -29,6 +29,12 @@ export interface OnrampQuoteResult {
   /** Settlement pair used for this quote (set when multi-pair / auto). */
   chainId?: string;
   token?: string;
+  /** Echo of preferred provider when supplied. */
+  provider?: string;
+  /** Lower bound for settlement crypto given optional slippageBps. */
+  minSettlement?: string;
+  /** Upper bound for settlement crypto given optional slippageBps. */
+  maxSettlement?: string;
   demo?: boolean;
 }
 

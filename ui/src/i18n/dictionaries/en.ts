@@ -6,7 +6,9 @@
  */
 import { walletEn } from "./wallet-en.js";
 import { createPasskeyEn } from "./create-passkey-en.js";
+import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
+import { payFaucetEn } from "./pay-faucet-en.js";
 
 export const en = {
   brand: "Trustless Commerce",
@@ -311,6 +313,7 @@ export const en = {
       "Use the project Cursor skill to create invoices and poll status without a merchant dashboard. Full docs:",
     docsGithubPages: "GitHub Pages",
     ...createPasskeyEn,
+    ...createWizardEn,
   },
 
   pay: {
@@ -370,6 +373,7 @@ export const en = {
     continueCard: "Continue",
     cardFeeNote: "Card issuers may charge extra. We count the invoice paid when {token} arrives on-chain.",
     sandboxNote: "Sandbox demo only — this checkout will not mark the invoice paid.",
+    ...payFaucetEn,
     waitingPayment: "Waiting for payment…",
     loadingCheckout: "Loading checkout…",
     checkoutFailed: "Could not open card checkout. Try again.",

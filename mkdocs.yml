@@ -8,6 +8,8 @@ theme:
 nav:
   - Home: index.md
   - Create invoice: create.md
+  - Invoice types: invoice-types.md
+  - Quote API: quote.md
   - HTTP API: api.md
   - Platform integrations: platform-integration.md
   - Agents: agents.md

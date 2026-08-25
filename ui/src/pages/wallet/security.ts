@@ -14,18 +14,20 @@ import {
   waitForUserOp,
 } from "../../shared/wallet-api.js";
 import { loadWalletSession } from "../../shared/webauthn.js";
+import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import {
   buildSignedAddOwnerUserOp,
   buildSignedRemoveOwnerUserOp,
   submitSignedUserOp,
 } from "../../shared/userop-client.js";
 import {
-  addressBox,
   bindCopyButtons,
+  bindWalletAccountBar,
   setButtonLoading,
   shortKey,
   showStatus,
-  walletSubnav,
+  walletFrame,
+  walletLoadingFrame,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 
@@ -34,15 +36,20 @@ const WALLET_ABI = [
 ];
 
 export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
+  const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
-    location.href = "/wallet/create";
+    spaNavigate("/wallet", "replace");
     return;
   }
+
+  root.innerHTML = walletLoadingFrame("security", t("wallet.devicesTab"), t("wallet.pairRequired"));
+  bindWalletAccountBar(root);
 
   let devices: Awaited<ReturnType<typeof listDevices>> = [];
   let pendingRecovery = false;
   const config = await fetchWalletConfig();
+  if (!isSpaRenderCurrent(gen)) return;
   const chain = primaryChain(config);
 
   try {
@@ -50,6 +57,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
   } catch {
     devices = [];
   }
+  if (!isSpaRenderCurrent(gen)) return;
 
   if (chain.rpcUrl) {
     try {
@@ -60,45 +68,74 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
       pendingRecovery = false;
     }
   }
+  if (!isSpaRenderCurrent(gen)) return;
 
-  root.innerHTML = `
-    <header class="page-header wallet-page-header">
-      <p class="eyebrow">${escapeHtml(t("wallet.eyebrow"))}</p>
-      <h1>${escapeHtml(t("wallet.securityTab"))}</h1>
-    </header>
-    <section class="panel wallet-panel">
-      ${walletSubnav("security")}
-      ${addressBox(session.address)}
+  const current =
+    devices.find((d) => d.credentialId && d.credentialId === session.credentialId) ??
+    devices.find((d) => d.ownerQx === session.qx && d.ownerQy === session.qy) ??
+    null;
+  const others = devices.filter((d) => d !== current);
+
+  root.innerHTML = walletFrame({
+    current: "security",
+    title: t("wallet.devicesTab"),
+    lede: t("wallet.pairRequired"),
+    body: `
       ${pendingRecovery ? `<div class="banner warn">${escapeHtml(t("wallet.pendingRecovery"))}</div>` : ""}
-      <h2>${escapeHtml(t("wallet.passkeys"))}</h2>
-      <ul class="wallet-device-list">
-        ${devices
-          .map(
-            (d) => `
-          <li>
-            <div>
-              <strong>${escapeHtml(d.label)}</strong>
-              <span class="mono faint">${escapeHtml(shortKey(d.ownerQx))}</span>
-            </div>
-            ${
-              devices.length > 1
-                ? `<button type="button" class="tc-btn secondary small" data-remove="${escapeHtml(d.ownerQx)}|${escapeHtml(d.ownerQy)}">${escapeHtml(t("wallet.remove"))}</button>`
-                : ""
-            }
-          </li>`
-          )
-          .join("")}
-      </ul>
-      <div class="cta-row">
-        <button type="button" class="tc-btn" id="add-device-qr">${escapeHtml(t("wallet.addDevice"))}</button>
-      </div>
-      <div id="pair-qr-box" class="wallet-qr-wrap hidden"></div>
-      <h2>${escapeHtml(t("wallet.recoverySection"))}</h2>
-      <p class="field-hint">${escapeHtml(t("wallet.recoveryHint"))}</p>
-      <p class="field-hint">${escapeHtml(t("wallet.recoveryTimelock", { hours: Math.round(config.recoveryTimelockSeconds / 3600) }))}</p>
-      <p id="security-status" class="status wallet-status" role="status"></p>
-    </section>`;
 
+      <article class="wallet-device-callout">
+        <div class="wallet-device-callout-head">
+          <h2>${escapeHtml(t("wallet.thisDeviceTitle"))}</h2>
+          <span class="wallet-device-badge">${escapeHtml(t("wallet.thisDeviceBadge"))}</span>
+        </div>
+        <p>${escapeHtml(t("wallet.thisDeviceBody"))}</p>
+        <p><strong>${escapeHtml(current?.label ?? session.label)}</strong>
+          <span class="mono faint"> · ${escapeHtml(shortKey(session.qx))}</span>
+        </p>
+      </article>
+
+      <section class="wallet-other-devices">
+        <h2>${escapeHtml(t("wallet.otherDevicesTitle"))}</h2>
+        ${
+          others.length === 0
+            ? `<p class="field-hint">${escapeHtml(t("wallet.otherDevicesEmpty"))}</p>`
+            : `<ul class="wallet-device-list">
+                ${others
+                  .map(
+                    (d) => `
+                  <li>
+                    <div>
+                      <strong>${escapeHtml(d.label)}</strong>
+                      <span class="mono faint">${escapeHtml(shortKey(d.ownerQx))}</span>
+                    </div>
+                    <button type="button" class="tc-btn secondary small" data-remove="${escapeHtml(d.ownerQx)}|${escapeHtml(d.ownerQy)}">${escapeHtml(t("wallet.remove"))}</button>
+                  </li>`
+                  )
+                  .join("")}
+              </ul>`
+        }
+
+        <div class="wallet-pair-howto">
+          <h3>${escapeHtml(t("wallet.pairStepsTitle"))}</h3>
+          <ol class="wallet-pair-steps">
+            <li>${escapeHtml(t("wallet.pairStep1"))}</li>
+            <li>${escapeHtml(t("wallet.pairStep2"))}</li>
+            <li>${escapeHtml(t("wallet.pairStep3"))}</li>
+          </ol>
+          <button type="button" class="tc-btn" id="add-device-qr">${escapeHtml(t("wallet.addDevice"))}</button>
+        </div>
+        <div id="pair-qr-box" class="wallet-qr-wrap hidden"></div>
+      </section>
+
+      <section class="wallet-recovery-section">
+        <h2>${escapeHtml(t("wallet.recoverySection"))}</h2>
+        <p class="field-hint">${escapeHtml(t("wallet.recoveryHint"))}</p>
+        <p class="field-hint">${escapeHtml(t("wallet.recoveryTimelock", { hours: Math.round(config.recoveryTimelockSeconds / 3600) }))}</p>
+      </section>
+      <p id="security-status" class="status wallet-status" role="status"></p>`,
+  });
+
+  bindWalletAccountBar(root);
   bindCopyButtons(root);
 
   root.querySelector("#add-device-qr")?.addEventListener("click", async () => {
@@ -137,12 +174,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
         <p class="field-hint"><span id="pair-countdown">${escapeHtml(t("wallet.pairingExpires"))}</span></p>
         <div id="pair-approve"></div>`;
 
-      box.querySelectorAll<HTMLElement>("[data-copy-text]").forEach((copyBtn) => {
-        copyBtn.addEventListener("click", () => {
-          const text = copyBtn.dataset.copyText;
-          if (text) void navigator.clipboard.writeText(text);
-        });
-      });
+      bindCopyButtons(box);
 
       const countdownEl = box.querySelector("#pair-countdown");
       const countdownTimer = setInterval(() => {
@@ -183,7 +215,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
                 ownerQx: p.newOwnerQx!,
                 ownerQy: p.newOwnerQy!,
                 label: p.deviceLabel ?? "Device",
-                credentialId: "",
+                credentialId: null,
               });
               await renderWalletSecurity(root);
             } catch (error) {

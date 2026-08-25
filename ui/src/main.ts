@@ -1,13 +1,14 @@
 import "./styles.css";
 import { renderIntegrations } from "./pages/integrations.js";
 import { renderAdmin } from "./pages/admin.js";
-import { renderCreate } from "./pages/create.js";
+import { renderCreate } from "./pages/create/index.js";
 import { renderHome } from "./pages/home.js";
 import { renderMerchant } from "./pages/merchant.js";
 import { renderPay } from "./pages/pay.js";
 import { renderWallet } from "./pages/wallet/index.js";
 import { SITE } from "./shared/site.js";
 import { applyTheme, initThemeToggle, preferredTheme } from "./shared/theme.js";
+import { beginSpaRender, isSpaRenderCurrent } from "./shared/spa-render.js";
 import { isLocale, LOCALES, LOCALE_NATIVE_NAMES } from "./i18n/locales.js";
 import { applyLocale, getLocale, setLocale, t } from "./i18n/t.js";
 import { resolvePageLocale } from "./i18n/detect.js";
@@ -26,6 +27,7 @@ const routes: Record<string, PageRenderer> = {
   "/wallet/create": renderWallet,
   "/wallet/pair": renderWallet,
   "/wallet/send": renderWallet,
+  "/wallet/receive": renderWallet,
 };
 
 applyTheme(preferredTheme());
@@ -47,19 +49,39 @@ document.addEventListener("click", (event) => {
 
 void render();
 
-async function render(): Promise<void> {
+async function render(options?: { rebuildShell?: boolean }): Promise<void> {
+  const gen = beginSpaRender();
   applyLocale(resolvePageLocale());
   const pathname = location.pathname;
   applyMeta(pathname);
   const route =
     routes[pathname] ??
     (pathname.startsWith("/merchant/") ? renderMerchant : pathname.startsWith("/wallet") ? renderWallet : renderHome);
-  appRoot.innerHTML = shell(pathname);
+
+  const outletExists = Boolean(appRoot.querySelector("#outlet"));
+  if (options?.rebuildShell || !outletExists) {
+    appRoot.innerHTML = shell(pathname);
+    initThemeToggle(appRoot.querySelector<HTMLButtonElement>("#theme-toggle"));
+    initLocaleSelect(appRoot.querySelector<HTMLSelectElement>("#locale-select"));
+  } else {
+    syncTopbarNav(pathname);
+  }
+
   const outlet = appRoot.querySelector<HTMLElement>("#outlet");
   if (!outlet) throw new Error("Missing outlet");
-  initThemeToggle(appRoot.querySelector<HTMLButtonElement>("#theme-toggle"));
-  initLocaleSelect(appRoot.querySelector<HTMLSelectElement>("#locale-select"));
+  if (!isSpaRenderCurrent(gen)) return;
   await route(outlet);
+}
+
+function syncTopbarNav(pathname: string): void {
+  const nav = appRoot.querySelector("header.topbar nav");
+  if (!nav) return;
+  nav.querySelectorAll("a[data-route]").forEach((anchor) => {
+    const href = anchor.getAttribute("href") ?? "";
+    const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+    if (isActive) anchor.setAttribute("aria-current", "page");
+    else anchor.removeAttribute("aria-current");
+  });
 }
 
 function applyMeta(pathname: string): void {
@@ -86,6 +108,8 @@ function pageMeta(path: string): { title: string; description: string } {
     case "/wallet/security":
     case "/wallet/create":
     case "/wallet/pair":
+    case "/wallet/send":
+    case "/wallet/receive":
       return { title: t("meta.walletTitle"), description: t("meta.walletDescription") };
     default:
       return { title: t("meta.homeTitle"), description: t("meta.homeDescription") };
@@ -99,7 +123,7 @@ function initLocaleSelect(select: HTMLSelectElement | null): void {
     const value = select.value;
     if (!isLocale(value)) return;
     setLocale(value);
-    void render();
+    void render({ rebuildShell: true });
   });
 }
 

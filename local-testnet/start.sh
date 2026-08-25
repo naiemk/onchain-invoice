@@ -42,6 +42,9 @@ npm run build >/dev/null
 test -d node_modules/vite || npm install >/dev/null
 
 echo "Starting commerce API on :8080…"
+# Drop a leftover listener so a rebuild is actually served (stale Node keeps old routes).
+fuser -k 8080/tcp 2>/dev/null || true
+sleep 0.2
 nohup env CONFIG_PATH="$DIR/server.yaml" DB_PATH="$DIR/trustless-commerce.db" \
   node commerce-dist/server/index.js \
   >"$DIR/logs/api.log" 2>&1 &

@@ -7,6 +7,7 @@ import {
   primaryChain,
   waitForUserOp,
 } from "../../shared/wallet-api.js";
+import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import { loadWalletSession } from "../../shared/webauthn.js";
 import {
   buildSignedSendUserOp,
@@ -14,21 +15,28 @@ import {
 } from "../../shared/userop-client.js";
 import { parseUsdcInput } from "../../../../commerce/shared/userop.js";
 import {
+  bindWalletAccountBar,
   chainBalanceRows,
   setButtonLoading,
   showStatus,
-  walletSubnav,
+  walletFrame,
+  walletLoadingFrame,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 
 export async function renderWalletSend(root: HTMLElement): Promise<void> {
+  const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
-    location.href = "/wallet/create";
+    spaNavigate("/wallet", "replace");
     return;
   }
 
+  root.innerHTML = walletLoadingFrame("send", t("wallet.sendTitle"));
+  bindWalletAccountBar(root);
+
   const config = await fetchWalletConfig();
+  if (!isSpaRenderCurrent(gen)) return;
   const feeAtoms = BigInt(config.bundlerFeeUsdc || "0");
   let balance = { totalUsd: "0.00", chains: [] as Awaited<ReturnType<typeof fetchWalletBalance>>["chains"] };
   let deployedOnPrimary = false;
@@ -40,19 +48,18 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
   } catch {
     /* ignore */
   }
+  if (!isSpaRenderCurrent(gen)) return;
 
   const account = await getWalletAccount(session.address).catch(() => null);
+  if (!isSpaRenderCurrent(gen)) return;
   if (account && account.deployedChains.includes(config.chainId)) {
     deployedOnPrimary = true;
   }
 
-  root.innerHTML = `
-    <header class="page-header wallet-page-header">
-      <p class="eyebrow">${escapeHtml(t("wallet.eyebrow"))}</p>
-      <h1>${escapeHtml(t("wallet.sendTitle"))}</h1>
-    </header>
-    <section class="panel wallet-panel">
-      ${walletSubnav("send")}
+  root.innerHTML = walletFrame({
+    current: "send",
+    title: t("wallet.sendTitle"),
+    body: `
       <p class="wallet-balance-total">${escapeHtml(t("wallet.sendAvailable", { amount: balance.totalUsd, symbol: t("wallet.usd") }))}</p>
       ${chainBalanceRows(balance.chains)}
       ${
@@ -73,8 +80,9 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
         <div><dt>${escapeHtml(t("wallet.sendTotal"))}</dt><dd id="send-total">${escapeHtml(config.bundlerFeeUsd)}</dd></div>
       </dl>
       <button type="button" class="tc-btn" id="send-submit" ${!deployedOnPrimary ? "disabled" : ""}>${escapeHtml(t("wallet.sendConfirm"))}</button>
-      <p id="send-status" class="status wallet-status" role="status"></p>
-    </section>`;
+      <p id="send-status" class="status wallet-status" role="status"></p>`,
+  });
+  bindWalletAccountBar(root);
 
   const chain = primaryChain(config);
   const primaryBalance = balance.chains.find((c) => c.chainId === config.chainId);

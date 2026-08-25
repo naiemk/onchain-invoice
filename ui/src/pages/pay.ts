@@ -497,6 +497,7 @@ function renderFiatInvoiceStage(
             : ""
         }
         <div id="pay-card-panel"></div>
+        <div id="pay-faucet-panel" class="pay-faucet-panel" hidden></div>
         <div id="pay-status" class="status">
           <p>${escapeHtml(t("pay.waitingPayment"))}</p>
           <p class="field-hint" style="margin:0.35rem 0 0">${t("pay.invoiceShort", { id: short(invoiceId) })}</p>
@@ -511,7 +512,10 @@ function renderFiatInvoiceStage(
   if (headlineEl && invoice.displayFiat) {
     attachOnramperHeadlineListener(headlineEl, invoice.displayFiat, root);
   }
-  if (panel) void mountOnrampPanel(panel, invoiceId, invoice, fields, true, headlineEl);
+  if (panel) {
+    void mountOnrampPanel(panel, invoiceId, invoice, fields, true, headlineEl);
+    void mountFaucetPanel(root, invoiceId, invoice);
+  }
 }
 
 function formatFiatDisplay(amount: string, fiat: string): string {
@@ -597,6 +601,98 @@ const FIAT_LABELS: Record<string, string> = {
   PLN: "Polish złoty",
   CZK: "Czech koruna",
 };
+
+async function mountFaucetPanel(
+  root: HTMLElement,
+  invoiceId: string,
+  invoice: InvoiceRecord
+): Promise<void> {
+  const panel = root.querySelector<HTMLElement>("#pay-faucet-panel");
+  if (!panel) return;
+  if (invoice.paymentMode !== "fiat") return;
+  const chainId = invoice.chainId;
+  if (!chainId || !isTestnet(chainId)) return;
+
+  let enabled = false;
+  try {
+    const res = await fetch(apiUrl("/api/public/faucet"));
+    if (res.ok) {
+      const body = (await res.json()) as { enabled?: boolean };
+      enabled = Boolean(body.enabled);
+    }
+  } catch {
+    return;
+  }
+  if (!enabled) return;
+
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="pay-faucet-card">
+      <h2 class="pay-faucet-title">${escapeHtml(t("pay.faucetTitle"))}</h2>
+      <p class="field-hint">${escapeHtml(t("pay.faucetHint"))}</p>
+      <label class="field" for="faucet-secret">
+        <span>${escapeHtml(t("pay.faucetSecretLabel"))}</span>
+        <input id="faucet-secret" type="password" autocomplete="off" placeholder="${escapeHtml(t("pay.faucetSecretPlaceholder"))}" />
+      </label>
+      <button type="button" class="tc-btn secondary" id="faucet-fund-btn">${escapeHtml(t("pay.faucetButton"))}</button>
+      <p id="faucet-status" class="status" role="status" hidden></p>
+    </div>`;
+
+  const btn = panel.querySelector<HTMLButtonElement>("#faucet-fund-btn");
+  const secretInput = panel.querySelector<HTMLInputElement>("#faucet-secret");
+  const statusEl = panel.querySelector<HTMLElement>("#faucet-status");
+
+  btn?.addEventListener("click", async () => {
+    const secret = secretInput?.value.trim() ?? "";
+    if (!secret) {
+      if (statusEl) {
+        statusEl.hidden = false;
+        statusEl.className = "status danger";
+        statusEl.textContent = t("pay.faucetNeedSecret");
+      }
+      return;
+    }
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = t("pay.faucetFunding");
+    }
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.className = "status";
+      statusEl.textContent = t("pay.faucetFunding");
+    }
+    try {
+      const res = await fetch(apiUrl(`/api/invoices/${encodeURIComponent(invoiceId)}/faucet`), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ secret }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        txHash?: string;
+        ok?: boolean;
+      };
+      if (!res.ok) {
+        throw new Error(body.error || t("pay.faucetFailed"));
+      }
+      if (statusEl) {
+        statusEl.className = "status success";
+        statusEl.textContent = t("pay.faucetSuccess");
+      }
+    } catch (error) {
+      if (statusEl) {
+        statusEl.className = "status danger";
+        statusEl.textContent = error instanceof Error ? error.message : t("pay.faucetFailed");
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = t("pay.faucetButton");
+      }
+    }
+  });
+}
 
 async function mountOnrampPanel(
   panel: HTMLElement,
