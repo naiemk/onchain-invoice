@@ -44,6 +44,9 @@ profiles:
     updateScript: update-onchain-invoice-nodes.sh
     extras:
       - register-onchain-invoice-node.sh
+      - register-onchain-invoice-bundler.sh
+      - onchain-invoice-bundler.yaml
+      - onchain-invoice-wallet-deployer.yaml
     autoUpdate:
       flag: NODES_AUTO_UPDATE
       intervalEnv: NODES_AUTO_UPDATE_INTERVAL_MIN
@@ -64,6 +67,12 @@ profiles:
           profile: solana
           roleEnv: SWEEPER_ROLE=solana
           activityLog: /data/logs/activity-solana.jsonl
+        - name: bundler-evm
+          containerName: onchain-invoice-bundler-evm
+          activityLog: /data/logs/activity-bundler.jsonl
+        - name: wallet-deployer-evm
+          containerName: onchain-invoice-wallet-deployer-evm
+          activityLog: /data/logs/activity-wallet-deployer.jsonl
 
   gateway:
     role: gateway

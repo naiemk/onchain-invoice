@@ -4,6 +4,7 @@ import type { WalletAccountRecord } from "../shared/wallet.js";
 import { ERC20_ABI } from "../shared/userop.js";
 import { ActivityLog } from "../sweeper/activity-log.js";
 import { load as loadYaml } from "../sweeper/config-loader.js";
+import { isUnsetSecret } from "../sweeper/worker.js";
 
 const FACTORY_ABI = [
   "function createAccount(bytes32 qx, bytes32 qy, bytes32 salt) returns (address)",
@@ -56,9 +57,19 @@ export class WalletDeployerWorker {
   }
 
   private async tick(): Promise<void> {
+    if (isUnsetSecret(this.config.sweeperApiKey)) {
+      this.activity?.append("soft-skip", {
+        payload: { reason: "SWEEPER_API_KEY unset — fill .env then recreate wallet-deployer-evm" },
+      });
+      return;
+    }
+    let anyReady = false;
     for (const chain of this.config.chains) {
       if (this.stopped) return;
-      if (!chain.rpcUrl || !chain.privateKey || !chain.factoryAddress) continue;
+      if (!chain.rpcUrl?.trim() || isUnsetSecret(chain.privateKey) || !chain.factoryAddress?.trim()) {
+        continue;
+      }
+      anyReady = true;
       try {
         await this.processChain(chain);
       } catch (error) {
@@ -67,6 +78,11 @@ export class WalletDeployerWorker {
           payload: { error: String(error) },
         });
       }
+    }
+    if (!anyReady) {
+      this.activity?.append("soft-skip", {
+        payload: { reason: "no deployer chain with rpcUrl + WALLET_DEPLOYER_PRIVATE_KEY + factory" },
+      });
     }
   }
 

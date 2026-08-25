@@ -1,0 +1,13 @@
+# Deploys passkey wallets when USDC arrives (factory.createAccount).
+# WALLET_DEPLOYER_PRIVATE_KEY often matches SWEEPER_PRIVATE_KEY (needs Sepolia ETH).
+serverUrl: ${SERVER_URL}
+sweeperApiKey: ${SWEEPER_API_KEY}
+intervalMs: 30000
+activityLogPath: ${ACTIVITY_LOG_PATH}
+chains:
+  - chainId: ${WALLET_CHAIN_ID}
+    rpcUrl: ${EVM_RPC_URL}
+    factoryAddress: ${WALLET_FACTORY_ADDRESS}
+    privateKey: ${WALLET_DEPLOYER_PRIVATE_KEY}
+    feeTokenAddress: ${WALLET_BUNDLER_FEE_TOKEN}
+    minBalanceUsdc: 1
