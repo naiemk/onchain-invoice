@@ -74,7 +74,12 @@ PY
     if [[ "$(basename "$COMPOSE_FILE")" == *mainnet* ]]; then
       containers=(mainnet-sweeper-evm mainnet-sweeper-tron)
     else
-      containers=(onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron)
+      containers=(
+        onchain-invoice-sweeper-evm
+        onchain-invoice-sweeper-tron
+        onchain-invoice-bundler-evm
+        onchain-invoice-wallet-deployer-evm
+      )
       if env_flag_on SWEEPER_SOLANA_ENABLED; then
         containers+=(onchain-invoice-sweeper-solana)
       elif docker inspect onchain-invoice-sweeper-solana >/dev/null 2>&1; then

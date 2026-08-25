@@ -14,6 +14,7 @@ import { validateUserOpFee } from "../shared/userop-fee.js";
 import { signBundlerRequest } from "../server/bundler-auth.js";
 import { ActivityLog } from "../sweeper/activity-log.js";
 import { load as loadYaml } from "../sweeper/config-loader.js";
+import { isUnsetSecret } from "../sweeper/worker.js";
 
 export interface BundlerChainConfig {
   chainId: string | number;
@@ -69,11 +70,26 @@ export class BundlerWorker {
   }
 
   private async tick(): Promise<void> {
+    if (isUnsetSecret(this.config.bundlerWalletKey)) {
+      this.activity?.append("soft-skip", {
+        payload: { reason: "BUNDLER_WALLET_KEY unset — fill .env then recreate bundler-evm" },
+      });
+      return;
+    }
+    const readyChains = this.config.chains.filter(
+      (c) => c.rpcUrl?.trim() && !isUnsetSecret(c.privateKey) && Boolean(c.bundlerAddress?.trim())
+    );
+    if (!readyChains.length) {
+      this.activity?.append("soft-skip", {
+        payload: { reason: "no bundler chain with rpcUrl + BUNDLER_PRIVATE_KEY" },
+      });
+      return;
+    }
     const userOps = await this.fetchUserOps();
     for (const record of userOps) {
       if (this.stopped) return;
-      const chain = this.config.chains.find((c) => String(c.chainId) === record.chainId);
-      if (!chain?.rpcUrl || !chain.privateKey) continue;
+      const chain = readyChains.find((c) => String(c.chainId) === record.chainId);
+      if (!chain) continue;
       try {
         await this.processUserOp(record, chain);
       } catch (error) {

@@ -92,18 +92,25 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/i
 
 Creates (if missing): `onchain-invoice-api.yaml`, `start-onchain-invoice-api.sh`, `.env` / `.env.example`.
 
-## Sweeper nodes only
+## Nodes (sweepers + bundler + wallet-deployer)
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
-# edit .env: TRON_* + SOLANA_* + SWEEPER_CHAINS=11155111,nile,devnet
+# edit .env: TRON_* + SWEEPER_* + BUNDLER_* + WALLET_* (see .env.example)
 ./register-onchain-invoice-node.sh
-./start-onchain-invoice-nodes.sh   # compose: sweeper-evm + sweeper-tron (+ solana if SWEEPER_SOLANA_ENABLED=1)
+./register-onchain-invoice-bundler.sh
+./start-onchain-invoice-nodes.sh
+# compose: sweeper-evm + sweeper-tron + bundler-evm + wallet-deployer-evm
+# (+ sweeper-solana if SWEEPER_SOLANA_ENABLED=1)
 ```
+
+All EVM workers use the **same** GHCR image `trustless-commerce-sweeper:main` with different `command` overrides (bundler / wallet-deployer). No separate bundler/deployer images in CI.
 
 Optional: `./register-onchain-invoice-node.sh --address 0x… --label dtn-node --chains 11155111,nile,devnet`
 
-Activity logs: `./logs/activity-evm.jsonl`, `activity-tron.jsonl`, `activity-solana.jsonl`.
+Activity logs: `./logs/activity-evm.jsonl`, `activity-tron.jsonl`, `activity-bundler.jsonl`, `activity-wallet-deployer.jsonl` (+ `activity-solana.jsonl` when enabled).
+
+API must also set `WALLET_BUNDLER_BENEFICIARY` (and related `WALLET_*`) so `/api/public/wallet-config` enables wallet send.
 
 ## Gateway only
 
@@ -129,7 +136,7 @@ On small VPS hosts (≈1 GB), overlapping `docker pull` can wedge Docker. Instal
 | `UI_TESTNET_AUTO_UPDATE` | `testnet-ui` | on | `GATEWAY_AUTO_UPDATE_INTERVAL_MIN` (20m @ :20) |
 | `UI_MAINNET_AUTO_UPDATE` | `mainnet-ui` | on | same cron |
 | `GATEWAY_AUTO_UPDATE` | nginx gateway | on | same cron |
-| `NODES_AUTO_UPDATE` | sweeper compose (`onchain-invoice-sweeper-*` or `mainnet-sweeper-*`) | on | `NODES_AUTO_UPDATE_INTERVAL_MIN` (30m @ :10) |
+| `NODES_AUTO_UPDATE` | nodes compose (`onchain-invoice-sweeper-*`, `bundler-evm`, `wallet-deployer-evm`, or `mainnet-sweeper-*`) | on | `NODES_AUTO_UPDATE_INTERVAL_MIN` (30m @ :10) |
 | `API_AUTO_UPDATE` | API (`testnet-api` / `mainnet-api` via `DOCKER_NAME`) | **off** in testnet example; **on** in `deploy/.env.mainnet.api.example` | `API_AUTO_UPDATE_INTERVAL_MIN` (30m @ :00) |
 
 ```bash

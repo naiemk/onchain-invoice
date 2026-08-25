@@ -1,4 +1,4 @@
-# Triple sweeper processes + optional bundler sharing YAML + .env.
+# Nodes: sweepers + wallet bundler + wallet-deployer (same sweeper image, different commands).
 # From the nodes install directory:
 #   docker compose -f docker-compose.sweepers.yml up -d
 # Solana (optional): SWEEPER_SOLANA_ENABLED=1 and:
@@ -74,11 +74,13 @@ services:
     networks:
       - edge
 
+  # Same image as sweepers — overrides CMD to commerce-dist/bundler.
   bundler-evm:
-    image: ${BUNDLER_IMAGE:-ghcr.io/naiemk/trustless-commerce-bundler:main}
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
     container_name: onchain-invoice-bundler-evm
     restart: unless-stopped
     mem_limit: ${BUNDLER_MEMORY_LIMIT:-192m}
+    command: ["node", "commerce-dist/bundler/index.js"]
     env_file: .env
     environment:
       BUNDLER_CONFIG: /tmp/bundler.yaml
@@ -91,11 +93,13 @@ services:
     networks:
       - edge
 
+  # Same image as sweepers — overrides CMD to commerce-dist/wallet-deployer.
   wallet-deployer-evm:
-    image: ${WALLET_DEPLOYER_IMAGE:-ghcr.io/naiemk/trustless-commerce-wallet-deployer:main}
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
     container_name: onchain-invoice-wallet-deployer-evm
     restart: unless-stopped
     mem_limit: ${WALLET_DEPLOYER_MEMORY_LIMIT:-192m}
+    command: ["node", "commerce-dist/wallet-deployer/index.js"]
     env_file: .env
     environment:
       WALLET_DEPLOYER_CONFIG: /tmp/wallet-deployer.yaml

@@ -1,4 +1,4 @@
-# Triple sweeper processes sharing one YAML + .env.
+# Nodes: sweepers + wallet bundler + wallet-deployer (same sweeper image, different commands).
 # From the nodes install directory:
 #   docker compose -f docker-compose.sweepers.yml up -d
 # Solana (optional): SWEEPER_SOLANA_ENABLED=1 and:
@@ -10,6 +10,7 @@
 #   wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 #   # edit .env then:
 #   ./register-onchain-invoice-node.sh
+#   ./register-onchain-invoice-bundler.sh
 #   ./start-onchain-invoice-nodes.sh
 
 networks:
@@ -68,6 +69,44 @@ services:
     volumes:
       - ./logs:/data/logs
       - ./onchain-invoice-nodes.yaml:/tmp/sweeper.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge
+
+  # Same image as sweepers — overrides CMD to commerce-dist/bundler.
+  bundler-evm:
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: onchain-invoice-bundler-evm
+    restart: unless-stopped
+    mem_limit: ${BUNDLER_MEMORY_LIMIT:-192m}
+    command: ["node", "commerce-dist/bundler/index.js"]
+    env_file: .env
+    environment:
+      BUNDLER_CONFIG: /tmp/bundler.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-bundler.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./onchain-invoice-bundler.yaml:/tmp/bundler.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge
+
+  # Same image as sweepers — overrides CMD to commerce-dist/wallet-deployer.
+  wallet-deployer-evm:
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: onchain-invoice-wallet-deployer-evm
+    restart: unless-stopped
+    mem_limit: ${WALLET_DEPLOYER_MEMORY_LIMIT:-192m}
+    command: ["node", "commerce-dist/wallet-deployer/index.js"]
+    env_file: .env
+    environment:
+      WALLET_DEPLOYER_CONFIG: /tmp/wallet-deployer.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-wallet-deployer.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./onchain-invoice-wallet-deployer.yaml:/tmp/wallet-deployer.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

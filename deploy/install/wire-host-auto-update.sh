@@ -21,7 +21,7 @@ docker run --rm \
       "api-mainnet:lib-env.sh install-auto-update.sh update-onchain-invoice-api.sh start-onchain-invoice-api.sh" \
       "api:lib-env.sh install-auto-update.sh update-onchain-invoice-api.sh start-onchain-invoice-api.sh" \
       "sweeper-mainnet:lib-env.sh install-auto-update.sh update-onchain-invoice-nodes.sh start-onchain-invoice-nodes.sh docker-compose.sweepers-mainnet.yml" \
-      "sweeper:lib-env.sh install-auto-update.sh update-onchain-invoice-nodes.sh start-onchain-invoice-nodes.sh docker-compose.sweepers.yml" \
+      "sweeper:lib-env.sh install-auto-update.sh update-onchain-invoice-nodes.sh start-onchain-invoice-nodes.sh docker-compose.sweepers.yml register-onchain-invoice-bundler.sh onchain-invoice-bundler.yaml onchain-invoice-wallet-deployer.yaml" \
       "gateway:lib-env.sh install-auto-update.sh update-onchain-invoice-gateway.sh start-onchain-invoice-gateway.sh"
     do
       dir="${pair%%:*}"

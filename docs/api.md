@@ -22,6 +22,7 @@ Invoice type field shapes and worked examples: [Invoice types](invoice-types.md)
 |--------|------|
 | GET | `/api/admin/stats` |
 | POST | `/api/admin/sweepers` |
+| POST | `/api/admin/bundlers` |
 
 Admin and `/api/internal/*` routes are **not** rate-limited (API-key gated).
 
@@ -38,6 +39,18 @@ Admin and `/api/internal/*` routes are **not** rate-limited (API-key gated).
 Headers: `x-sweeper-address`, `x-sweeper-timestamp`, `x-sweeper-nonce`, `x-sweeper-body-hash`, `x-sweeper-signature`.
 
 Track/claim use optimistic `expectedVersion`; conflicts return **409**.
+
+## Bundler (wallet-signed)
+
+| Method | Path |
+|--------|------|
+| GET | `/api/bundler/userops` |
+| POST | `/api/bundler/claim` |
+| POST | `/api/bundler/track` |
+
+Same header pattern as sweeper (`x-bundler-*`). Register via `POST /api/admin/bundlers` then `./register-onchain-invoice-bundler.sh`.
+
+Wallet UserOps: `POST /api/wallet/userops` (public submit). Rejected/failed hashes may be **requeued** with a fresh signature; pending/included hashes return **409** `duplicate_user_op_hash`.
 
 ## Rate limiting
 

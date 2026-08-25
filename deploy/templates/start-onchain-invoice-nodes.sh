@@ -171,8 +171,8 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
   # until real keys are filled in .env (keeps `_PRIVATE_KEY_` visible in .env for operators).
   if [[ -f .env ]]; then
     sed -E \
-      -e 's/^(SWEEPER_WALLET_KEY|SWEEPER_PRIVATE_KEY|TRON_SPONSOR_PRIVATE_KEY|SOLANA_SWEEPER_KEY|TRON_INVOICE_MASTER_SECRET)=_PRIVATE_KEY_$/\1=/' \
-      -e 's/^(SWEEPER_WALLET_KEY|SWEEPER_PRIVATE_KEY|TRON_SPONSOR_PRIVATE_KEY|SOLANA_SWEEPER_KEY|TRON_INVOICE_MASTER_SECRET)=change-me.*$/\1=/' \
+      -e 's/^(SWEEPER_WALLET_KEY|SWEEPER_PRIVATE_KEY|TRON_SPONSOR_PRIVATE_KEY|SOLANA_SWEEPER_KEY|TRON_INVOICE_MASTER_SECRET|BUNDLER_WALLET_KEY|BUNDLER_PRIVATE_KEY|WALLET_DEPLOYER_PRIVATE_KEY)=_PRIVATE_KEY_$/\1=/' \
+      -e 's/^(SWEEPER_WALLET_KEY|SWEEPER_PRIVATE_KEY|TRON_SPONSOR_PRIVATE_KEY|SOLANA_SWEEPER_KEY|TRON_INVOICE_MASTER_SECRET|BUNDLER_WALLET_KEY|BUNDLER_PRIVATE_KEY|WALLET_DEPLOYER_PRIVATE_KEY)=change-me.*$/\1=/' \
       .env > .env.runtime
   fi
 
@@ -187,7 +187,7 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
     fi
   fi
 
-  echo "Starting sweepers via $COMPOSE_FILE (memory ${SWEEPER_MEMORY_LIMIT}) ..."
+  echo "Starting nodes via $COMPOSE_FILE (sweepers + bundler + wallet-deployer, memory ${SWEEPER_MEMORY_LIMIT}) ..."
   DOCKER_NETWORK="${DOCKER_NETWORK:-trustless-commerce-edge}"
   docker network create "$DOCKER_NETWORK" >/dev/null 2>&1 || true
   export DOCKER_NETWORK
@@ -199,11 +199,12 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
   else
     docker compose "${COMPOSE_ARGS[@]}" up -d --force-recreate "${PULL_ARGS[@]}"
   fi
-  echo "Sweepers up (container names from $COMPOSE_FILE)"
+  echo "Nodes up (container names from $COMPOSE_FILE)"
+  echo "  Register bundler once: ./register-onchain-invoice-bundler.sh"
   if [[ "$solana_enabled" -eq 1 ]]; then
-    echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-solana.jsonl"
+    echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-solana.jsonl $LOGS_ABS/activity-bundler.jsonl $LOGS_ABS/activity-wallet-deployer.jsonl"
   else
-    echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl"
+    echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-bundler.jsonl $LOGS_ABS/activity-wallet-deployer.jsonl"
     echo "(Solana sweeper off — set SWEEPER_SOLANA_ENABLED=1 to start)"
   fi
   exit 0

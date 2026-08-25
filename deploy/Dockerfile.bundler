@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# Local/dev only. Production nodes use the sweeper image with:
+#   command: ["node", "commerce-dist/bundler/index.js"]
 # Build from repo root: docker build -f deploy/Dockerfile.bundler -t trustless-commerce-bundler .
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
