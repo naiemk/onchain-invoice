@@ -737,6 +737,9 @@ export class CommerceDb {
 
       CREATE INDEX IF NOT EXISTS idx_wallet_user_ops_status ON wallet_user_ops(status, chain_id);
 
+      CREATE INDEX IF NOT EXISTS idx_wallet_accounts_credential ON wallet_accounts(credential_id);
+      CREATE INDEX IF NOT EXISTS idx_wallet_devices_credential ON wallet_devices(credential_id);
+
       CREATE TABLE IF NOT EXISTS bundlers (
         address TEXT PRIMARY KEY,
         label TEXT NOT NULL,
@@ -807,6 +810,44 @@ export class CommerceDb {
       .prepare(`SELECT * FROM wallet_accounts WHERE address = ?`)
       .get(address.toLowerCase()) as WalletAccountRow | undefined;
     return row ? mapWalletAccount(row) : null;
+  }
+
+  /** Lookup by WebAuthn credential id (account row or paired device). */
+  getWalletAccountByCredentialId(credentialId: string): WalletAccountRecord | null {
+    const id = credentialId.trim();
+    if (!id) return null;
+    const byAccount = this.db
+      .prepare(`SELECT * FROM wallet_accounts WHERE credential_id = ? LIMIT 1`)
+      .get(id) as WalletAccountRow | undefined;
+    if (byAccount) return mapWalletAccount(byAccount);
+
+    const device = this.db
+      .prepare(
+        `SELECT wallet_address FROM wallet_devices WHERE credential_id = ? ORDER BY last_used_at DESC LIMIT 1`
+      )
+      .get(id) as { wallet_address: string } | undefined;
+    if (!device) return null;
+    return this.getWalletAccount(device.wallet_address);
+  }
+
+  getWalletDeviceByCredentialId(
+    credentialId: string,
+    walletAddress?: string
+  ): WalletDeviceRecord | null {
+    const id = credentialId.trim();
+    if (!id) return null;
+    if (walletAddress) {
+      const row = this.db
+        .prepare(
+          `SELECT * FROM wallet_devices WHERE credential_id = ? AND wallet_address = ? LIMIT 1`
+        )
+        .get(id, walletAddress.toLowerCase()) as WalletDeviceRow | undefined;
+      return row ? mapWalletDevice(row) : null;
+    }
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_devices WHERE credential_id = ? ORDER BY last_used_at DESC LIMIT 1`)
+      .get(id) as WalletDeviceRow | undefined;
+    return row ? mapWalletDevice(row) : null;
   }
 
   listUndeployedWalletAccounts(chainId: string): WalletAccountRecord[] {

@@ -19,11 +19,8 @@ export function registerWalletRoutes(
   db: CommerceDb,
   walletConfig: WalletConfig,
   handlers: {
-    rateLimit: (ip: string, bucket: string, limit: number) => void;
     sendJson: (res: import("node:http").ServerResponse, code: number, body: unknown) => void;
     readJson: (req: import("node:http").IncomingMessage) => Promise<Record<string, unknown>>;
-    clientIp: (req: import("node:http").IncomingMessage) => string;
-    publicLimit: number;
     sweeperApiKey: string;
     requireApiKey: (
       req: import("node:http").IncomingMessage,
@@ -39,7 +36,6 @@ export function registerWalletRoutes(
     ip: string
   ): Promise<boolean> {
     if (req.method === "GET" && url.pathname === "/api/wallet/balance") {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const wallet = url.searchParams.get("wallet")?.trim();
       if (!wallet) {
         handlers.sendJson(res, 400, { error: "wallet required" });
@@ -59,7 +55,6 @@ export function registerWalletRoutes(
 
     const accountMatch = url.pathname.match(/^\/api\/wallet\/accounts\/(0x[0-9a-fA-F]{40})$/);
     if (req.method === "GET" && accountMatch) {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const account = db.getWalletAccount(accountMatch[1]);
       if (!account) {
         handlers.sendJson(res, 404, { error: "account_not_found" });
@@ -69,8 +64,33 @@ export function registerWalletRoutes(
       return true;
     }
 
+    if (req.method === "GET" && url.pathname === "/api/wallet/accounts") {
+      const credentialId = url.searchParams.get("credentialId")?.trim();
+      if (!credentialId) {
+        handlers.sendJson(res, 400, { error: "credentialId required" });
+        return true;
+      }
+      const account = db.getWalletAccountByCredentialId(credentialId);
+      if (!account) {
+        handlers.sendJson(res, 404, { error: "account_not_found" });
+        return true;
+      }
+      const device = db.getWalletDeviceByCredentialId(credentialId, account.address);
+      handlers.sendJson(res, 200, {
+        account,
+        device: device
+          ? {
+              label: device.label,
+              ownerQx: device.ownerQx,
+              ownerQy: device.ownerQy,
+              credentialId: device.credentialId,
+            }
+          : null,
+      });
+      return true;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/wallet/accounts") {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const body = await handlers.readJson(req);
       const ownerQx = normalizeHex32(str(body.ownerQx));
       const ownerQy = normalizeHex32(str(body.ownerQy));
@@ -141,7 +161,6 @@ export function registerWalletRoutes(
     }
 
     if (req.method === "GET" && url.pathname === "/api/wallet/devices") {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const wallet = url.searchParams.get("wallet")?.trim().toLowerCase();
       const chainId = url.searchParams.get("chainId")?.trim() ?? "11155111";
       if (!wallet) {
@@ -153,7 +172,6 @@ export function registerWalletRoutes(
     }
 
     if (req.method === "POST" && url.pathname === "/api/wallet/devices") {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const body = await handlers.readJson(req);
       const walletAddress = str(body.walletAddress)?.toLowerCase();
       const chainId = str(body.chainId) ?? "11155111";
@@ -176,7 +194,6 @@ export function registerWalletRoutes(
     }
 
     if (req.method === "DELETE" && url.pathname.startsWith("/api/wallet/devices/")) {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const parts = url.pathname.split("/");
       const wallet = parts[4]?.trim().toLowerCase();
       const ownerQx = normalizeHex32(parts[5] ? (parts[5].startsWith("0x") ? parts[5] : `0x${parts[5]}`) : undefined);
@@ -192,7 +209,6 @@ export function registerWalletRoutes(
     }
 
     if (req.method === "POST" && url.pathname === "/api/wallet/pairing") {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const body = await handlers.readJson(req);
       const chainId = str(body.chainId) ?? "11155111";
       if (body.action === "create") {
@@ -241,7 +257,6 @@ export function registerWalletRoutes(
 
     const userOpPoll = url.pathname.match(/^\/api\/wallet\/userops\/(0x[0-9a-fA-F]{64})$/);
     if (req.method === "GET" && userOpPoll) {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const hash = userOpPoll[1].toLowerCase();
       const record = db.getWalletUserOpByHash(hash);
       if (!record) {
@@ -253,7 +268,6 @@ export function registerWalletRoutes(
     }
 
     if (req.method === "POST" && url.pathname === "/api/wallet/userops") {
-      handlers.rateLimit(ip, "public", handlers.publicLimit);
       const body = await handlers.readJson(req);
       const userOp = body.userOp as PackedUserOperationJson | undefined;
       const userOpHash = str(body.userOpHash)?.toLowerCase();

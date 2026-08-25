@@ -1,18 +1,25 @@
 import type { WalletBalanceResponse } from "../../../commerce/shared/wallet.js";
 import type { WalletPublicConfig, WalletAccountRecord } from "../../../commerce/shared/wallet.js";
 import type { PackedUserOperationJson, WalletUserOpRecord } from "../../../commerce/shared/userop.js";
+import { apiUrl } from "./site.js";
 
-const API = "";
+let walletConfigCache: { at: number; value: WalletPublicConfig } | null = null;
 
 export async function fetchWalletConfig(): Promise<WalletPublicConfig> {
-  const res = await fetch(`${API}/api/public/wallet-config`);
+  const now = Date.now();
+  if (walletConfigCache && now - walletConfigCache.at < 30_000) {
+    return walletConfigCache.value;
+  }
+  const res = await fetch(apiUrl("/api/public/wallet-config"));
   if (!res.ok) throw new Error("wallet config unavailable");
-  return res.json() as Promise<WalletPublicConfig>;
+  const value = (await res.json()) as WalletPublicConfig;
+  walletConfigCache = { at: now, value };
+  return value;
 }
 
 export async function fetchWalletBalance(wallet: string): Promise<WalletBalanceResponse> {
   const q = new URLSearchParams({ wallet });
-  const res = await fetch(`${API}/api/wallet/balance?${q}`);
+  const res = await fetch(apiUrl(`/api/wallet/balance?${q}`));
   if (!res.ok) throw new Error("failed to load balance");
   return res.json() as Promise<WalletBalanceResponse>;
 }
@@ -25,7 +32,7 @@ export async function registerWalletAccount(input: {
   credentialId: string;
   webauthnAttestation?: unknown;
 }): Promise<WalletAccountRecord> {
-  const res = await fetch(`${API}/api/wallet/accounts`, {
+  const res = await fetch(apiUrl("/api/wallet/accounts"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -39,16 +46,30 @@ export async function registerWalletAccount(input: {
 }
 
 export async function getWalletAccount(address: string): Promise<WalletAccountRecord | null> {
-  const res = await fetch(`${API}/api/wallet/accounts/${address}`);
+  const res = await fetch(apiUrl(`/api/wallet/accounts/${address}`));
   if (res.status === 404) return null;
   if (!res.ok) throw new Error("failed to load account");
   const body = (await res.json()) as { account: WalletAccountRecord };
   return body.account;
 }
 
+export async function fetchWalletAccountByCredentialId(credentialId: string): Promise<{
+  account: WalletAccountRecord;
+  device: { label: string; ownerQx: string; ownerQy: string; credentialId: string | null } | null;
+} | null> {
+  const q = new URLSearchParams({ credentialId });
+  const res = await fetch(apiUrl(`/api/wallet/accounts?${q}`));
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("failed to look up account");
+  return res.json() as Promise<{
+    account: WalletAccountRecord;
+    device: { label: string; ownerQx: string; ownerQy: string; credentialId: string | null } | null;
+  }>;
+}
+
 export async function listDevices(wallet: string, chainId: string): Promise<import("../../../commerce/shared/wallet.js").WalletDeviceRecord[]> {
   const q = new URLSearchParams({ wallet, chainId });
-  const res = await fetch(`${API}/api/wallet/devices?${q}`);
+  const res = await fetch(apiUrl(`/api/wallet/devices?${q}`));
   if (!res.ok) throw new Error("failed to load devices");
   const body = (await res.json()) as { devices: import("../../../commerce/shared/wallet.js").WalletDeviceRecord[] };
   return body.devices;
@@ -60,9 +81,9 @@ export async function registerDevice(input: {
   ownerQx: string;
   ownerQy: string;
   label: string;
-  credentialId: string;
+  credentialId: string | null;
 }): Promise<import("../../../commerce/shared/wallet.js").WalletDeviceRecord> {
-  const res = await fetch(`${API}/api/wallet/devices`, {
+  const res = await fetch(apiUrl("/api/wallet/devices"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -79,12 +100,12 @@ export async function deleteDevice(
   ownerQy: string
 ): Promise<void> {
   const path = `/api/wallet/devices/${wallet}/${ownerQx.slice(2)}/${ownerQy.slice(2)}?chainId=${encodeURIComponent(chainId)}`;
-  const res = await fetch(`${API}${path}`, { method: "DELETE" });
+  const res = await fetch(apiUrl(path), { method: "DELETE" });
   if (!res.ok) throw new Error("failed to delete device");
 }
 
 export async function createPairing(walletAddress: string, chainId: string) {
-  const res = await fetch(`${API}/api/wallet/pairing`, {
+  const res = await fetch(apiUrl("/api/wallet/pairing"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action: "create", walletAddress, chainId }),
@@ -99,7 +120,7 @@ export async function submitPairing(input: {
   newOwnerQy: string;
   deviceLabel: string;
 }) {
-  const res = await fetch(`${API}/api/wallet/pairing`, {
+  const res = await fetch(apiUrl("/api/wallet/pairing"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action: "submit", ...input }),
@@ -109,7 +130,7 @@ export async function submitPairing(input: {
 }
 
 export async function pollPairing(nonce: string) {
-  const res = await fetch(`${API}/api/wallet/pairing`, {
+  const res = await fetch(apiUrl("/api/wallet/pairing"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action: "poll", nonce }),
@@ -171,7 +192,7 @@ export async function submitUserOp(input: {
   userOp: PackedUserOperationJson;
   userOpHash: string;
 }): Promise<WalletUserOpRecord> {
-  const res = await fetch(`${API}/api/wallet/userops`, {
+  const res = await fetch(apiUrl("/api/wallet/userops"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -185,7 +206,7 @@ export async function submitUserOp(input: {
 }
 
 export async function pollUserOpStatus(userOpHash: string): Promise<WalletUserOpRecord> {
-  const res = await fetch(`${API}/api/wallet/userops/${userOpHash}`);
+  const res = await fetch(apiUrl(`/api/wallet/userops/${userOpHash}`));
   if (!res.ok) throw new Error("userOp status unavailable");
   const body = (await res.json()) as { userOp: WalletUserOpRecord };
   return body.userOp;

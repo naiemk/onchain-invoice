@@ -4,7 +4,8 @@ description: >-
   Create Trustless Commerce crypto invoices and check payment status. Use when building
   or verifying USDC/USDT pay links, invoiceAddress, awaiting_payment,
   POST /api/invoices create invoice API, GET /api/invoices/:id polling, sweep status,
-  Trustless Commerce checkout, Sepolia, Nile, or crypto invoice integration for shops and agents.
+  Trustless Commerce checkout, Sepolia, Nile, fiat/crypto/combined paymentMode,
+  GET /api/public/onramp-quote, or crypto invoice integration for shops and agents.
 ---
 
 # Trustless Commerce — create & check invoices
@@ -12,14 +13,25 @@ description: >-
 ## When to use
 
 - Create a payment link or embed button for a shop order
-- Call the one-shot create invoice API
+- Call the one-shot create invoice API (`crypto`, `crypto_or_fiat`, or `fiat`)
+- Quote card/bank → settlement via `GET /api/public/onramp-quote`
 - Check whether an invoice is `created`, `awaiting_payment`, `paid`, `paid_partial`, or `swept`
 
 No merchant wallet connection is required for create or status check.
 
+## Rate limits (read first)
+
+| Bucket | Default | Routes |
+|--------|---------|--------|
+| `create` | ~1/s/IP | `POST /api/invoices` |
+| `quote` | ~2/s, burst 20/IP | `/api/public/onramp-quote`, `/api/public/onramp-methods` |
+| `public` | ~20/s/IP | other public GETs |
+
+**429** responses include `Retry-After`, `RateLimit-Remaining`, and `RateLimit-Reset`. Back off and retry — do not hammer create or quote.
+
 ## Canonical agent path (one step)
 
-### Sepolia USDC
+### Crypto — Sepolia USDC
 
 ```http
 POST /api/invoices
@@ -35,11 +47,12 @@ Content-Type: application/json
   "token": "USDC",
   "selectedTo": "0x…",
   "title": "Order",
-  "allowPartial": false
+  "allowPartial": false,
+  "paymentMode": "crypto"
 }
 ```
 
-### Nile USDT
+### Crypto — Nile USDT
 
 ```http
 POST /api/invoices
@@ -55,7 +68,8 @@ Content-Type: application/json
   "token": "USDT",
   "selectedTo": "T…",
   "title": "Order",
-  "allowPartial": false
+  "allowPartial": false,
+  "paymentMode": "crypto"
 }
 ```
 
@@ -69,7 +83,7 @@ Duplicate invoice ids are rejected with `409`. Use `Idempotency-Key` for safe re
 
 **Do not** use deprecated `POST /api/sessions` + `POST /api/invoices/activate`.
 
-### Solana Devnet (USDC or USDT)
+### Crypto — Solana Devnet
 
 ```http
 POST /api/invoices
@@ -85,21 +99,92 @@ Content-Type: application/json
   "token": "USDC",
   "selectedTo": "So111…",
   "title": "Order",
-  "allowPartial": false
+  "allowPartial": false,
+  "paymentMode": "crypto"
 }
 ```
 
-`invoiceAddress` is the invoice PDA's ATA for the selected mint (mint is bound into PDA seeds). Settlement is destination-bound on-chain (sweeper cannot redirect). Mainnet (`mainnet-beta`) uses the same API once enabled in config.
+### Combined (`crypto_or_fiat`)
 
-Stablecoins only for now (`USDC`/`USDT` on Solana, `USDC` on EVM, `USDT` on Nile). Token–chain pairs are enforced. Rate limit: ~1 create/s per IP (429 if exceeded).
+```http
+POST /api/invoices
+Content-Type: application/json
 
-### Optional `paymentMode` (card/bank)
+{
+  "price": "49.00",
+  "to": ["0x…"],
+  "chains": ["8453"],
+  "tokens": ["USDC"],
+  "clientInvoiceId": "order-both-1",
+  "chainId": "8453",
+  "token": "USDC",
+  "selectedTo": "0x…",
+  "paymentMode": "crypto_or_fiat",
+  "displayFiat": "EUR",
+  "quoteCountry": "de",
+  "quotePaymentMethod": "creditcard",
+  "quoteSlippageBps": 100
+}
+```
 
-When the operator enables Onramper (`ONRAMPER_ENABLED` + keys), create may set:
+Payer chooses crypto or card on `/pay`. Card funding: `POST /api/invoices/:id/onramp-session` with `{ "fiat": "EUR" }`.
 
-- `paymentMode`: `"crypto"` (default) | `"crypto_or_fiat"` | `"fiat"`
-- Fiat-only requires **exactly one** chain and token on a supported mainnet rail (Base USDC, Tron USDT, BNB USDC/USDT).
-- Paid still means the invoice address was funded on-chain (existing poll / sweeper). Card checkout is only a funding source via `POST /api/invoices/:id/onramp-session` with `{ "fiat": "EUR" }`.
+### Fiat only
+
+1. Quote (customer pays fixed fiat):
+
+```http
+GET /api/public/onramp-quote?fiat=SEK&direction=pay&fiatAmount=500&country=se&chains=1,8453,tron&tokens=USDC,USDT&slippageBps=100
+```
+
+2. Create with mapped fields:
+
+```http
+POST /api/invoices
+Content-Type: application/json
+
+{
+  "to": ["0x…", "T…"],
+  "chains": ["1", "8453", "tron"],
+  "tokens": ["USDC", "USDT"],
+  "clientInvoiceId": "order-fiat-1",
+  "paymentMode": "fiat",
+  "displayFiat": "SEK",
+  "displayAmount": "500.00",
+  "quoteCountry": "se",
+  "quotePaymentMethod": "swish",
+  "quoteProvider": "revolut",
+  "quoteSlippageBps": 100
+}
+```
+
+You may omit `price` for fiat — the server quotes and fills settlement. Or set `price` from `cryptoAmount` in the quote response.
+
+### Quote → create mapping
+
+| Quote | Create |
+|-------|--------|
+| `fiat` | `displayFiat` |
+| `fiatAmount` | `displayAmount` |
+| `cryptoAmount` | `price` |
+| `country` | `quoteCountry` |
+| `paymentMethod` | `quotePaymentMethod` |
+| `provider` / `recommended.provider` | `quoteProvider` |
+| `slippageBps` | `quoteSlippageBps` |
+
+### Fiat field cascade
+
+When refining a quote:
+
+- **currency / country / pairs** → refetch methods, then providers; reset method/provider to remembered-if-still-offered else Auto
+- **payment method** → refetch providers only
+- **provider** → no refetch; reselect from `quotes[]`
+- **amount** → refetch providers (debounce)
+- **max drift** → no refetch (enforced at pay time)
+
+Omit method/provider for Auto (server `recommended`).
+
+Full docs: https://naiemk.github.io/onchain-invoice/invoice-types/ and https://naiemk.github.io/onchain-invoice/quote/
 
 ## Pay link (browser)
 
@@ -115,7 +200,7 @@ Uniqueness comes from a server-generated random `invoiceSeed`; `toAddresses` bin
 `clientInvoiceId`, price, title, etc. are metadata only (not part of the hash).
 `chains` / `tokens` are not part of the hash.
 
-Helpers: `ui/src/shared/invoice.ts`. Manual UI: `/create`. Docs: https://naiemk.github.io/onchain-invoice/
+Helpers: `ui/src/shared/invoice.ts`. Manual UI: `/create` (3-step wizard). Docs: https://naiemk.github.io/onchain-invoice/
 
 ## Check status
 

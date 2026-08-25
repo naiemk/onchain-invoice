@@ -50,8 +50,9 @@ import { requireApiKey, requireMerchant } from "./auth.js";
 import { verifyCaptcha } from "./captcha.js";
 import { resolveEvmChain, type AppConfig } from "./config.js";
 import type { CommerceDb } from "./db.js";
+import { fundFiatInvoiceFromFaucet, isFaucetPubliclyEnabled } from "./faucet.js";
 import { log, newRequestId } from "./logger.js";
-import { clientIp, takeToken } from "./rate-limit.js";
+import { clientIp, resolveRateLimit, takeToken } from "./rate-limit.js";
 import { requireSweeper } from "./sweeper-auth.js";
 import { requireBundler } from "./bundler-auth.js";
 import { registerWalletRoutes } from "./wallet-routes.js";
@@ -65,11 +66,8 @@ interface RouteContext {
 
 export function createRouter(context: RouteContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const handleWalletRoute = registerWalletRoutes(context.db, context.config.wallet, {
-    rateLimit: rateLimitOrThrow,
     sendJson,
     readJson,
-    clientIp,
-    publicLimit: context.config.rateLimit.publicPerIpPerSecond,
     sweeperApiKey: context.config.sweeperApiKey,
     requireApiKey,
   });
@@ -87,6 +85,22 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
     const url = new URL(req.url ?? "/", context.config.baseUrl);
 
     try {
+      const method = (req.method ?? "GET").toUpperCase();
+      const decision = resolveRateLimit(method, url.pathname, context.config.rateLimit);
+      if (decision) {
+        const taken = takeToken(`${decision.bucket}:${ip}`, decision.perSecond, decision.burst);
+        res.setHeader(
+          "RateLimit-Remaining",
+          String(taken.remaining === Infinity ? decision.burst : taken.remaining)
+        );
+        if (!taken.ok) {
+          const retryAfter = Math.max(1, Math.ceil(taken.resetMs / 1000));
+          res.setHeader("Retry-After", String(retryAfter));
+          res.setHeader("RateLimit-Reset", String(retryAfter));
+          throw Object.assign(new Error("Rate limit exceeded"), { statusCode: 429 });
+        }
+      }
+
       if (req.method === "GET" && url.pathname === "/api/health") {
         sendJson(res, 200, { ok: true, service: "trustless-commerce", time: new Date().toISOString() });
         return;
@@ -99,7 +113,6 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       }
 
       if (req.method === "GET" && url.pathname === "/api/public/onramp") {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         const onramper = context.config.onramper;
         sendJson(res, 200, {
           enabled: onramper.enabled,
@@ -111,32 +124,32 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         return;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/public/faucet") {
+        sendJson(res, 200, { enabled: isFaucetPubliclyEnabled(context.config.faucet) });
+        return;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/public/onramp-quote") {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         await getOnrampQuote(res, context, url);
         return;
       }
 
       if (req.method === "GET" && url.pathname === "/api/public/onramp-methods") {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         await getOnrampMethods(res, context, url);
         return;
       }
 
       if (req.method === "GET" && url.pathname === "/api/public/onramp-demo") {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         sendOnrampDemoHtml(res, url);
         return;
       }
 
       if (req.method === "POST" && url.pathname === "/api/public/onramp-webhook") {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         await handleOnrampWebhook(req, res, context);
         return;
       }
 
       if (req.method === "GET" && url.pathname === "/api/public/wallet-config") {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         const w = context.config.wallet;
         sendJson(res, 200, {
           chainId: w.chainId,
@@ -171,33 +184,28 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
 
       // One-shot create (canonical)
       if (req.method === "POST" && url.pathname === "/api/invoices") {
-        rateLimitOrThrow(ip, "create", context.config.rateLimit.createPerSecond);
         await createInvoice(req, res, context);
         return;
       }
 
       // Deprecated aliases → same create path
       if (req.method === "POST" && url.pathname === "/api/sessions") {
-        rateLimitOrThrow(ip, "create", context.config.rateLimit.createPerSecond);
         await createSessionDeprecated(req, res, context);
         return;
       }
 
       if (req.method === "POST" && url.pathname === "/api/invoices/activate") {
-        rateLimitOrThrow(ip, "create", context.config.rateLimit.createPerSecond);
         await createInvoice(req, res, context);
         return;
       }
 
       if (req.method === "GET" && url.pathname === "/api/invoices") {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         listMerchantInvoices(req, res, context, url);
         return;
       }
 
       // Sweeper signed API
       if (req.method === "GET" && url.pathname === "/api/sweeper/me") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         const auth = requireSweeper(req, context.db);
         const sweeper = context.db.getSweeper(auth.address)!;
         sendJson(res, 200, { sweeper });
@@ -205,7 +213,6 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       }
 
       if (req.method === "GET" && url.pathname === "/api/sweeper/invoices") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         const auth = requireSweeper(req, context.db);
         const sweeper = context.db.getSweeper(auth.address)!;
         const requested = url.searchParams.get("status");
@@ -219,7 +226,6 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       }
 
       if (req.method === "POST" && url.pathname === "/api/sweeper/heartbeat") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         const auth = requireSweeper(req, context.db);
         context.db.touchSweeper(auth.address);
         sendJson(res, 200, { ok: true });
@@ -227,20 +233,17 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       }
 
       if (req.method === "POST" && url.pathname === "/api/sweeper/claim") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         await claimInvoice(req, res, context);
         return;
       }
 
       if (req.method === "POST" && url.pathname === "/api/sweeper/track") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         await trackInvoiceSigned(req, res, context);
         return;
       }
 
       // Bundler signed API
       if (req.method === "GET" && url.pathname === "/api/bundler/me") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         const auth = requireBundler(req, context.db);
         const bundler = context.db.getBundler(auth.address)!;
         sendJson(res, 200, { bundler });
@@ -248,7 +251,6 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       }
 
       if (req.method === "GET" && url.pathname === "/api/bundler/userops") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         const auth = requireBundler(req, context.db);
         const bundler = context.db.getBundler(auth.address)!;
         const requested = url.searchParams.get("status");
@@ -262,13 +264,11 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       }
 
       if (req.method === "POST" && url.pathname === "/api/bundler/claim") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         await claimUserOp(req, res, context);
         return;
       }
 
       if (req.method === "POST" && url.pathname === "/api/bundler/track") {
-        rateLimitOrThrow(ip, "sweeper", context.config.rateLimit.sweeperPerIpPerSecond);
         await trackUserOp(req, res, context);
         return;
       }
@@ -335,14 +335,18 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
 
       const onrampMatch = url.pathname.match(/^\/api\/invoices\/([^/]+)\/onramp-session$/);
       if (req.method === "POST" && onrampMatch) {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         await createOnrampSession(req, res, context, decodeURIComponent(onrampMatch[1]));
+        return;
+      }
+
+      const faucetMatch = url.pathname.match(/^\/api\/invoices\/([^/]+)\/faucet$/);
+      if (req.method === "POST" && faucetMatch) {
+        await fundInvoiceFaucet(req, res, context, decodeURIComponent(faucetMatch[1]));
         return;
       }
 
       const invoiceMatch = url.pathname.match(/^\/api\/invoices\/([^/]+)$/);
       if (req.method === "GET" && invoiceMatch) {
-        rateLimitOrThrow(ip, "public", context.config.rateLimit.publicPerIpPerSecond);
         getInvoice(res, context, decodeURIComponent(invoiceMatch[1]));
         return;
       }
@@ -398,7 +402,14 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       if (statusCode >= 500) {
         log("error", "request failed", { requestId, path: url.pathname, error: String(error) });
       }
-      sendJson(res, statusCode, { error: error instanceof Error ? error.message : "Internal server error" });
+      const code =
+        typeof error === "object" && error && "code" in error
+          ? String((error as { code?: unknown }).code ?? "")
+          : "";
+      sendJson(res, statusCode, {
+        error: error instanceof Error ? error.message : "Internal server error",
+        ...(code ? { code } : {}),
+      });
     }
   };
 }
@@ -640,6 +651,10 @@ async function getOnrampQuote(
   const cryptoAmount = url.searchParams.get("cryptoAmount") ?? url.searchParams.get("crypto_amount") ?? undefined;
   const fiatAmount = url.searchParams.get("fiatAmount") ?? url.searchParams.get("fiat_amount") ?? undefined;
   const pairs = parseOnrampPairsQuery(url);
+  const slippageBps = parseSlippageBps(
+    url.searchParams.get("slippageBps") ?? url.searchParams.get("slippage_bps") ?? undefined,
+    -1
+  );
 
   if (!fiat) throw Object.assign(new Error("fiat is required"), { statusCode: 400 });
   if (!config.onramper.fiats.includes(fiat)) {
@@ -659,6 +674,34 @@ async function getOnrampQuote(
     fiatAmount: fiatAmount ?? undefined,
   };
 
+  const enrich = (quote: Awaited<ReturnType<typeof fetchOnrampQuote>>, pair?: { chainId: string; token: string }) => {
+    const settlement = quote.cryptoAmount;
+    const resolvedChain = quote.chainId || pair?.chainId || chainId || undefined;
+    const resolvedToken = quote.token || pair?.token || token || undefined;
+    const out: Record<string, unknown> = {
+      ...quote,
+      chainId: resolvedChain,
+      token: resolvedToken,
+      country,
+      paymentMethod: quote.paymentMethod || paymentMethod,
+      provider: provider ?? quote.recommended?.provider,
+    };
+    if (slippageBps >= 0 && settlement) {
+      const amt = Number(settlement);
+      if (Number.isFinite(amt) && amt > 0) {
+        const factor = slippageBps / 10_000;
+        const fmt = (n: number) => {
+          const s = n.toFixed(6);
+          return s.replace(/\.?0+$/, "") || "0";
+        };
+        out.minSettlement = fmt(amt * (1 - factor));
+        out.maxSettlement = fmt(amt * (1 + factor));
+        out.slippageBps = slippageBps;
+      }
+    }
+    return out;
+  };
+
   if (pairs.length > 0 || (!chainId && !token)) {
     const candidatePairs =
       pairs.length > 0
@@ -668,7 +711,7 @@ async function getOnrampQuote(
       ...quoteBase,
       pairs: preferEthereumFirst(candidatePairs),
     });
-    sendJson(res, 200, quote);
+    sendJson(res, 200, enrich(quote));
     return;
   }
 
@@ -686,7 +729,7 @@ async function getOnrampQuote(
     token,
   });
 
-  sendJson(res, 200, { ...quote, chainId, token });
+  sendJson(res, 200, enrich(quote, { chainId, token }));
 }
 
 async function getOnrampMethods(
@@ -742,7 +785,10 @@ async function getOnrampMethods(
   sendJson(res, 200, { fiat, chainId, token, country, methods });
 }
 
-/** `pairs=1:USDC,8453:USDC,tron:USDT` or repeated pair params. */
+/** `pairs=1:USDC,8453:USDC,tron:USDT` or repeated pair params.
+ * Also accepts `chains` + `tokens` (same shape as invoice create) and expands the cartesian product
+ * of allowed Onramper pairs.
+ */
 function parseOnrampPairsQuery(url: URL): Array<{ chainId: string; token: string }> {
   const raw = [
     ...url.searchParams.getAll("pairs"),
@@ -756,6 +802,24 @@ function parseOnrampPairsQuery(url: URL): Array<{ chainId: string; token: string
     const [chainId, token] = item.split(":");
     if (!chainId || !token) continue;
     out.push({ chainId: chainId.trim(), token: token.trim().toUpperCase() });
+  }
+  if (out.length > 0) return out;
+
+  const chains = String(url.searchParams.get("chains") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const tokens = String(url.searchParams.get("tokens") ?? "")
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  if (chains.length === 0 || tokens.length === 0) return out;
+  for (const chainId of chains) {
+    for (const token of tokens) {
+      if (onramperSupportedPair(chainId, token)) {
+        out.push({ chainId, token });
+      }
+    }
   }
   return out;
 }
@@ -775,6 +839,35 @@ function preferEthereumFirst(
     return 10;
   };
   return [...pairs].sort((a, b) => score(a) - score(b));
+}
+
+async function fundInvoiceFaucet(
+  req: IncomingMessage,
+  res: ServerResponse,
+  { config, db }: RouteContext,
+  invoiceId: string
+): Promise<void> {
+  const invoice = db.getInvoice(invoiceId);
+  if (!invoice) {
+    throw Object.assign(new Error("Invoice not found"), { statusCode: 404 });
+  }
+  const body = await readJson(req);
+  const secret = String(body.secret ?? "");
+  const result = await fundFiatInvoiceFromFaucet(config, invoice, secret);
+  db.addEvent(invoiceId, "force_sweep", {
+    faucet: true,
+    txHash: result.txHash,
+    chainId: result.chainId,
+    amount: result.amount,
+    dryRun: Boolean(result.dryRun),
+  });
+  sendJson(res, 200, {
+    ok: true,
+    txHash: result.txHash,
+    chainId: result.chainId,
+    amount: result.amount,
+    dryRun: Boolean(result.dryRun),
+  });
 }
 
 async function createOnrampSession(
@@ -1283,11 +1376,6 @@ async function postCallback(db: CommerceDb, callbackUrl: string, invoice: unknow
   }
 }
 
-function rateLimitOrThrow(ip: string, bucket: string, perSecond: number): void {
-  if (!takeToken(`${bucket}:${ip}`, perSecond)) {
-    throw Object.assign(new Error("Rate limit exceeded"), { statusCode: 429 });
-  }
-}
 
 async function readRawBody(req: IncomingMessage, maxBytes = 64_000): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -1380,12 +1468,17 @@ function escapeHtmlAttr(value: string): string {
 }
 
 function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {
-  const headers: Record<string, string> = {
+  const headers: Record<string, string | number | string[]> = {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
   };
-  if (statusCode === 429) {
+  if (statusCode === 429 && !res.getHeader("Retry-After")) {
     headers["retry-after"] = "1";
+  }
+  // Preserve RateLimit-* / Retry-After already set on the response.
+  for (const name of ["RateLimit-Remaining", "RateLimit-Reset", "Retry-After"]) {
+    const existing = res.getHeader(name);
+    if (existing != null) headers[name] = existing;
   }
   res.writeHead(statusCode, headers);
   res.end(JSON.stringify(body, bigintReplacer, 2));

@@ -48,3 +48,10 @@ rateLimit:
   publicPerIpPerSecond: 20
   sweeperPerIpPerSecond: 50
 claimLeaseMs: 180000
+# Passkey wallet (Sepolia — data/wallet-deploy-sepolia.json). Quote 0x so YAML 1.1 won't parse them as ints.
+wallet:
+  chainId: "${WALLET_CHAIN_ID}"
+  factoryAddress: "${WALLET_FACTORY_ADDRESS}"
+  recoveryAddress: "${WALLET_RECOVERY_ADDRESS}"
+  implementationAddress: "${WALLET_IMPLEMENTATION_ADDRESS}"
+  recoveryTimelockSeconds: 259200

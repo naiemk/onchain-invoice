@@ -13,6 +13,10 @@ export interface RateLimitConfig {
   createPerSecond: number;
   publicPerIpPerSecond: number;
   sweeperPerIpPerSecond: number;
+  /** Sustained Onramper quote/methods requests per IP per second (default 2). */
+  quotePerSecond: number;
+  /** Burst capacity for quote/methods (default 20). */
+  quoteBurst: number;
 }
 
 export type EvmTokenConfig = {
@@ -69,6 +73,21 @@ export interface AppConfig {
   onramper: OnramperConfig;
   /** Passkey smart wallet factory (Sepolia / per-chain). */
   wallet: WalletConfig;
+  /** Testnet faucet for fiat-only invoice e2e (secret-gated). */
+  faucet: FaucetConfig;
+}
+
+export interface FaucetConfig {
+  /** Master switch; default on unless FAUCET_ENABLED=0/false/no. */
+  enabled: boolean;
+  /** Shared secret typed on /pay. Empty → not publicly usable. */
+  secret?: string;
+  /** EVM funding key; falls back to sweeperPrivateKey. */
+  privateKey?: string;
+  /** Tron Nile funding key (FAUCET_TRON_PRIVATE_KEY or TRON_SPONSOR_PRIVATE_KEY). */
+  tronPrivateKey?: string;
+  /** Test-only: skip on-chain transfer after validation. */
+  dryRun: boolean;
 }
 
 export interface WalletConfig {
@@ -154,6 +173,26 @@ interface YamlFile {
     widgetOrigin?: string;
     fiats?: string[];
   };
+  faucet?: {
+    enabled?: boolean;
+    secret?: string;
+    privateKey?: string;
+    tronPrivateKey?: string;
+  };
+  wallet?: {
+    chainId?: string;
+    factoryAddress?: string;
+    recoveryAddress?: string;
+    implementationAddress?: string;
+    rpcUrl?: string;
+    recoveryTimelockSeconds?: number | string;
+    entryPointAddress?: string;
+    bundlerFeeUsdc?: string | number;
+    bundlerBeneficiary?: string;
+    feeTokenAddress?: string;
+    feeTokenSymbol?: string;
+    feeTokenDecimals?: number;
+  };
 }
 
 /** Sepolia product chainId used when synthesizing legacy flat EVM env. */
@@ -208,36 +247,84 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       createPerSecond: Number(env.RATE_LIMIT_CREATE_PER_SECOND ?? file.rateLimit?.createPerSecond ?? 1),
       publicPerIpPerSecond: Number(env.RATE_LIMIT_PUBLIC_PER_SECOND ?? file.rateLimit?.publicPerIpPerSecond ?? 20),
       sweeperPerIpPerSecond: Number(env.RATE_LIMIT_SWEEPER_PER_SECOND ?? file.rateLimit?.sweeperPerIpPerSecond ?? 50),
+      quotePerSecond: Number(env.RATE_LIMIT_QUOTE_PER_SECOND ?? file.rateLimit?.quotePerSecond ?? 2),
+      quoteBurst: Number(env.RATE_LIMIT_QUOTE_BURST ?? file.rateLimit?.quoteBurst ?? 20),
     },
     claimLeaseMs: Number(env.CLAIM_LEASE_MS ?? file.claimLeaseMs ?? 180_000),
     configPath,
     onramper: loadOnramperConfig(env, file.onramper),
-    wallet: loadWalletConfig(env, legacy?.rpcUrl, evmChains),
+    wallet: loadWalletConfig(env, legacy?.rpcUrl, evmChains, file.wallet),
+    faucet: loadFaucetConfig(env, file.faucet, {
+      sweeperPrivateKey: blankToUndefined(expand(env.SWEEPER_PRIVATE_KEY ?? file.evm?.sweeperPrivateKey ?? "")),
+    }),
   };
+}
+
+function loadFaucetConfig(
+  env: NodeJS.ProcessEnv,
+  file: YamlFile["faucet"] | undefined,
+  deps: { sweeperPrivateKey?: string }
+): FaucetConfig {
+  const enabledRaw = (env.FAUCET_ENABLED ?? "").trim();
+  const explicitlyOff =
+    enabledRaw === "0" ||
+    enabledRaw.toLowerCase() === "false" ||
+    enabledRaw.toLowerCase() === "no" ||
+    file?.enabled === false;
+  const enabled = !explicitlyOff;
+
+  const secret = blankToUndefined(expand(env.FAUCET_SECRET ?? file?.secret ?? ""));
+  const privateKey =
+    blankToUndefined(expand(env.FAUCET_PRIVATE_KEY ?? file?.privateKey ?? "")) ?? deps.sweeperPrivateKey;
+  const tronPrivateKey = blankToUndefined(
+    expand(env.FAUCET_TRON_PRIVATE_KEY ?? env.TRON_SPONSOR_PRIVATE_KEY ?? file?.tronPrivateKey ?? "")
+  );
+  const dryRunRaw = (env.FAUCET_DRY_RUN ?? "").trim().toLowerCase();
+  const dryRun = dryRunRaw === "1" || dryRunRaw === "true" || dryRunRaw === "yes";
+
+  return { enabled, secret, privateKey, tronPrivateKey, dryRun };
 }
 
 function loadWalletConfig(
   env: NodeJS.ProcessEnv,
   fallbackRpc?: string,
-  evmChains?: EvmNetworksConfig
+  evmChains?: EvmNetworksConfig,
+  file?: YamlFile["wallet"]
 ): WalletConfig {
-  const chainId = expand(env.WALLET_CHAIN_ID ?? "11155111");
-  const timelock = Number(env.WALLET_RECOVERY_TIMELOCK ?? "259200");
-  const feeOverride = env[`WALLET_${chainId}_BUNDLER_FEE_USDC`] ?? env.WALLET_BUNDLER_FEE_USDC ?? "100000";
-  const feeAtoms = BigInt(feeOverride);
+  const chainId = blankToUndefined(expand(env.WALLET_CHAIN_ID ?? file?.chainId ?? "")) ?? "11155111";
+  const timelock = Number(env.WALLET_RECOVERY_TIMELOCK ?? file?.recoveryTimelockSeconds ?? "259200");
+  const feeOverride =
+    env[`WALLET_${chainId}_BUNDLER_FEE_USDC`] ??
+    env.WALLET_BUNDLER_FEE_USDC ??
+    (file?.bundlerFeeUsdc != null ? String(file.bundlerFeeUsdc) : undefined) ??
+    "100000";
+  const feeAtoms = BigInt(feeOverride || "100000");
   const entryPoint =
-    blankToUndefined(expand(env.WALLET_ENTRYPOINT_ADDRESS ?? "")) ??
+    blankToUndefined(expand(env.WALLET_ENTRYPOINT_ADDRESS ?? file?.entryPointAddress ?? "")) ??
     "0x433709009B8330FDa32311DF1C2AFA402eD8D009";
   const sepoliaUsdc = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
-  const factoryAddress = blankToUndefined(expand(env.WALLET_FACTORY_ADDRESS ?? ""));
-  const implementationAddress = blankToUndefined(expand(env.WALLET_IMPLEMENTATION_ADDRESS ?? ""));
-  const recoveryAddress = blankToUndefined(expand(env.WALLET_RECOVERY_ADDRESS ?? ""));
-  const rpcUrl = blankToUndefined(expand(env.WALLET_RPC_URL ?? env.EVM_RPC_URL ?? fallbackRpc ?? ""));
-  const feeTokenAddress = blankToUndefined(
-    expand(env.WALLET_BUNDLER_FEE_TOKEN ?? env.WALLET_FEE_TOKEN ?? sepoliaUsdc)
+  // Published Sepolia passkey wallet (data/wallet-deploy-sepolia.json).
+  const sepoliaFactory = "0x2b245a20589c745B11F8a69C677F891e8175a550";
+  const sepoliaImpl = "0x297CF0F47e9f6dAd3903694dE531abaD83CE8AAA";
+  const sepoliaRecovery = "0x87CB1c5eD04959A51A7CACe8eA2787791F9cE347";
+  let factoryAddress = blankToUndefined(expand(env.WALLET_FACTORY_ADDRESS ?? file?.factoryAddress ?? ""));
+  let implementationAddress = blankToUndefined(
+    expand(env.WALLET_IMPLEMENTATION_ADDRESS ?? file?.implementationAddress ?? "")
   );
-  const feeTokenSymbol = expand(env.WALLET_FEE_TOKEN_SYMBOL ?? "USDC");
-  const feeTokenDecimals = Number(env.WALLET_FEE_TOKEN_DECIMALS ?? "6") || 6;
+  let recoveryAddress = blankToUndefined(expand(env.WALLET_RECOVERY_ADDRESS ?? file?.recoveryAddress ?? ""));
+  if (chainId === "11155111") {
+    factoryAddress ??= sepoliaFactory;
+    implementationAddress ??= sepoliaImpl;
+    recoveryAddress ??= sepoliaRecovery;
+  }
+  const rpcUrl = blankToUndefined(
+    expand(env.WALLET_RPC_URL ?? file?.rpcUrl ?? env.EVM_RPC_URL ?? fallbackRpc ?? "")
+  );
+  const feeTokenAddress = blankToUndefined(
+    expand(env.WALLET_BUNDLER_FEE_TOKEN ?? env.WALLET_FEE_TOKEN ?? file?.feeTokenAddress ?? sepoliaUsdc)
+  );
+  const feeTokenSymbol = expand(env.WALLET_FEE_TOKEN_SYMBOL ?? file?.feeTokenSymbol ?? "USDC");
+  const feeTokenDecimals = Number(env.WALLET_FEE_TOKEN_DECIMALS ?? file?.feeTokenDecimals ?? "6") || 6;
 
   const chains = loadWalletChains(env, {
     chainId,
@@ -258,7 +345,7 @@ function loadWalletConfig(
     rpcUrl,
     entryPointAddress: entryPoint,
     bundlerFeeUsdc: feeAtoms,
-    bundlerBeneficiary: blankToUndefined(expand(env.WALLET_BUNDLER_BENEFICIARY ?? "")),
+    bundlerBeneficiary: blankToUndefined(expand(env.WALLET_BUNDLER_BENEFICIARY ?? file?.bundlerBeneficiary ?? "")),
     feeTokenAddress,
     feeTokenSymbol,
     feeTokenDecimals,

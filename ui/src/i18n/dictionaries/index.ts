@@ -1,6 +1,7 @@
 import type { Locale } from "../locales.js";
 import type { Messages } from "./en.js";
 import { createPasskeyEn } from "./create-passkey-en.js";
+import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
 import { en } from "./en.js";
 import { ar } from "./ar.js";
@@ -31,7 +32,7 @@ import { zhHant } from "./zh-Hant.js";
 function withPasskeyCreate(messages: Messages): Messages {
   return {
     ...messages,
-    create: { ...messages.create, ...createPasskeyEn },
+    create: { ...messages.create, ...createPasskeyEn, ...createWizardEn },
     errors: { ...messages.errors, ...onrampErrorsEn },
   };
 }

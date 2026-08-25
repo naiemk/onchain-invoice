@@ -1,4 +1,19 @@
 import { encodeWebAuthnSignature } from "../../../commerce/shared/webauthn-signature.js";
+import { listWalletRegistry } from "./wallet-session.js";
+
+export type { WalletSession } from "./wallet-session.js";
+export {
+  clearWalletSession,
+  loadWalletSession,
+  saveWalletSession,
+  listWalletRegistry,
+  upsertWalletSession,
+  setActiveWallet,
+  clearActiveWallet,
+  removeFromRegistry,
+  shortAddress,
+  migrateWalletSessionStorage,
+} from "./wallet-session.js";
 
 export interface PasskeyOwner {
   qx: string;
@@ -80,7 +95,11 @@ export async function createPasskey(displayName: string): Promise<PasskeyOwner> 
   };
 }
 
-export async function authenticatePasskey(): Promise<PasskeyOwner | null> {
+/**
+ * Discoverable WebAuthn get — returns credentialId from the assertion.
+ * If a matching session is already in the local registry, returns owner coords from it.
+ */
+export async function authenticatePasskey(): Promise<(PasskeyOwner & { fromRegistry: boolean }) | null> {
   if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
   const challenge = randomChallenge();
   const cred = (await navigator.credentials.get({
@@ -91,13 +110,24 @@ export async function authenticatePasskey(): Promise<PasskeyOwner | null> {
     },
   })) as PublicKeyCredential | null;
   if (!cred) return null;
-  const stored = loadWalletSession();
-  if (!stored) return null;
+  const credentialId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+  const rawId = bufferToHex(cred.rawId);
+  const match = listWalletRegistry().find((w) => w.credentialId === credentialId);
+  if (match) {
+    return {
+      qx: match.qx,
+      qy: match.qy,
+      credentialId: match.credentialId,
+      rawId: match.rawId || rawId,
+      fromRegistry: true,
+    };
+  }
   return {
-    qx: stored.qx,
-    qy: stored.qy,
-    credentialId: stored.credentialId,
-    rawId: stored.rawId,
+    qx: "",
+    qy: "",
+    credentialId,
+    rawId,
+    fromRegistry: false,
   };
 }
 
@@ -140,35 +170,4 @@ function bufferToHex(buf: ArrayBuffer): string {
 
 function bufferToBase64(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
-}
-
-export interface WalletSession {
-  address: string;
-  chainId: string;
-  salt: string;
-  qx: string;
-  qy: string;
-  credentialId: string;
-  rawId: string;
-  label: string;
-}
-
-const SESSION_KEY = "tc-wallet-session";
-
-export function saveWalletSession(session: WalletSession): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-}
-
-export function loadWalletSession(): WalletSession | null {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as WalletSession;
-  } catch {
-    return null;
-  }
-}
-
-export function clearWalletSession(): void {
-  localStorage.removeItem(SESSION_KEY);
 }

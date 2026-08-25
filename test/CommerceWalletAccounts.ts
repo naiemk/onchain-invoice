@@ -23,11 +23,15 @@ const BASE_ENV = {
   EVM_RPC_URL: "",
 } as const;
 
-async function withApp(fn: (baseUrl: string) => Promise<void>): Promise<void> {
+async function withApp(
+  fn: (baseUrl: string) => Promise<void>,
+  envOverrides: Record<string, string> = {}
+): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "commerce-wallet-"));
   const config = loadConfig({
     ...process.env,
     ...BASE_ENV,
+    ...envOverrides,
     DB_PATH: join(dir, "test.db"),
   } as NodeJS.ProcessEnv);
   const app = createApp(config);
@@ -93,6 +97,75 @@ describe("commerce wallet accounts API", function () {
       expect(body.factoryAddress?.toLowerCase()).to.equal(FACTORY.toLowerCase());
       expect(body.implementationAddress?.toLowerCase()).to.equal(IMPL.toLowerCase());
       expect(body.chains.length).to.be.greaterThan(0);
+    });
+  });
+
+  it("wallet-config defaults to published Sepolia factory when env is unset", async function () {
+    await withApp(
+      async (baseUrl) => {
+        const res = await fetch(`${baseUrl}/api/public/wallet-config`);
+        expect(res.status).to.equal(200);
+        const body = (await res.json()) as {
+          chainId: string;
+          factoryAddress: string | null;
+          implementationAddress: string | null;
+        };
+        expect(body.chainId).to.equal("11155111");
+        expect(body.factoryAddress?.toLowerCase()).to.equal(FACTORY.toLowerCase());
+        expect(body.implementationAddress?.toLowerCase()).to.equal(IMPL.toLowerCase());
+      },
+      {
+        WALLET_FACTORY_ADDRESS: "",
+        WALLET_IMPLEMENTATION_ADDRESS: "",
+        WALLET_RECOVERY_ADDRESS: "",
+        WALLET_CHAIN_ID: "",
+      }
+    );
+  });
+
+  it("looks up account by credentialId", async function () {
+    await withApp(async (baseUrl) => {
+      const salt = deriveWalletSalt(QX, QY);
+      const address = predictWalletAddress(FACTORY, IMPL, salt);
+      const credentialId = "cred-lookup-abc";
+      await fetch(`${baseUrl}/api/wallet/accounts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          address,
+          salt,
+          ownerQx: QX,
+          ownerQy: QY,
+          credentialId,
+        }),
+      });
+      await fetch(`${baseUrl}/api/wallet/devices`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: address,
+          chainId: "11155111",
+          ownerQx: QX,
+          ownerQy: QY,
+          label: "Phone",
+          credentialId,
+        }),
+      });
+
+      const found = await fetch(
+        `${baseUrl}/api/wallet/accounts?credentialId=${encodeURIComponent(credentialId)}`
+      );
+      expect(found.status).to.equal(200);
+      const body = (await found.json()) as {
+        account: { address: string; credentialId: string | null };
+        device: { label: string } | null;
+      };
+      expect(body.account.address).to.equal(address.toLowerCase());
+      expect(body.account.credentialId).to.equal(credentialId);
+      expect(body.device?.label).to.equal("Phone");
+
+      const missing = await fetch(`${baseUrl}/api/wallet/accounts?credentialId=nope`);
+      expect(missing.status).to.equal(404);
     });
   });
 

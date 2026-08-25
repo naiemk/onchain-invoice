@@ -25,6 +25,8 @@ const BASE_ENV = {
   SWEEPER_API_KEY: "sweeper-test",
   RATE_LIMIT_CREATE_PER_SECOND: "100",
   RATE_LIMIT_PUBLIC_PER_SECOND: "100",
+  RATE_LIMIT_QUOTE_PER_SECOND: "100",
+  RATE_LIMIT_QUOTE_BURST: "100",
   EVM_RPC_URL: "https://sepolia.example",
   SWEEPER_ADDRESS: "0x5bcbEF31E3DcE37235CF8B2900ca7a1439e46cB9",
   FORWARDER_IMPLEMENTATION: "0x0bA4bb324eB41d9c0f1c4Ac7a3876dEfcc4d72b9",
@@ -916,5 +918,33 @@ describe("commerce Onramper / fiat invoices", function () {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it("accepts chains+tokens aliases and always returns chainId/token", async function () {
+    clearOnrampQuoteCaches();
+    await withApp({ ONRAMPER_ENABLED: "1" }, async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/public/onramp-quote?fiat=USD&direction=receive&cryptoAmount=25&country=us&chains=11155111,8453&tokens=USDC&slippageBps=100`
+      );
+      expect(res.status).to.equal(200);
+      const body = (await res.json()) as {
+        chainId?: string;
+        token?: string;
+        country?: string;
+        paymentMethod?: string;
+        provider?: string;
+        cryptoAmount?: string;
+        minSettlement?: string;
+        maxSettlement?: string;
+        slippageBps?: number;
+      };
+      expect(body.chainId).to.be.a("string").and.not.empty;
+      expect(body.token).to.equal("USDC");
+      expect(body.country).to.equal("us");
+      expect(body.cryptoAmount).to.equal("25");
+      expect(body.slippageBps).to.equal(100);
+      expect(Number(body.minSettlement)).to.be.lessThan(25);
+      expect(Number(body.maxSettlement)).to.be.greaterThan(25);
+    });
   });
 });

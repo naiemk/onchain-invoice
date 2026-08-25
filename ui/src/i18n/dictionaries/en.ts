@@ -6,6 +6,7 @@
  */
 import { walletEn } from "./wallet-en.js";
 import { createPasskeyEn } from "./create-passkey-en.js";
+import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
 
 export const en = {
@@ -311,6 +312,7 @@ export const en = {
       "Use the project Cursor skill to create invoices and poll status without a merchant dashboard. Full docs:",
     docsGithubPages: "GitHub Pages",
     ...createPasskeyEn,
+    ...createWizardEn,
   },
 
   pay: {
@@ -370,6 +372,16 @@ export const en = {
     continueCard: "Continue",
     cardFeeNote: "Card issuers may charge extra. We count the invoice paid when {token} arrives on-chain.",
     sandboxNote: "Sandbox demo only — this checkout will not mark the invoice paid.",
+    faucetTitle: "Testnet faucet",
+    faucetHint:
+      "Onramper sandbox does not fund testnet addresses. Enter the operator faucet secret to send the settlement amount on-chain so the sweeper can complete payment.",
+    faucetSecretLabel: "Faucet secret",
+    faucetSecretPlaceholder: "FAUCET_SECRET",
+    faucetButton: "Fund invoice (testnet)",
+    faucetFunding: "Sending testnet funds…",
+    faucetSuccess: "Funded — waiting for sweeper confirmation…",
+    faucetFailed: "Faucet funding failed",
+    faucetNeedSecret: "Enter the faucet secret",
     waitingPayment: "Waiting for payment…",
     loadingCheckout: "Loading checkout…",
     checkoutFailed: "Could not open card checkout. Try again.",

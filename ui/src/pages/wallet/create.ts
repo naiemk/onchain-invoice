@@ -4,20 +4,19 @@ import { webAuthnSupported } from "../../shared/webauthn.js";
 import {
   addressBox,
   bindCopyButtons,
+  bindWalletAccountBar,
   setButtonLoading,
   showStatus,
-  walletSubnav,
+  walletFrame,
 } from "../../shared/wallet-ui.js";
+import { escapeHtml } from "../../shared/dom.js";
 
 export async function renderWalletCreate(root: HTMLElement): Promise<void> {
-  root.innerHTML = `
-    <header class="page-header wallet-page-header">
-      <p class="eyebrow">${escapeHtml(t("wallet.eyebrow"))}</p>
-      <h1>${escapeHtml(t("wallet.createTitle"))}</h1>
-      <p class="lede">${escapeHtml(t("wallet.createLede"))}</p>
-    </header>
-    <section class="panel wallet-panel">
-      ${walletSubnav("create")}
+  root.innerHTML = walletFrame({
+    current: "create",
+    title: t("wallet.createTitle"),
+    lede: t("wallet.createLede"),
+    body: `
       <div class="callout info" role="note">${escapeHtml(t("wallet.counterfactualCallout"))}</div>
       <div class="field">
         <label for="device-name">${escapeHtml(t("wallet.deviceName"))}</label>
@@ -30,8 +29,9 @@ export async function renderWalletCreate(root: HTMLElement): Promise<void> {
         <a class="tc-btn secondary" href="/wallet" data-route>${escapeHtml(t("wallet.cancel"))}</a>
       </div>
       <div id="wallet-create-result" class="hidden"></div>
-      <p id="wallet-create-status" class="status wallet-status" role="status"></p>
-    </section>`;
+      <p id="wallet-create-status" class="status wallet-status" role="status"></p>`,
+  });
+  bindWalletAccountBar(root);
 
   root.querySelector("#wallet-create-btn")?.addEventListener("click", () => void runCreate(root));
 }
@@ -64,12 +64,4 @@ async function runCreate(root: HTMLElement): Promise<void> {
   } finally {
     setButtonLoading(btn, false);
   }
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
