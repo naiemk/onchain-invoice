@@ -1,5 +1,41 @@
 import { t } from "./t.js";
 
+export function localizeOnrampQuoteError(body: {
+  code?: string;
+  error?: string;
+  fiat?: string;
+  minAmount?: number;
+  maxAmount?: number;
+}): string | null {
+  const fiat = (body.fiat ?? "").toUpperCase() || "USD";
+  switch (body.code) {
+    case "onramp_limit_mismatch": {
+      if (body.minAmount != null && body.maxAmount != null) {
+        return t("errors.onrampLimitMismatch", {
+          fiat,
+          min: String(body.minAmount),
+          max: String(body.maxAmount),
+        });
+      }
+      if (body.minAmount != null) {
+        return t("errors.onrampLimitMin", { fiat, min: String(body.minAmount) });
+      }
+      if (body.maxAmount != null) {
+        return t("errors.onrampLimitMax", { fiat, max: String(body.maxAmount) });
+      }
+      return t("errors.onrampQuoteUnavailable");
+    }
+    case "onramp_no_payment_method":
+      return t("errors.onrampNoPaymentMethod", { fiat });
+    case "onramp_provider_unavailable":
+      return t("errors.onrampProviderUnavailable");
+    case "onramp_quote_unavailable":
+      return t("errors.onrampQuoteUnavailable");
+    default:
+      return null;
+  }
+}
+
 export function localizeError(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   if (!message) return t("common.loadFailed");
@@ -33,6 +69,19 @@ export function localizeError(error: unknown): string {
   if (message === "Stats request failed") return t("admin.statsFailed");
   if (message === "Failed to load invoices") return t("merchant.loadFailed");
   if (message === "Failed to load") return t("common.loadFailed");
+
+  const limitBetween = message.match(
+    /^Amount should be in between ([A-Z]{3}) ([\d.]+) and \1 ([\d.]+)$/i
+  );
+  if (limitBetween) {
+    return t("errors.onrampLimitMismatch", {
+      fiat: limitBetween[1]!.toUpperCase(),
+      min: limitBetween[2]!,
+      max: limitBetween[3]!,
+    });
+  }
+  if (message.startsWith("No Onramper quotes available")) return t("errors.onrampQuoteUnavailable");
+  if (message.startsWith("Onramper provider ")) return t("errors.onrampProviderUnavailable");
 
   return message;
 }

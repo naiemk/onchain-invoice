@@ -844,4 +844,77 @@ describe("commerce Onramper / fiat invoices", function () {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("returns structured LimitMismatch when amount is below Onramper min", async function () {
+    clearOnrampQuoteCaches();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/quotes/sek/usdc_base")) {
+        return new Response(
+          JSON.stringify([
+            {
+              ramp: "moonpay",
+              paymentMethod: "creditcard",
+              availablePaymentMethods: [
+                {
+                  paymentTypeId: "creditcard",
+                  details: { limits: { aggregatedLimit: { min: 250, max: 105000 } } },
+                },
+              ],
+              errors: [
+                {
+                  type: "LimitMismatch",
+                  errorId: 6101,
+                  message: "Amount should be in between SEK 250 and SEK 105000",
+                  minAmount: 250,
+                  maxAmount: 105000,
+                },
+              ],
+            },
+            {
+              ramp: "stripe",
+              paymentMethod: "creditcard",
+              errors: [{ type: "NoSupportedPayments", message: "No supported payments found" }],
+            },
+          ]),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return originalFetch(input);
+    };
+    try {
+      await withApp(
+        {
+          ONRAMPER_ENABLED: "1",
+          ONRAMPER_API_KEY: API_KEY,
+          ONRAMPER_SIGNING_KEY: SIGNING_KEY_PEM,
+        },
+        async (baseUrl) => {
+          const res = await fetch(
+            `${baseUrl}/api/public/onramp-quote?fiat=SEK&chainId=8453&token=USDC&country=se&paymentMethod=creditcard&direction=pay&fiatAmount=100`
+          );
+          expect(res.status).to.equal(400);
+          const body = (await res.json()) as {
+            error?: string;
+            code?: string;
+            fiat?: string;
+            minAmount?: number;
+            maxAmount?: number;
+            errorId?: number;
+            type?: string;
+          };
+          expect(body.code).to.equal("onramp_limit_mismatch");
+          expect(body.fiat).to.equal("SEK");
+          expect(body.minAmount).to.equal(250);
+          expect(body.maxAmount).to.equal(105000);
+          expect(body.errorId).to.equal(6101);
+          expect(body.type).to.equal("LimitMismatch");
+          expect(body.error).to.include("250");
+        }
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
