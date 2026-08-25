@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import { decodePayLink, encodeInvoiceResumeLink, encodePayLink } from "../shared/invoice.js";
+import { currentPayChromeFromLocation, withPayChrome } from "../shared/pay-chrome.js";
 import { escapeHtml } from "../shared/dom.js";
 import { localizeError, statusLabel } from "../i18n/errors.js";
 import { t } from "../i18n/t.js";
@@ -248,7 +249,10 @@ function renderCheckoutStage(root: HTMLElement, fields: PayLinkFields): void {
   });
 
   root.querySelector<HTMLButtonElement>("#copy-link")?.addEventListener("click", async () => {
-    await navigator.clipboard.writeText(`${location.origin}/pay?${encodePayLink(fields)}`);
+    const chrome = currentPayChromeFromLocation();
+    const qs = encodePayLink(fields);
+    const path = chrome === "full" ? `/pay?${qs}` : withPayChrome(`/pay?${qs}`, chrome);
+    await navigator.clipboard.writeText(`${location.origin}${path}`);
     if (status) status.textContent = t("pay.payLinkCopied");
   });
 
@@ -438,7 +442,11 @@ async function renderInvoiceStage(
     sessionStorage.removeItem(ACTIVATION_KEY(invoiceId));
     const fingerprint = checkoutFingerprint(fields);
     sessionStorage.removeItem(CHECKOUT_KEY(fingerprint));
-    history.replaceState(null, "", `/pay?${encodePayLink(fields)}`);
+    history.replaceState(
+      null,
+      "",
+      withPayChrome(`/pay?${encodePayLink(fields)}`, currentPayChromeFromLocation())
+    );
     renderPay(root);
   });
 
@@ -1047,7 +1055,15 @@ function checkoutFingerprint(fields: PayLinkFields): string {
 }
 
 function replaceResumeUrl(invoiceId: string, lang?: string | null): void {
-  history.replaceState(null, "", `/pay?${encodeInvoiceResumeLink(invoiceId, { lang })}`);
+  const header = currentPayChromeFromLocation();
+  history.replaceState(
+    null,
+    "",
+    `/pay?${encodeInvoiceResumeLink(invoiceId, {
+      lang,
+      header: header === "full" ? null : header,
+    })}`
+  );
 }
 
 function short(value: string): string {

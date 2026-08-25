@@ -10,6 +10,7 @@ import {
   buildPackedUserOperation,
   buildSendBatchCalls,
   encodeExecuteCallData,
+  estimateUserOpPrefund,
   type PackedUserOperationJson,
 } from "../commerce/shared/userop.js";
 import { validateSendUserOp, validateUserOpFee } from "../commerce/shared/userop-fee.js";
@@ -61,6 +62,23 @@ function sampleSendUserOp(feeAmount = 100_000n, sendAmount = 500_000n): PackedUs
 }
 
 describe("commerce bundler + userOp fee", function () {
+  it("estimates EntryPoint prefund from packed gas fields", function () {
+    const userOp = buildPackedUserOperation({
+      sender: WALLET,
+      nonce: 0n,
+      callData: "0x",
+      gas: {
+        verificationGasLimit: 500_000n,
+        callGasLimit: 350_000n,
+        preVerificationGas: 50_000n,
+        maxFeePerGas: 1_000_000_000n,
+        maxPriorityFeePerGas: 1_000_000_000n,
+      },
+    });
+    // (500k + 350k + 50k) * 1 gwei
+    expect(estimateUserOpPrefund(userOp)).to.equal(900_000n * 1_000_000_000n);
+  });
+
   it("validates fee-first batch on send userOp", function () {
     const userOp = sampleSendUserOp();
     const result = validateSendUserOp(userOp, feeConfig());
@@ -118,6 +136,13 @@ describe("commerce bundler + userOp fee", function () {
       const created = (await submit.json()) as { userOp: { version: number; status: string } };
       expect(created.userOp.status).to.equal("pending");
 
+      const dup = await fetch(`${baseUrl}/api/wallet/userops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chainId: "11155111", userOpHash, userOp }),
+      });
+      expect(dup.status).to.equal(409);
+
       const listHeaders = await signBundlerRequest(bundler, { method: "GET", path: "/api/bundler/userops" });
       const list = await fetch(`${baseUrl}/api/bundler/userops`, { headers: listHeaders });
       expect(list.status).to.equal(200);
@@ -160,6 +185,64 @@ describe("commerce bundler + userOp fee", function () {
       const done = (await track.json()) as { userOp: { status: string; txHash: string | null } };
       expect(done.userOp.status).to.equal("included");
       expect(done.userOp.txHash).to.equal("0xdead");
+    });
+  });
+
+  it("requeues rejected userOp with the same hash", async function () {
+    await withApp(async (baseUrl, bundler) => {
+      const userOp = sampleSendUserOp();
+      const userOpHash = "0x" + "cd".repeat(32);
+      const submit = await fetch(`${baseUrl}/api/wallet/userops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chainId: "11155111", userOpHash, userOp }),
+      });
+      expect(submit.status).to.equal(201);
+      const created = (await submit.json()) as { userOp: { version: number } };
+
+      const claimHeaders = await signBundlerRequest(bundler, {
+        method: "POST",
+        path: "/api/bundler/claim",
+        body: JSON.stringify({ userOpHash, expectedVersion: created.userOp.version }),
+      });
+      const claim = await fetch(`${baseUrl}/api/bundler/claim`, {
+        method: "POST",
+        headers: { ...claimHeaders, "content-type": "application/json" },
+        body: JSON.stringify({ userOpHash, expectedVersion: created.userOp.version }),
+      });
+      expect(claim.status).to.equal(200);
+
+      const trackHeaders = await signBundlerRequest(bundler, {
+        method: "POST",
+        path: "/api/bundler/track",
+        body: JSON.stringify({
+          userOpHash,
+          status: "rejected",
+          rejectReason: "simulation_revert",
+          expectedVersion: created.userOp.version + 1,
+        }),
+      });
+      const track = await fetch(`${baseUrl}/api/bundler/track`, {
+        method: "POST",
+        headers: { ...trackHeaders, "content-type": "application/json" },
+        body: JSON.stringify({
+          userOpHash,
+          status: "rejected",
+          rejectReason: "simulation_revert",
+          expectedVersion: created.userOp.version + 1,
+        }),
+      });
+      expect(track.status).to.equal(200);
+
+      const retry = await fetch(`${baseUrl}/api/wallet/userops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chainId: "11155111", userOpHash, userOp }),
+      });
+      expect(retry.status).to.equal(200);
+      const body = (await retry.json()) as { userOp: { status: string; rejectReason: string | null } };
+      expect(body.userOp.status).to.equal("pending");
+      expect(body.userOp.rejectReason).to.equal(null);
     });
   });
 });

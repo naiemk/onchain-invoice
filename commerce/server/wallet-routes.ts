@@ -286,8 +286,9 @@ export function registerWalletRoutes(
         handlers.sendJson(res, 400, { error: feeCheck.reason, message: feeCheck.message });
         return true;
       }
-      if (db.getWalletUserOpByHash(userOpHash)) {
-        handlers.sendJson(res, 409, { error: "duplicate_user_op_hash" });
+      const existing = db.getWalletUserOpByHash(userOpHash);
+      if (existing && existing.status !== "rejected" && existing.status !== "failed") {
+        handlers.sendJson(res, 409, { error: "duplicate_user_op_hash", status: existing.status });
         return true;
       }
       try {
@@ -303,13 +304,16 @@ export function registerWalletRoutes(
             return true;
           }
         }
-        const record = db.createWalletUserOp({
-          walletAddress: getAddress(userOp.sender),
-          chainId,
-          userOpHash,
-          userOp,
-        });
-        handlers.sendJson(res, 201, { userOp: record });
+        const walletAddress = getAddress(userOp.sender);
+        const record =
+          existing != null
+            ? db.requeueWalletUserOp({ userOpHash, userOp, walletAddress, chainId })
+            : db.createWalletUserOp({ walletAddress, chainId, userOpHash, userOp });
+        if (!record) {
+          handlers.sendJson(res, 409, { error: "duplicate_user_op_hash" });
+          return true;
+        }
+        handlers.sendJson(res, existing ? 200 : 201, { userOp: record });
       } catch (error) {
         handlers.sendJson(res, 400, {
           error: "submit_failed",

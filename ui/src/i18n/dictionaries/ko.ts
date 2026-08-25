@@ -2,7 +2,7 @@
  * Korean copy for Trustless Commerce UI.
  */
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletKo } from "./wallet-ko.js";
 
 export const ko = {
   brand: "Trustless Commerce",
@@ -535,5 +535,5 @@ export const ko = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletKo,
 } satisfies Messages;

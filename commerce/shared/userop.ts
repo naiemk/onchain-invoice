@@ -20,6 +20,8 @@ export const WALLET_EXECUTE_ABI = [
 
 export const ENTRYPOINT_ABI = [
   "function getNonce(address sender, uint192 key) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function depositTo(address account) payable",
   "function getUserOpHash((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature) userOp) view returns (bytes32)",
   "function handleOps((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature)[] ops, address payable beneficiary)",
 ];
@@ -92,6 +94,23 @@ export function packUint128Pair(high: bigint, low: bigint): string {
   const mask = (1n << 128n) - 1n;
   const packed = ((high & mask) << 128n) | (low & mask);
   return toBeHex(packed, 32);
+}
+
+export function unpackUint128Pair(packed: string): { high: bigint; low: bigint } {
+  const value = BigInt(packed);
+  const mask = (1n << 128n) - 1n;
+  return { high: value >> 128n, low: value & mask };
+}
+
+/**
+ * Rough EntryPoint requiredPrefund for a packed userOp with no paymaster.
+ * Bundler tops up EntryPoint.depositTo(sender) so gasless USDC wallets can send.
+ */
+export function estimateUserOpPrefund(userOp: PackedUserOperationJson): bigint {
+  const { high: verificationGasLimit, low: callGasLimit } = unpackUint128Pair(userOp.accountGasLimits);
+  const { low: maxFeePerGas } = unpackUint128Pair(userOp.gasFees);
+  const preVerificationGas = BigInt(userOp.preVerificationGas);
+  return (verificationGasLimit + callGasLimit + preVerificationGas) * maxFeePerGas;
 }
 
 export function encodeErc20Transfer(to: string, amount: bigint): string {

@@ -1,4 +1,5 @@
 import { encodePayLink, payPath } from "../../shared/invoice.js";
+import { withPayChrome, type PayChrome } from "../../shared/pay-chrome.js";
 import { copyText, escapeHtml } from "../../shared/dom.js";
 import { localizeError, localizeOnrampQuoteError } from "../../i18n/errors.js";
 import { t } from "../../i18n/t.js";
@@ -26,6 +27,9 @@ import {
   selectedPaymentMode,
   setWalletField,
   validateStep,
+  applySingletonChainToken,
+  canOmitNetworkStep,
+  syncChainTokenPickerVisibility,
   type WizardStep,
 } from "./form.js";
 import { loadCreatePrefs, patchCreatePrefs, pickRemembered } from "./prefs.js";
@@ -103,6 +107,15 @@ export function renderCreate(root: HTMLElement): void {
         <h2>${t("create.outputTitle")}</h2>
         <p class="field-hint">${t("create.outputHint")}</p>
         <div id="preview-body"></div>
+        <div class="field" style="margin-top:1rem">
+          <label for="pay-chrome">${t("create.chromeLabel")}</label>
+          <p class="field-hint">${t("create.chromeHint")}</p>
+          <select id="pay-chrome">
+            <option value="full" selected>${t("create.chromeFull")}</option>
+            <option value="minimal">${t("create.chromeMinimal")}</option>
+            <option value="none">${t("create.chromeNone")}</option>
+          </select>
+        </div>
       </aside>
     </div>
 
@@ -168,10 +181,20 @@ ${t("create.docsStatusLine")}</pre>
     for (const el of root.querySelectorAll<HTMLElement>(".wizard-step")) {
       el.hidden = Number(el.dataset.step) !== step;
     }
+    const omitNetwork = canOmitNetworkStep(root);
     for (const li of root.querySelectorAll<HTMLElement>(".create-wizard-stepper li")) {
       const n = Number(li.dataset.goto);
+      if (n === 2) {
+        li.hidden = omitNetwork;
+        if (omitNetwork) {
+          li.classList.remove("is-active", "is-done");
+          continue;
+        }
+      } else {
+        li.hidden = false;
+      }
       li.classList.toggle("is-active", n === step);
-      li.classList.toggle("is-done", n < step);
+      li.classList.toggle("is-done", n < step && !(omitNetwork && n === 2));
     }
     const back = root.querySelector<HTMLButtonElement>("#wizard-back");
     const next = root.querySelector<HTMLButtonElement>("#wizard-next");
@@ -221,13 +244,17 @@ ${t("create.docsStatusLine")}</pre>
     renderTokenOptions(root, checked(root, "chains"));
     const openBtn = root.querySelector<HTMLButtonElement>("#open-checkout");
     const copyBtn = root.querySelector<HTMLButtonElement>("#copy-pay-link");
+    const chrome = (root.querySelector<HTMLSelectElement>("#pay-chrome")?.value ?? "full") as PayChrome;
     if (!previewBody) return;
     try {
       const fields = readForm(root);
-      const path = payPath(fields);
+      const path = withPayChrome(payPath(fields), chrome);
       const link = `${location.origin}${path}`;
+      const iframePath = withPayChrome(payPath(fields), "none");
+      const iframeSrc = `${location.origin}${iframePath}`;
       const payLabel = t("create.payWithCrypto", { price: fields.price });
       const embed = `<a href="${link}" class="tc-pay-button" target="_blank" rel="noopener noreferrer">${payLabel}</a>`;
+      const iframe = `<iframe src="${iframeSrc}" title="${escapeHtml(payLabel)}" style="width:100%;min-height:720px;border:0" allow="payment *"></iframe>`;
       previewBody.innerHTML = `
         <div class="field">
           <label>${t("create.payLinkLabel")}</label>
@@ -237,6 +264,12 @@ ${t("create.docsStatusLine")}</pre>
           <label>${t("create.embedLabel")}</label>
           <div class="mono-block" id="out-embed">${escapeHtml(embed)}</div>
           <button type="button" class="secondary" id="copy-embed">${t("create.copyHtml")}</button>
+        </div>
+        <div class="field">
+          <label>${t("create.iframeLabel")}</label>
+          <p class="field-hint">${t("create.iframeHint")}</p>
+          <div class="mono-block" id="out-iframe">${escapeHtml(iframe)}</div>
+          <button type="button" class="secondary" id="copy-iframe">${t("create.copyHtml")}</button>
         </div>
         <div class="field">
           <label>${t("create.renderedLabel")}</label>
@@ -256,7 +289,12 @@ ${t("create.docsStatusLine")}</pre>
         const note = previewBody.querySelector<HTMLElement>("#copy-status");
         if (note) note.textContent = t("create.embedCopied");
       });
-      if (docsQuery) docsQuery.textContent = `${location.origin}/pay?${encodePayLink(fields)}`;
+      previewBody.querySelector<HTMLButtonElement>("#copy-iframe")?.addEventListener("click", async () => {
+        await copyText(iframe);
+        const note = previewBody.querySelector<HTMLElement>("#copy-status");
+        if (note) note.textContent = t("create.iframeCopied");
+      });
+      if (docsQuery) docsQuery.textContent = link;
     } catch (error) {
       previewBody.innerHTML = `<p class="danger">${escapeHtml(error instanceof Error ? localizeError(error) : t("common.incomplete"))}</p>`;
       if (openBtn) openBtn.disabled = true;
@@ -266,7 +304,7 @@ ${t("create.docsStatusLine")}</pre>
       }
       if (docsQuery) {
         try {
-          docsQuery.textContent = `${location.origin}/pay?${encodePayLink(readFormLoose(root))}`;
+          docsQuery.textContent = `${location.origin}${withPayChrome(`/pay?${encodePayLink(readFormLoose(root))}`, chrome)}`;
         } catch {
           docsQuery.textContent = `${location.origin}/pay?…`;
         }
@@ -282,6 +320,7 @@ ${t("create.docsStatusLine")}</pre>
   });
   form?.addEventListener("input", refresh);
   form?.addEventListener("change", refresh);
+  root.querySelector("#pay-chrome")?.addEventListener("change", refresh);
 
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -292,7 +331,8 @@ ${t("create.docsStatusLine")}</pre>
     }
     try {
       const fields = readForm(root);
-      window.open(payPath(fields), "_blank", "noopener,noreferrer");
+      const chrome = (root.querySelector<HTMLSelectElement>("#pay-chrome")?.value ?? "full") as PayChrome;
+      window.open(withPayChrome(payPath(fields), chrome), "_blank", "noopener,noreferrer");
       const note = root.querySelector<HTMLElement>("#form-action-status");
       if (note) note.textContent = t("create.openedCheckout");
       persistPrefs(root);
@@ -308,8 +348,13 @@ ${t("create.docsStatusLine")}</pre>
   root.querySelector("#wizard-next")?.addEventListener("click", () => {
     try {
       validateStep(root, currentStep);
-      if (currentStep === 1) goToStep(2);
-      else if (currentStep === 2) goToStep(3);
+      if (currentStep === 1) {
+        applyPaymentModeUi(root);
+        applySingletonChainToken(root);
+        renderTokenOptions(root, checked(root, "chains"));
+        syncChainTokenPickerVisibility(root);
+        goToStep(canOmitNetworkStep(root) ? 3 : 2);
+      } else if (currentStep === 2) goToStep(3);
     } catch (error) {
       const note = root.querySelector<HTMLElement>("#form-action-status");
       if (note) {
@@ -319,16 +364,33 @@ ${t("create.docsStatusLine")}</pre>
     }
   });
   root.querySelector("#wizard-back")?.addEventListener("click", () => {
-    if (currentStep === 3) goToStep(2);
-    else if (currentStep === 2) goToStep(1);
+    if (currentStep === 3) {
+      applyPaymentModeUi(root);
+      applySingletonChainToken(root);
+      renderTokenOptions(root, checked(root, "chains"));
+      syncChainTokenPickerVisibility(root);
+      goToStep(canOmitNetworkStep(root) ? 1 : 2);
+    } else if (currentStep === 2) goToStep(1);
   });
   root.querySelectorAll<HTMLElement>(".create-wizard-stepper li").forEach((li) => {
     li.querySelector("button")?.addEventListener("click", () => {
       const n = Number(li.dataset.goto) as WizardStep;
+      if (n === 2 && canOmitNetworkStep(root)) return;
       if (n < currentStep) goToStep(n);
       else if (n > currentStep) {
         try {
-          for (let s = currentStep; s < n; s++) validateStep(root, s as WizardStep);
+          for (let s = currentStep; s < n; s++) {
+            if (s === 2 && canOmitNetworkStep(root)) continue;
+            validateStep(root, s as WizardStep);
+          }
+          if (n === 3 && currentStep === 1) {
+            applyPaymentModeUi(root);
+            applySingletonChainToken(root);
+            renderTokenOptions(root, checked(root, "chains"));
+            if (!canOmitNetworkStep(root)) {
+              validateStep(root, 2);
+            }
+          }
           goToStep(n);
         } catch (error) {
           const note = root.querySelector<HTMLElement>("#form-action-status");
@@ -845,6 +907,14 @@ function applyPaymentModeUi(root: HTMLElement): void {
       chainInputs[0].checked = true;
     }
   }
+
+  applySingletonChainToken(root);
+  renderTokenOptions(root, checked(root, "chains"));
+  syncChainTokenPickerVisibility(root);
+
+  // Refresh stepper omit state when rails change while on amount step
+  const step2Li = root.querySelector<HTMLElement>('.create-wizard-stepper li[data-goto="2"]');
+  if (step2Li) step2Li.hidden = canOmitNetworkStep(root);
 }
 
 async function submitFiatInvoice(root: HTMLElement): Promise<void> {
@@ -860,7 +930,8 @@ async function submitFiatInvoice(root: HTMLElement): Promise<void> {
     const fields = readForm(root);
     if (!fields.displayAmount || !fields.displayFiat) throw new Error(t("create.quoteError"));
     if (!fields.price || fields.price === "0") throw new Error(t("create.quoteError"));
-    const link = `${location.origin}${payPath(fields)}`;
+    const chrome = (root.querySelector<HTMLSelectElement>("#pay-chrome")?.value ?? "full") as PayChrome;
+    const link = `${location.origin}${withPayChrome(payPath(fields), chrome)}`;
     window.open(link, "_blank", "noopener,noreferrer");
     if (note) note.textContent = t("create.openedCheckout");
     persistPrefs(root);

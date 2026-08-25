@@ -2,7 +2,7 @@
  * Indonesian (id) UI copy for Trustless Commerce.
  */
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletId } from "./wallet-id.js";
 
 export const id = {
   brand: "Trustless Commerce",
@@ -549,5 +549,5 @@ export const id = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletId,
 } satisfies Messages;

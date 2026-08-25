@@ -112,10 +112,16 @@ export function encodePayLink(fields: PayLinkFields): string {
 }
 
 /** Resume link for an already-created invoice. */
-export function encodeInvoiceResumeLink(invoiceId: string, options?: { lang?: string | null }): string {
+export function encodeInvoiceResumeLink(
+  invoiceId: string,
+  options?: { lang?: string | null; header?: string | null }
+): string {
   const params = new URLSearchParams();
   params.set("id", invoiceId);
   if (options?.lang) params.set("lang", options.lang);
+  if (options?.header === "minimal" || options?.header === "none") {
+    params.set("header", options.header);
+  }
   return params.toString();
 }
 

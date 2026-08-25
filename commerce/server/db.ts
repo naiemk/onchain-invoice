@@ -987,6 +987,45 @@ export class CommerceDb {
     return this.getWalletUserOpByHash(input.userOpHash)!;
   }
 
+  /**
+   * Same UserOp hash can be retried after reject/fail (e.g. AA21 then fixed bundler).
+   * Resets to pending with a fresh signature payload.
+   */
+  requeueWalletUserOp(input: {
+    userOpHash: string;
+    userOp: PackedUserOperationJson;
+    walletAddress: string;
+    chainId: string;
+  }): WalletUserOpRecord | null {
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(
+        `UPDATE wallet_user_ops SET
+           wallet_address = ?,
+           chain_id = ?,
+           user_op_json = ?,
+           status = 'pending',
+           claimed_by = NULL,
+           claimed_until = NULL,
+           tx_hash = NULL,
+           reject_reason = NULL,
+           gas_spent_wei = NULL,
+           version = version + 1,
+           updated_at = ?
+         WHERE user_op_hash = ?
+           AND status IN ('rejected', 'failed')`
+      )
+      .run(
+        input.walletAddress.toLowerCase(),
+        input.chainId,
+        JSON.stringify(input.userOp),
+        now,
+        input.userOpHash.toLowerCase()
+      );
+    if (result.changes === 0) return null;
+    return this.getWalletUserOpByHash(input.userOpHash);
+  }
+
   getWalletUserOpByHash(userOpHash: string): WalletUserOpRecord | null {
     const row = this.db
       .prepare(`SELECT * FROM wallet_user_ops WHERE user_op_hash = ?`)

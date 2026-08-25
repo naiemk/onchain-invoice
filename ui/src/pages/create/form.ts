@@ -192,6 +192,56 @@ export function renderTokenOptions(root: HTMLElement, chains: string[]): void {
 
 export type WizardStep = 1 | 2 | 3;
 
+/**
+ * Chain/token pickers are irrelevant for fiat (locked rails) or when the
+ * deployment surface has exactly one chain with exactly one token.
+ */
+export function isChainTokenSkippable(root: HTMLElement): boolean {
+  if (selectedPaymentMode(root) === "fiat") return true;
+  const chainInputs = [...root.querySelectorAll<HTMLInputElement>('input[name="chains"]')];
+  if (chainInputs.length !== 1) return false;
+  const chainId = chainInputs[0]!.value;
+  return tokensForChains([chainId]).length === 1;
+}
+
+/** Ensure singleton chain+token are selected before skipping the pickers. */
+export function applySingletonChainToken(root: HTMLElement): void {
+  if (selectedPaymentMode(root) === "fiat") return;
+  const chainInputs = [...root.querySelectorAll<HTMLInputElement>('input[name="chains"]')];
+  if (chainInputs.length !== 1) return;
+  const only = chainInputs[0]!;
+  only.checked = true;
+  const tokens = tokensForChains([only.value]);
+  if (tokens.length !== 1) return;
+  renderTokenOptions(root, [only.value]);
+  for (const el of root.querySelectorAll<HTMLInputElement>('input[name="tokens"]')) {
+    el.checked = el.value === tokens[0]!.id;
+  }
+}
+
+export function syncChainTokenPickerVisibility(root: HTMLElement): void {
+  const skip = isChainTokenSkippable(root);
+  const chainField = root.querySelector<HTMLElement>("#chain-select-field");
+  const tokenField = root.querySelector<HTMLElement>("#token-select-field");
+  if (chainField) chainField.hidden = skip;
+  if (tokenField) tokenField.hidden = skip;
+}
+
+/** True when step 2 wallets (and locked rails) already validate. */
+export function step2Ready(root: HTMLElement): boolean {
+  try {
+    validateStep(root, 2);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether the Network stepper item can be omitted (skip 1→3). */
+export function canOmitNetworkStep(root: HTMLElement): boolean {
+  return isChainTokenSkippable(root) && step2Ready(root);
+}
+
 /** Validate only the fields owned by a step. Throws with localized Error. */
 export function validateStep(root: HTMLElement, step: WizardStep): void {
   if (step === 1) {

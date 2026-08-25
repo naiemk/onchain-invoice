@@ -193,7 +193,14 @@ Full docs: https://naiemk.github.io/onchain-invoice/invoice-types/ and https://n
 /pay?price=10&to=T…&chains=nile&tokens=USDT&title=Order&allow_partial=0
 ```
 
-Shareable checkout links never include `invoice_seed`. The API creates the seed when the payer continues (or when you call `POST /api/invoices`). After create, resume with `/pay?id=<invoiceId>`.
+Optional chrome: `header=full` (default) | `minimal` | `none`. Use `none` inside an iframe:
+
+```html
+<iframe src="https://your.host/pay?price=10&to=0x…&chains=11155111&tokens=USDC&header=none"
+  style="width:100%;min-height:720px;border:0" allow="payment *"></iframe>
+```
+
+Shareable checkout links never include `invoice_seed`. The API creates the seed when the payer continues (or when you call `POST /api/invoices`). After create, resume with `/pay?id=<invoiceId>` (preserve `header` if present).
 
 Deterministic `invoiceId` = `keccak256(abi.encode(bytes32 invoiceSeed, string[] toAddresses))`.
 Uniqueness comes from a server-generated random `invoiceSeed`; `toAddresses` bind payout destinations.

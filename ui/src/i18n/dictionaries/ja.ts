@@ -2,7 +2,7 @@
  * Japanese copy for Trustless Commerce UI.
  */
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletJa } from "./wallet-ja.js";
 
 export const ja = {
   brand: "Trustless Commerce",
@@ -535,5 +535,5 @@ export const ja = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletJa,
 } satisfies Messages;

@@ -1043,6 +1043,27 @@ button:disabled {
   min-height: 100vh;
 }
 
+#app[data-chrome="none"] {
+  min-height: 100%;
+}
+
+#app[data-chrome="none"] #outlet,
+.outlet-chrome-none {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0.75rem 1rem 1.5rem;
+}
+
+.topbar-minimal nav {
+  margin-left: auto;
+}
+
+.global-footer-minimal {
+  justify-content: space-between;
+}
+
 .pay-asset-banner {
   display: grid;
   gap: 0.85rem;
