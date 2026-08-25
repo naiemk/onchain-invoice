@@ -2,7 +2,7 @@
  * Turkish (tr) UI copy for Trustless Commerce.
  */
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletTr } from "./wallet-tr.js";
 
 export const tr = {
   brand: "Trustless Commerce",
@@ -548,5 +548,5 @@ export const tr = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletTr,
 } satisfies Messages;

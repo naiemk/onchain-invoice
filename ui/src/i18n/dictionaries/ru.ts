@@ -2,7 +2,7 @@
  * Russian (ru) UI copy for Trustless Commerce.
  */
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletRu } from "./wallet-ru.js";
 
 export const ru = {
   brand: "Trustless Commerce",
@@ -548,5 +548,5 @@ export const ru = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletRu,
 } satisfies Messages;

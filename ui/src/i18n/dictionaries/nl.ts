@@ -1,5 +1,5 @@
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletNl } from "./wallet-nl.js";
 
 export const nl = {
   brand: "Trustless Commerce",
@@ -542,5 +542,5 @@ export const nl = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletNl,
 } satisfies Messages;

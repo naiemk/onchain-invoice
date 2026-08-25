@@ -2,7 +2,7 @@
  * Traditional Chinese (Taiwan) copy for Trustless Commerce UI.
  */
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletZhHant } from "./wallet-zh-Hant.js";
 
 export const zhHant = {
   brand: "Trustless Commerce",
@@ -535,5 +535,5 @@ export const zhHant = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletZhHant,
 } satisfies Messages;

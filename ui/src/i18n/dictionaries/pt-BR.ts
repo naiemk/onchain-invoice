@@ -3,7 +3,7 @@
  * Same keys as `en` — see `./en.ts` for the source of truth.
  */
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletPtBR } from "./wallet-pt-BR.js";
 
 export const ptBR = {
   brand: "Trustless Commerce",
@@ -543,5 +543,5 @@ export const ptBR = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletPtBR,
 } satisfies Messages;

@@ -2,7 +2,7 @@
  * Malay (ms, Malaysia) UI copy for Trustless Commerce.
  */
 import type { Messages } from "./en.js";
-import { walletEn } from "./wallet-en.js";
+import { walletMs } from "./wallet-ms.js";
 
 export const ms = {
   brand: "Trustless Commerce",
@@ -549,5 +549,5 @@ export const ms = {
       },
     },
   },
-  wallet: walletEn,
+  wallet: walletMs,
 } satisfies Messages;

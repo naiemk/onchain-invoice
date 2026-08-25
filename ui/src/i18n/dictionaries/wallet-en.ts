@@ -1,4 +1,4 @@
-/** Wallet UI strings (English); re-used in all locales until translated. */
+/** Wallet UI strings (English). Other locales use wallet-<locale>.ts. */
 export const walletEn = {
   eyebrow: "Passkey wallet",
   navLabel: "Wallet navigation",

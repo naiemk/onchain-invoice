@@ -5,8 +5,10 @@ import {
   ENTRYPOINT_ABI,
   ENTRYPOINT_V09,
   ERC20_ABI,
+  estimateUserOpPrefund,
   userOpToTuple,
   type BundlerFeeConfig,
+  type PackedUserOperationJson,
 } from "../shared/userop.js";
 import { validateUserOpFee } from "../shared/userop-fee.js";
 import { signBundlerRequest } from "../server/bundler-auth.js";
@@ -135,11 +137,24 @@ export class BundlerWorker {
 
     const submitter = new Wallet(chain.privateKey, provider);
     const beneficiary = getAddress(chain.beneficiary ?? chain.bundlerAddress);
+    const ep = entryPoint.connect(submitter) as Contract;
     try {
-      await (entryPoint.connect(submitter) as Contract).handleOps.staticCall(
-        [userOpToTuple(record.userOp)],
-        beneficiary
-      );
+      await this.ensureAccountPrefund(ep, record.walletAddress, record.userOp, record.chainId);
+    } catch (error) {
+      await this.trackWithRetry({
+        userOpHash: record.userOpHash,
+        status: "rejected",
+        rejectReason: "prefund_failed",
+        expectedVersion: record.version,
+      });
+      this.activity?.append("userop-prefund-failed", {
+        chainId: record.chainId,
+        payload: { userOpHash: record.userOpHash, error: String(error) },
+      });
+      return;
+    }
+    try {
+      await ep.handleOps.staticCall([userOpToTuple(record.userOp)], beneficiary);
     } catch (error) {
       await this.trackWithRetry({
         userOpHash: record.userOpHash,
@@ -163,10 +178,7 @@ export class BundlerWorker {
       expectedVersion: claimed.version,
     });
 
-    const tx = await (entryPoint.connect(submitter) as Contract).handleOps(
-      [userOpToTuple(record.userOp)],
-      beneficiary
-    );
+    const tx = await ep.handleOps([userOpToTuple(record.userOp)], beneficiary);
     const receipt = await tx.wait();
     const gasSpent = receipt?.gasUsed ? receipt.gasUsed.toString() : null;
 
@@ -193,6 +205,29 @@ export class BundlerWorker {
       bundlerBeneficiary: chain.beneficiary ?? chain.bundlerAddress,
       minFeeUsdc: BigInt(chain.feeUsdc ?? "100000"),
     };
+  }
+
+  /** Top up EntryPoint deposit so USDC-only wallets pass AA21 (no paymaster in v1). */
+  private async ensureAccountPrefund(
+    entryPoint: Contract,
+    walletAddress: string,
+    userOp: PackedUserOperationJson,
+    chainId: string
+  ): Promise<void> {
+    const required = estimateUserOpPrefund(userOp);
+    const deposit = BigInt(await entryPoint.balanceOf(walletAddress));
+    if (deposit >= required) return;
+    const topUp = required - deposit + required / 5n; // 20% buffer
+    const tx = await entryPoint.depositTo(getAddress(walletAddress), { value: topUp });
+    const receipt = await tx.wait();
+    this.activity?.append("userop-prefund", {
+      chainId,
+      payload: {
+        address: walletAddress,
+        topUp: topUp.toString(),
+        txHash: receipt?.hash ?? tx.hash,
+      },
+    });
   }
 
   private async claimWithRetry(record: WalletUserOpRecord): Promise<WalletUserOpRecord | null> {

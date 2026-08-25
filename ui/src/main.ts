@@ -12,6 +12,7 @@ import { beginSpaRender, isSpaRenderCurrent } from "./shared/spa-render.js";
 import { isLocale, LOCALES, LOCALE_NATIVE_NAMES } from "./i18n/locales.js";
 import { applyLocale, getLocale, setLocale, t } from "./i18n/t.js";
 import { resolvePageLocale } from "./i18n/detect.js";
+import { currentPayChromeFromLocation, type PayChrome } from "./shared/pay-chrome.js";
 
 export type PageRenderer = (root: HTMLElement) => void | Promise<void>;
 
@@ -28,6 +29,7 @@ const routes: Record<string, PageRenderer> = {
   "/wallet/pair": renderWallet,
   "/wallet/send": renderWallet,
   "/wallet/receive": renderWallet,
+  "/wallet/recover": renderWallet,
 };
 
 applyTheme(preferredTheme());
@@ -36,6 +38,8 @@ applyLocale(resolvePageLocale());
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app");
 const appRoot = app;
+
+let lastChrome: PayChrome | null = null;
 
 window.addEventListener("popstate", () => void render());
 document.addEventListener("click", (event) => {
@@ -53,17 +57,23 @@ async function render(options?: { rebuildShell?: boolean }): Promise<void> {
   const gen = beginSpaRender();
   applyLocale(resolvePageLocale());
   const pathname = location.pathname;
+  const chrome = pathname === "/pay" ? currentPayChromeFromLocation() : "full";
   applyMeta(pathname);
   const route =
     routes[pathname] ??
     (pathname.startsWith("/merchant/") ? renderMerchant : pathname.startsWith("/wallet") ? renderWallet : renderHome);
 
   const outletExists = Boolean(appRoot.querySelector("#outlet"));
-  if (options?.rebuildShell || !outletExists) {
-    appRoot.innerHTML = shell(pathname);
+  const chromeChanged = lastChrome !== null && lastChrome !== chrome;
+  if (options?.rebuildShell || !outletExists || chromeChanged) {
+    appRoot.innerHTML = shell(pathname, chrome);
+    appRoot.dataset.chrome = chrome;
+    lastChrome = chrome;
     initThemeToggle(appRoot.querySelector<HTMLButtonElement>("#theme-toggle"));
     initLocaleSelect(appRoot.querySelector<HTMLSelectElement>("#locale-select"));
   } else {
+    appRoot.dataset.chrome = chrome;
+    lastChrome = chrome;
     syncTopbarNav(pathname);
   }
 
@@ -140,11 +150,38 @@ function localeSelectHtml(): string {
     </label>`;
 }
 
-function shell(pathname: string): string {
+function shell(pathname: string, chrome: PayChrome = "full"): string {
+  if (chrome === "none") {
+    return `<main id="outlet" class="outlet-chrome-none"></main>`;
+  }
+
   const active = (href: string) =>
     pathname === href || (href !== "/" && pathname.startsWith(href));
   const link = (href: string, label: string) =>
     `<a href="${href}" data-route${active(href) ? ' aria-current="page"' : ""}>${label}</a>`;
+
+  if (chrome === "minimal") {
+    return `
+    <header class="topbar topbar-minimal">
+      <a class="brand" href="/" data-route>
+        <span class="brand-mark"><img src="/logo.svg" alt="" width="32" height="32" /></span>
+        <span>${t("brand")}</span>
+      </a>
+      <nav>
+        ${localeSelectHtml()}
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="${t("theme.switchTheme")}"></button>
+      </nav>
+    </header>
+    <main id="outlet"></main>
+    <footer class="site-footer global-footer global-footer-minimal">
+      <span>${t("brand")}</span>
+      <span>
+        <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">${t("nav.docs")}</a>
+      </span>
+    </footer>
+  `;
+  }
+
   return `
     <header class="topbar">
       <a class="brand" href="/" data-route>

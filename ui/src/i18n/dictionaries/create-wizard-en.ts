@@ -19,4 +19,12 @@ export const createWizardEn = {
   amountLimits: "Allowed range: {min} – {max} {fiat}",
   invoiceTypeLabel: "Invoice type",
   invoiceTypeHint: "Crypto is on-chain only. Combined lets the payer choose. Fiat is card/bank only.",
+  chromeLabel: "Checkout chrome",
+  chromeHint: "Controls header and footer on the pay page. Use none for iframes.",
+  chromeFull: "Full",
+  chromeMinimal: "Minimal",
+  chromeNone: "None",
+  iframeLabel: "Embed iframe HTML",
+  iframeHint: "Uses header=none so the checkout fits inside an iframe.",
+  iframeCopied: "Iframe HTML copied.",
 };

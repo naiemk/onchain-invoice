@@ -108,6 +108,8 @@ Treat **`/pay`** as the canonical buyer experience.
 2. Redirect buyer to `{baseUrl}{payLink}` (or render a button to that URL).
 3. Buyer completes payment on hosted checkout; sweeper settles on-chain.
 
+Optional UI chrome on `/pay` links: `header=full` (default), `minimal`, or `none` (iframe). See [Create an invoice](create.md#checkout-chrome-header).
+
 Platform adapters should **not** reimplement wallet UI unless required by the host platform.
 
 ## Status polling

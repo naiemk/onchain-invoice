@@ -55,7 +55,7 @@ export function walletPickerHtml(): string {
 export function stepNetworkHtml(networks: NetworkOption[], modeLabel: string): string {
   return `
     <div class="wizard-step" data-step="2" hidden>
-      <div class="field">
+      <div class="field" id="chain-select-field">
         <label id="networks-label">${t("create.networksLabel")} <span class="required">${t("common.required")}</span></label>
         <p class="field-hint" id="networks-hint">${t("create.networksHint")}</p>
         <p class="field-hint" id="fiat-networks-locked-hint" hidden>${t("create.fiatNetworksLockedHint")}</p>
@@ -102,7 +102,7 @@ export function stepNetworkHtml(networks: NetworkOption[], modeLabel: string): s
         <p class="field-error" id="toSolana-error" hidden></p>
       </div>
 
-      <div class="field">
+      <div class="field" id="token-select-field">
         <label>${t("create.tokensLabel")} <span class="required">${t("common.required")}</span></label>
         <p class="field-hint">${t("create.tokensHint")}</p>
         <div class="field-row" id="tokens"></div>
