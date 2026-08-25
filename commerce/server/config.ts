@@ -84,6 +84,17 @@ export interface WalletConfig {
   feeTokenAddress?: string;
   feeTokenSymbol: string;
   feeTokenDecimals: number;
+  chains: WalletChainEntry[];
+}
+
+export interface WalletChainEntry {
+  chainId: string;
+  factoryAddress: string;
+  rpcUrl?: string;
+  feeTokenAddress?: string;
+  feeTokenSymbol: string;
+  feeTokenDecimals: number;
+  networkLabel: string;
 }
 
 export interface OnramperConfig {
@@ -201,11 +212,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     claimLeaseMs: Number(env.CLAIM_LEASE_MS ?? file.claimLeaseMs ?? 180_000),
     configPath,
     onramper: loadOnramperConfig(env, file.onramper),
-    wallet: loadWalletConfig(env, legacy?.rpcUrl),
+    wallet: loadWalletConfig(env, legacy?.rpcUrl, evmChains),
   };
 }
 
-function loadWalletConfig(env: NodeJS.ProcessEnv, fallbackRpc?: string): WalletConfig {
+function loadWalletConfig(
+  env: NodeJS.ProcessEnv,
+  fallbackRpc?: string,
+  evmChains?: EvmNetworksConfig
+): WalletConfig {
   const chainId = expand(env.WALLET_CHAIN_ID ?? "11155111");
   const timelock = Number(env.WALLET_RECOVERY_TIMELOCK ?? "259200");
   const feeOverride = env[`WALLET_${chainId}_BUNDLER_FEE_USDC`] ?? env.WALLET_BUNDLER_FEE_USDC ?? "100000";
@@ -214,20 +229,94 @@ function loadWalletConfig(env: NodeJS.ProcessEnv, fallbackRpc?: string): WalletC
     blankToUndefined(expand(env.WALLET_ENTRYPOINT_ADDRESS ?? "")) ??
     "0x433709009B8330FDa32311DF1C2AFA402eD8D009";
   const sepoliaUsdc = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+  const factoryAddress = blankToUndefined(expand(env.WALLET_FACTORY_ADDRESS ?? ""));
+  const implementationAddress = blankToUndefined(expand(env.WALLET_IMPLEMENTATION_ADDRESS ?? ""));
+  const recoveryAddress = blankToUndefined(expand(env.WALLET_RECOVERY_ADDRESS ?? ""));
+  const rpcUrl = blankToUndefined(expand(env.WALLET_RPC_URL ?? env.EVM_RPC_URL ?? fallbackRpc ?? ""));
+  const feeTokenAddress = blankToUndefined(
+    expand(env.WALLET_BUNDLER_FEE_TOKEN ?? env.WALLET_FEE_TOKEN ?? sepoliaUsdc)
+  );
+  const feeTokenSymbol = expand(env.WALLET_FEE_TOKEN_SYMBOL ?? "USDC");
+  const feeTokenDecimals = Number(env.WALLET_FEE_TOKEN_DECIMALS ?? "6") || 6;
+
+  const chains = loadWalletChains(env, {
+    chainId,
+    factoryAddress,
+    rpcUrl,
+    feeTokenAddress,
+    feeTokenSymbol,
+    feeTokenDecimals,
+    evmChains,
+  });
+
   return {
     chainId,
-    factoryAddress: blankToUndefined(expand(env.WALLET_FACTORY_ADDRESS ?? "")),
-    recoveryAddress: blankToUndefined(expand(env.WALLET_RECOVERY_ADDRESS ?? "")),
-    implementationAddress: blankToUndefined(expand(env.WALLET_IMPLEMENTATION_ADDRESS ?? "")),
+    factoryAddress,
+    recoveryAddress,
+    implementationAddress,
     recoveryTimelockSeconds: Number.isFinite(timelock) ? timelock : 259200,
-    rpcUrl: blankToUndefined(expand(env.WALLET_RPC_URL ?? env.EVM_RPC_URL ?? fallbackRpc ?? "")),
+    rpcUrl,
     entryPointAddress: entryPoint,
     bundlerFeeUsdc: feeAtoms,
     bundlerBeneficiary: blankToUndefined(expand(env.WALLET_BUNDLER_BENEFICIARY ?? "")),
-    feeTokenAddress: blankToUndefined(expand(env.WALLET_BUNDLER_FEE_TOKEN ?? env.WALLET_FEE_TOKEN ?? sepoliaUsdc)),
-    feeTokenSymbol: expand(env.WALLET_FEE_TOKEN_SYMBOL ?? "USDC"),
-    feeTokenDecimals: Number(env.WALLET_FEE_TOKEN_DECIMALS ?? "6") || 6,
+    feeTokenAddress,
+    feeTokenSymbol,
+    feeTokenDecimals,
+    chains,
   };
+}
+
+const CHAIN_LABELS: Record<string, string> = {
+  "11155111": "Sepolia",
+  "8453": "Base",
+  "56": "BNB Chain",
+  "1": "Ethereum",
+};
+
+function loadWalletChains(
+  env: NodeJS.ProcessEnv,
+  base: {
+    chainId: string;
+    factoryAddress?: string;
+    rpcUrl?: string;
+    feeTokenAddress?: string;
+    feeTokenSymbol: string;
+    feeTokenDecimals: number;
+    evmChains?: EvmNetworksConfig;
+  }
+): WalletChainEntry[] {
+  const rawJson = blankToUndefined(expand(env.WALLET_CHAINS ?? ""));
+  if (rawJson) {
+    try {
+      const parsed = JSON.parse(rawJson) as WalletChainEntry[];
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {
+      /* fall through */
+    }
+  }
+  if (!base.factoryAddress) return [];
+  const entries: WalletChainEntry[] = [];
+  const seen = new Set<string>();
+  const add = (chainId: string, rpcUrl?: string, feeToken?: string) => {
+    if (seen.has(chainId)) return;
+    seen.add(chainId);
+    entries.push({
+      chainId,
+      factoryAddress: base.factoryAddress!,
+      rpcUrl: rpcUrl || base.rpcUrl,
+      feeTokenAddress: feeToken ?? base.feeTokenAddress,
+      feeTokenSymbol: base.feeTokenSymbol,
+      feeTokenDecimals: base.feeTokenDecimals,
+      networkLabel: CHAIN_LABELS[chainId] ?? `Chain ${chainId}`,
+    });
+  };
+  add(base.chainId, base.rpcUrl, base.feeTokenAddress);
+  if (base.evmChains) {
+    for (const [id, chain] of Object.entries(base.evmChains)) {
+      if (chain.rpcUrl) add(id, chain.rpcUrl);
+    }
+  }
+  return entries;
 }
 
 function loadOnramperConfig(

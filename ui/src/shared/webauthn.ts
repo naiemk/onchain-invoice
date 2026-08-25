@@ -5,6 +5,10 @@ export interface PasskeyOwner {
   qy: string;
   credentialId: string;
   rawId: string;
+  attestation?: {
+    clientDataJSON: string;
+    attestationObject: string;
+  };
 }
 
 function rpId(): string {
@@ -62,11 +66,17 @@ export async function createPasskey(displayName: string): Promise<PasskeyOwner> 
   const pk = response.getPublicKey?.();
   if (!pk) throw new Error("Could not read passkey public key");
   const { qx, qy } = spkiToP256Coordinates(pk);
+  const attObj = response.attestationObject;
+  const clientData = response.clientDataJSON;
   return {
     qx,
     qy,
     credentialId: btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),
     rawId: bufferToHex(cred.rawId),
+    attestation: {
+      clientDataJSON: bufferToBase64(clientData),
+      attestationObject: bufferToBase64(attObj),
+    },
   };
 }
 
@@ -128,9 +138,14 @@ function bufferToHex(buf: ArrayBuffer): string {
   return "0x" + [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function bufferToBase64(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+
 export interface WalletSession {
   address: string;
   chainId: string;
+  salt: string;
   qx: string;
   qy: string;
   credentialId: string;

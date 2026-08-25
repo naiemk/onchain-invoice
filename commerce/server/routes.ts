@@ -69,6 +69,8 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
     readJson,
     clientIp,
     publicLimit: context.config.rateLimit.publicPerIpPerSecond,
+    sweeperApiKey: context.config.sweeperApiKey,
+    requireApiKey,
   });
 
   return async (req, res) => {
@@ -139,6 +141,7 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
           chainId: w.chainId,
           factoryAddress: w.factoryAddress ?? null,
           recoveryAddress: w.recoveryAddress ?? null,
+          implementationAddress: w.implementationAddress ?? null,
           rpcUrl: w.rpcUrl ?? null,
           recoveryTimelockSeconds: w.recoveryTimelockSeconds,
           entryPointAddress: w.entryPointAddress,
@@ -148,6 +151,15 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
           feeTokenAddress: w.feeTokenAddress ?? null,
           feeTokenSymbol: w.feeTokenSymbol,
           feeTokenDecimals: w.feeTokenDecimals,
+          chains: w.chains.map((c) => ({
+            chainId: c.chainId,
+            factoryAddress: c.factoryAddress,
+            rpcUrl: c.rpcUrl ?? null,
+            feeTokenAddress: c.feeTokenAddress ?? null,
+            feeTokenSymbol: c.feeTokenSymbol,
+            feeTokenDecimals: c.feeTokenDecimals,
+            networkLabel: c.networkLabel,
+          })),
         });
         return;
       }

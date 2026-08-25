@@ -1,15 +1,16 @@
-import { randomUUID } from "node:crypto";
 import { Contract, JsonRpcProvider, getAddress } from "ethers";
 import type { WalletConfig } from "./config.js";
-import type { WalletDeviceRecord } from "../shared/wallet.js";
+import type { WalletDeviceRecord, WalletBalanceResponse } from "../shared/wallet.js";
 import type { PackedUserOperationJson } from "../shared/userop.js";
 import {
   ENTRYPOINT_ABI,
   ERC20_ABI,
+  formatUsdFromUsdc,
   userOpToTuple,
   type BundlerFeeConfig,
 } from "../shared/userop.js";
 import { validateUserOpFee } from "../shared/userop-fee.js";
+import { deriveWalletSalt, predictWalletAddress } from "../shared/wallet-address.js";
 import type { CommerceDb } from "./db.js";
 
 const PAIRING_TTL_MS = 5 * 60 * 1000;
@@ -23,6 +24,12 @@ export function registerWalletRoutes(
     readJson: (req: import("node:http").IncomingMessage) => Promise<Record<string, unknown>>;
     clientIp: (req: import("node:http").IncomingMessage) => string;
     publicLimit: number;
+    sweeperApiKey: string;
+    requireApiKey: (
+      req: import("node:http").IncomingMessage,
+      key: string,
+      label: string
+    ) => void;
   }
 ) {
   return async function handleWalletRoute(
@@ -31,6 +38,108 @@ export function registerWalletRoutes(
     url: URL,
     ip: string
   ): Promise<boolean> {
+    if (req.method === "GET" && url.pathname === "/api/wallet/balance") {
+      handlers.rateLimit(ip, "public", handlers.publicLimit);
+      const wallet = url.searchParams.get("wallet")?.trim();
+      if (!wallet) {
+        handlers.sendJson(res, 400, { error: "wallet required" });
+        return true;
+      }
+      try {
+        const balance = await fetchWalletBalance(getAddress(wallet), walletConfig, db);
+        handlers.sendJson(res, 200, balance);
+      } catch (error) {
+        handlers.sendJson(res, 400, {
+          error: "balance_failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return true;
+    }
+
+    const accountMatch = url.pathname.match(/^\/api\/wallet\/accounts\/(0x[0-9a-fA-F]{40})$/);
+    if (req.method === "GET" && accountMatch) {
+      handlers.rateLimit(ip, "public", handlers.publicLimit);
+      const account = db.getWalletAccount(accountMatch[1]);
+      if (!account) {
+        handlers.sendJson(res, 404, { error: "account_not_found" });
+        return true;
+      }
+      handlers.sendJson(res, 200, { account });
+      return true;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/wallet/accounts") {
+      handlers.rateLimit(ip, "public", handlers.publicLimit);
+      const body = await handlers.readJson(req);
+      const ownerQx = normalizeHex32(str(body.ownerQx));
+      const ownerQy = normalizeHex32(str(body.ownerQy));
+      const salt = normalizeHex32(str(body.salt));
+      if (!ownerQx || !ownerQy) {
+        handlers.sendJson(res, 400, { error: "ownerQx, ownerQy required" });
+        return true;
+      }
+      const derivedSalt = salt ?? deriveWalletSalt(ownerQx, ownerQy);
+      if (!walletConfig.factoryAddress || !walletConfig.implementationAddress) {
+        handlers.sendJson(res, 503, { error: "wallet_factory_not_configured" });
+        return true;
+      }
+      const predicted = predictWalletAddress(
+        walletConfig.factoryAddress,
+        walletConfig.implementationAddress,
+        derivedSalt
+      );
+      const address = str(body.address)?.toLowerCase() ?? predicted.toLowerCase();
+      if (address !== predicted.toLowerCase()) {
+        handlers.sendJson(res, 400, { error: "address_mismatch", expected: predicted });
+        return true;
+      }
+      const attestation =
+        body.webauthnAttestation != null ? JSON.stringify(body.webauthnAttestation) : null;
+      const account = db.upsertWalletAccount({
+        address,
+        salt: derivedSalt,
+        ownerQx,
+        ownerQy,
+        credentialId: str(body.credentialId) || null,
+        webauthnAttestation: attestation,
+      });
+      handlers.sendJson(res, 201, { account });
+      return true;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/wallet/deployer/accounts") {
+      try {
+        handlers.requireApiKey(req, handlers.sweeperApiKey, "SWEEPER_API_KEY");
+      } catch {
+        handlers.sendJson(res, 401, { error: "unauthorized" });
+        return true;
+      }
+      const chainId = url.searchParams.get("chainId")?.trim() ?? walletConfig.chainId;
+      const accounts = db.listUndeployedWalletAccounts(chainId);
+      handlers.sendJson(res, 200, { accounts, chainId });
+      return true;
+    }
+
+    const deployedMatch = url.pathname.match(/^\/api\/wallet\/accounts\/(0x[0-9a-fA-F]{40})\/deployed$/);
+    if (req.method === "PATCH" && deployedMatch) {
+      try {
+        handlers.requireApiKey(req, handlers.sweeperApiKey, "SWEEPER_API_KEY");
+      } catch {
+        handlers.sendJson(res, 401, { error: "unauthorized" });
+        return true;
+      }
+      const body = await handlers.readJson(req);
+      const chainId = str(body.chainId) ?? walletConfig.chainId;
+      const account = db.markWalletDeployed(deployedMatch[1], chainId);
+      if (!account) {
+        handlers.sendJson(res, 404, { error: "account_not_found" });
+        return true;
+      }
+      handlers.sendJson(res, 200, { account });
+      return true;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/wallet/devices") {
       handlers.rateLimit(ip, "public", handlers.publicLimit);
       const wallet = url.searchParams.get("wallet")?.trim().toLowerCase();
@@ -270,3 +379,44 @@ function str(value: unknown): string | undefined {
 }
 
 export { PAIRING_TTL_MS };
+
+async function fetchWalletBalance(
+  wallet: string,
+  config: WalletConfig,
+  db: CommerceDb
+): Promise<WalletBalanceResponse> {
+  const chains = config.chains.length ? config.chains : [];
+  const account = db.getWalletAccount(wallet);
+  const results = await Promise.all(
+    chains.map(async (chain) => {
+      let balance = 0n;
+      let deployed = account?.deployedChains.includes(chain.chainId) ?? false;
+      if (chain.rpcUrl && chain.feeTokenAddress) {
+        try {
+          const provider = new JsonRpcProvider(chain.rpcUrl);
+          const code = await provider.getCode(wallet);
+          if (code !== "0x") deployed = true;
+          const token = new Contract(chain.feeTokenAddress, ERC20_ABI, provider);
+          balance = BigInt(await token.balanceOf(wallet));
+        } catch {
+          /* ignore RPC errors per chain */
+        }
+      }
+      return {
+        chainId: chain.chainId,
+        networkLabel: chain.networkLabel,
+        balance: balance.toString(),
+        balanceUsd: formatUsdFromUsdc(balance, chain.feeTokenDecimals),
+        deployed,
+        feeTokenSymbol: chain.feeTokenSymbol,
+      };
+    })
+  );
+  const totalUsdc = results.reduce((sum, c) => sum + BigInt(c.balance), 0n);
+  return {
+    wallet,
+    totalUsdc: totalUsdc.toString(),
+    totalUsd: formatUsdFromUsdc(totalUsdc, config.feeTokenDecimals),
+    chains: results,
+  };
+}

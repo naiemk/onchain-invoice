@@ -1,5 +1,6 @@
 import type { Locale } from "../locales.js";
 import type { Messages } from "./en.js";
+import { createPasskeyEn } from "./create-passkey-en.js";
 import { en } from "./en.js";
 import { ar } from "./ar.js";
 import { bn } from "./bn.js";
@@ -26,30 +27,36 @@ import { vi } from "./vi.js";
 import { zhHans } from "./zh-Hans.js";
 import { zhHant } from "./zh-Hant.js";
 
+function withPasskeyCreate(messages: Messages): Messages {
+  return { ...messages, create: { ...messages.create, ...createPasskeyEn } };
+}
+
+const withPasskey = (m: Messages) => withPasskeyCreate(m);
+
 export const dictionaries: Record<Locale, Messages> = {
-  en,
-  "zh-Hans": zhHans,
-  "zh-Hant": zhHant,
-  es,
-  ar,
-  hi,
-  "pt-BR": ptBR,
-  bn,
-  ru,
-  ja,
-  de,
-  fr,
-  id,
-  ko,
-  tr,
-  it,
-  vi,
-  th,
-  pl,
-  nl,
-  uk,
-  fa,
-  ms,
-  he,
-  ur,
+  en: withPasskey(en),
+  "zh-Hans": withPasskey(zhHans),
+  "zh-Hant": withPasskey(zhHant),
+  es: withPasskey(es),
+  ar: withPasskey(ar),
+  hi: withPasskey(hi),
+  "pt-BR": withPasskey(ptBR),
+  bn: withPasskey(bn),
+  ru: withPasskey(ru),
+  ja: withPasskey(ja),
+  de: withPasskey(de),
+  fr: withPasskey(fr),
+  id: withPasskey(id),
+  ko: withPasskey(ko),
+  tr: withPasskey(tr),
+  it: withPasskey(it),
+  vi: withPasskey(vi),
+  th: withPasskey(th),
+  pl: withPasskey(pl),
+  nl: withPasskey(nl),
+  uk: withPasskey(uk),
+  fa: withPasskey(fa),
+  ms: withPasskey(ms),
+  he: withPasskey(he),
+  ur: withPasskey(ur),
 };
