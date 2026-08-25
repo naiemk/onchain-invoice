@@ -1,6 +1,6 @@
 import { encodePayLink, payPath } from "../shared/invoice.js";
 import { copyText, escapeHtml } from "../shared/dom.js";
-import { localizeError } from "../i18n/errors.js";
+import { localizeError, localizeOnrampQuoteError } from "../i18n/errors.js";
 import { LOCALES, LOCALE_NATIVE_NAMES } from "../i18n/locales.js";
 import { t } from "../i18n/t.js";
 import { createCounterfactualWallet } from "../shared/wallet-create.js";
@@ -673,11 +673,18 @@ async function refreshFiatQuote(root: HTMLElement): Promise<void> {
     const res = await fetch(apiUrl(`/api/public/onramp-quote?${params}`));
     const body = (await res.json()) as OnrampQuoteResponse & {
       error?: string;
+      code?: string;
+      fiat?: string;
+      minAmount?: number;
+      maxAmount?: number;
       chainId?: string;
       token?: string;
       demo?: boolean;
     };
-    if (!res.ok) throw new Error(body.error ?? t("create.quoteError"));
+    if (!res.ok) {
+      const localized = localizeOnrampQuoteError(body);
+      throw new Error(localized ?? body.error ?? t("create.quoteError"));
+    }
     const settleToken = body.token ?? "USDC";
     const recommended = body.recommended ?? {
       provider: body.quotes?.[0]?.provider ?? "demo",

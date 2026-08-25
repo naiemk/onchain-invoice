@@ -1,6 +1,7 @@
 import type { Locale } from "../locales.js";
 import type { Messages } from "./en.js";
 import { createPasskeyEn } from "./create-passkey-en.js";
+import { onrampErrorsEn } from "./onramp-errors-en.js";
 import { en } from "./en.js";
 import { ar } from "./ar.js";
 import { bn } from "./bn.js";
@@ -28,7 +29,11 @@ import { zhHans } from "./zh-Hans.js";
 import { zhHant } from "./zh-Hant.js";
 
 function withPasskeyCreate(messages: Messages): Messages {
-  return { ...messages, create: { ...messages.create, ...createPasskeyEn } };
+  return {
+    ...messages,
+    create: { ...messages.create, ...createPasskeyEn },
+    errors: { ...messages.errors, ...onrampErrorsEn },
+  };
 }
 
 const withPasskey = (m: Messages) => withPasskeyCreate(m);

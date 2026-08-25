@@ -40,6 +40,36 @@ export interface OnrampPaymentMethod {
   pairs?: Array<{ chainId: string; token: string }>;
 }
 
+/** Stable codes for UI/i18n — English `message` is a fallback only. */
+export type OnrampQuoteErrorCode =
+  | "onramp_limit_mismatch"
+  | "onramp_no_payment_method"
+  | "onramp_quote_unavailable"
+  | "onramp_provider_unavailable";
+
+export interface OnrampQuoteErrorDetails {
+  code: OnrampQuoteErrorCode;
+  message: string;
+  statusCode: number;
+  fiat?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  errorId?: number;
+  type?: string;
+}
+
+export function throwOnrampQuoteError(details: OnrampQuoteErrorDetails): never {
+  throw Object.assign(new Error(details.message), {
+    statusCode: details.statusCode,
+    code: details.code,
+    fiat: details.fiat,
+    minAmount: details.minAmount,
+    maxAmount: details.maxAmount,
+    errorId: details.errorId,
+    type: details.type,
+  });
+}
+
 const CACHE_MS = 30_000;
 const quoteCache = new Map<string, { expires: number; value: OnrampQuoteResult }>();
 const methodsCache = new Map<string, { expires: number; value: OnrampPaymentMethod[] }>();
@@ -177,6 +207,110 @@ interface RawOnramperQuote {
   errors?: unknown[];
   recommendations?: string[];
   quoteId?: string;
+  availablePaymentMethods?: Array<{
+    paymentTypeId?: string;
+    details?: { limits?: Record<string, { min?: number; max?: number }> };
+  }>;
+}
+
+interface RawOnramperError {
+  type?: string;
+  errorId?: number;
+  message?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  name?: string;
+}
+
+function asRawError(value: unknown): RawOnramperError | null {
+  if (!value || typeof value !== "object") return null;
+  return value as RawOnramperError;
+}
+
+function limitsFromAvailableMethods(
+  raw: RawOnramperQuote,
+  paymentMethod: string
+): { minAmount?: number; maxAmount?: number } {
+  const methods = raw.availablePaymentMethods ?? [];
+  const match =
+    methods.find((m) => (m.paymentTypeId ?? "").toLowerCase() === paymentMethod.toLowerCase()) ??
+    methods[0];
+  const limits = match?.details?.limits;
+  if (!limits) return {};
+  const aggregated = limits.aggregatedLimit ?? Object.values(limits)[0];
+  if (!aggregated) return {};
+  return {
+    minAmount: typeof aggregated.min === "number" ? aggregated.min : undefined,
+    maxAmount: typeof aggregated.max === "number" ? aggregated.max : undefined,
+  };
+}
+
+/** Prefer LimitMismatch; otherwise first typed/message error from a failed quote list. */
+export function extractOnrampQuoteFailure(
+  data: unknown,
+  fiat: string,
+  paymentMethod: string
+): OnrampQuoteErrorDetails | null {
+  const list = Array.isArray(data) ? (data as RawOnramperQuote[]) : [];
+  const failures: OnrampQuoteErrorDetails[] = [];
+  for (const item of list) {
+    const errors = Array.isArray(item.errors) ? item.errors : [];
+    for (const err of errors) {
+      const raw = asRawError(err);
+      if (!raw) continue;
+      const type = raw.type ?? "";
+      const message = (raw.message ?? "").trim();
+      const fromMethods = limitsFromAvailableMethods(item, paymentMethod);
+      const minAmount = typeof raw.minAmount === "number" ? raw.minAmount : fromMethods.minAmount;
+      const maxAmount = typeof raw.maxAmount === "number" ? raw.maxAmount : fromMethods.maxAmount;
+      if (type === "LimitMismatch" || message.toLowerCase().includes("amount should be in between")) {
+        failures.push({
+          code: "onramp_limit_mismatch",
+          message:
+            message ||
+            (minAmount != null && maxAmount != null
+              ? `Amount should be in between ${fiat} ${minAmount} and ${fiat} ${maxAmount}`
+              : `Amount is outside Onramper limits for ${fiat}`),
+          statusCode: 400,
+          fiat,
+          minAmount,
+          maxAmount,
+          errorId: raw.errorId,
+          type: type || "LimitMismatch",
+        });
+        continue;
+      }
+      if (
+        type === "NoSupportedPayments" ||
+        message.toLowerCase().includes("no supported payments")
+      ) {
+        failures.push({
+          code: "onramp_no_payment_method",
+          message: message || `No supported payment methods for ${fiat}`,
+          statusCode: 400,
+          fiat,
+          errorId: raw.errorId,
+          type: type || "NoSupportedPayments",
+        });
+        continue;
+      }
+      if (message) {
+        failures.push({
+          code: "onramp_quote_unavailable",
+          message,
+          statusCode: 502,
+          fiat,
+          errorId: raw.errorId,
+          type: type || undefined,
+        });
+      }
+    }
+  }
+  const limit = failures.find((f) => f.code === "onramp_limit_mismatch");
+  if (limit) return limit;
+  const noPay = failures.find((f) => f.code === "onramp_no_payment_method");
+  if (noPay && failures.every((f) => f.code === "onramp_no_payment_method")) return noPay;
+  return failures[0] ?? null;
 }
 
 function rowFromRaw(
@@ -241,15 +375,24 @@ function parseQuoteResponse(
     if (row) rows.push(row);
   }
   if (rows.length === 0) {
-    throw Object.assign(new Error("No Onramper quotes available for this pair"), { statusCode: 502 });
+    const failure = extractOnrampQuoteFailure(data, fiat, paymentMethod);
+    if (failure) throwOnrampQuoteError(failure);
+    throwOnrampQuoteError({
+      code: "onramp_quote_unavailable",
+      message: "No Onramper quotes available for this pair",
+      statusCode: 502,
+      fiat,
+    });
   }
   if (preferredProvider) {
     const match = rows.find((r) => r.provider.toLowerCase() === preferredProvider.toLowerCase());
     if (!match) {
-      throw Object.assign(
-        new Error(`Onramper provider "${preferredProvider}" is not available for this quote`),
-        { statusCode: 502 }
-      );
+      throwOnrampQuoteError({
+        code: "onramp_provider_unavailable",
+        message: `Onramper provider "${preferredProvider}" is not available for this quote`,
+        statusCode: 502,
+        fiat,
+      });
     }
   }
   const recommended = pickRecommended(rows, preferredProvider);
@@ -468,6 +611,7 @@ export async function fetchOnrampQuoteAcrossPairs(options: {
   fetchImpl?: typeof fetch;
 }): Promise<OnrampQuoteResult> {
   const errors: string[] = [];
+  const structured: OnrampQuoteErrorDetails[] = [];
   for (const pair of options.pairs) {
     if (!resolveOnramperAsset(pair.chainId, pair.token)) continue;
     try {
@@ -483,19 +627,51 @@ export async function fetchOnrampQuoteAcrossPairs(options: {
         quotes: quote.quotes.map((q) => q),
       };
     } catch (error) {
+      const details = onrampErrorDetails(error);
+      if (details) structured.push(details);
       errors.push(
         `${pair.chainId}/${pair.token}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
-  throw Object.assign(
-    new Error(
-      errors.length
-        ? `No Onramper quotes available (${errors.slice(0, 3).join("; ")})`
-        : "No Onramper quotes available for the selected pairs"
-    ),
-    { statusCode: 502 }
-  );
+  const limit = structured.find((e) => e.code === "onramp_limit_mismatch");
+  if (limit) throwOnrampQuoteError(limit);
+  const noPay = structured.find((e) => e.code === "onramp_no_payment_method");
+  if (noPay && structured.every((e) => e.code === "onramp_no_payment_method")) {
+    throwOnrampQuoteError(noPay);
+  }
+  throwOnrampQuoteError({
+    code: "onramp_quote_unavailable",
+    message: errors.length
+      ? `No Onramper quotes available (${errors.slice(0, 3).join("; ")})`
+      : "No Onramper quotes available for the selected pairs",
+    statusCode: 502,
+    fiat: options.fiat.trim().toUpperCase(),
+  });
+}
+
+export function onrampErrorDetails(error: unknown): OnrampQuoteErrorDetails | null {
+  if (!error || typeof error !== "object") return null;
+  const e = error as Partial<OnrampQuoteErrorDetails> & { message?: string };
+  if (!e.code || typeof e.code !== "string") return null;
+  if (
+    e.code !== "onramp_limit_mismatch" &&
+    e.code !== "onramp_no_payment_method" &&
+    e.code !== "onramp_quote_unavailable" &&
+    e.code !== "onramp_provider_unavailable"
+  ) {
+    return null;
+  }
+  return {
+    code: e.code,
+    message: e.message ?? "Onramper quote failed",
+    statusCode: typeof e.statusCode === "number" ? e.statusCode : 502,
+    fiat: e.fiat,
+    minAmount: e.minAmount,
+    maxAmount: e.maxAmount,
+    errorId: e.errorId,
+    type: e.type,
+  };
 }
 
 export async function fetchOnrampPaymentMethods(options: {

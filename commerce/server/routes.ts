@@ -40,6 +40,7 @@ import {
   fetchOnrampQuote,
   fetchOnrampQuoteAcrossPairs,
   isSettlementWithinSlippage,
+  onrampErrorDetails,
   parseSlippageBps,
   settlementAmountFromQuote,
   settlementDriftBps,
@@ -378,6 +379,19 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
           liveSettlement: e.liveSettlement,
           slippageBps: e.slippageBps,
           driftBps: e.driftBps,
+        });
+        return;
+      }
+      const onramp = onrampErrorDetails(error);
+      if (onramp) {
+        sendJson(res, onramp.statusCode, {
+          error: onramp.message,
+          code: onramp.code,
+          fiat: onramp.fiat,
+          minAmount: onramp.minAmount,
+          maxAmount: onramp.maxAmount,
+          errorId: onramp.errorId,
+          type: onramp.type,
         });
         return;
       }

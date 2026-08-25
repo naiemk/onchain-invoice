@@ -6,6 +6,7 @@
  */
 import { walletEn } from "./wallet-en.js";
 import { createPasskeyEn } from "./create-passkey-en.js";
+import { onrampErrorsEn } from "./onramp-errors-en.js";
 
 export const en = {
   brand: "Trustless Commerce",
@@ -115,6 +116,7 @@ export const en = {
     invoiceNotFoundStatus: "Invoice not found ({status})",
     createFailed: "Create failed",
     fillRequired: "Fill required fields first.",
+    ...onrampErrorsEn,
   },
 
   home: {
