@@ -92,6 +92,10 @@ function paintDashboard(
           <a class="tc-btn" href="/wallet/send" data-route>${escapeHtml(t("wallet.sendTitle"))}</a>
           <a class="tc-btn secondary" href="/wallet/receive" data-route>${escapeHtml(t("wallet.receiveTitle"))}</a>
         </div>
+        <div class="cta-row wallet-actions wallet-actions-fiat">
+          <a class="tc-btn secondary" href="/wallet/deposit" data-route>${escapeHtml(t("wallet.depositCta"))}</a>
+          <a class="tc-btn secondary" href="/wallet/withdraw" data-route>${escapeHtml(t("wallet.withdrawCta"))}</a>
+        </div>
         <p class="wallet-device-status">
           <span class="wallet-device-status-label">${escapeHtml(t("wallet.thisDeviceChip"))}</span>
           <a href="/wallet/security" data-route>${escapeHtml(t("wallet.manageDevices"))}</a>

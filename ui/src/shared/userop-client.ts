@@ -21,9 +21,16 @@ export async function buildSignedSendUserOp(input: {
   sendAmount: bigint;
   feeAmount: bigint;
   credentialId?: string;
+  /** Override primary chain (e.g. BNB for USDT cashout). */
+  chainId?: string;
+  /** ERC-20 to send; defaults to chain fee token. */
+  sendTokenAddress?: string;
 }): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
   const { config, walletAddress, recipient, sendAmount, feeAmount } = input;
-  const chain = primaryChain(config);
+  const chain =
+    input.chainId != null
+      ? config.chains.find((c) => c.chainId === input.chainId) ?? primaryChain(config)
+      : primaryChain(config);
   if (!chain.feeTokenAddress || !config.bundlerBeneficiary) {
     throw new Error("Bundler fee not configured");
   }
@@ -38,6 +45,7 @@ export async function buildSignedSendUserOp(input: {
       feeAmount,
       recipient,
       sendAmount,
+      sendToken: input.sendTokenAddress ?? chain.feeTokenAddress,
     })
   );
   const unsigned = buildPackedUserOperation({ sender: walletAddress, nonce, callData });
@@ -116,9 +124,10 @@ export async function submitSignedUserOp(input: {
   userOp: PackedUserOperationJson;
   userOpHash: string;
   walletAddress: string;
+  chainId?: string;
 }): Promise<void> {
   await submitUserOp({
-    chainId: input.config.chainId,
+    chainId: input.chainId ?? input.config.chainId,
     walletAddress: input.walletAddress,
     userOp: input.userOp,
     userOpHash: input.userOpHash,

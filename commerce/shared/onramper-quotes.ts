@@ -3,7 +3,7 @@
  * @see https://docs.onramper.com/reference/get_quotes-fiat-crypto
  */
 
-import { isOnramperSandboxOrigin, resolveOnramperAsset } from "./onramper.js";
+import { isOnramperSandboxOrigin, resolveOnramperAsset } from "./onramper-assets.js";
 
 export type QuoteDirection = "receive" | "pay";
 

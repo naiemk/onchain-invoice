@@ -228,9 +228,82 @@ export async function waitForUserOp(userOpHash: string, timeoutMs = 120_000): Pr
 export function primaryChain(config: WalletPublicConfig) {
   const chain = config.chains?.find((c) => c.chainId === config.chainId) ?? config.chains?.[0];
   return {
+    chainId: chain?.chainId ?? config.chainId,
     rpcUrl: chain?.rpcUrl ?? config.rpcUrl,
     feeTokenAddress: chain?.feeTokenAddress ?? config.feeTokenAddress,
     feeTokenSymbol: chain?.feeTokenSymbol ?? config.feeTokenSymbol,
     feeTokenDecimals: chain?.feeTokenDecimals ?? config.feeTokenDecimals,
+    stableTokens: chain?.stableTokens,
   };
+}
+
+export interface WalletOnramperSessionResponse {
+  widgetUrl: string;
+  expiresAt: string;
+  fiat: string;
+  demo?: boolean;
+  assets?: Array<{ chainId: string; token: string; cryptoId: string; networkId: string }>;
+}
+
+export async function createWalletOnrampSession(input: {
+  walletAddress: string;
+  fiat?: string;
+  theme?: "light" | "dark";
+  amount?: string;
+}): Promise<WalletOnramperSessionResponse> {
+  const res = await fetch(apiUrl("/api/wallet/onramp-session"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await res.json().catch(() => ({}))) as WalletOnramperSessionResponse & {
+    error?: string;
+  };
+  if (!res.ok || !body.widgetUrl) {
+    throw new Error(body.error ?? "Failed to start deposit checkout");
+  }
+  return body;
+}
+
+export async function createWalletOfframpSession(input: {
+  walletAddress: string;
+  fiat?: string;
+  theme?: "light" | "dark";
+  maxAvailableCrypto?: string;
+}): Promise<WalletOnramperSessionResponse> {
+  const res = await fetch(apiUrl("/api/wallet/offramp-session"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await res.json().catch(() => ({}))) as WalletOnramperSessionResponse & {
+    error?: string;
+  };
+  if (!res.ok || !body.widgetUrl) {
+    throw new Error(body.error ?? "Failed to start cash-out checkout");
+  }
+  return body;
+}
+
+export async function confirmWalletOfframp(input: {
+  walletAddress: string;
+  transactionId: string;
+  transactionHash: string;
+  targetAddress: string;
+  sourceCurrency?: string;
+}): Promise<{ ok: boolean; status?: string }> {
+  const res = await fetch(apiUrl("/api/wallet/offramp/confirm"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    status?: string;
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(body.error ?? "Failed to confirm cash-out");
+  }
+  return { ok: true, status: body.status };
 }

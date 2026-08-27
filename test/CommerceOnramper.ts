@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { createHmac, generateKeyPairSync } from "node:crypto";
-import { getAddress, Wallet } from "ethers";
+import { getAddress, Wallet, zeroPadValue } from "ethers";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,12 +8,16 @@ import { createApp } from "../commerce/server/app.js";
 import { loadConfig } from "../commerce/server/config.js";
 import {
   buildOnrampWidgetSession,
+  buildOnramperWidgetSession,
   isOnramperSandboxOrigin,
+  listOnramperEvmWalletAssets,
   ONRAMPER_SUPPORTED_PAIRS,
   resolveOnramperAsset,
+  resolveProductAssetFromOnramperCryptoId,
   signWidgetUrlV1,
 } from "../commerce/shared/onramper.js";
 import { clearOnrampQuoteCaches } from "../commerce/shared/onramper-quotes.js";
+import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
 
 const { privateKey } = generateKeyPairSync("ed25519");
 const SIGNING_KEY_PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
@@ -946,5 +950,123 @@ describe("commerce Onramper / fiat invoices", function () {
       expect(Number(body.minSettlement)).to.be.lessThan(25);
       expect(Number(body.maxSettlement)).to.be.greaterThan(25);
     });
+  });
+
+  it("lists EVM wallet assets including USDT on BNB and reverses crypto ids", function () {
+    const assets = listOnramperEvmWalletAssets(["8453", "56", "11155111"]);
+    expect(assets.some((a) => a.cryptoId === "usdc_base")).to.equal(true);
+    expect(assets.some((a) => a.cryptoId === "usdt_bsc")).to.equal(true);
+    expect(assets.some((a) => a.networkId === "tron")).to.equal(false);
+    expect(resolveProductAssetFromOnramperCryptoId("usdt_bsc")).to.deep.equal({
+      chainId: "56",
+      token: "USDT",
+    });
+  });
+
+  it("builds buy sessions for wallet destinations with multi-asset locks", function () {
+    const assets = listOnramperEvmWalletAssets(["8453", "56"]);
+    const session = buildOnramperWidgetSession({
+      apiKey: API_KEY,
+      signingKeyPem: SIGNING_KEY_PEM,
+      widgetOrigin: "https://buy.onramper.com",
+      mode: "buy",
+      partnerContext: "wallet:0x1111111111111111111111111111111111111111",
+      walletAddress: "0x1111111111111111111111111111111111111111",
+      assets,
+      fiat: "USD",
+      defaultAmount: "40",
+    });
+    const url = new URL(session.widgetUrl);
+    expect(url.searchParams.get("mode")).to.equal("buy");
+    expect(url.searchParams.get("defaultAmount")).to.equal("40");
+    expect(url.searchParams.get("onlyCryptos")).to.include("usdc_base");
+    expect(url.searchParams.get("onlyCryptos")).to.include("usdt_bsc");
+    expect(url.searchParams.get("wallets")).to.include("usdc_base:0x1111111111111111111111111111111111111111");
+  });
+
+  it("builds sell sessions with cashout redirect and max crypto", function () {
+    const assets = listOnramperEvmWalletAssets(["8453"]);
+    const session = buildOnramperWidgetSession({
+      apiKey: API_KEY,
+      signingKeyPem: SIGNING_KEY_PEM,
+      widgetOrigin: "https://buy.onramper.com",
+      mode: "sell",
+      partnerContext: "wallet:0x2222222222222222222222222222222222222222",
+      walletAddress: "0x2222222222222222222222222222222222222222",
+      assets,
+      fiat: "EUR",
+      offrampCashoutRedirectUrl: "https://app.example/wallet/offramp/cashout",
+      maxAvailableCrypto: "12.5",
+    });
+    const url = new URL(session.widgetUrl);
+    expect(url.searchParams.get("mode")).to.equal("sell");
+    expect(url.searchParams.get("sell_defaultCrypto")).to.equal("usdc_base");
+    expect(url.searchParams.get("sell_maxAvailableCrypto")).to.equal("12.5");
+    expect(url.searchParams.get("offrampCashoutRedirectUrl")).to.equal(
+      "https://app.example/wallet/offramp/cashout"
+    );
+  });
+
+  it("returns demo wallet onramp/offramp sessions for registered wallets", async function () {
+    const factory = "0x2b245a20589c745B11F8a69C677F891e8175a550";
+    const impl = "0x297CF0F47e9f6dAd3903694dE531abaD83CE8AAA";
+    const qx = zeroPadValue("0x0a", 32);
+    const qy = zeroPadValue("0x0b", 32);
+    const salt = deriveWalletSalt(qx, qy);
+    const walletAddress = predictWalletAddress(factory, impl, salt);
+
+    await withApp(
+      {
+        ONRAMPER_ENABLED: "1",
+        WALLET_FACTORY_ADDRESS: factory,
+        WALLET_IMPLEMENTATION_ADDRESS: impl,
+        WALLET_RECOVERY_ADDRESS: "0x87CB1c5eD04959A51A7CACe8eA2787791F9cE347",
+      },
+      async (baseUrl) => {
+        const reg = await fetch(`${baseUrl}/api/wallet/accounts`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            address: walletAddress,
+            salt,
+            ownerQx: qx,
+            ownerQy: qy,
+            credentialId: "cred-onramp-wallet",
+          }),
+        });
+        expect(reg.status).to.equal(201);
+
+        const missing = await fetch(`${baseUrl}/api/wallet/onramp-session`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            walletAddress: "0x1111111111111111111111111111111111111111",
+            fiat: "USD",
+          }),
+        });
+        expect(missing.status).to.equal(400);
+
+        const onramp = await fetch(`${baseUrl}/api/wallet/onramp-session`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ walletAddress, fiat: "USD" }),
+        });
+        expect(onramp.status).to.equal(200);
+        const onrampBody = (await onramp.json()) as { widgetUrl?: string; demo?: boolean };
+        expect(onrampBody.demo).to.equal(true);
+        expect(onrampBody.widgetUrl).to.include("/api/public/onramp-demo");
+        expect(onrampBody.widgetUrl).to.include("walletAddress");
+
+        const offramp = await fetch(`${baseUrl}/api/wallet/offramp-session`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ walletAddress, fiat: "EUR" }),
+        });
+        expect(offramp.status).to.equal(200);
+        const offrampBody = (await offramp.json()) as { widgetUrl?: string; demo?: boolean };
+        expect(offrampBody.demo).to.equal(true);
+        expect(offrampBody.widgetUrl).to.include("mode=sell");
+      }
+    );
   });
 });
