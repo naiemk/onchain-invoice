@@ -25,6 +25,6 @@ export const createWizardEn = {
   chromeMinimal: "Minimal",
   chromeNone: "None",
   iframeLabel: "Embed iframe HTML",
-  iframeHint: "Uses header=none so the checkout fits inside an iframe.",
+  iframeHint: "Embeddable checkout (no site header/footer). Includes header=none.",
   iframeCopied: "Iframe HTML copied.",
 };

@@ -193,7 +193,7 @@ Full docs: https://naiemk.github.io/onchain-invoice/invoice-types/ and https://n
 /pay?price=10&to=T…&chains=nile&tokens=USDT&title=Order&allow_partial=0
 ```
 
-Optional chrome: `header=full` (default) | `minimal` | `none`. Use `none` inside an iframe:
+Optional chrome: `header=full` (default) | `minimal` | `none`. Use `none` inside an iframe (or omit `header` — embedded `/pay` defaults to no chrome). Gateways allow cross-origin framing of `/pay` only:
 
 ```html
 <iframe src="https://your.host/pay?price=10&to=0x…&chains=11155111&tokens=USDC&header=none"

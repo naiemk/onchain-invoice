@@ -22,9 +22,13 @@ Optional query param on shareable `/pay` links (UI only — not sent to `POST /a
 
 | Value | Effect |
 |-------|--------|
-| `full` (default) | Full Trustless Commerce header and footer |
+| `full` (default top-level) | Full Trustless Commerce header and footer |
 | `minimal` | Brand + locale/theme; thin footer |
 | `none` | No chrome — for iframes |
+
+When `/pay` is loaded inside an iframe, chrome defaults to `none` even if `header` is omitted. Set `header=full` or `header=minimal` to force chrome inside an embed.
+
+Cross-origin embedding is allowed for `/pay` only (`Content-Security-Policy: frame-ancestors *`). Other UI routes stay non-embeddable.
 
 ```html
 <iframe
