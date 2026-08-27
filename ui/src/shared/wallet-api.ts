@@ -146,6 +146,26 @@ export async function pollPairing(nonce: string) {
   };
 }
 
+export async function consumePairing(nonce: string) {
+  const res = await fetch(apiUrl("/api/wallet/pairing"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "consume", nonce }),
+  });
+  if (!res.ok) throw new Error("pairing consume failed");
+  return (await res.json()) as { pairing: { status: string } };
+}
+
+export async function rejectPairing(nonce: string) {
+  const res = await fetch(apiUrl("/api/wallet/pairing"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "reject", nonce }),
+  });
+  if (!res.ok) throw new Error("pairing reject failed");
+  return (await res.json()) as { pairing: { status: string } };
+}
+
 export function pairingQrPayload(input: {
   walletAddress: string;
   chainId: string;
