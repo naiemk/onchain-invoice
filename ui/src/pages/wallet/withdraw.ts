@@ -15,6 +15,7 @@ import {
 } from "../../shared/wallet-api.js";
 import {
   bindWalletAccountBar,
+  formatWalletAvailable,
   showStatus,
   walletFrame,
   walletLoadingFrame,
@@ -73,9 +74,7 @@ export async function renderWalletWithdraw(root: HTMLElement): Promise<void> {
     title: t("wallet.withdrawTitle"),
     lede: t("wallet.withdrawLede"),
     body: `
-      <p class="wallet-balance-total">${escapeHtml(
-        t("wallet.sendAvailable", { amount: maxAvailable, symbol: t("wallet.usd") })
-      )}</p>
+      <p class="wallet-available">${formatWalletAvailable(maxAvailable)}</p>
       <div class="field">
         <label for="wallet-withdraw-fiat">${escapeHtml(t("wallet.withdrawFiatLabel"))}</label>
         <select id="wallet-withdraw-fiat">${fiats

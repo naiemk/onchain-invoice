@@ -17,6 +17,7 @@ import { parseUsdcInput } from "../../../../commerce/shared/userop.js";
 import {
   bindWalletAccountBar,
   chainBalanceRows,
+  formatWalletAvailable,
   setButtonLoading,
   showStatus,
   walletFrame,
@@ -60,7 +61,7 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
     current: "send",
     title: t("wallet.sendTitle"),
     body: `
-      <p class="wallet-balance-total">${escapeHtml(t("wallet.sendAvailable", { amount: balance.totalUsd, symbol: t("wallet.usd") }))}</p>
+      <p class="wallet-available">${formatWalletAvailable(balance.totalUsd)}</p>
       ${chainBalanceRows(balance.chains)}
       ${
         !deployedOnPrimary
