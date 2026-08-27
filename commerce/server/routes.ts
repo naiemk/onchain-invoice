@@ -33,6 +33,7 @@ import {
   parsePaymentMode,
   paymentModeAllowsFiat,
   verifyOnramperWebhookSignature,
+  walletStableTokensForChain,
 } from "../shared/onramper.js";
 import {
   fetchOnrampPaymentMethods,
@@ -65,7 +66,7 @@ interface RouteContext {
 }
 
 export function createRouter(context: RouteContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
-  const handleWalletRoute = registerWalletRoutes(context.db, context.config.wallet, {
+  const handleWalletRoute = registerWalletRoutes(context.db, context.config, {
     sendJson,
     readJson,
     sweeperApiKey: context.config.sweeperApiKey,
@@ -173,6 +174,7 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
             feeTokenSymbol: c.feeTokenSymbol,
             feeTokenDecimals: c.feeTokenDecimals,
             networkLabel: c.networkLabel,
+            stableTokens: walletStableTokensForChain(c),
           })),
         });
         return;
@@ -1422,12 +1424,20 @@ function sendOnrampDemoHtml(res: ServerResponse, url: URL): void {
   const token = escapeHtmlAttr(url.searchParams.get("token") ?? "USDC");
   const chainId = escapeHtmlAttr(url.searchParams.get("chainId") ?? "");
   const invoiceId = escapeHtmlAttr(url.searchParams.get("invoiceId") ?? "");
+  const walletAddress = escapeHtmlAttr(url.searchParams.get("walletAddress") ?? "");
+  const mode = escapeHtmlAttr(url.searchParams.get("mode") ?? "buy");
+  const isWallet = Boolean(walletAddress);
+  const title = mode === "sell" ? "Sandbox cash-out" : "Sandbox card checkout";
+  const headline = mode === "sell" ? "Sell crypto to bank or card" : "Card or bank checkout";
+  const destLine = isWallet
+    ? `<p>Funds go to wallet <code>${walletAddress}</code> (no invoice sweep).</p>`
+    : `<p>Invoice <code>${invoiceId}</code></p>`;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sandbox card checkout</title>
+  <title>${title}</title>
   <style>
     :root { color-scheme: light; font-family: system-ui, sans-serif; }
     body { margin: 0; padding: 1.5rem; background: #f6f9fc; color: #0a2540; }
@@ -1442,11 +1452,11 @@ function sendOnrampDemoHtml(res: ServerResponse, url: URL): void {
 <body>
   <div class="panel">
     <span class="badge">Sandbox demo</span>
-    <h1>Card or bank checkout</h1>
-    <p class="amount">$${price} · ${fiat}</p>
-    <p>Settles as <strong>${token}</strong> on chain <code>${chainId}</code>.</p>
+    <h1>${headline}</h1>
+    ${price ? `<p class="amount">$${price} · ${fiat}</p>` : `<p class="amount">${fiat}</p>`}
+    <p>Stablecoins <strong>${token}</strong> on chain(s) <code>${chainId}</code>.</p>
     <p>This is a local stub — no real card charge and no on-chain funding. On mainnet, set Onramper API + signing keys to load the live widget.</p>
-    <p>Invoice <code>${invoiceId}</code></p>
+    ${destLine}
   </div>
 </body>
 </html>`;

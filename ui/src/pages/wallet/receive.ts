@@ -28,6 +28,9 @@ export async function renderWalletReceive(root: HTMLElement): Promise<void> {
         <p class="eyebrow">${escapeHtml(t("wallet.yourAddress"))}</p>
         ${addressBox(session.address, "wallet-receive-address")}
         <p class="field-hint">${escapeHtml(t("wallet.receiveSameAddress"))}</p>
+        <div class="cta-row">
+          <a class="tc-btn secondary" href="/wallet/deposit" data-route>${escapeHtml(t("wallet.depositCta"))}</a>
+        </div>
       </div>`,
   });
   bindWalletAccountBar(root);

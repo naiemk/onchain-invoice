@@ -26,6 +26,11 @@ import type {
   PayLinkFields,
 } from "../shared/types.js";
 import { apiUrl } from "../shared/site.js";
+import {
+  currentUiTheme,
+  FIAT_LABELS,
+  mountOnramperIframe,
+} from "../shared/onramper-iframe.js";
 
 const ACTIVATION_KEY = (invoiceId: string) => `tc.activation.${invoiceId}`;
 const CHECKOUT_KEY = (fingerprint: string) => `tc.checkout.${fingerprint}`;
@@ -591,25 +596,6 @@ function attachOnramperHeadlineListener(
   window.addEventListener("message", handler);
 }
 
-function currentUiTheme(): "light" | "dark" {
-  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-}
-
-const FIAT_LABELS: Record<string, string> = {
-  USD: "US Dollar",
-  EUR: "Euro",
-  GBP: "British pound",
-  SEK: "Swedish krona",
-  NOK: "Norwegian krone",
-  DKK: "Danish krone",
-  CHF: "Swiss franc",
-  CAD: "Canadian dollar",
-  AUD: "Australian dollar",
-  JPY: "Japanese yen",
-  PLN: "Polish złoty",
-  CZK: "Czech koruna",
-};
-
 async function mountFaucetPanel(
   root: HTMLElement,
   invoiceId: string,
@@ -795,19 +781,7 @@ async function mountOnrampPanel(
         throw new Error(body.error ?? t("pay.checkoutFailed"));
       }
       if (host) {
-        const iframe = document.createElement("iframe");
-        iframe.className = "onramp-iframe";
-        iframe.title = t("pay.onrampIframeTitle");
-        iframe.allow = "accelerometer; autoplay; camera; gyroscope; payment; microphone; clipboard-write";
-        if (isSameOriginWidgetUrl(body.widgetUrl)) {
-          const demo = await fetch(body.widgetUrl);
-          if (!demo.ok) throw new Error(t("pay.checkoutFailed"));
-          iframe.srcdoc = await demo.text();
-        } else {
-          iframe.src = body.widgetUrl;
-          iframe.loading = "lazy";
-        }
-        host.replaceChildren(iframe);
+        await mountOnramperIframe(host, body.widgetUrl, t("pay.onrampIframeTitle"));
       }
     } catch (error) {
       if (host) host.hidden = !lockedDisplayFiat;
@@ -1074,13 +1048,4 @@ function short(value: string): string {
 function maskMerchant(address: string): string {
   if (!address || address.length < 10) return address;
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
-}
-
-function isSameOriginWidgetUrl(url: string): boolean {
-  if (url.startsWith("/")) return true;
-  try {
-    return new URL(url, window.location.href).origin === window.location.origin;
-  } catch {
-    return false;
-  }
 }

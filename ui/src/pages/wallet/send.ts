@@ -80,6 +80,7 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
         <div><dt>${escapeHtml(t("wallet.sendTotal"))}</dt><dd id="send-total">${escapeHtml(config.bundlerFeeUsd)}</dd></div>
       </dl>
       <button type="button" class="tc-btn" id="send-submit" ${!deployedOnPrimary ? "disabled" : ""}>${escapeHtml(t("wallet.sendConfirm"))}</button>
+      <p class="field-hint"><a href="/wallet/withdraw" data-route>${escapeHtml(t("wallet.withdrawCta"))}</a></p>
       <p id="send-status" class="status wallet-status" role="status"></p>`,
   });
   bindWalletAccountBar(root);

@@ -1,5 +1,5 @@
-import { Contract, JsonRpcProvider, getAddress } from "ethers";
-import type { WalletConfig } from "./config.js";
+import { Contract, JsonRpcProvider, getAddress, isAddress } from "ethers";
+import type { AppConfig, WalletConfig } from "./config.js";
 import type { WalletDeviceRecord, WalletBalanceResponse } from "../shared/wallet.js";
 import type { PackedUserOperationJson } from "../shared/userop.js";
 import {
@@ -11,13 +11,20 @@ import {
 } from "../shared/userop.js";
 import { validateUserOpFee } from "../shared/userop-fee.js";
 import { deriveWalletSalt, predictWalletAddress } from "../shared/wallet-address.js";
+import {
+  buildOnramperWidgetSession,
+  listOnramperEvmWalletAssets,
+  resolveEvmStableTokenAddress,
+  resolveProductAssetFromOnramperCryptoId,
+} from "../shared/onramper.js";
+import { confirmOnramperOfframpTransaction } from "../shared/onramper-confirm.js";
 import type { CommerceDb } from "./db.js";
 
 const PAIRING_TTL_MS = 5 * 60 * 1000;
 
 export function registerWalletRoutes(
   db: CommerceDb,
-  walletConfig: WalletConfig,
+  appConfig: AppConfig,
   handlers: {
     sendJson: (res: import("node:http").ServerResponse, code: number, body: unknown) => void;
     readJson: (req: import("node:http").IncomingMessage) => Promise<Record<string, unknown>>;
@@ -29,12 +36,26 @@ export function registerWalletRoutes(
     ) => void;
   }
 ) {
+  const walletConfig = appConfig.wallet;
   return async function handleWalletRoute(
     req: import("node:http").IncomingMessage,
     res: import("node:http").ServerResponse,
     url: URL,
     ip: string
   ): Promise<boolean> {
+    if (req.method === "POST" && url.pathname === "/api/wallet/onramp-session") {
+      await createWalletOnrampSession(req, res, db, appConfig, handlers);
+      return true;
+    }
+    if (req.method === "POST" && url.pathname === "/api/wallet/offramp-session") {
+      await createWalletOfframpSession(req, res, db, appConfig, handlers);
+      return true;
+    }
+    if (req.method === "POST" && url.pathname === "/api/wallet/offramp/confirm") {
+      await confirmWalletOfframp(req, res, db, appConfig, handlers);
+      return true;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/wallet/balance") {
       const wallet = url.searchParams.get("wallet")?.trim();
       if (!wallet) {
@@ -437,4 +458,256 @@ async function fetchWalletBalance(
     totalUsd: formatUsdFromUsdc(totalUsdc, config.feeTokenDecimals),
     chains: results,
   };
+}
+
+type JsonHandlers = {
+  sendJson: (res: import("node:http").ServerResponse, code: number, body: unknown) => void;
+  readJson: (req: import("node:http").IncomingMessage) => Promise<Record<string, unknown>>;
+};
+
+async function createWalletOnrampSession(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  db: CommerceDb,
+  appConfig: AppConfig,
+  handlers: JsonHandlers
+): Promise<void> {
+  const onramper = appConfig.onramper;
+  if (!onramper.enabled) {
+    handlers.sendJson(res, 503, { error: "Card and bank payments are not enabled on this instance" });
+    return;
+  }
+
+  const body = await handlers.readJson(req);
+  const walletAddress = resolveRegisteredWallet(body, db);
+  if (!walletAddress) {
+    handlers.sendJson(res, 400, { error: "walletAddress required (registered wallet)" });
+    return;
+  }
+
+  const assets = listOnramperEvmWalletAssets(appConfig.wallet.chains.map((c) => c.chainId));
+  if (!assets.length) {
+    handlers.sendJson(res, 400, { error: "No Onramper-supported EVM stables configured for this wallet" });
+    return;
+  }
+
+  const fiat = String(body.fiat ?? body.currency ?? "USD").trim().toUpperCase();
+  if (!onramper.fiats.includes(fiat)) {
+    handlers.sendJson(res, 400, { error: `Unsupported fiat currency: ${fiat}` });
+    return;
+  }
+  const themeRaw = String(body.theme ?? "").trim().toLowerCase();
+  const theme = themeRaw === "dark" ? "dark" : "light";
+  const amountRaw = body.amount != null ? String(body.amount).trim() : "";
+  const defaultAmount = amountRaw || (fiat === "USD" ? "50" : "50");
+
+  if (onramper.demo || !onramper.apiKey || !onramper.signingKey) {
+    const demo = new URLSearchParams({
+      walletAddress,
+      fiat,
+      price: defaultAmount,
+      token: assets.map((a) => a.token).join(","),
+      chainId: assets.map((a) => a.chainId).join(","),
+      mode: "buy",
+    });
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    handlers.sendJson(res, 200, {
+      widgetUrl: `/api/public/onramp-demo?${demo.toString()}`,
+      expiresAt,
+      fiat,
+      demo: true,
+      assets,
+    });
+    return;
+  }
+
+  const successRedirectUrl = new URL("/wallet/receive", appConfig.baseUrl).toString();
+  const session = buildOnramperWidgetSession({
+    apiKey: onramper.apiKey,
+    signingKeyPem: onramper.signingKey,
+    widgetOrigin: onramper.widgetOrigin,
+    mode: "buy",
+    partnerContext: `wallet:${walletAddress.toLowerCase()}`,
+    walletAddress,
+    assets,
+    fiat,
+    defaultAmount,
+    lockFiat: false,
+    theme,
+    successRedirectUrl,
+    failureRedirectUrl: successRedirectUrl,
+  });
+
+  handlers.sendJson(res, 200, {
+    widgetUrl: session.widgetUrl,
+    expiresAt: session.expiresAt,
+    fiat,
+    assets,
+  });
+}
+
+async function createWalletOfframpSession(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  db: CommerceDb,
+  appConfig: AppConfig,
+  handlers: JsonHandlers
+): Promise<void> {
+  const onramper = appConfig.onramper;
+  if (!onramper.enabled) {
+    handlers.sendJson(res, 503, { error: "Card and bank payments are not enabled on this instance" });
+    return;
+  }
+
+  const body = await handlers.readJson(req);
+  const walletAddress = resolveRegisteredWallet(body, db);
+  if (!walletAddress) {
+    handlers.sendJson(res, 400, { error: "walletAddress required (registered wallet)" });
+    return;
+  }
+
+  const assets = listOnramperEvmWalletAssets(appConfig.wallet.chains.map((c) => c.chainId));
+  if (!assets.length) {
+    handlers.sendJson(res, 400, { error: "No Onramper-supported EVM stables configured for this wallet" });
+    return;
+  }
+
+  const fiat = String(body.fiat ?? body.currency ?? "USD").trim().toUpperCase();
+  if (!onramper.fiats.includes(fiat)) {
+    handlers.sendJson(res, 400, { error: `Unsupported fiat currency: ${fiat}` });
+    return;
+  }
+  const themeRaw = String(body.theme ?? "").trim().toLowerCase();
+  const theme = themeRaw === "dark" ? "dark" : "light";
+
+  let maxAvailableCrypto: string | undefined;
+  if (body.maxAvailableCrypto != null && String(body.maxAvailableCrypto).trim() !== "") {
+    maxAvailableCrypto = String(body.maxAvailableCrypto).trim();
+  }
+
+  if (onramper.demo || !onramper.apiKey || !onramper.signingKey) {
+    const demo = new URLSearchParams({
+      walletAddress,
+      fiat,
+      token: assets.map((a) => a.token).join(","),
+      chainId: assets.map((a) => a.chainId).join(","),
+      mode: "sell",
+    });
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    handlers.sendJson(res, 200, {
+      widgetUrl: `/api/public/onramp-demo?${demo.toString()}`,
+      expiresAt,
+      fiat,
+      demo: true,
+      assets,
+    });
+    return;
+  }
+
+  const cashoutUrl = new URL("/wallet/offramp/cashout", appConfig.baseUrl).toString();
+  const successRedirectUrl = new URL("/wallet", appConfig.baseUrl).toString();
+  const session = buildOnramperWidgetSession({
+    apiKey: onramper.apiKey,
+    signingKeyPem: onramper.signingKey,
+    widgetOrigin: onramper.widgetOrigin,
+    mode: "sell",
+    partnerContext: `wallet:${walletAddress.toLowerCase()}`,
+    walletAddress,
+    assets,
+    fiat,
+    lockFiat: false,
+    theme,
+    offrampCashoutRedirectUrl: cashoutUrl,
+    maxAvailableCrypto,
+    successRedirectUrl,
+    failureRedirectUrl: successRedirectUrl,
+  });
+
+  handlers.sendJson(res, 200, {
+    widgetUrl: session.widgetUrl,
+    expiresAt: session.expiresAt,
+    fiat,
+    assets,
+  });
+}
+
+async function confirmWalletOfframp(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  db: CommerceDb,
+  appConfig: AppConfig,
+  handlers: JsonHandlers
+): Promise<void> {
+  const onramper = appConfig.onramper;
+  if (!onramper.enabled || !onramper.apiKey) {
+    handlers.sendJson(res, 503, { error: "Onramper is not configured" });
+    return;
+  }
+
+  const body = await handlers.readJson(req);
+  const walletAddress = resolveRegisteredWallet(body, db);
+  if (!walletAddress) {
+    handlers.sendJson(res, 400, { error: "walletAddress required (registered wallet)" });
+    return;
+  }
+
+  const transactionId = String(body.transactionId ?? "").trim();
+  const transactionHash = String(body.transactionHash ?? "").trim();
+  const targetAddress = String(body.targetAddress ?? "").trim();
+  if (!transactionId || !transactionHash || !isAddress(targetAddress)) {
+    handlers.sendJson(res, 400, {
+      error: "transactionId, transactionHash, and targetAddress are required",
+    });
+    return;
+  }
+
+  // Optional: validate sourceCurrency maps to a known asset (client already sent the tokens).
+  const sourceCurrency = String(body.sourceCurrency ?? "").trim();
+  if (sourceCurrency) {
+    const mapped = resolveProductAssetFromOnramperCryptoId(sourceCurrency);
+    if (!mapped) {
+      handlers.sendJson(res, 400, { error: `Unsupported sourceCurrency: ${sourceCurrency}` });
+      return;
+    }
+    const tokenAddr = resolveEvmStableTokenAddress(mapped.chainId, mapped.token, {
+      symbol: appConfig.wallet.feeTokenSymbol,
+      address: appConfig.wallet.feeTokenAddress,
+    });
+    if (!tokenAddr) {
+      handlers.sendJson(res, 400, { error: `No token address for ${mapped.token} on ${mapped.chainId}` });
+      return;
+    }
+  }
+
+  try {
+    const result = await confirmOnramperOfframpTransaction({
+      apiKey: onramper.apiKey,
+      widgetOrigin: onramper.widgetOrigin,
+      transactionId,
+      transactionHash,
+      sourceAddress: walletAddress,
+      targetAddress: getAddress(targetAddress),
+    });
+    handlers.sendJson(res, 200, { ok: true, ...result });
+  } catch (error) {
+    const status =
+      error && typeof error === "object" && "statusCode" in error
+        ? Number((error as { statusCode: number }).statusCode)
+        : 502;
+    handlers.sendJson(res, status, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function resolveRegisteredWallet(
+  body: Record<string, unknown>,
+  db: CommerceDb
+): string | null {
+  const raw = String(body.walletAddress ?? body.wallet ?? "").trim();
+  if (!raw || !isAddress(raw)) return null;
+  const address = getAddress(raw);
+  const account = db.getWalletAccount(address);
+  if (!account) return null;
+  return address;
 }

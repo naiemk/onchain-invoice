@@ -149,11 +149,14 @@ export function buildSendBatchCalls(input: {
   feeAmount: bigint;
   recipient: string;
   sendAmount: bigint;
+  /** ERC-20 to transfer to recipient; defaults to feeToken (USDC send). */
+  sendToken?: string;
 }): BatchCall[] {
+  const sendToken = input.sendToken ?? input.feeToken;
   return [
     buildFeeTransferCall(input.feeToken, input.beneficiary, input.feeAmount),
     {
-      target: getAddress(input.feeToken),
+      target: getAddress(sendToken),
       value: 0n,
       data: encodeErc20Transfer(input.recipient, input.sendAmount),
     },

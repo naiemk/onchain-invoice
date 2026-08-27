@@ -29,6 +29,9 @@ const routes: Record<string, PageRenderer> = {
   "/wallet/pair": renderWallet,
   "/wallet/send": renderWallet,
   "/wallet/receive": renderWallet,
+  "/wallet/deposit": renderWallet,
+  "/wallet/withdraw": renderWallet,
+  "/wallet/offramp/cashout": renderWallet,
   "/wallet/recover": renderWallet,
 };
 
@@ -120,6 +123,9 @@ function pageMeta(path: string): { title: string; description: string } {
     case "/wallet/pair":
     case "/wallet/send":
     case "/wallet/receive":
+    case "/wallet/deposit":
+    case "/wallet/withdraw":
+    case "/wallet/offramp/cashout":
       return { title: t("meta.walletTitle"), description: t("meta.walletDescription") };
     default:
       return { title: t("meta.homeTitle"), description: t("meta.homeDescription") };

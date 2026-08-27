@@ -29,6 +29,14 @@ export interface WalletChainConfig {
   feeTokenSymbol: string;
   feeTokenDecimals: number;
   networkLabel?: string;
+  /** Extra stables (e.g. USDT) available for on/off-ramp beyond the fee token. */
+  stableTokens?: WalletStableToken[];
+}
+
+export interface WalletStableToken {
+  symbol: string;
+  address: string;
+  decimals: number;
 }
 
 export interface WalletBalanceChain {
