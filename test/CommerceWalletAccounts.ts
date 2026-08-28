@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../commerce/server/app.js";
 import { loadConfig } from "../commerce/server/config.js";
+import { CommerceDb } from "../commerce/server/db.js";
+import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
 import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
 
 const FACTORY = "0x2b245a20589c745B11F8a69C677F891e8175a550";
@@ -27,6 +29,7 @@ async function withApp(
   fn: (baseUrl: string) => Promise<void>,
   envOverrides: Record<string, string> = {}
 ): Promise<void> {
+  resetRateLimitBuckets();
   const dir = await mkdtemp(join(tmpdir(), "commerce-wallet-"));
   const config = loadConfig({
     ...process.env,
@@ -188,7 +191,7 @@ describe("commerce wallet accounts API", function () {
 });
 
 describe("commerce wallet pairing API", function () {
-  it("create → submit → poll approved", async function () {
+  it("create → submit → poll approved → consume", async function () {
     await withApp(async (baseUrl) => {
       const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
       const create = await fetch(`${baseUrl}/api/wallet/pairing`, {
@@ -219,6 +222,112 @@ describe("commerce wallet pairing API", function () {
       });
       const polled = (await poll.json()) as { pairing: { status: string } };
       expect(polled.pairing.status).to.equal("approved");
+
+      const consume = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "consume", nonce: pairing.nonce }),
+      });
+      expect(consume.status).to.equal(200);
+      const consumed = (await consume.json()) as { pairing: { status: string } };
+      expect(consumed.pairing.status).to.equal("consumed");
     });
+  });
+
+  it("reject expires a pending pairing", async function () {
+    await withApp(async (baseUrl) => {
+      const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
+      const create = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "create", walletAddress: wallet, chainId: "11155111" }),
+      });
+      const { pairing } = (await create.json()) as { pairing: { nonce: string } };
+
+      const reject = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "reject", nonce: pairing.nonce }),
+      });
+      expect(reject.status).to.equal(200);
+      const body = (await reject.json()) as { pairing: { status: string } };
+      expect(body.pairing.status).to.equal("expired");
+
+      const submit = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "submit",
+          nonce: pairing.nonce,
+          newOwnerQx: ethersLib.zeroPadValue("0x11", 32),
+          newOwnerQy: ethersLib.zeroPadValue("0x12", 32),
+          deviceLabel: "iPad",
+        }),
+      });
+      expect(submit.status).to.equal(404);
+    });
+  });
+
+  it("cannot consume after reject", async function () {
+    await withApp(async (baseUrl) => {
+      const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
+      const create = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "create", walletAddress: wallet, chainId: "11155111" }),
+      });
+      const { pairing } = (await create.json()) as { pairing: { nonce: string } };
+
+      await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "submit",
+          nonce: pairing.nonce,
+          newOwnerQx: ethersLib.zeroPadValue("0x21", 32),
+          newOwnerQy: ethersLib.zeroPadValue("0x22", 32),
+          deviceLabel: "Phone",
+        }),
+      });
+
+      const reject = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "reject", nonce: pairing.nonce }),
+      });
+      const rejected = (await reject.json()) as { pairing: { status: string } };
+      expect(rejected.pairing.status).to.equal("expired");
+
+      const consume = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "consume", nonce: pairing.nonce }),
+      });
+      expect(consume.status).to.equal(404);
+
+      const poll = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "poll", nonce: pairing.nonce }),
+      });
+      const polled = (await poll.json()) as { pairing: { status: string } };
+      expect(polled.pairing.status).to.equal("expired");
+    });
+  });
+
+  it("lazy-expires pairing on get after expiresAt", async function () {
+    resetRateLimitBuckets();
+    const dir = await mkdtemp(join(tmpdir(), "commerce-wallet-lazy-"));
+    try {
+      const db = new CommerceDb(join(dir, "test.db"));
+      const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
+      const pairing = db.createWalletPairing(wallet, "11155111");
+      db.setWalletPairingExpiresAt(pairing.nonce, new Date(Date.now() - 1_000).toISOString());
+      const got = db.getWalletPairing(pairing.nonce);
+      expect(got?.status).to.equal("expired");
+      db.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

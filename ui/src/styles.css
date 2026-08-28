@@ -2768,6 +2768,12 @@ a.wallet-account-menu-item:hover,
   font-weight: 600;
 }
 
+.wallet-stepper li.is-done {
+  background: var(--surface-muted);
+  color: var(--ink);
+  opacity: 0.85;
+}
+
 .wallet-status {
   margin-top: 1rem;
 }

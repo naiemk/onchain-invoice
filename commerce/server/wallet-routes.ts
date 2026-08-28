@@ -272,6 +272,34 @@ export function registerWalletRoutes(
         handlers.sendJson(res, 200, { pairing });
         return true;
       }
+      if (body.action === "consume") {
+        const nonce = str(body.nonce);
+        if (!nonce) {
+          handlers.sendJson(res, 400, { error: "nonce required" });
+          return true;
+        }
+        const pairing = db.consumeWalletPairing(nonce);
+        if (!pairing) {
+          handlers.sendJson(res, 404, { error: "pairing_not_found" });
+          return true;
+        }
+        handlers.sendJson(res, 200, { pairing });
+        return true;
+      }
+      if (body.action === "reject") {
+        const nonce = str(body.nonce);
+        if (!nonce) {
+          handlers.sendJson(res, 400, { error: "nonce required" });
+          return true;
+        }
+        const pairing = db.rejectWalletPairing(nonce);
+        if (!pairing) {
+          handlers.sendJson(res, 404, { error: "pairing_not_found" });
+          return true;
+        }
+        handlers.sendJson(res, 200, { pairing });
+        return true;
+      }
       handlers.sendJson(res, 400, { error: "unknown action" });
       return true;
     }

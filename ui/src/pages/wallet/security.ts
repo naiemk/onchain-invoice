@@ -2,6 +2,7 @@ import QRCode from "qrcode";
 import { Contract, JsonRpcProvider } from "ethers";
 import { t } from "../../i18n/t.js";
 import {
+  consumePairing,
   createPairing,
   deleteDevice,
   fetchWalletConfig,
@@ -11,6 +12,7 @@ import {
   pollPairing,
   primaryChain,
   registerDevice,
+  rejectPairing,
   waitForUserOp,
 } from "../../shared/wallet-api.js";
 import { loadWalletSession } from "../../shared/webauthn.js";
@@ -163,6 +165,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
         qrDataUrl = "";
       }
       const expiresAt = new Date(pairing.pairing.expiresAt).getTime();
+      const nonce = pairing.pairing.nonce;
       box.classList.remove("hidden");
       box.innerHTML = `
         <p class="field-hint">${escapeHtml(t("wallet.scanOnNewDevice"))}</p>
@@ -172,56 +175,124 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
           <button type="button" class="tc-btn secondary small copy-btn" data-copy-text="${escapeHtml(deepLink)}">${escapeHtml(t("wallet.copy"))}</button>
         </div>
         <p class="field-hint"><span id="pair-countdown">${escapeHtml(t("wallet.pairingExpires"))}</span></p>
+        <div class="cta-row" id="pair-reject-row">
+          <button type="button" class="tc-btn secondary" id="pair-reject">${escapeHtml(t("wallet.pairReject"))}</button>
+        </div>
         <div id="pair-approve"></div>`;
 
       bindCopyButtons(box);
 
+      let closed = false;
+      let countdownTimer: ReturnType<typeof setInterval> | undefined;
+      let interval: ReturnType<typeof setInterval> | undefined;
+      const stopPairingUi = async (message: string, kind: "error" | "info" = "error") => {
+        if (closed) return;
+        closed = true;
+        if (interval != null) clearInterval(interval);
+        if (countdownTimer != null) clearInterval(countdownTimer);
+        const status = root.querySelector<HTMLElement>("#security-status");
+        showStatus(status, message, kind);
+        box.innerHTML = "";
+        box.classList.add("hidden");
+      };
+
+      box.querySelector("#pair-reject")?.addEventListener("click", () => {
+        void (async () => {
+          try {
+            await rejectPairing(nonce);
+          } catch {
+            /* ignore */
+          }
+          await stopPairingUi(t("wallet.pairRejected"), "info");
+        })();
+      });
+
       const countdownEl = box.querySelector("#pair-countdown");
-      const countdownTimer = setInterval(() => {
+      countdownTimer = setInterval(() => {
         const left = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
         if (countdownEl) countdownEl.textContent = t("wallet.pairingCountdown", { seconds: left });
-        if (left <= 0) clearInterval(countdownTimer);
+        if (left <= 0) {
+          void (async () => {
+            try {
+              await rejectPairing(nonce);
+            } catch {
+              /* ignore */
+            }
+            await stopPairingUi(t("wallet.pairExpired"));
+          })();
+        }
       }, 1000);
 
       const approve = box.querySelector("#pair-approve");
-      const interval = setInterval(async () => {
-        const { pairing: p } = await pollPairing(pairing.pairing.nonce);
-        if (p.status === "approved" && p.newOwnerQx && p.newOwnerQy) {
-          clearInterval(interval);
-          clearInterval(countdownTimer);
-          approve!.innerHTML = `
-            <p>${escapeHtml(t("wallet.approvePairing", { label: p.deviceLabel ?? "device" }))}</p>
-            <button type="button" class="tc-btn" id="confirm-add-owner">${escapeHtml(t("wallet.confirmAddOwner"))}</button>`;
-          approve!.querySelector("#confirm-add-owner")?.addEventListener("click", async () => {
-            const status = root.querySelector<HTMLElement>("#security-status");
-            try {
-              showStatus(status, t("wallet.sendSigning"));
-              const cfg = await fetchWalletConfig();
-              const fee = BigInt(cfg.bundlerFeeUsdc || "0");
-              const { userOp, userOpHash } = await buildSignedAddOwnerUserOp({
-                config: cfg,
-                walletAddress: session.address,
-                qx: p.newOwnerQx!,
-                qy: p.newOwnerQy!,
-                feeAmount: fee,
-                credentialId: session.credentialId,
-              });
-              await submitSignedUserOp({ config: cfg, userOp, userOpHash, walletAddress: session.address });
-              const result = await waitForUserOp(userOpHash);
-              if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
-              await registerDevice({
-                walletAddress: session.address,
-                chainId: session.chainId,
-                ownerQx: p.newOwnerQx!,
-                ownerQy: p.newOwnerQy!,
-                label: p.deviceLabel ?? "Device",
-                credentialId: null,
-              });
-              await renderWalletSecurity(root);
-            } catch (error) {
-              showStatus(status, error instanceof Error ? error.message : String(error), "error");
-            }
-          });
+      interval = setInterval(async () => {
+        if (closed) return;
+        try {
+          const { pairing: p } = await pollPairing(nonce);
+          if (p.status === "expired") {
+            await stopPairingUi(t("wallet.pairExpired"));
+            return;
+          }
+          if (p.status === "consumed") {
+            await stopPairingUi(t("wallet.pairConsumed"), "info");
+            await renderWalletSecurity(root);
+            return;
+          }
+          if (p.status === "approved" && p.newOwnerQx && p.newOwnerQy && approve && !approve.dataset.armed) {
+            approve.dataset.armed = "1";
+            if (countdownTimer != null) clearInterval(countdownTimer);
+            approve.innerHTML = `
+              <p>${escapeHtml(t("wallet.approvePairing", { label: p.deviceLabel ?? "device" }))}</p>
+              <div class="cta-row">
+                <button type="button" class="tc-btn" id="confirm-add-owner">${escapeHtml(t("wallet.confirmAddOwner"))}</button>
+                <button type="button" class="tc-btn secondary" id="pair-reject-confirm">${escapeHtml(t("wallet.pairReject"))}</button>
+              </div>`;
+            box.querySelector("#pair-reject-row")?.remove();
+            approve.querySelector("#pair-reject-confirm")?.addEventListener("click", () => {
+              void (async () => {
+                try {
+                  await rejectPairing(nonce);
+                } catch {
+                  /* ignore */
+                }
+                await stopPairingUi(t("wallet.pairRejected"), "info");
+              })();
+            });
+            approve.querySelector("#confirm-add-owner")?.addEventListener("click", async () => {
+              const status = root.querySelector<HTMLElement>("#security-status");
+              try {
+                showStatus(status, t("wallet.sendSigning"));
+                const cfg = await fetchWalletConfig();
+                const fee = BigInt(cfg.bundlerFeeUsdc || "0");
+                const { userOp, userOpHash } = await buildSignedAddOwnerUserOp({
+                  config: cfg,
+                  walletAddress: session.address,
+                  qx: p.newOwnerQx!,
+                  qy: p.newOwnerQy!,
+                  feeAmount: fee,
+                  credentialId: session.credentialId,
+                });
+                await submitSignedUserOp({ config: cfg, userOp, userOpHash, walletAddress: session.address });
+                const result = await waitForUserOp(userOpHash);
+                if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
+                await consumePairing(nonce);
+                await registerDevice({
+                  walletAddress: session.address,
+                  chainId: session.chainId,
+                  ownerQx: p.newOwnerQx!,
+                  ownerQy: p.newOwnerQy!,
+                  label: p.deviceLabel ?? "Device",
+                  credentialId: null,
+                });
+                closed = true;
+                if (interval != null) clearInterval(interval);
+                await renderWalletSecurity(root);
+              } catch (error) {
+                showStatus(status, error instanceof Error ? error.message : String(error), "error");
+              }
+            });
+          }
+        } catch {
+          /* keep polling */
         }
       }, 2000);
     } finally {

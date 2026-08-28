@@ -953,11 +953,41 @@ export class CommerceDb {
     return this.getWalletPairing(nonce);
   }
 
+  /** Mark pairing complete after existing device addOwner succeeds. */
+  consumeWalletPairing(nonce: string): WalletPairingRecord | null {
+    const row = this.getWalletPairing(nonce);
+    if (!row || row.status !== "approved") return null;
+    this.db.prepare(`UPDATE wallet_pairings SET status = 'consumed' WHERE nonce = ?`).run(nonce);
+    return this.getWalletPairing(nonce);
+  }
+
+  /** Reject or abandon pairing (pending or approved → expired). */
+  rejectWalletPairing(nonce: string): WalletPairingRecord | null {
+    const row = this.getWalletPairing(nonce);
+    if (!row || (row.status !== "pending" && row.status !== "approved")) return null;
+    this.db.prepare(`UPDATE wallet_pairings SET status = 'expired' WHERE nonce = ?`).run(nonce);
+    return this.getWalletPairing(nonce);
+  }
+
+  /** Test helper: backdate expiry so the next get/poll lazy-expires. */
+  setWalletPairingExpiresAt(nonce: string, expiresAtIso: string): void {
+    this.db.prepare(`UPDATE wallet_pairings SET expires_at = ? WHERE nonce = ?`).run(expiresAtIso, nonce);
+  }
+
   getWalletPairing(nonce: string): WalletPairingRecord | null {
     const row = this.db.prepare(`SELECT * FROM wallet_pairings WHERE nonce = ?`).get(nonce) as
       | WalletPairingRow
       | undefined;
-    return row ? mapWalletPairing(row) : null;
+    if (!row) return null;
+    const mapped = mapWalletPairing(row);
+    if (
+      (mapped.status === "pending" || mapped.status === "approved") &&
+      new Date(mapped.expiresAt).getTime() < Date.now()
+    ) {
+      this.db.prepare(`UPDATE wallet_pairings SET status = 'expired' WHERE nonce = ?`).run(nonce);
+      return mapWalletPairing({ ...row, status: "expired" });
+    }
+    return mapped;
   }
 
   createWalletUserOp(input: {
