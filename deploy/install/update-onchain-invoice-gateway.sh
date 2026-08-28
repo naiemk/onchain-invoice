@@ -51,11 +51,41 @@ run_gateway_update() {
   CERTBOT_WWW="${CERTBOT_WWW:-/var/www/certbot}"
   HTTP_PORT="${HTTP_PORT:-80}"
   HTTPS_PORT="${HTTPS_PORT:-443}"
+  # Host-mounted domains.conf is not inside the nginx image — refresh from git on update.
+  ONCHAIN_INVOICE_REF="${ONCHAIN_INVOICE_REF:-${IMAGE_TAG:-main}}"
+  DOMAINS_CONF_URL="${DOMAINS_CONF_URL:-https://raw.githubusercontent.com/naiemk/onchain-invoice/${ONCHAIN_INVOICE_REF}/deploy/templates/gateway/conf.d/domains.conf}"
 
   need_ui_pull=0
   need_nginx_pull=0
   [[ "$UPDATE_TESTNET" -eq 1 || "$UPDATE_MAINNET" -eq 1 ]] && need_ui_pull=1
   [[ "$UPDATE_GATEWAY" -eq 1 ]] && need_nginx_pull=1
+
+  refresh_domains_conf() {
+    local dest="$CONF_D/domains.conf"
+    local tmp
+    unset GATEWAY_DOMAINS_CONF_REFRESHED
+    mkdir -p "$CONF_D"
+    tmp="$(mktemp)"
+    if ! curl -fsSL "$DOMAINS_CONF_URL" -o "$tmp"; then
+      rm -f "$tmp"
+      log_update "$SCRIPT_DIR" "gateway: could not fetch domains.conf from $DOMAINS_CONF_URL"
+      return 1
+    fi
+    if ! grep -q "location = /pay" "$tmp"; then
+      rm -f "$tmp"
+      log_update "$SCRIPT_DIR" "gateway: fetched domains.conf missing /pay location — keep existing"
+      return 1
+    fi
+    if [[ -f "$dest" ]] && cmp -s "$tmp" "$dest"; then
+      rm -f "$tmp"
+      log_update "$SCRIPT_DIR" "gateway: domains.conf already current"
+      return 0
+    fi
+    mv "$tmp" "$dest"
+    GATEWAY_DOMAINS_CONF_REFRESHED=1
+    log_update "$SCRIPT_DIR" "gateway: refreshed domains.conf from $ONCHAIN_INVOICE_REF"
+    return 0
+  }
 
   # Pull BEFORE any stop so a wedged pull cannot leave the site down.
   if [[ "$need_ui_pull" -eq 1 ]]; then
@@ -88,7 +118,17 @@ run_gateway_update() {
   }
 
   recreate_gateway() {
-    if ! container_needs_image "$GATEWAY_NAME" "$NGINX_IMAGE"; then
+    local conf_changed=0
+    if refresh_domains_conf; then
+      # refresh_domains_conf returns 0 for both "updated" and "already current".
+      # Detect change via mtime window or force reload when GATEWAY_FORCE_CONF_RELOAD=1.
+      :
+    fi
+    # Re-fetch status: if dest was rewritten in this run, reload even when image is current.
+    if [[ -n "${GATEWAY_DOMAINS_CONF_REFRESHED:-}" ]]; then
+      conf_changed=1
+    fi
+    if ! container_needs_image "$GATEWAY_NAME" "$NGINX_IMAGE" && [[ "$conf_changed" -eq 0 ]]; then
       log_update "$SCRIPT_DIR" "gateway: $GATEWAY_NAME already on latest nginx image"
       return 0
     fi
@@ -99,6 +139,14 @@ run_gateway_update() {
     if [[ ! -f "$TLS_FULLCHAIN" || ! -f "$TLS_PRIVKEY" ]]; then
       log_update "$SCRIPT_DIR" "gateway: TLS certs missing — skip nginx update"
       return 1
+    fi
+    # Conf-only change: try reload first (no downtime).
+    if [[ "$conf_changed" -eq 1 ]] && ! container_needs_image "$GATEWAY_NAME" "$NGINX_IMAGE"; then
+      if docker exec "$GATEWAY_NAME" nginx -t >/dev/null 2>&1 && docker exec "$GATEWAY_NAME" nginx -s reload >/dev/null 2>&1; then
+        log_update "$SCRIPT_DIR" "gateway: reloaded $GATEWAY_NAME after domains.conf refresh"
+        return 0
+      fi
+      log_update "$SCRIPT_DIR" "gateway: reload failed — recreating $GATEWAY_NAME"
     fi
     log_update "$SCRIPT_DIR" "gateway: updating $GATEWAY_NAME (stop -t $STOP_TIMEOUT)"
     graceful_stop "$GATEWAY_NAME" "$STOP_TIMEOUT"
