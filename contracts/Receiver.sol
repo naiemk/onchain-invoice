@@ -5,9 +5,12 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IReceiver} from "./interfaces/IReceiver.sol";
 
 abstract contract Receiver is Initializable, OwnableUpgradeable, UUPSUpgradeable, IReceiver {
+    using SafeERC20 for IERC20;
+
     address internal constant NATIVE_TOKEN = address(0);
 
     struct InvoicePayment {
@@ -66,9 +69,13 @@ abstract contract Receiver is Initializable, OwnableUpgradeable, UUPSUpgradeable
         bytes calldata data
     ) external {
         if (amount == 0) revert NoPayment();
-        if (IERC20(token).balanceOf(address(this)) < amount) revert NoPayment();
 
-        _handleInvoice(invoiceId, token, msg.sender, amount, data);
+        uint256 before = IERC20(token).balanceOf(address(this));
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = IERC20(token).balanceOf(address(this)) - before;
+        if (received == 0) revert NoPayment();
+
+        _handleInvoice(invoiceId, token, msg.sender, received, data);
     }
 
     function executeInvoice(

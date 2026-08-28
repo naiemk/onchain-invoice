@@ -35,7 +35,8 @@ contract Forwarder {
         amount = IERC20(token).balanceOf(address(this));
         if (amount == 0) revert NoBalance();
 
-        IERC20(token).safeTransfer(RECEIVER, amount);
+        IERC20(token).forceApprove(RECEIVER, amount);
         IReceiver(RECEIVER).receiveTokenInvoice(token, invoiceId, amount, data);
+        IERC20(token).forceApprove(RECEIVER, 0);
     }
 }

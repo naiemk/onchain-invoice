@@ -141,6 +141,30 @@ describe("InvoiceSweeper", function () {
     expect(await receiver.handledCount()).to.equal(1n);
   });
 
+  it("rejects ERC20 invoice payment without a pull from the forwarder", async function () {
+    const { payer, receiver, sweeper, token } = await deployFixture();
+    const victimData = ethersLib.toUtf8Bytes("victim-invoice");
+    const attackerData = ethersLib.toUtf8Bytes("attacker-invoice");
+    const amount = ethersLib.parseUnits("100", 18);
+    const tokenAddress = await token.getAddress();
+    const victimInvoiceId = ethersLib.keccak256(victimData);
+    const attackerInvoiceId = ethersLib.keccak256(attackerData);
+    const victimAddress = await sweeper.getInvoiceAddress(victimInvoiceId);
+
+    await token.mint(victimAddress, amount);
+    await sweeper.sweepToken(victimInvoiceId, tokenAddress, victimData);
+
+    expect(await token.balanceOf(await receiver.getAddress())).to.equal(amount);
+
+    await expectRevert(
+      receiver.receiveTokenInvoice(tokenAddress, attackerInvoiceId, amount, attackerData),
+      "ERC20InsufficientAllowance"
+    );
+
+    const attackerPayment = await receiver.invoicePayment(attackerInvoiceId);
+    expect(attackerPayment.paid).to.equal(false);
+  });
+
   it("executes invoice logic independently when data matches the invoice ID", async function () {
     const { receiver } = await deployFixture();
     const data = ethersLib.toUtf8Bytes("manual execution");
