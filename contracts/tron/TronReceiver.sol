@@ -66,9 +66,13 @@ abstract contract TronReceiver is Initializable, OwnableUpgradeable, UUPSUpgrade
         bytes calldata data
     ) external {
         if (amount == 0) revert NoPayment();
-        if (ITrc20(token).balanceOf(address(this)) < amount) revert NoPayment();
 
-        _handleInvoice(invoiceId, token, msg.sender, amount, data);
+        uint256 before = ITrc20(token).balanceOf(address(this));
+        _safeTransferFrom(token, msg.sender, address(this), amount);
+        uint256 received = ITrc20(token).balanceOf(address(this)) - before;
+        if (received == 0) revert NoPayment();
+
+        _handleInvoice(invoiceId, token, msg.sender, received, data);
     }
 
     function executeInvoice(
@@ -125,5 +129,11 @@ abstract contract TronReceiver is Initializable, OwnableUpgradeable, UUPSUpgrade
         assembly {
             $.slot := TRON_RECEIVER_STORAGE_LOCATION
         }
+    }
+
+    function _safeTransferFrom(address token, address from, address to, uint256 amount) private {
+        (bool ok, bytes memory result) =
+            token.call(abi.encodeCall(ITrc20.transferFrom, (from, to, amount)));
+        if (!ok || (result.length != 0 && !abi.decode(result, (bool)))) revert NoPayment();
     }
 }

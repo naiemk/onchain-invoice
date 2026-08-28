@@ -33,12 +33,18 @@ contract TronForwarder {
         amount = ITrc20(token).balanceOf(address(this));
         if (amount == 0) revert NoBalance();
 
-        _safeTransfer(token, RECEIVER, amount);
+        _safeApprove(token, RECEIVER, amount);
         ITronReceiver(RECEIVER).receiveTokenInvoice(token, invoiceId, amount, data);
+        _safeApprove(token, RECEIVER, 0);
     }
 
     function _safeTransfer(address token, address to, uint256 amount) private {
         (bool ok, bytes memory result) = token.call(abi.encodeCall(ITrc20.transfer, (to, amount)));
+        if (!ok || (result.length != 0 && !abi.decode(result, (bool)))) revert TransferFailed();
+    }
+
+    function _safeApprove(address token, address spender, uint256 amount) private {
+        (bool ok, bytes memory result) = token.call(abi.encodeCall(ITrc20.approve, (spender, amount)));
         if (!ok || (result.length != 0 && !abi.decode(result, (bool)))) revert TransferFailed();
     }
 }
