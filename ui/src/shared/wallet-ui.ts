@@ -287,6 +287,17 @@ export function bindCopyButtons(root: HTMLElement): void {
   });
 }
 
+/** Available line for send/withdraw — emphasize amount without oversized home total styles. */
+export function formatWalletAvailable(amount: string): string {
+  const symbol = t("wallet.usd");
+  const full = t("wallet.sendAvailable", { amount, symbol });
+  const idx = full.indexOf(amount);
+  if (idx < 0) return escapeHtml(full);
+  return `${escapeHtml(full.slice(0, idx))}<strong class="mono">${escapeHtml(amount)}</strong>${escapeHtml(
+    full.slice(idx + amount.length)
+  )}`;
+}
+
 export function chainBalanceRows(chains: WalletBalanceChain[]): string {
   if (!chains.length) {
     return `<p class="field-hint">${escapeHtml(t("wallet.noChains"))}</p>`;

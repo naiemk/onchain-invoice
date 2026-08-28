@@ -2,6 +2,17 @@
 
 export type PayChrome = "full" | "minimal" | "none";
 
+/** True when checkout is running inside a cross- or same-origin iframe. */
+export function isPayEmbedded(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    // Some browsers throw when the parent is cross-origin; treat as embedded.
+    return true;
+  }
+}
+
 export function parsePayChrome(search: string = typeof location !== "undefined" ? location.search : ""): PayChrome {
   const raw = new URLSearchParams(search.startsWith("?") ? search : `?${search}`).get("header");
   if (raw === "minimal" || raw === "none" || raw === "full") return raw;
@@ -32,5 +43,11 @@ export function withPayChrome(payQueryOrUrl: string, chrome: PayChrome): string 
 }
 
 export function currentPayChromeFromLocation(): PayChrome {
-  return parsePayChrome(typeof location !== "undefined" ? location.search : "");
+  const search = typeof location !== "undefined" ? location.search : "";
+  const params = new URLSearchParams(search.startsWith("?") ? search : `?${search}`);
+  const raw = params.get("header");
+  if (raw === "minimal" || raw === "none" || raw === "full") return raw;
+  // Default to no chrome when iframed so merchants can embed without `header=none`.
+  if (isPayEmbedded()) return "none";
+  return "full";
 }
