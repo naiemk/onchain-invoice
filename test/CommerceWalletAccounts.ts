@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { createApp } from "../commerce/server/app.js";
 import { loadConfig } from "../commerce/server/config.js";
 import { CommerceDb } from "../commerce/server/db.js";
+import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
 import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
 
 const FACTORY = "0x2b245a20589c745B11F8a69C677F891e8175a550";
@@ -28,6 +29,7 @@ async function withApp(
   fn: (baseUrl: string) => Promise<void>,
   envOverrides: Record<string, string> = {}
 ): Promise<void> {
+  resetRateLimitBuckets();
   const dir = await mkdtemp(join(tmpdir(), "commerce-wallet-"));
   const config = loadConfig({
     ...process.env,
@@ -314,6 +316,7 @@ describe("commerce wallet pairing API", function () {
   });
 
   it("lazy-expires pairing on get after expiresAt", async function () {
+    resetRateLimitBuckets();
     const dir = await mkdtemp(join(tmpdir(), "commerce-wallet-lazy-"));
     try {
       const db = new CommerceDb(join(dir, "test.db"));
