@@ -1,0 +1,106 @@
+# Nodes: sweepers + wallet bundler + wallet-deployer (tctest / testnet).
+# From the nodes install directory:
+#   docker compose -f docker-compose.workers.yml up -d
+# Solana (optional): SWEEPER_SOLANA_ENABLED=1 and:
+#   docker compose -f docker-compose.workers.yml --profile solana up -d
+#
+# SWEEPER_ROLE filters which half of nodes-workers.yaml each service uses.
+
+networks:
+  edge:
+    external: true
+    name: ${DOCKER_NETWORK:-vps-edge}
+
+services:
+  sweeper-evm:
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: tctest-sweeper-evm
+    restart: unless-stopped
+    mem_limit: ${SWEEPER_MEMORY_LIMIT:-192m}
+    env_file: .env
+    environment:
+      SWEEPER_ROLE: evm
+      SWEEPER_CONFIG: /tmp/sweeper.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-evm.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./nodes-workers.yaml:/tmp/sweeper.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge
+
+  sweeper-tron:
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: tctest-sweeper-tron
+    restart: unless-stopped
+    mem_limit: ${SWEEPER_MEMORY_LIMIT:-192m}
+    env_file: .env
+    environment:
+      SWEEPER_ROLE: tron
+      SWEEPER_CONFIG: /tmp/sweeper.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-tron.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./nodes-workers.yaml:/tmp/sweeper.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge
+
+  sweeper-solana:
+    profiles: ["solana"]
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: tctest-sweeper-solana
+    restart: unless-stopped
+    mem_limit: ${SWEEPER_MEMORY_LIMIT:-192m}
+    env_file: .env
+    environment:
+      SWEEPER_ROLE: solana
+      SWEEPER_CONFIG: /tmp/sweeper.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-solana.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./nodes-workers.yaml:/tmp/sweeper.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge
+
+  # Same image as sweepers — overrides CMD to commerce-dist/bundler.
+  bundler-evm:
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: tctest-bundler-evm
+    restart: unless-stopped
+    mem_limit: ${BUNDLER_MEMORY_LIMIT:-192m}
+    command: ["node", "commerce-dist/bundler/index.js"]
+    env_file: .env
+    environment:
+      BUNDLER_CONFIG: /tmp/bundler.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-bundler.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./onchain-invoice-bundler.yaml:/tmp/bundler.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge
+
+  # Same image as sweepers — overrides CMD to commerce-dist/wallet-deployer.
+  wallet-deployer-evm:
+    image: ${SWEEPER_IMAGE:-ghcr.io/naiemk/trustless-commerce-sweeper:main}
+    container_name: tctest-wallet-deployer-evm
+    restart: unless-stopped
+    mem_limit: ${WALLET_DEPLOYER_MEMORY_LIMIT:-192m}
+    command: ["node", "commerce-dist/wallet-deployer/index.js"]
+    env_file: .env
+    environment:
+      WALLET_DEPLOYER_CONFIG: /tmp/wallet-deployer.yaml
+      ACTIVITY_LOG_PATH: /data/logs/activity-wallet-deployer.jsonl
+    volumes:
+      - ./logs:/data/logs
+      - ./onchain-invoice-wallet-deployer.yaml:/tmp/wallet-deployer.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge

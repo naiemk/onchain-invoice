@@ -1,12 +1,13 @@
 # System tests pull published GHCR images (no local product builds).
 # Override tags with IMAGE_TAG (default: main).
+# TLS/edge is host gateway on VPS (vibed-infra 0.8); this stack is api + ui + sweeper only.
 name: trustless-commerce-system-tests
 
 services:
   api:
     image: ghcr.io/naiemk/trustless-commerce-api:${IMAGE_TAG:-main}
     environment:
-      BASE_URL: ${BASE_URL:-https://localhost}
+      BASE_URL: ${BASE_URL:-http://localhost:18080}
       DB_PATH: /data/trustless-commerce.db
       ADMIN_API_KEY: ${ADMIN_API_KEY:-system-test-admin}
       SWEEPER_API_KEY: ${SWEEPER_API_KEY:-system-test-sweeper}
@@ -23,8 +24,8 @@ services:
       WALLET_BUNDLER_FEE_TOKEN: ${WALLET_BUNDLER_FEE_TOKEN:-0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238}
     volumes:
       - api-data:/data
-    expose:
-      - "8080"
+    ports:
+      - "18080:8080"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 3s
@@ -35,8 +36,8 @@ services:
 
   ui:
     image: ghcr.io/naiemk/trustless-commerce-ui:${IMAGE_TAG:-main}
-    expose:
-      - "80"
+    ports:
+      - "18081:80"
     networks:
       - internal
 
@@ -79,19 +80,6 @@ services:
     networks:
       - internal
     restart: unless-stopped
-
-  nginx:
-    image: ghcr.io/naiemk/trustless-commerce-nginx:${IMAGE_TAG:-main}
-    depends_on:
-      api:
-        condition: service_healthy
-      ui:
-        condition: service_started
-    ports:
-      - "18080:80"
-      - "18443:443"
-    networks:
-      - internal
 
 volumes:
   api-data:

@@ -1,7 +1,9 @@
-# Trustless Commerce product templates
+# Legacy product templates
 
-Opaque config and start/update scripts for the [vibed-infra](https://github.com/naiemk/vibed-infra) packager.
+Superseded by vibed-infra 0.8 multi-tenant packaging:
 
-Fetched by `vibed-infra/install.sh` using `rawBase` from [`packageconfig.yaml`](../packageconfig.yaml).
+- [`../tctest/`](../tctest/) — testnet product + `dist/`
+- [`../tcmain/`](../tcmain/) — mainnet product + `dist/`
+- [`../overlays/`](../overlays/) — TC lifecycle overlays applied by [`../package.sh`](../package.sh)
 
-Do not put packager logic here — only product-specific YAML, `.env` examples, nginx snippets, and lifecycle scripts.
+Kept temporarily for CI/system-tests that still reference these paths. Do not add new gateway/nginx assets here.

@@ -1,0 +1,91 @@
+name: tcmain
+version: 1
+rawBase: "https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tcmain/dist"
+packagerRaw: "https://raw.githubusercontent.com/naiemk/vibed-infra/main"
+network:
+  edge: vps-edge
+images:
+  backend: "ghcr.io/naiemk/trustless-commerce-api:main"
+  ui: "ghcr.io/naiemk/trustless-commerce-ui:main"
+  worker: "ghcr.io/naiemk/trustless-commerce-sweeper:main"
+  nginx: "nginx:alpine"
+autoUpdate:
+  lockFile: /var/lock/infra-auto-update.lock
+profiles:
+  api:
+    role: backend
+    templates:
+      config: api-app.yaml
+      envExample: .env.api.example
+    startScript: start-api.sh
+    updateScript: update-api.sh
+    autoUpdate:
+      flag: API_AUTO_UPDATE
+      intervalEnv: API_AUTO_UPDATE_INTERVAL_MIN
+      offset: 0
+      stopTimeoutEnv: API_STOP_TIMEOUT
+  ui:
+    role: ui
+    templates:
+      envExample: .env.ui.example
+    startScript: start-ui.sh
+    updateScript: update-ui.sh
+    autoUpdate:
+      flag: UI_AUTO_UPDATE
+      intervalEnv: UI_AUTO_UPDATE_INTERVAL_MIN
+      offset: 15
+      stopTimeoutEnv: UI_STOP_TIMEOUT
+  nodes:
+    role: workers
+
+    extras:
+      - onchain-invoice-bundler.yaml
+      - onchain-invoice-wallet-deployer.yaml
+      - register-onchain-invoice-node.sh
+      - register-onchain-invoice-bundler.sh
+    templates:
+      config: nodes-workers.yaml
+      envExample: .env.nodes.example
+      compose: docker-compose.workers.yml
+    startScript: start-nodes.sh
+    updateScript: update-nodes.sh
+    autoUpdate:
+      flag: NODES_AUTO_UPDATE
+      intervalEnv: NODES_AUTO_UPDATE_INTERVAL_MIN
+      offset: 10
+      stopTimeoutEnv: NODES_STOP_TIMEOUT
+    workers:
+      services:
+        - name: worker
+          containerName: tcmain-worker
+          roleEnv: WORKER_ROLE=heartbeat
+  gateway:
+    role: gateway
+    mode: host-extension
+    templates:
+      envExample: .env.gateway.example
+    startScript: start-gateway.sh
+    updateScript: update-gateway.sh
+    autoUpdate:
+      flags:
+        - GATEWAY_AUTO_UPDATE
+      intervalEnv: GATEWAY_AUTO_UPDATE_INTERVAL_MIN
+      offset: 20
+      stopTimeoutEnv: GATEWAY_STOP_TIMEOUT
+    sites:
+      - host: trustless-commerce.com
+        backend: tcmain-api
+        backendPort: 8080
+        ui: tcmain-ui
+        uiPort: 80
+        healthPath: /api/health
+        tlsCertDir: /etc/letsencrypt/live/trustless-commerce.com
+        aliases:
+        - www.trustless-commerce.com
+        createPath: /api/invoices
+    publicIp: 57.131.150.182
+    tlsEmail: "ops@trustless-commerce.com"
+webhook:
+  url: "https://trustless-commerce.com/_vibed/hooks/ghcr"
+  fallbackUrl: "http://57.131.150.182/_vibed/hooks/ghcr"
+  token: 7354279cfa40c6e7fe2087a7decfb7ff

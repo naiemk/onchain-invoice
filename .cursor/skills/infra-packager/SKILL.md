@@ -1,53 +1,57 @@
 ---
 name: infra-packager
 description: >-
-  Wire a new product to the infra VPS packager: packageconfig.yaml, Docker images,
-  deploy/templates, thin install wrappers, and CI. Use when adding Backend/UI/worker
-  deploy to a repo or migrating from ad-hoc deploy/install scripts.
+  Wire a new product to vibed-infra 0.8: four YAML templates, package.sh →
+  committed dist/, multi-tenant apps under deploy/, GHCR OIDC pulls, and CI.
+  Use when adding Backend/UI/worker deploy or migrating from ad-hoc install scripts.
 ---
 
-# Infra packager — onboard a product
+# Infra packager — vibed-infra 0.8 multi-app
 
 ## When to use
 
-- New repo needs wget VPS install (backend + UI + workers + HTTPS gateway)
-- Splitting deploy scripts into reusable infra + product templates
+- New product needs wget VPS install (api + ui + workers + shared host gateway)
+- Multi-tenant products on one VPS (this repo: **tctest** + **tcmain**)
+
+## Layout (Trustless Commerce)
+
+| Path | Role |
+|------|------|
+| `deploy/tctest/templates/` | Four YAMLs: `vibed-infra-config.yml`, `api-config.yaml`, `ui-config.yaml`, `nodes-config.yaml` |
+| `deploy/tcmain/templates/` | Same for mainnet |
+| `deploy/package.sh` | Runs vibed `package.sh` → `deploy/{tctest,tcmain}/dist/` + TC overlays |
+| `deploy/overlays/` | Product `start-*.sh` / compose / `.env.*.example` copied into dist |
+| `~/services/` on VPS | Host gateway + update-agent (machine-wide) |
 
 ## Steps
 
-1. **Copy or submodule** [`infra/`](../../infra/) (later: separate `infra-packager` repo; set `packagerRaw` in packageconfig).
+1. **Depend on** `vibed-infra@0.8.x` (`npm i vibed-infra@0.8.0 --save-exact`).
 
-2. **Create** `deploy/packageconfig.yaml` — see [`infra/schema/packageconfig.md`](../../infra/schema/packageconfig.md) and Trustless Commerce example [`deploy/packageconfig.yaml`](../../deploy/packageconfig.yaml).
+2. **Templates** under `deploy/<product>/templates/` — set `gateway.publicIp`, `gateway.tlsEmail`, `gateway.sites[]` (backend/ui container names on `network.edge`).
 
-3. **Add templates** under `deploy/templates/`:
-   - `.env.*.example` (secrets — opaque to infra)
-   - App config YAML (opaque)
-   - `start-*.sh` / `update-*.sh` (or use generic `infra/start.sh`)
-   - Worker `docker-compose.*.yml` if multi-runner
-
-4. **Thin wrappers** (3 lines each):
+3. **Package and commit dist:**
 
 ```bash
-# deploy/install/install-api.sh
-export INFRA_PROFILE=api
-export PACKAGECONFIG_URL=https://raw.githubusercontent.com/ORG/REPO/main/deploy/packageconfig.yaml
-wget -qO- https://raw.githubusercontent.com/ORG/REPO/main/infra/install.sh | bash
+npm run deploy:package   # or bash deploy/package.sh
+git add deploy/tctest/dist deploy/tcmain/dist && git commit
 ```
 
-5. **Build images** — Dockerfiles in `deploy/`; push to GHCR; reference in `packageconfig.images`.
-
-6. **CI** — use [`infra/github/workflows/docker-build-reusable.yml`](../../infra/github/workflows/docker-build-reusable.yml); add install e2e serving `infra/` + `deploy/templates/` over HTTP.
-
-7. **VPS** — per component directory:
+4. **VPS install** (per product dist):
 
 ```bash
-mkdir -p ~/app/api && cd ~/app/api
-wget -qO- .../deploy/install/install-api.sh | bash
-# edit .env, then ./start-onchain-invoice-api.sh (or ./start.sh)
+wget -qO- .../deploy/tctest/dist/install-api.sh | bash
+# edit .env → ./start-api.sh
+wget -qO- .../deploy/tctest/dist/install-ui.sh | bash
+wget -qO- .../deploy/tctest/dist/install-nodes.sh | bash
+wget -qO- .../deploy/tctest/dist/install-gateway.sh | bash  # extends ~/services/gateway
 ```
+
+5. **CI** — package drift check + GHCR build + OIDC notify (`id-token: write`). See infra-cicd.
 
 ## Rules
 
-- Infra never parses app config keys — only image names, ports, volume paths, site hostnames.
+- Infra never parses opaque app config keys — only images, ports, volumes, site hostnames.
 - Never overwrite existing `.env` on re-install.
-- Gateway container names must match `sites[].backend` / `sites[].ui` on shared `network.edge`.
+- No product nginx image — TLS is the **host gateway** under `~/services/gateway`.
+- Container names in `sites[]` must match running API/UI on `vps-edge`.
+- Immediate pull after `:main` push requires CI `id-token: write` + `notify-vps-pull.py`.

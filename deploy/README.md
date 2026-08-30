@@ -1,121 +1,52 @@
 # Deploy
 
-## Local test
+## Local smoke (api + ui)
 
-From this repo root:
+From repo root:
 
 ```bash
 npm run docker:test
 ```
 
-Checks HTTPS health, HTTP→HTTPS redirect, HSTS, and create rate limit (via compose networking). Host ports are **18080/18443**.
+Builds and runs `docker-compose.yml` (api on **18080**, ui on **18081**). Smoke checks health/ready, UI root, and create rate limit. TLS/edge is not in this compose — use the host gateway from vibed-infra 0.8.
 
 ## Images (GHCR)
 
-Built on every **pull request** and push to `main` by [`.github/workflows/docker.yml`](../.github/workflows/docker.yml). PRs publish `pr-<n>` tags (they do not overwrite `:main`). Merges to `main` publish `:main`. Reusable GHCR build: [`vibed-infra`](https://github.com/naiemk/vibed-infra) [`github/workflows/docker-build-reusable.yml`](https://github.com/naiemk/vibed-infra/blob/main/github/workflows/docker-build-reusable.yml).
+Built on every **pull request** and push to `main` by [`.github/workflows/docker.yml`](../.github/workflows/docker.yml). PRs publish `pr-<n>` tags; merges to `main` publish `:main`.
 
 - `ghcr.io/naiemk/trustless-commerce-api`
 - `ghcr.io/naiemk/trustless-commerce-sweeper`
 - `ghcr.io/naiemk/trustless-commerce-ui`
-- `ghcr.io/naiemk/trustless-commerce-nginx`
 
-## Domains (testnet + mainnet on one VPS)
+## VPS install (vibed-infra 0.8 multi-tenant)
 
-Same-origin APIs:
+Two products share one host gateway under `~/services/`:
 
-| Host | Stack | Chain |
-|------|--------|--------|
-| `https://testnet.trustless-commerce.com` | testnet-api + testnet-ui | Sepolia |
-| `https://trustless-commerce.com` (+ `www`) | mainnet-api + mainnet-ui | Mainnet |
+| Product | Role | Dist |
+|---------|------|------|
+| **tctest** | testnet | [`tctest/dist/`](tctest/dist/) |
+| **tcmain** | mainnet | [`tcmain/dist/`](tcmain/dist/) |
 
-Compose file: [`docker-compose.domains.yml`](docker-compose.domains.yml)  
-Nginx routing: [`nginx/domains/domains.conf`](nginx/domains/domains.conf)
-
-### Namecheap DNS → `206.189.49.251`
-
-| Type | Host | Value |
-|------|------|--------|
-| A | `@` | `206.189.49.251` |
-| A | `www` | `206.189.49.251` |
-| A | `testnet` | `206.189.49.251` |
-
-Wait until DNS resolves before requesting certificates.
-
-### SSH runbook (VPS)
+Package (from repo root after `npm install`):
 
 ```bash
-# 1) Prereqs
-sudo apt-get update
-sudo apt-get install -y docker.io docker-compose-v2 certbot
-sudo systemctl enable --now docker
-# free ports 80/443 from stock nginx if present:
-sudo systemctl disable --now nginx || true
-
-# 2) Data dirs (API image USER node = uid 1000)
-sudo mkdir -p /var/lib/trustless-commerce/{testnet,mainnet}/api /var/www/certbot
-sudo chown -R 1000:1000 /var/lib/trustless-commerce
-
-# 3) Clone repo (or sync deploy/)
-git clone https://github.com/naiemk/onchain-invoice.git
-cd onchain-invoice
-
-# 4) Env files
-cp deploy/.env.domains.example deploy/.env.domains
-cp deploy/.env.testnet.example deploy/.env.testnet
-cp deploy/.env.mainnet.example deploy/.env.mainnet
-# edit: strong ADMIN/SWEEPER keys; mainnet SWEEPER_ADDRESS + FORWARDER_IMPLEMENTATION when ready
-
-# 5) TLS (one SAN cert) — nothing else on :80
-sudo certbot certonly --standalone \
-  -d trustless-commerce.com \
-  -d www.trustless-commerce.com \
-  -d testnet.trustless-commerce.com
-
-# 6) Start
-docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains pull
-docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains up -d
-
-# 7) Verify
-curl -fsS https://testnet.trustless-commerce.com/api/health
-curl -fsS https://trustless-commerce.com/api/health
+npm run deploy:package  # or bash deploy/package.sh
 ```
 
-Renewal (example): keep using certbot; after renew, `docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains restart nginx`. HTTP serves `/.well-known/acme-challenge/` from `/var/www/certbot` for webroot renewals if you switch off standalone later.
-
-### Sweeper nodes
-
-Prefer the wget installers on worker hosts ([`install/README.md`](install/README.md)):
-
-- Testnet node: `API_URL=https://testnet.trustless-commerce.com` then `./register-onchain-invoice-node.sh` + `./start-onchain-invoice-nodes.sh`
-- Mainnet node: same with `https://trustless-commerce.com` and mainnet keys/addresses
-
-## Operator install (wget | bash, includes HTTPS gateway)
-
-Preferred path for a VPS: API(s) + **install-gateway** (nginx + UI + Let's Encrypt mounts) + sweeper nodes.
-
-**Infra packager:** npm package [`vibed-infra`](https://www.npmjs.com/package/vibed-infra). Product config: [`packageconfig.yaml`](packageconfig.yaml). Templates: [`templates/`](templates/).
-
-See [`install/README.md`](install/README.md):
+Install from a packaged dist (example for tctest):
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-api.sh | bash
-wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-gateway.sh | bash
-wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-api.sh | bash
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-ui.sh | bash
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-nodes.sh | bash
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-gateway.sh | bash
 ```
 
-Or interactive (all components):
-
-```bash
-wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install.sh | bash
-```
-
-`docker-compose.domains.yml` is an equivalent all-in-one compose alternative to the wget gateway.
+Gateway lives once at `~/services/gateway`; products drop site config under `apps/{product}/`. Overlays: [`overlays/`](overlays/). Operator console (CREATE2): [`operator/`](operator/).
 
 ## Checklist
 
-1. DNS A records for `@`, `www`, `testnet`
-2. Let’s Encrypt SAN cert mounted into nginx
-3. Separate SQLite dirs per environment; single API replica each
-4. Distinct `ADMIN_API_KEY` / `SWEEPER_API_KEY` per environment
-5. Register sweeper wallets per environment via `register-onchain-invoice-node.sh`
-6. Mainnet: set real `SWEEPER_ADDRESS` + `FORWARDER_IMPLEMENTATION` after contract deploy
+1. Package both products (`deploy/package.sh`) and commit `tctest/dist` + `tcmain/dist` when shipping installers
+2. Distinct `ADMIN_API_KEY` / `SWEEPER_API_KEY` per environment
+3. Register sweeper wallets via `register-onchain-invoice-node.sh` in each product dist
+4. Mainnet: set real `SWEEPER_ADDRESS` + `FORWARDER_IMPLEMENTATION` after contract deploy

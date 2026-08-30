@@ -1,6 +1,7 @@
 # From repo root:
 #   npm run docker:up
 #   npm run docker:smoke
+# Local smoke only (api + ui). TLS/edge is host gateway via vibed-infra (tctest/tcmain).
 services:
   api:
     build:
@@ -9,7 +10,7 @@ services:
     image: ghcr.io/naiemk/trustless-commerce-api:local
     environment:
       CONFIG_PATH: /config/server.yaml
-      BASE_URL: https://localhost
+      BASE_URL: http://localhost:18080
       DB_PATH: /data/trustless-commerce.db
       ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-key}
       SWEEPER_API_KEY: ${SWEEPER_API_KEY:-dev-sweeper-key}
@@ -17,8 +18,8 @@ services:
       RATE_LIMIT_CREATE_PER_SECOND: "1"
     volumes:
       - api-data:/data
-    expose:
-      - "8080"
+    ports:
+      - "18080:8080"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
@@ -32,24 +33,8 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.ui
     image: ghcr.io/naiemk/trustless-commerce-ui:local
-    expose:
-      - "80"
-    networks:
-      - internal
-
-  nginx:
-    build:
-      context: .
-      dockerfile: Dockerfile.nginx
-    image: ghcr.io/naiemk/trustless-commerce-nginx:local
-    depends_on:
-      api:
-        condition: service_healthy
-      ui:
-        condition: service_started
     ports:
-      - "18080:80"
-      - "18443:443"
+      - "18081:80"
     networks:
       - internal
 

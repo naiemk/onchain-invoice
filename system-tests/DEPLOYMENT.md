@@ -1,289 +1,86 @@
-# Trustless Commerce — VPS deployment (wget | bash)
+# Trustless Commerce — VPS deployment (vibed-infra 0.8)
 
-Operator runbook for deploying published GHCR images on a host (e.g. `dtn-node`).  
-Installer sources: [`deploy/install/`](../deploy/install/). Automated checks: [`README.md`](README.md) (`npm run system-test` / `system-test:install`).
+Operator runbook for published GHCR images on a host. Installers live in committed **product dist** folders (not `deploy/install/`):
 
-Images (tag `:main` unless overridden):
+| Product | Dist | Role |
+|---------|------|------|
+| **tctest** | [`deploy/tctest/dist/`](../deploy/tctest/dist/) | testnet |
+| **tcmain** | [`deploy/tcmain/dist/`](../deploy/tcmain/dist/) | mainnet |
+
+Package after template/overlay changes: `npm run deploy:package` (commit both `dist/` trees). Automated checks: [`README.md`](README.md).
+
+Images (tag `:main`):
 
 | Image | Role |
 |-------|------|
 | `ghcr.io/naiemk/trustless-commerce-api` | Commerce API + SQLite |
-| `ghcr.io/naiemk/trustless-commerce-sweeper` | Sweeper node |
+| `ghcr.io/naiemk/trustless-commerce-sweeper` | Sweepers / bundler / wallet-deployer |
 | `ghcr.io/naiemk/trustless-commerce-ui` | Static UI |
-| `ghcr.io/naiemk/trustless-commerce-nginx` | HTTPS edge |
+
+HTTPS edge is the **host gateway** (`~/services/gateway`) from vibed-infra — there is no product nginx image. GHCR `:main` pushes notify the VPS update-agent via OIDC for instant pull.
 
 ```mermaid
 flowchart TB
-  dns[DNS A records] --> cert[certbot TLS]
-  cert --> apiT[testnet-api]
-  cert --> apiM[mainnet-api optional]
-  apiT --> gw[gateway nginx + UI]
-  apiM --> gw
-  gw --> node[sweeper node]
+  dns[DNS A records] --> gw[host gateway ~/services/gateway]
+  gw --> apiT[tctest-api]
+  gw --> uiT[tctest-ui]
+  gw --> apiM[tcmain-api]
+  gw --> uiM[tcmain-ui]
+  apiT --> node[tctest workers]
   node -->|signed API| apiT
 ```
 
 ---
 
-## 0) Host prerequisites
+## 0) Prerequisites
 
-- Docker (and preferably Compose)
-- Ports **80** / **443** free for the gateway (disable host nginx if it binds them)
-- `curl` or `wget`, `python3`, `crontab` (for auto-update)
-- DNS A records for `@`, `www`, `testnet` → this host
+- Docker + Compose, `curl`/`wget`, `python3`
+- Ports **80** / **443** free for the host gateway
+- DNS for testnet + apex (see each dist `DNS-SKILL.md`)
 
-Suggested layout:
-
-```text
-~/tc/api-testnet/   # testnet API
-~/tc/api-mainnet/   # mainnet API (optional)
-~/tc/gateway/       # UI + nginx
-~/tc/sweeper/       # sweeper node
-```
+Layout under `~/services/` (machine) and product install dirs (operator choice, e.g. `~/tc/tctest-api`).
 
 ---
 
-## 1) DNS + TLS (once)
+## 1) Install (example: tctest)
 
 ```bash
-# Port 80 must be free (stop host nginx / gateway first if needed)
-sudo certbot certonly --standalone \
-  -d trustless-commerce.com \
-  -d www.trustless-commerce.com \
-  -d testnet.trustless-commerce.com
+mkdir -p ~/tc/tctest-api && cd ~/tc/tctest-api
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-api.sh | bash
+# edit .env (DOCKER_NAME=tctest-api, DOCKER_NETWORK=vps-edge, keys, contracts)
+./start-api.sh
+
+mkdir -p ~/tc/tctest-ui && cd ~/tc/tctest-ui
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-ui.sh | bash
+./start-ui.sh
+
+mkdir -p ~/tc/tctest-nodes && cd ~/tc/tctest-nodes
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-nodes.sh | bash
+./register-onchain-invoice-node.sh
+./start-nodes.sh
+
+# Once per host (or second product only extends sites.conf):
+wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-gateway.sh | bash
 ```
 
-Certs live on the host under `/etc/letsencrypt/live/trustless-commerce.com/` (never in git). Gateway mounts them read-only.
+Repeat with `deploy/tcmain/dist/` for mainnet (`DOCKER_NAME=tcmain-api`, distinct keys).
 
 ---
 
-## 2) Testnet API
-
-```bash
-mkdir -p ~/tc/api-testnet && cd ~/tc/api-testnet
-wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-api.sh | bash
-```
-
-Edit `.env` (created from template):
-
-| Key | Purpose |
-|-----|---------|
-| `ADMIN_API_KEY` / `SWEEPER_API_KEY` | Secrets (match sweeper register / legacy key) |
-| `BASE_URL` | `https://testnet.trustless-commerce.com` |
-| `DOCKER_NETWORK` | `trustless-commerce-edge` |
-| `DOCKER_NAME` | `testnet-api` (nginx upstream name) |
-| `EVM_RPC_URL` / `SWEEPER_ADDRESS` / `FORWARDER_IMPLEMENTATION` | Sepolia (see `data/commerce-deploy-sepolia.json`) |
-| `TRON_FULL_HOST` / `TRON_INVOICE_MASTER_SECRET` | Nile EOA invoice prediction (must match sweeper) |
-| `API_AUTO_UPDATE` | Default `0` (opt-in) |
-
-```bash
-./start-onchain-invoice-api.sh
-curl -fsS http://localhost:8080/api/health
-# After gateway is up:
-curl -fsS https://testnet.trustless-commerce.com/api/health
-```
-
-Re-running install refreshes `.env.example` and **appends** missing auto-update keys; it does **not** overwrite existing secrets in `.env`.
-
----
-
-## 3) Mainnet API (optional)
-
-```bash
-mkdir -p ~/tc/api-mainnet && cd ~/tc/api-mainnet
-wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-api.sh | bash
-```
-
-In `.env`:
-
-- `BASE_URL=https://trustless-commerce.com`
-- `DOCKER_NAME=mainnet-api`
-- `DOCKER_NETWORK=trustless-commerce-edge`
-- Distinct admin/sweeper keys; set mainnet contract addresses when live
-- If host port 8080 is taken, set `docker.port: 8081` in `onchain-invoice-api.yaml`
-
-Gateway nginx resolves `mainnet-api` optionally (starts even if mainnet API is absent).
-
----
-
-## 4) HTTPS gateway (UI + nginx)
-
-```bash
-mkdir -p ~/tc/gateway && cd ~/tc/gateway
-wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-gateway.sh | bash
-# confirm TLS_* paths in .env match certbot
-./start-onchain-invoice-gateway.sh
-```
-
-Starts containers:
-
-| Name | Image |
-|------|--------|
-| `testnet-ui` | `trustless-commerce-ui` |
-| `mainnet-ui` | `trustless-commerce-ui` |
-| `onchain-invoice-gateway` | `trustless-commerce-nginx` on 80/443 |
-
-Routing:
-
-| Host | UI | API |
-|------|----|-----|
-| `https://testnet.trustless-commerce.com` | `testnet-ui` | `testnet-api:8080` |
-| `https://trustless-commerce.com` (+ `www`) | `mainnet-ui` | `mainnet-api:8080` |
-
-Verify:
+## 2) Ops checklist
 
 ```bash
 curl -fsS https://testnet.trustless-commerce.com/api/health
-```
-
----
-
-## 5) Sweeper nodes (testnet — Sepolia + Nile + Solana Devnet)
-
-```bash
-# Tear down any previous single/dual sweeper containers, then reinstall:
-docker rm -f onchain-invoice-node \
-  onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana 2>/dev/null || true
-
-mkdir -p ~/tc/sweeper && cd ~/tc/sweeper
-wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
-```
-
-Install refreshes `docker-compose.sweepers.yml` + shared `onchain-invoice-nodes.yaml`. Start runs **three** services (`sweeper-evm` + `sweeper-tron` + `sweeper-solana`) from the same `.env`.
-
-Important `.env` keys:
-
-| Key | Notes |
-|-----|--------|
-| `API_URL` / `SERVER_URL` | `https://testnet.trustless-commerce.com` (prefer public HTTPS, not `host.docker.internal`) |
-| `ADMIN_API_KEY` | Same as testnet API |
-| `SWEEPER_WALLET_KEY` / `SWEEPER_REGISTER_ADDRESS` | Testnet example uses Hardhat #0 — throwaway only |
-| `SWEEPER_CHAINS` | `11155111,nile,devnet` so all workers receive invoices |
-| `SWEEPER_ADDRESS` / `EVM_RPC_URL` | Sepolia sweeper contract |
-| `TRON_FULL_HOST` | `https://nile.trongrid.io` |
-| `TRON_INVOICE_MASTER_SECRET` | Same secret as API (EOA derivation) |
-| `TRON_USDT_ADDRESS` | Nile USDT (default in template; verify on Tronscan if unsure) |
-| `TRON_SPONSOR_PRIVATE_KEY` | Sponsor with **staked** TRX; delegates ENERGY + BANDWIDTH (no TRX sent to invoice EOAs) |
-| `SOLANA_RPC_URL` | Default `https://api.devnet.solana.com` |
-| `SOLANA_PROGRAM_ID` | From `npm run solana:deploy:devnet` / `solana/data/commerce-deploy-devnet.json` |
-| `SOLANA_SWEEPER_KEY` | Authority keypair JSON byte array (same key that ran `initialize`) |
-| `SOLANA_FEE_RECIPIENT` | Fee destination pubkey (base58); empty → authority pubkey |
-| `SOLANA_USDC_MINT` | Circle Devnet USDC (template default) |
-| `ACTIVITY_LOG_PATH` | Single-container fallback; compose uses `activity-{evm,tron,solana}.jsonl` |
-| `NODES_AUTO_UPDATE` | Default `1` on testnet template |
-
-```bash
-./register-onchain-invoice-node.sh   # once per API DB / wallet (chains include nile + devnet)
-./start-onchain-invoice-nodes.sh     # docker compose triple sweepers
-
-docker logs -f onchain-invoice-sweeper-evm
-docker logs -f onchain-invoice-sweeper-tron
-docker logs -f onchain-invoice-sweeper-solana
-tail -f ~/tc/sweeper/logs/activity-evm.jsonl \
-  ~/tc/sweeper/logs/activity-tron.jsonl \
-  ~/tc/sweeper/logs/activity-solana.jsonl
-```
-
-Legacy single container: `USE_COMPOSE=0 ./start-onchain-invoice-nodes.sh`.
-
-### Registration vs image updates
-
-Registration is stored in the **API SQLite** (`sweepers` table), keyed by wallet address. Recreating sweeper containers keeps the same `.env` keys → **no re-register** unless you change the wallet or wipe the API data dir.
-
-### Activity log stages
-
-JSONL on the host (`./logs/activity-*.jsonl`):
-
-- `invoice-paid` — non-zero balance observed
-- `sweep-submitted` / `sweep-confirmed` — sweep tx hash + amounts
-- `sweep-failed` / `tick-failed` — errors
-
-Quote `0x…` values in YAML (installer templates already do). Unquoted YAML 1.1 parses them as integers and corrupts private keys.
-
-API must also set matching `TRON_INVOICE_MASTER_SECRET` / `TRON_FULL_HOST` so create returns Nile invoice EOAs.
----
-
-## 6) Auto-update (cron)
-
-Each install dir can schedule `update-onchain-invoice-*.sh` via `./install-auto-update.sh` (role auto-detected from files present).
-
-### Flags
-
-| Flag | Container | Default |
-|------|-----------|---------|
-| `UI_TESTNET_AUTO_UPDATE` | `testnet-ui` | on |
-| `UI_MAINNET_AUTO_UPDATE` | `mainnet-ui` | on |
-| `GATEWAY_AUTO_UPDATE` | nginx | on |
-| `NODES_AUTO_UPDATE` | sweeper | on (testnet example; use `0` on mainnet) |
-| `API_AUTO_UPDATE` | API | **off** |
-
-Intervals: `GATEWAY_AUTO_UPDATE_INTERVAL_MIN` (5), `NODES_AUTO_UPDATE_INTERVAL_MIN` (15), `API_AUTO_UPDATE_INTERVAL_MIN` (15).  
-Stop grace: `GATEWAY_STOP_TIMEOUT`, `NODES_STOP_TIMEOUT`, `API_STOP_TIMEOUT`.
-
-### Algorithm
-
-1. Cron runs the role’s `update-*.sh` every N minutes.
-2. If the relevant flag is off → exit.
-3. `docker pull` configured image(s).
-4. Compare running container `Image` id vs pulled tag `Id`.
-5. If unchanged → no-op; else `docker stop -t …` (sweeper drains in-flight tick), then recreate (`start-*.sh` with `PULL=0`, or selective UI/nginx recreate).
-6. Append to `./logs/auto-update.log`.
-
-```bash
-cd ~/tc/gateway && ./install-auto-update.sh
-cd ~/tc/sweeper && ./install-auto-update.sh
-cd ~/tc/api-testnet && ./install-auto-update.sh   # only if API_AUTO_UPDATE=1
-
-crontab -l | grep onchain-invoice-auto-update
-tail -f ~/tc/gateway/logs/auto-update.log
-```
-
-Legacy `AUTO_UPDATE` is still accepted if the role-specific flag is unset.
-
----
-
-## 7) Operational checklist
-
-```bash
-# Health
-curl -fsS https://testnet.trustless-commerce.com/api/health
-
-# Containers
 docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
-
-# API data (SQLite) — uid 1000
-ls -la ~/tc/api-testnet/data/
-
-# Sweeper activity
-tail -f ~/tc/sweeper/logs/activity-evm.jsonl ~/tc/sweeper/logs/activity-tron.jsonl
-
-# Manual recreate (pull + replace)
-cd ~/tc/api-testnet && ./start-onchain-invoice-api.sh
-cd ~/tc/gateway && ./start-onchain-invoice-gateway.sh
-cd ~/tc/sweeper && ./start-onchain-invoice-nodes.sh
+# Manual recreate: cd install-dir && ./start-api.sh  (or start-nodes.sh / start-ui.sh)
 ```
 
-Skip pull: `PULL=0` or `ONCHAIN_INVOICE_SKIP_PULL=1`.  
-Dev branch installers: `ONCHAIN_INVOICE_RAW=https://raw.githubusercontent.com/naiemk/onchain-invoice/<ref>/deploy/install`.
-
----
-
-## 8) Known pitfalls
-
-| Symptom | Fix |
-|---------|-----|
-| `invalid private key` | Quote `0x` keys in YAML; ensure `SWEEPER_WALLET_KEY` reaches the container (`docker inspect … \| grep SWEEPER`) |
-| `SQLITE_CANTOPEN` | Data dir must be writable by uid `1000` (start script `chown`s) |
-| Sweeper `503` / invoice list fail | Empty `SWEEPER_API_KEY` or wallet not registered |
-| Gateway fails resolving `mainnet-api` | Use current `domains.conf` (optional upstream via Docker DNS variables) |
-| Auto-update missing in `.env` | Re-run install script — appends missing flags; refresh cron with `./install-auto-update.sh` |
-| Host nginx fights Docker | Stop/disable host nginx; gateway container owns 80/443 |
+Skip pull: `PULL=0` or `ONCHAIN_INVOICE_SKIP_PULL=1`. Branch override: set `PRODUCT_RAW` / `PACKAGECONFIG_URL` to the branch raw URLs under `deploy/tctest/dist`.
 
 ---
 
 ## Related
 
-- Installer detail: [`deploy/install/README.md`](../deploy/install/README.md)
-- Domains compose (alternative): [`deploy/docker-compose.domains.yml`](../docker-compose.domains.yml)
-- Product roadmap: [`ROADMAP.md`](../ROADMAP.md)
+- Deploy overview: [`deploy/README.md`](../deploy/README.md)
+- Operator CREATE2 console: [`deploy/operator/README.md`](../deploy/operator/README.md)
 - Local image suite: [`README.md`](README.md)

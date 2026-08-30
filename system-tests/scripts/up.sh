@@ -21,8 +21,6 @@ fi
 set -a && source .env && set +a
 export IMAGE_TAG="${IMAGE_TAG:-main}"
 
-"$REPO/deploy/gen-dev-certs.sh" >/dev/null 2>&1 || true
-
 echo "Pulling images (IMAGE_TAG=${IMAGE_TAG})..."
 if [[ "${PULL:-1}" != "0" ]]; then
   docker compose pull

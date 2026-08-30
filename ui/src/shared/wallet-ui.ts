@@ -10,8 +10,20 @@ import {
   type WalletSession,
 } from "./wallet-session.js";
 import { spaNavigate } from "./spa-render.js";
+import { isAdvancedMode, loadWalletMode, saveWalletMode, type WalletMode } from "./wallet-mode.js";
 
-export type WalletTab = "home" | "security" | "send" | "receive" | "create" | "pair" | "recover";
+export type WalletTab =
+  | "home"
+  | "security"
+  | "send"
+  | "receive"
+  | "create"
+  | "pair"
+  | "recover"
+  | "cash"
+  | "getPaid"
+  | "invoices"
+  | "developers";
 
 const ICON_COPY = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="9" y="9" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M5 12.5l4.2 4.2L19 7.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -112,6 +124,7 @@ export function walletAccountBarHtml(session: WalletSession, registry: WalletSes
 }
 
 export function bindWalletAccountBar(root: HTMLElement): void {
+  bindWalletModeToggle(root);
   const bar = root.querySelector<HTMLElement>(".wallet-account-bar");
   if (!bar) return;
   const session = loadWalletSession();
@@ -229,6 +242,12 @@ export function walletFrame(opts: {
     </section>`;
 }
 
+/** After painting walletFrame HTML, bind mode toggle + account bar helpers. */
+export function bindWalletChrome(root: HTMLElement): void {
+  bindWalletAccountBar(root);
+  bindWalletModeToggle(root);
+}
+
 /** Chrome + subnav so a tab can paint before async data arrives. */
 export function walletLoadingFrame(
   current: WalletTab,
@@ -243,27 +262,57 @@ export function walletLoadingFrame(
   });
 }
 
+export function walletModeToggleHtml(): string {
+  const mode = loadWalletMode();
+  return `
+    <div class="wallet-mode-toggle" role="group" aria-label="${escapeHtml(t("wallet.modeLabel"))}">
+      <button type="button" class="wallet-mode-btn ${mode === "simple" ? "is-active" : ""}" data-wallet-mode="simple">${escapeHtml(t("wallet.modeSimple"))}</button>
+      <button type="button" class="wallet-mode-btn ${mode === "advanced" ? "is-active" : ""}" data-wallet-mode="advanced">${escapeHtml(t("wallet.modeAdvanced"))}</button>
+    </div>`;
+}
+
+export function bindWalletModeToggle(root: HTMLElement, onChange?: (mode: WalletMode) => void): void {
+  root.querySelectorAll<HTMLButtonElement>("[data-wallet-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.walletMode as WalletMode;
+      if (mode !== "simple" && mode !== "advanced") return;
+      saveWalletMode(mode);
+      onChange?.(mode);
+      spaNavigate(location.pathname + location.search, "replace");
+    });
+  });
+}
+
 export function walletSubnav(current: WalletTab): string {
   const session = loadWalletSession();
+  const advanced = isAdvancedMode();
   const links: Array<{ href: string; key: WalletTab; label: string }> = [
     { href: "/wallet", key: "home", label: t("wallet.homeTab") },
-    { href: "/wallet/send", key: "send", label: t("wallet.sendTitle") },
-    { href: "/wallet/receive", key: "receive", label: t("wallet.receiveTitle") },
-    { href: "/wallet/security", key: "security", label: t("wallet.devicesTab") },
+    { href: "/wallet/get-paid", key: "getPaid", label: t("wallet.getPaidTab") },
+    { href: "/wallet/send", key: "send", label: t("wallet.payTab") },
+    { href: "/wallet/cash", key: "cash", label: t("wallet.cashTab") },
+    { href: "/wallet/security", key: "security", label: t("wallet.securityTab") },
   ];
-  if (session || current === "recover") {
+  if (advanced) {
+    links.push({ href: "/merchant", key: "invoices", label: t("wallet.invoicesTab") });
+    links.push({ href: "/wallet/recover", key: "recover", label: t("wallet.recoverTab") });
+    links.push({ href: "/wallet/developers", key: "developers", label: t("wallet.developersTab") });
+  } else if (session || current === "recover") {
     links.push({ href: "/wallet/recover", key: "recover", label: t("wallet.recoverTab") });
   }
   return `
-    <nav class="wallet-subnav" aria-label="${escapeHtml(t("wallet.navLabel"))}">
-      ${links
-        .map((l) =>
-          l.key === current
-            ? `<span aria-current="page">${escapeHtml(l.label)}</span>`
-            : `<a href="${l.href}" data-route>${escapeHtml(l.label)}</a>`
-        )
-        .join("")}
-    </nav>`;
+    <div class="wallet-subnav-row">
+      ${walletModeToggleHtml()}
+      <nav class="wallet-subnav" aria-label="${escapeHtml(t("wallet.navLabel"))}">
+        ${links
+          .map((l) =>
+            l.key === current
+              ? `<span aria-current="page">${escapeHtml(l.label)}</span>`
+              : `<a href="${l.href}" data-route>${escapeHtml(l.label)}</a>`
+          )
+          .join("")}
+      </nav>
+    </div>`;
 }
 
 export function addressBox(address: string, id = "wallet-address-copy"): string {

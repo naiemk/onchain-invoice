@@ -1,0 +1,27 @@
+name: tcmain
+version: 1
+
+templates:
+  api: api-config.yaml
+  ui: ui-config.yaml
+  nodes: nodes-config.yaml
+
+network:
+  edge: vps-edge
+
+autoUpdate:
+  api: { enabled: true, intervalMin: 30, offset: 0 }
+  ui: { enabled: true, intervalMin: 20, offset: 15 }
+  nodes: { enabled: true, intervalMin: 30, offset: 10 }
+  gateway: { enabled: true, intervalMin: 20, offset: 20 }
+
+gateway:
+  publicIp: 57.131.150.182
+  tlsEmail: ops@trustless-commerce.com
+  nginxImage: nginx:alpine
+  sites:
+    - host: trustless-commerce.com
+      aliases: [www.trustless-commerce.com]
+      healthPath: /api/health
+      createPath: /api/invoices
+      tlsCertDir: /etc/letsencrypt/live/trustless-commerce.com
