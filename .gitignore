@@ -77,6 +77,7 @@ web_modules/
 !.env.api.example
 !.env.nodes.example
 !.env.gateway.example
+!.env.ui.example
 FastSwapConfig.testnet.live.yaml
 
 # parcel-bundler cache (https://parceljs.org/)
