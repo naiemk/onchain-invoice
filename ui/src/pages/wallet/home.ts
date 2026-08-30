@@ -12,12 +12,16 @@ import { unlockWalletWithPasskey } from "../../shared/wallet-unlock.js";
 import {
   bindCopyButtons,
   bindWalletAccountBar,
+  bindWalletModeToggle,
   chainBalanceRows,
   showStatus,
   walletAccountBarHtml,
   walletPickerCard,
   walletSubnav,
 } from "../../shared/wallet-ui.js";
+import { isAdvancedMode } from "../../shared/wallet-mode.js";
+import { listDevices } from "../../shared/wallet-api.js";
+import { fetchWalletRecovery } from "../../shared/wallet-recovery-api.js";
 
 export async function renderWalletHome(root: HTMLElement): Promise<void> {
   const session = loadWalletSession();
@@ -79,6 +83,7 @@ function paintDashboard(
   registry: ReturnType<typeof listWalletRegistry>,
   opts: { totalUsd: string; chainHtml: string; balanceError: boolean; loading: boolean }
 ): void {
+  const advanced = isAdvancedMode();
   root.innerHTML = `
     <section class="panel wallet-panel wallet-panel-unlocked">
       ${walletAccountBarHtml(session, registry)}
@@ -89,13 +94,19 @@ function paintDashboard(
           <p class="wallet-balance-total"><span class="wallet-balance-amount">${escapeHtml(opts.totalUsd)}</span> <span class="wallet-balance-currency">${escapeHtml(t("wallet.usd"))}</span></p>
         </div>
         <div class="cta-row wallet-actions wallet-actions-primary">
-          <a class="tc-btn" href="/wallet/send" data-route>${escapeHtml(t("wallet.sendTitle"))}</a>
-          <a class="tc-btn secondary" href="/wallet/receive" data-route>${escapeHtml(t("wallet.receiveTitle"))}</a>
+          <a class="tc-btn" href="/wallet/get-paid" data-route>${escapeHtml(t("wallet.actionGetPaid"))}</a>
+          <a class="tc-btn secondary" href="/wallet/send" data-route>${escapeHtml(t("wallet.actionPay"))}</a>
+          <a class="tc-btn secondary" href="/wallet/cash" data-route>${escapeHtml(t("wallet.actionCashIn"))}</a>
+          <a class="tc-btn secondary" href="/wallet/cash" data-route>${escapeHtml(t("wallet.actionCashOut"))}</a>
         </div>
-        <div class="cta-row wallet-actions wallet-actions-fiat">
-          <a class="tc-btn secondary" href="/wallet/deposit" data-route>${escapeHtml(t("wallet.depositCta"))}</a>
-          <a class="tc-btn secondary" href="/wallet/withdraw" data-route>${escapeHtml(t("wallet.withdrawCta"))}</a>
-        </div>
+        <div id="wallet-needs-attention" class="wallet-needs-attention hidden" hidden></div>
+        ${
+          advanced
+            ? `<div class="wallet-advanced-home" id="wallet-advanced-home">
+                <p class="field-hint">${escapeHtml(t("wallet.advancedHomeLoading"))}</p>
+              </div>`
+            : ""
+        }
         <p class="wallet-device-status">
           <span class="wallet-device-status-label">${escapeHtml(t("wallet.thisDeviceChip"))}</span>
           <a href="/wallet/security" data-route>${escapeHtml(t("wallet.manageDevices"))}</a>
@@ -107,7 +118,56 @@ function paintDashboard(
     </section>`;
 
   bindWalletAccountBar(root);
+  bindWalletModeToggle(root);
   bindCopyButtons(root);
+
+  void (async () => {
+    const attention = root.querySelector<HTMLElement>("#wallet-needs-attention");
+    try {
+      const recovery = await fetchWalletRecovery(session.address);
+      if (recovery.request || recovery.pendingOwner?.active) {
+        if (attention) {
+          attention.hidden = false;
+          attention.classList.remove("hidden");
+          attention.innerHTML = `
+            <p class="banner warn">${escapeHtml(t("wallet.pendingRecovery"))}
+              <a href="/wallet/recover" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
+            </p>`;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    if (!advanced) return;
+    const box = root.querySelector<HTMLElement>("#wallet-advanced-home");
+    if (!box) return;
+    let deviceCount = 1;
+    try {
+      deviceCount = (await listDevices(session.address, session.chainId)).length || 1;
+    } catch {
+      deviceCount = 1;
+    }
+    box.innerHTML = `
+      <div class="wallet-advanced-cards">
+        <a class="wallet-advanced-card" href="/wallet/security" data-route>
+          <strong>${escapeHtml(t("wallet.advancedDevicesTitle"))}</strong>
+          <span>${escapeHtml(t("wallet.advancedDevicesBody", { count: deviceCount }))}</span>
+        </a>
+        <a class="wallet-advanced-card" href="/wallet/recover" data-route>
+          <strong>${escapeHtml(t("wallet.advancedRecoveryTitle"))}</strong>
+          <span>${escapeHtml(t("wallet.advancedRecoveryBody"))}</span>
+        </a>
+        <a class="wallet-advanced-card" href="/merchant" data-route>
+          <strong>${escapeHtml(t("wallet.advancedInvoicesTitle"))}</strong>
+          <span>${escapeHtml(t("wallet.advancedInvoicesBody"))}</span>
+        </a>
+        <a class="wallet-advanced-card" href="/wallet/developers" data-route>
+          <strong>${escapeHtml(t("wallet.developersTab"))}</strong>
+          <span>${escapeHtml(t("wallet.advancedDevBody"))}</span>
+        </a>
+      </div>`;
+  })();
 }
 
 async function renderPicker(

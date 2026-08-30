@@ -8,6 +8,9 @@ import { renderWalletDeposit } from "./deposit.js";
 import { renderWalletWithdraw } from "./withdraw.js";
 import { renderWalletOfframpCashout } from "./offramp-cashout.js";
 import { renderWalletRecover } from "./recover.js";
+import { renderWalletCash } from "./cash.js";
+import { renderWalletGetPaid } from "./get-paid.js";
+import { renderWalletDevelopers } from "./developers.js";
 
 export async function renderWallet(root: HTMLElement): Promise<void> {
   const path = location.pathname;
@@ -33,6 +36,18 @@ export async function renderWallet(root: HTMLElement): Promise<void> {
   }
   if (path === "/wallet/receive") {
     await renderWalletReceive(root);
+    return;
+  }
+  if (path === "/wallet/cash") {
+    await renderWalletCash(root);
+    return;
+  }
+  if (path === "/wallet/get-paid") {
+    await renderWalletGetPaid(root);
+    return;
+  }
+  if (path === "/wallet/developers") {
+    await renderWalletDevelopers(root);
     return;
   }
   if (path === "/wallet/deposit") {

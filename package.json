@@ -42,13 +42,11 @@
     "ui:build": "vite build --config ui/vite.config.ts",
     "ui:verify": "bash ui/scripts/verify-ui-steps.sh",
     "docker:certs": "bash deploy/gen-dev-certs.sh",
-    "docker:up": "bash deploy/gen-dev-certs.sh && docker compose -f deploy/docker-compose.yml up --build -d",
+    "docker:up": "docker compose -f deploy/docker-compose.yml up --build -d",
     "docker:smoke": "bash deploy/smoke-test.sh",
     "docker:down": "docker compose -f deploy/docker-compose.yml down -v",
     "docker:test": "npm run docker:up && sleep 8 && npm run docker:smoke && npm run docker:down",
-    "docker:domains:pull": "docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains pull",
-    "docker:domains:up": "docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains up -d",
-    "docker:domains:down": "docker compose -f deploy/docker-compose.domains.yml --env-file deploy/.env.domains down",
+    "deploy:package": "bash deploy/package.sh",
     "system-test": "bash system-tests/scripts/run.sh",
     "system-test:install": "bash system-tests/scripts/run-install-e2e.sh",
     "system-test:infra-deploy": "bash system-tests/scripts/run-infra-deploy-e2e.sh",
@@ -105,7 +103,7 @@
     "onchain-invoice": "file:.",
     "qrcode": "^1.5.4",
     "tronweb": "^6.3.0",
-    "vibed-infra": "^0.5.0",
+    "vibed-infra": "0.8.0",
     "yaml": "^2.9.0"
   }
 }

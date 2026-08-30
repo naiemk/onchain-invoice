@@ -27,12 +27,3 @@ assert_contains "$pay" "Trustless Commerce"
 echo "== API health via network =="
 health="$(api_json GET /api/health)"
 assert_body_ok "$health"
-
-echo "== edge HTTP redirect =="
-headers="$(https_headers /api/health)"
-lower="$(echo "$headers" | tr '[:upper:]' '[:lower:]')"
-if ! echo "$lower" | grep -Eq 'http/[0-9.]+ 30[12]| 30[12] '; then
-  echo "expected 301/302 redirect from nginx http, got:" >&2
-  echo "$headers" >&2
-  exit 1
-fi

@@ -1,0 +1,16 @@
+# Wallet UserOp bundler (ERC-4337). Env expanded by the worker config loader.
+serverUrl: ${SERVER_URL}
+intervalMs: 15000
+bundlerWalletKey: ${BUNDLER_WALLET_KEY}
+activityLogPath: ${ACTIVITY_LOG_PATH}
+chains:
+  - chainId: ${WALLET_CHAIN_ID}
+    rpcUrl: ${EVM_RPC_URL}
+    bundlerAddress: ${BUNDLER_ADDRESS}
+    privateKey: ${BUNDLER_PRIVATE_KEY}
+    entryPointAddress: ${WALLET_ENTRYPOINT_ADDRESS}
+    beneficiary: ${WALLET_BUNDLER_BENEFICIARY}
+    feeUsdc: ${WALLET_BUNDLER_FEE_USDC}
+    feeTokenAddress: ${WALLET_BUNDLER_FEE_TOKEN}
+    feeTokenSymbol: USDC
+    feeTokenDecimals: 6

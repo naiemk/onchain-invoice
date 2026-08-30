@@ -78,11 +78,6 @@ fetch("http://ui" + process.env.T_PATH).then(async (res) => {
 '
 }
 
-https_headers() {
-  local path="$1"
-  "${COMPOSE[@]}" exec -T nginx wget -S -O /dev/null "http://127.0.0.1${path}" 2>&1 || true
-}
-
 assert_contains() {
   local haystack="$1"
   local needle="$2"

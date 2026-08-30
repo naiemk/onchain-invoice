@@ -7,6 +7,8 @@ import { renderHome } from "./pages/home.js";
 import { renderMerchant } from "./pages/merchant.js";
 import { renderPay } from "./pages/pay.js";
 import { renderWallet } from "./pages/wallet/index.js";
+import { renderGetPaid } from "./pages/get-paid.js";
+import { renderSecurityMarketing } from "./pages/security.js";
 import { SITE } from "./shared/site.js";
 import { applyTheme, initThemeToggle, preferredTheme } from "./shared/theme.js";
 import { beginSpaRender, isSpaRenderCurrent } from "./shared/spa-render.js";
@@ -20,6 +22,8 @@ export type PageRenderer = (root: HTMLElement) => void | Promise<void>;
 const routes: Record<string, PageRenderer> = {
   "/": renderHome,
   "/integrations": renderIntegrations,
+  "/get-paid": renderGetPaid,
+  "/security": renderSecurityMarketing,
   "/create": renderCreate,
   "/pay": renderPay,
   "/merchant": renderMerchant,
@@ -35,6 +39,9 @@ const routes: Record<string, PageRenderer> = {
   "/wallet/withdraw": renderWallet,
   "/wallet/offramp/cashout": renderWallet,
   "/wallet/recover": renderWallet,
+  "/wallet/cash": renderWallet,
+  "/wallet/get-paid": renderWallet,
+  "/wallet/developers": renderWallet,
 };
 
 applyTheme(preferredTheme());
@@ -93,7 +100,10 @@ function syncTopbarNav(pathname: string): void {
   if (!nav) return;
   nav.querySelectorAll("a[data-route]").forEach((anchor) => {
     const href = anchor.getAttribute("href") ?? "";
-    const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+    const isActive =
+      pathname === href ||
+      (href !== "/" && pathname.startsWith(href)) ||
+      (href === "/get-paid" && (pathname.startsWith("/create") || pathname.startsWith("/merchant")));
     if (isActive) anchor.setAttribute("aria-current", "page");
     else anchor.removeAttribute("aria-current");
   });
@@ -109,6 +119,10 @@ function applyMeta(pathname: string): void {
 
 function pageMeta(path: string): { title: string; description: string } {
   switch (path) {
+    case "/get-paid":
+      return { title: t("meta.getPaidTitle"), description: t("meta.getPaidDescription") };
+    case "/security":
+      return { title: t("meta.securityTitle"), description: t("meta.securityDescription") };
     case "/create":
       return { title: t("meta.createTitle"), description: t("meta.createDescription") };
     case "/pay":
@@ -131,6 +145,9 @@ function pageMeta(path: string): { title: string; description: string } {
     case "/wallet/withdraw":
     case "/wallet/offramp/cashout":
     case "/wallet/recover":
+    case "/wallet/cash":
+    case "/wallet/get-paid":
+    case "/wallet/developers":
       return { title: t("meta.walletTitle"), description: t("meta.walletDescription") };
     default:
       return { title: t("meta.homeTitle"), description: t("meta.homeDescription") };
@@ -166,8 +183,12 @@ function shell(pathname: string, chrome: PayChrome = "full"): string {
     return `<main id="outlet" class="outlet-chrome-none"></main>`;
   }
 
-  const active = (href: string) =>
-    pathname === href || (href !== "/" && pathname.startsWith(href));
+  const active = (href: string) => {
+    if (pathname === href || (href !== "/" && pathname.startsWith(href))) return true;
+    if (href === "/get-paid" && (pathname.startsWith("/create") || pathname.startsWith("/merchant"))) return true;
+    if (href === "/wallet" && pathname.startsWith("/wallet")) return true;
+    return false;
+  };
   const link = (href: string, label: string) =>
     `<a href="${href}" data-route${active(href) ? ' aria-current="page"' : ""}>${label}</a>`;
 
@@ -200,11 +221,10 @@ function shell(pathname: string, chrome: PayChrome = "full"): string {
         <span>${t("brand")}</span>
       </a>
       <nav>
-        ${link("/", t("nav.product"))}
-        ${link("/integrations", t("nav.integrations"))}
-        ${link("/create", t("nav.create"))}
         ${link("/wallet", t("nav.wallet"))}
-        ${link("/merchant", t("nav.merchant"))}
+        ${link("/get-paid", t("nav.getPaid"))}
+        ${link("/integrations", t("nav.integrations"))}
+        ${link("/security", t("nav.security"))}
         <a href="${SITE.docsUrl}" target="_blank" rel="noopener noreferrer">${t("nav.docs")}</a>
         ${localeSelectHtml()}
         <button type="button" class="theme-toggle" id="theme-toggle" aria-pressed="false" aria-label="${t("theme.switchTheme")}"></button>

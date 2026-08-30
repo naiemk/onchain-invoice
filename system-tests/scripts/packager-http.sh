@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Start HTTP servers for packager e2e (vibed-infra + product repo).
-# Sets PACKAGER_RAW, PACKAGECONFIG_URL, PRODUCT_RAW, PACKAGER_HTTP_PID, PRODUCT_HTTP_PID.
+# Start HTTP servers for packager e2e (vibed-infra + product tctest dist).
+# Sets PACKAGER_RAW, PACKAGECONFIG_URL, PRODUCT_RAW, RAW_BASE, PACKAGER_HTTP_PID, PRODUCT_HTTP_PID.
 set -euo pipefail
 
 packager_http_pick_port() {
@@ -26,15 +26,15 @@ packager_http_start() {
   PRODUCT_HTTP_PID=$!
   for _ in $(seq 1 30); do
     if curl -fsS "http://127.0.0.1:${packager_port}/install.sh" >/dev/null 2>&1 \
-      && curl -fsS "http://127.0.0.1:${product_port}/deploy/packageconfig.yaml" >/dev/null 2>&1; then
+      && curl -fsS "http://127.0.0.1:${product_port}/deploy/tctest/dist/packageconfig.yaml" >/dev/null 2>&1; then
       break
     fi
     sleep 0.2
   done
   PACKAGER_RAW="http://127.0.0.1:${packager_port}"
-  PACKAGECONFIG_URL="http://127.0.0.1:${product_port}/deploy/packageconfig.yaml"
-  PRODUCT_RAW="http://127.0.0.1:${product_port}/deploy/templates"
-  RAW_BASE="http://127.0.0.1:${product_port}/deploy/install"
+  PACKAGECONFIG_URL="http://127.0.0.1:${product_port}/deploy/tctest/dist/packageconfig.yaml"
+  PRODUCT_RAW="http://127.0.0.1:${product_port}/deploy/tctest/dist"
+  RAW_BASE="http://127.0.0.1:${product_port}/deploy/tctest/dist"
   export PACKAGER_RAW PACKAGECONFIG_URL PRODUCT_RAW RAW_BASE PACKAGER_HTTP_PID PRODUCT_HTTP_PID
 }
 

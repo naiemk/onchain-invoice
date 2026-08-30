@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# End-to-end: wget|bash installers → start scripts → API + sweeper assertions.
+# End-to-end: wget|bash tctest installers → start-api/start-nodes → API + sweeper assertions.
+# Uses separate install dirs (api + nodes) — vibed register fails if both share one .env.
 set -euo pipefail
 
 ST_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "$ST_ROOT/.." && pwd)"
-INSTALL_SRC="$REPO_ROOT/deploy/install"
-TEMPLATE_SRC="$REPO_ROOT/deploy/templates"
 
 # shellcheck disable=SC1091
 source "$ST_ROOT/scripts/lib.sh"
@@ -15,8 +14,9 @@ source "$ST_ROOT/scripts/packager-http.sh"
 IMAGE_TAG="${IMAGE_TAG:-main}"
 API_IMAGE="ghcr.io/naiemk/trustless-commerce-api:${IMAGE_TAG}"
 SWEEPER_IMAGE="ghcr.io/naiemk/trustless-commerce-sweeper:${IMAGE_TAG}"
-API_CONTAINER="onchain-invoice-api"
-NODE_CONTAINER="onchain-invoice-node"
+API_CONTAINER="tctest-api"
+DOCKER_NETWORK="${DOCKER_NETWORK:-vps-edge}"
+APP_PREFIX="tctest"
 
 ADMIN_API_KEY="${ADMIN_API_KEY:-system-test-admin}"
 SWEEPER_API_KEY="${SWEEPER_API_KEY:-system-test-sweeper}"
@@ -28,20 +28,23 @@ EVM_RPC_URL="${EVM_RPC_URL:-}"
 MERCHANT="${MERCHANT:-0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb}"
 SWEEPER_ADDR="${SWEEPER_ADDR:-0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266}"
 
-INSTALL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/onchain-invoice-install-e2e.XXXXXX")"
+INSTALL_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/onchain-invoice-install-e2e.XXXXXX")"
+API_DIR="${INSTALL_ROOT}/api"
+NODES_DIR="${INSTALL_ROOT}/nodes"
 
 cleanup_install() {
   packager_http_stop
-  docker rm -f "$API_CONTAINER" "$NODE_CONTAINER" \
-    onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana \
+  docker rm -f "$API_CONTAINER" \
+    tctest-sweeper-evm tctest-sweeper-tron tctest-sweeper-solana \
+    tctest-bundler-evm tctest-wallet-deployer-evm \
     >/dev/null 2>&1 || true
   docker volume rm -f "${API_CONTAINER}-data" >/dev/null 2>&1 || true
-  rm -rf "$INSTALL_DIR"
+  rm -rf "$INSTALL_ROOT"
 }
 trap cleanup_install EXIT
 
-echo "======== wget install e2e ========"
-echo "INSTALL_DIR=$INSTALL_DIR"
+echo "======== wget install e2e (tctest / vibed-infra 0.8) ========"
+echo "INSTALL_ROOT=$INSTALL_ROOT"
 echo "IMAGE_TAG=$IMAGE_TAG"
 
 if [[ "${BUILD_LOCAL:-1}" == "1" ]] && [[ "$IMAGE_TAG" != "main" ]]; then
@@ -59,82 +62,53 @@ fi
 packager_http_start "$REPO_ROOT"
 echo "PACKAGER_RAW=$PACKAGER_RAW"
 echo "PRODUCT_RAW=$PRODUCT_RAW"
+echo "PACKAGECONFIG_URL=$PACKAGECONFIG_URL"
+echo "RAW_BASE=$RAW_BASE"
 
-docker rm -f "$API_CONTAINER" "$NODE_CONTAINER" \
-  onchain-invoice-sweeper-evm onchain-invoice-sweeper-tron onchain-invoice-sweeper-solana \
+# Dry-run: install wrappers must be reachable over HTTP.
+for script in install-api.sh install-nodes.sh; do
+  curl -fsS "${RAW_BASE}/${script}" >/dev/null
+done
+echo "packager install scripts reachable"
+
+docker rm -f "$API_CONTAINER" \
+  tctest-sweeper-evm tctest-sweeper-tron tctest-sweeper-solana \
+  tctest-bundler-evm tctest-wallet-deployer-evm \
   >/dev/null 2>&1 || true
 
-echo "== wget|bash install-api.sh (infra packager) =="
+mkdir -p "$API_DIR" "$NODES_DIR"
+
+echo "== wget|bash install-api.sh (tctest dist) =="
 wget -qO- "${RAW_BASE}/install-api.sh" | \
   env PACKAGER_RAW="$PACKAGER_RAW" \
       PACKAGECONFIG_URL="$PACKAGECONFIG_URL" \
-      ONCHAIN_INVOICE_RAW="$PRODUCT_RAW" \
-      INSTALL_DIR="$INSTALL_DIR" bash
+      PRODUCT_RAW="$PRODUCT_RAW" \
+      INSTALL_DIR="$API_DIR" bash
 
-echo "== wget|bash install-nodes.sh (infra packager) =="
+echo "== wget|bash install-nodes.sh (tctest dist) =="
 wget -qO- "${RAW_BASE}/install-nodes.sh" | \
   env PACKAGER_RAW="$PACKAGER_RAW" \
       PACKAGECONFIG_URL="$PACKAGECONFIG_URL" \
-      ONCHAIN_INVOICE_RAW="$PRODUCT_RAW" \
-      INSTALL_DIR="$INSTALL_DIR" bash
+      PRODUCT_RAW="$PRODUCT_RAW" \
+      INSTALL_DIR="$NODES_DIR" bash
 
-[[ -x "$INSTALL_DIR/start-onchain-invoice-api.sh" ]]
-[[ -x "$INSTALL_DIR/start-onchain-invoice-nodes.sh" ]]
-[[ -f "$INSTALL_DIR/onchain-invoice-api.yaml" ]]
-[[ -f "$INSTALL_DIR/onchain-invoice-nodes.yaml" ]]
-[[ -f "$INSTALL_DIR/lib-env.sh" ]]
-[[ -f "$INSTALL_DIR/.infra-profile" ]]
+[[ -x "$API_DIR/start-api.sh" ]]
+[[ -f "$API_DIR/api-app.yaml" ]]
+[[ -x "$NODES_DIR/start-nodes.sh" ]]
+[[ -f "$NODES_DIR/nodes-workers.yaml" ]]
+[[ -f "$NODES_DIR/docker-compose.workers.yml" ]]
+[[ -x "$NODES_DIR/register-onchain-invoice-node.sh" ]]
 
-echo "== patch YAML images / rate limit =="
-python3 - "$INSTALL_DIR/onchain-invoice-api.yaml" "$API_IMAGE" <<'PY'
+echo "== patch api-app.yaml rate limit =="
+python3 - "$API_DIR/api-app.yaml" <<'PY'
 import sys
-path, image = sys.argv[1], sys.argv[2]
+path = sys.argv[1]
 text = open(path, encoding="utf-8").read().splitlines()
 out = []
 for line in text:
-    if line.strip().startswith("image:"):
-        indent = line[: len(line) - len(line.lstrip(" "))]
-        out.append(f"{indent}image: {image}")
-    elif line.strip().startswith("createPerSecond:"):
+    if line.strip().startswith("createPerSecond:"):
         indent = line[: len(line) - len(line.lstrip(" "))]
         out.append(f"{indent}createPerSecond: 10")
-    elif line.strip().startswith("adminApiKey:"):
-        indent = line[: len(line) - len(line.lstrip(" "))]
-        out.append(f"{indent}adminApiKey: ${{ADMIN_API_KEY}}")
-    elif line.strip().startswith("sweeperApiKey:"):
-        indent = line[: len(line) - len(line.lstrip(" "))]
-        out.append(f"{indent}sweeperApiKey: ${{SWEEPER_API_KEY}}")
-    else:
-        out.append(line)
-open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
-PY
-
-python3 - "$INSTALL_DIR/onchain-invoice-nodes.yaml" "$SWEEPER_IMAGE" "$SWEEPER_WALLET_KEY" "$SWEEPER_PRIVATE_KEY" "$SWEEPER_ADDRESS" <<'PY'
-import sys
-path, image, wallet_key, private_key, sweeper_addr = sys.argv[1:6]
-text = open(path, encoding="utf-8").read().splitlines()
-out = []
-section = ""
-for line in text:
-    stripped = line.strip()
-    indent = line[: len(line) - len(line.lstrip(" "))]
-    # Track top-level YAML section so we do not stuff an EVM hex key into solana.privateKey.
-    if line and not line[0].isspace() and ":" in line:
-        section = line.split(":", 1)[0].strip()
-    if stripped.startswith("image:"):
-        out.append(f"{indent}image: {image}")
-    elif stripped.startswith("sweeperWalletKey:"):
-        out.append(f'{indent}sweeperWalletKey: "{wallet_key}"')
-    elif stripped.startswith("privateKey:"):
-        if section == "solana":
-            # Leave ${SOLANA_SWEEPER_KEY}; soft-skip keeps the solana service up without a key.
-            out.append(line)
-        else:
-            out.append(f'{indent}privateKey: "{private_key}"')
-    elif stripped.startswith("sweeperAddress:") and "${" in stripped:
-        out.append(f'{indent}sweeperAddress: "{sweeper_addr}"')
-    elif stripped.startswith("apiKey:"):
-        out.append(f'{indent}apiKey: "system-test-sweeper"')
     else:
         out.append(line)
 open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
@@ -143,32 +117,48 @@ PY
 export ADMIN_API_KEY SWEEPER_API_KEY SWEEPER_ADDRESS FORWARDER_IMPLEMENTATION
 export SWEEPER_WALLET_KEY SWEEPER_PRIVATE_KEY EVM_RPC_URL
 export BASE_URL="${BASE_URL:-http://localhost:8080}"
-# Same-host installer e2e: API published on host 8080
 export SERVER_URL="${SERVER_URL:-http://host.docker.internal:8080}"
 export API_URL="${API_URL:-http://host.docker.internal:8080}"
 export PULL="${PULL:-1}"
 export ONCHAIN_INVOICE_SKIP_PULL="${ONCHAIN_INVOICE_SKIP_PULL:-}"
-# DooD / remote Docker: avoid host bind-mounts for data dirs.
 export ONCHAIN_INVOICE_SKIP_HOST_MOUNTS=1
 if [[ "$PULL" == "0" ]]; then
   export ONCHAIN_INVOICE_SKIP_PULL=1
 fi
 
-# Installer .env must not override our exports (start scripts prefer already-set env).
-cat > "$INSTALL_DIR/.env" <<EOF
+# Images + container naming via env (api-app.yaml has no docker.image block).
+cat > "$API_DIR/.env" <<EOF
 ADMIN_API_KEY=${ADMIN_API_KEY}
 SWEEPER_API_KEY=${SWEEPER_API_KEY}
 BASE_URL=${BASE_URL}
 EVM_RPC_URL=${EVM_RPC_URL}
 SWEEPER_ADDRESS=${SWEEPER_ADDRESS}
 FORWARDER_IMPLEMENTATION=${FORWARDER_IMPLEMENTATION}
-SERVER_URL=${SERVER_URL}
-API_URL=${API_URL}
+DOCKER_NAME=${API_CONTAINER}
+DOCKER_NETWORK=${DOCKER_NETWORK}
+HOST_PORT=8080
+BACKEND_IMAGE=${API_IMAGE}
+EOF
+
+cat > "$NODES_DIR/.env" <<EOF
+ADMIN_API_KEY=${ADMIN_API_KEY}
+SWEEPER_API_KEY=${SWEEPER_API_KEY}
+BASE_URL=${BASE_URL}
+EVM_RPC_URL=${EVM_RPC_URL}
+SWEEPER_ADDRESS=${SWEEPER_ADDRESS}
+FORWARDER_IMPLEMENTATION=${FORWARDER_IMPLEMENTATION}
+SERVER_URL=http://${API_CONTAINER}:8080
+API_URL=http://${API_CONTAINER}:8080
 SWEEPER_WALLET_KEY=${SWEEPER_WALLET_KEY}
 SWEEPER_PRIVATE_KEY=${SWEEPER_PRIVATE_KEY}
 SWEEPER_REGISTER_ADDRESS=${SWEEPER_ADDR}
 SWEEPER_LABEL=install-e2e
 SWEEPER_CHAINS=11155111
+DOCKER_NETWORK=${DOCKER_NETWORK}
+APP_PREFIX=${APP_PREFIX}
+SWEEPER_IMAGE=${SWEEPER_IMAGE}
+WORKER_IMAGE=${SWEEPER_IMAGE}
+SWEEPER_SOLANA_ENABLED=0
 EOF
 
 container_api_json() {
@@ -176,7 +166,6 @@ container_api_json() {
   local path="$2"
   local body="${3:-}"
   local api_key="${4:-}"
-  # Retries cover docker-exec races after compose teardown; POST body uses unique client ids.
   local attempts=5
   local attempt out=""
   for ((attempt = 1; attempt <= attempts; attempt++)); do
@@ -210,7 +199,6 @@ fetch("http://127.0.0.1:8080" + process.env.T_PATH, {
 }
 
 signed_sweeper_me() {
-  # Sign from the API container (always up); proves the registered wallet can auth.
   docker exec \
     -e SWEEPER_WALLET_KEY="$SWEEPER_WALLET_KEY" \
     "$API_CONTAINER" node -e '
@@ -248,10 +236,10 @@ wallet.signMessage(message).then((signature) =>
 ' 2>/dev/null || true
 }
 
-echo "== start API via installer script =="
+echo "== start API via start-api.sh =="
 (
-  cd "$INSTALL_DIR"
-  ./start-onchain-invoice-api.sh
+  cd "$API_DIR"
+  ./start-api.sh
 )
 
 echo "== wait for API health =="
@@ -287,13 +275,10 @@ created="$(container_api_json POST /api/invoices "$BODY")"
 python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["status"] in (200,201), d; b=json.loads(d["body"]); assert b.get("invoiceAddress") or (b.get("invoice") or {}).get("invoiceAddress")' "$created"
 assert_contains "$created" 'invoiceAddress'
 
-echo "== register sweeper wallet (register-onchain-invoice-node.sh) =="
-# Script talks to API_URL; use host-published port from inside this environment via docker network gateway.
-# Prefer hitting the API container loopback through our helper, then also exercise the install register script
-# against localhost (published 8080) when reachable; fall back to direct API register.
+echo "== register sweeper wallet =="
 if API_URL="http://127.0.0.1:8080" ADMIN_API_KEY="$ADMIN_API_KEY" \
   SWEEPER_REGISTER_ADDRESS="$SWEEPER_ADDR" SWEEPER_LABEL=install-e2e SWEEPER_CHAINS=11155111 \
-  bash "$INSTALL_DIR/register-onchain-invoice-node.sh" 2>/dev/null; then
+  bash "$NODES_DIR/register-onchain-invoice-node.sh" 2>/dev/null; then
   echo "register script OK"
 else
   echo "register script could not reach host:8080; registering via docker exec"
@@ -303,10 +288,10 @@ else
   assert_contains_ci "$reg" "$SWEEPER_ADDR"
 fi
 
-echo "== start sweeper via installer script =="
+echo "== start nodes via start-nodes.sh =="
 (
-  cd "$INSTALL_DIR"
-  ./start-onchain-invoice-nodes.sh
+  cd "$NODES_DIR"
+  ./start-nodes.sh
 )
 
 echo "== wait for signed /api/sweeper/me =="
@@ -322,7 +307,7 @@ for _ in $(seq 1 30); do
 done
 if [[ "$me_ok" -ne 1 ]]; then
   echo "sweeper /me failed; last=$me" >&2
-  docker logs --tail=80 "$NODE_CONTAINER" >&2 || true
+  docker logs --tail=80 tctest-sweeper-evm >&2 || true
   docker logs --tail=40 "$API_CONTAINER" >&2 || true
   exit 1
 fi

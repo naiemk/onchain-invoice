@@ -1,53 +1,51 @@
 ---
 name: system-gateway
 description: >-
-  Configure a system-wide HTTPS gateway on one VPS for multiple products/domains.
-  Use when several infra-packaged projects share one host, edge network, and Let's Encrypt.
+  Configure vibed-infra 0.8 shared host HTTPS gateway so multiple products
+  (tctest + tcmain) share one VPS (ports 80/443) without a product nginx image.
 ---
 
-# System-wide gateway (multi-project)
+# System-wide host gateway (multi-app)
 
 ## Model
 
-- One **gateway** install dir per host (or per edge): nginx on ports 80/443.
-- Each product **backend** + **UI** containers join the same Docker network (`network.edge` from each product's packageconfig — use one shared name, e.g. `vps-edge`).
-- Gateway `sites[]` in one product's packageconfig **or** a dedicated `gateway-only` packageconfig lists all vhosts.
+```
+~/services/gateway/          # GATEWAY_HOME — once per machine
+  setup-tls.sh               # LE or TLS_MODE=lab
+  gateway/nginx.conf         # includes apps/*/sites.conf
+  apps/
+    tctest/sites.conf
+    tcmain/sites.conf
 
-## Steps
-
-1. Pick shared network: `DOCKER_NETWORK=vps-edge` in every product `.env`.
-
-2. Install APIs/UIs with distinct container names:
-   - `product-a-api`, `product-a-ui`
-   - `product-b-api`, `product-b-ui`
-
-3. Install gateway once:
-
-```bash
-mkdir -p ~/vps/gateway && cd ~/vps/gateway
-wget -qO- .../install-gateway.sh | bash
+~/services/vibed-infra/
+  update-agent/              # serial GHCR pull queue (OIDC webhook)
 ```
 
-4. Edit gateway `packageconfig` `sites[]` (or merge generated `gateway/conf.d/domains.conf`) so each `host` maps to the correct `backend` + `ui` container names.
+- Shared Docker network: **`vps-edge`**.
+- Only the **host** binds 80/443. Product `install-gateway.sh` bootstraps host if missing, writes `apps/{name}/sites.conf`, runs `setup-tls.sh`.
+- API/UI join `DOCKER_NETWORK=vps-edge` with names like `tctest-api` / `tctest-ui`.
 
-5. **TLS** — single SAN cert or per-host certs:
+## Trustless Commerce
+
+| Product | Dist | Example hosts |
+|---------|------|----------------|
+| tctest | `deploy/tctest/dist/` | `testnet.trustless-commerce.com` → `tctest-api` + `tctest-ui` |
+| tcmain | `deploy/tcmain/dist/` | `trustless-commerce.com` → `tcmain-api` + `tcmain-ui` |
 
 ```bash
-sudo certbot certonly --standalone \
-  -d app-a.example.com -d app-b.example.com -d www.app-b.example.com
+# DNS first — paste dist/DNS-SKILL.md into AU agent
+wget -qO- .../deploy/tctest/dist/install-gateway.sh | bash
+wget -qO- .../deploy/tcmain/dist/install-gateway.sh | bash  # adds sites + SANs only
 ```
 
-Set `TLS_FULLCHAIN` / `TLS_PRIVKEY` in gateway `.env`.
+## TLS / webhook
 
-6. **Auto-update** — stagger cron: APIs :00, workers :10, gateway :20 (infra default).
-
-## Trustless Commerce dual-domain
-
-- `testnet-api` + `testnet-ui` + `mainnet-api` + `mainnet-ui` on `trustless-commerce-edge`.
-- Gateway profile in [`deploy/packageconfig.yaml`](../../deploy/packageconfig.yaml) `sites[]`.
+- Production: `gateway.tlsEmail` → certbot via `setup-tls.sh`.
+- Lab/CI: `TLS_MODE=lab`.
+- `/_vibed/hooks/ghcr` → update-agent (CI OIDC JWT). Do not expose update-agent port publicly.
 
 ## Pitfalls
 
-- API must listen on container name resolvable by nginx (`testnet-api:8080`, not `localhost`).
-- Do not bind host port 443 twice — only gateway publishes 443.
-- Pull UI/nginx **before** stop on gateway update (infra update scripts do this).
+- Do not run a second nginx on 80/443; do not ship a product `trustless-commerce-nginx` image.
+- Site `backend` / `ui` names must match live containers on `vps-edge`.
+- After host/IP change: `cd ~/services/gateway && ./setup-tls.sh --force`.

@@ -1,0 +1,2 @@
+image: ghcr.io/naiemk/trustless-commerce-ui:main
+port: 80

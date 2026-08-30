@@ -87,9 +87,9 @@ FastSwapConfig.testnet.live.yaml
 .next
 out
 
-# Nuxt.js build / generate output
+# Nuxt.js / TypeScript build output (repo root only; keep deploy/*/dist committed)
 .nuxt
-dist
+/dist
 .output
 
 # Gatsby files
@@ -200,3 +200,4 @@ local-testnet/*.db
 local-testnet/*.db-*
 local-testnet/logs/
 local-testnet/pids/
+secrets
