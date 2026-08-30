@@ -30,7 +30,14 @@ Config: `onchain-invoice-bundler.yaml`.
 
 - Uses sweeper API key against `GET /api/wallet/deployer/accounts` and `PATCH …/deployed`
 - Needs `WALLET_FACTORY_ADDRESS` + funded `WALLET_DEPLOYER_PRIVATE_KEY` (often same as sweeper key)
+- Also polls `GET /api/internal/wallet-recovery/jobs` and runs guardian recovery:
+  - `initiate` → `AdminGuardianRecovery.initiateOwnerRecovery`
+  - `cancel` → `Wallet.cancelPendingOwnerWithSignature`
+  - after timelock → `executeOwnerRecovery`
+- Optional per-chain `guardianPrivateKey` (defaults to deployer key) and `recoveryAddress`
 
 Config: `onchain-invoice-wallet-deployer.yaml`.
 
 Empty/`_PRIVATE_KEY_` placeholders soft-skip so containers stay up until keys are filled.
+
+Partner HMAC wallet API (create/list/send/recover): [Wallet client API](wallet-client-api.md).

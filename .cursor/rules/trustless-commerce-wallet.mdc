@@ -1,0 +1,11 @@
+---
+description: Trustless Commerce HMAC wallet client API uses the dedicated skill
+globs:
+  - commerce/server/wallet-client-routes.ts
+  - commerce/server/client-auth.ts
+  - commerce/shared/webauthn-verify.ts
+  - docs/wallet-client-api.md
+  - .cursor/skills/trustless-commerce-wallet/**
+---
+
+When implementing or calling the HMAC wallet client API (`/api/client/wallets`, wallet-clients admin, WebAuthn on a partner domain, send prepare/submit, or recovery), read and follow `.cursor/skills/trustless-commerce-wallet/SKILL.md`. Do not confuse with hosted `/api/wallet/*` or invoice `POST /api/invoices`.

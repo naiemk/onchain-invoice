@@ -98,6 +98,11 @@ export function resolveRateLimit(
     perSecond: config.sweeperPerIpPerSecond,
     burst: Math.max(1, config.sweeperPerIpPerSecond),
   };
+  const walletClient: RateLimitDecision = {
+    bucket: "wallet_client",
+    perSecond: config.walletClientPerIpPerSecond,
+    burst: Math.max(1, config.walletClientPerIpPerSecond),
+  };
 
   // Exemptions — key-authenticated / health probes
   if (pathname === "/api/health" || pathname === "/api/ready") return null;
@@ -123,6 +128,11 @@ export function resolveRateLimit(
   if (m === "POST" && /^\/api\/invoices\/[^/]+\/faucet$/.test(pathname)) {
     const capped = Math.max(1, Math.min(5, config.createPerSecond));
     return { bucket: "create", perSecond: capped, burst: capped };
+  }
+
+  // HMAC wallet client API
+  if (pathname === "/api/client/wallets" || pathname.startsWith("/api/client/wallets/")) {
+    return walletClient;
   }
 
   // Sweeper / bundler
