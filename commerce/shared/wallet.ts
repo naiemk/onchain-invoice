@@ -94,3 +94,64 @@ export interface BundlerRecord {
   createdAt: string;
   lastSeenAt: string | null;
 }
+
+/** HMAC partner / wallet client (server-to-server). */
+export interface WalletClientRecord {
+  id: string;
+  label: string;
+  rpId: string;
+  origins: string[] | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WalletIdentityRecord {
+  clientId: string;
+  email: string;
+  walletAddress: string;
+  contactJson: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type WalletChallengePurpose = "create" | "recover" | "cancel";
+
+export interface WalletChallengeRecord {
+  id: string;
+  clientId: string;
+  purpose: WalletChallengePurpose;
+  challenge: string;
+  email: string | null;
+  walletAddress: string | null;
+  consumed: boolean;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export type WalletRecoveryJobKind = "initiate" | "cancel" | "execute";
+export type WalletRecoveryJobStatus =
+  | "pending"
+  | "claimed"
+  | "submitted"
+  | "included"
+  | "failed"
+  | "rejected";
+
+export interface WalletRecoveryJobRecord {
+  id: string;
+  walletAddress: string;
+  chainId: string;
+  kind: WalletRecoveryJobKind;
+  newQx: string | null;
+  newQy: string | null;
+  cancelSignature: string | null;
+  status: WalletRecoveryJobStatus;
+  claimedBy: string | null;
+  claimedUntil: string | null;
+  version: number;
+  txHash: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

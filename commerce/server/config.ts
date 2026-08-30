@@ -13,6 +13,8 @@ export interface RateLimitConfig {
   createPerSecond: number;
   publicPerIpPerSecond: number;
   sweeperPerIpPerSecond: number;
+  /** HMAC wallet-client API per IP per second (default same as sweeper). */
+  walletClientPerIpPerSecond: number;
   /** Sustained Onramper quote/methods requests per IP per second (default 2). */
   quotePerSecond: number;
   /** Burst capacity for quote/methods (default 20). */
@@ -247,6 +249,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       createPerSecond: Number(env.RATE_LIMIT_CREATE_PER_SECOND ?? file.rateLimit?.createPerSecond ?? 1),
       publicPerIpPerSecond: Number(env.RATE_LIMIT_PUBLIC_PER_SECOND ?? file.rateLimit?.publicPerIpPerSecond ?? 20),
       sweeperPerIpPerSecond: Number(env.RATE_LIMIT_SWEEPER_PER_SECOND ?? file.rateLimit?.sweeperPerIpPerSecond ?? 50),
+      walletClientPerIpPerSecond: Number(
+        env.RATE_LIMIT_WALLET_CLIENT_PER_SECOND ??
+          file.rateLimit?.walletClientPerIpPerSecond ??
+          env.RATE_LIMIT_SWEEPER_PER_SECOND ??
+          file.rateLimit?.sweeperPerIpPerSecond ??
+          50
+      ),
       quotePerSecond: Number(env.RATE_LIMIT_QUOTE_PER_SECOND ?? file.rateLimit?.quotePerSecond ?? 2),
       quoteBurst: Number(env.RATE_LIMIT_QUOTE_BURST ?? file.rateLimit?.quoteBurst ?? 20),
     },

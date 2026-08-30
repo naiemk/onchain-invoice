@@ -17,3 +17,7 @@ Ecommerce and creator adapters (WooCommerce, Shopify, Kajabi, Teachable) share o
 
 - [Platform integration contract](platform-integration.md)
 - Plugins & SDKs in [`platforms/`](../platforms/)
+
+## Wallet client API
+
+Partners who embed passkey smart wallets on **their own domain** use the HMAC [Wallet client API](wallet-client-api.md) (not the hosted `/wallet` UI).

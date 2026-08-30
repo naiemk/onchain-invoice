@@ -174,8 +174,11 @@ Callbacks are **best-effort** (no automatic retries today). Combine with polling
 | Invoice create / public read | Unauthenticated (IP rate limits) |
 | Merchant list / force sweep | Wallet signature headers (`x-merchant-address`, `x-merchant-message`, `x-merchant-signature`) |
 | Admin / sweeper registration | `x-api-key` |
+| Embedded passkey wallets | HMAC wallet client API (`x-client-*`) — see [Wallet client API](wallet-client-api.md) |
 
 Platform plugins store the **hosted API base URL** and merchant wallet addresses in settings. They do not need merchant wallet signing for create + callback flows.
+
+Invoice create stays public. Platforms that embed **user passkey wallets** on their own domain use the HMAC [Wallet client API](wallet-client-api.md), not the hosted `/wallet` UI.
 
 ## Client libraries
 
@@ -207,6 +210,7 @@ Each platform has a Cursor skill for fast integration:
 | BigCommerce | `.cursor/skills/trustless-commerce-bigcommerce/SKILL.md` |
 | Lemon Squeezy | `.cursor/skills/trustless-commerce-lemonsqueezy/SKILL.md` |
 | Gumroad | `.cursor/skills/trustless-commerce-gumroad/SKILL.md` |
+| Wallet client (HMAC) | `.cursor/skills/trustless-commerce-wallet/SKILL.md` |
 
 Product UI: `/integrations` on the hosted site lists all platforms with docs and skill links.
 

@@ -52,6 +52,18 @@ Same header pattern as sweeper (`x-bundler-*`). Register via `POST /api/admin/bu
 
 Wallet UserOps: `POST /api/wallet/userops` (public submit). Rejected/failed hashes may be **requeued** with a fresh signature; pending/included hashes return **409** `duplicate_user_op_hash`.
 
+## Wallet client API (HMAC)
+
+Partner backends embedding passkey wallets on **their** WebAuthn domain. Full contract: [Wallet client API](wallet-client-api.md).
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST/GET/PATCH | `/api/admin/wallet-clients…` | `ADMIN_API_KEY` |
+| POST/GET | `/api/client/wallets…` | HMAC (`x-client-*`) |
+| GET/POST | `/api/internal/wallet-recovery/*` | `SWEEPER_API_KEY` |
+
+Headers: `x-client-id`, `x-client-timestamp`, `x-client-nonce`, `x-client-body-hash`, `x-client-signature`. Path in the canonical message is **pathname only**.
+
 ## Rate limiting
 
 Central table-driven limiter (IP + bucket). New public routes are limited by default.
@@ -59,9 +71,10 @@ Central table-driven limiter (IP + bucket). New public routes are limited by def
 | Bucket | Default | Env | Used for |
 |--------|---------|-----|----------|
 | `create` | 1/s | `RATE_LIMIT_CREATE_PER_SECOND` | `POST /api/invoices` (+ aliases, faucet capped) |
-| `public` | 20/s | `RATE_LIMIT_PUBLIC_PER_SECOND` | Public GETs, wallet APIs, onramp config |
+| `public` | 20/s | `RATE_LIMIT_PUBLIC_PER_SECOND` | Public GETs, hosted wallet APIs, onramp config |
 | `quote` | 2/s, burst 20 | `RATE_LIMIT_QUOTE_PER_SECOND`, `RATE_LIMIT_QUOTE_BURST` | `/api/public/onramp-quote`, `/api/public/onramp-methods` |
 | `sweeper` | 50/s | `RATE_LIMIT_SWEEPER_PER_SECOND` | Sweeper + bundler signed APIs |
+| `wallet_client` | 50/s | `RATE_LIMIT_WALLET_CLIENT_PER_SECOND` | `/api/client/wallets*` |
 
 **Exempt:** `/api/health`, `/api/ready`, `/api/admin/*`, `/api/internal/*`, wallet deployer routes.
 

@@ -12,6 +12,37 @@ export interface WebAuthnAssertionParts {
 /** Parse ES256 WebAuthn assertion and ABI-encode for OZ WebAuthn.verify. */
 export function encodeWebAuthnSignature(assertion: AuthenticatorAssertionResponse): string {
   const parts = parseWebAuthnAssertion(assertion);
+  return encodeWebAuthnParts(parts);
+}
+
+/** Encode assertion fields already as base64/hex/JSON strings (API / worker). */
+export function encodeWebAuthnSignatureFromJson(input: {
+  authenticatorData: string;
+  clientDataJSON: string;
+  signature: string;
+}): string {
+  const clientDataJSON = decodeClientData(input.clientDataJSON);
+  const authenticatorData = decodeToHex(input.authenticatorData);
+  const sigBuf = decodeToBytes(input.signature);
+  const { r, s } = parseEs256Signature(
+    sigBuf.buffer.slice(sigBuf.byteOffset, sigBuf.byteOffset + sigBuf.byteLength) as ArrayBuffer
+  );
+  const typeIndex = clientDataJSON.indexOf('"type":"webauthn.get"');
+  const challengeIndex = clientDataJSON.indexOf('"challenge":"');
+  if (typeIndex < 0 || challengeIndex < 0) {
+    throw new Error("Invalid WebAuthn clientDataJSON");
+  }
+  return encodeWebAuthnParts({
+    r,
+    s,
+    challengeIndex,
+    typeIndex,
+    authenticatorData,
+    clientDataJSON,
+  });
+}
+
+function encodeWebAuthnParts(parts: WebAuthnAssertionParts): string {
   const coder = AbiCoder.defaultAbiCoder();
   return coder.encode(
     ["bytes32", "bytes32", "uint256", "uint256", "bytes", "string"],
@@ -71,4 +102,27 @@ function hex32(bytes: Uint8Array): string {
 function hex(buffer: ArrayBuffer | Uint8Array): string {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   return "0x" + [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function decodeClientData(value: string): string {
+  const t = value.trim();
+  if (t.startsWith("{") && t.includes("challenge")) return t;
+  return new TextDecoder().decode(decodeToBytes(value));
+}
+
+function decodeToHex(value: string): string {
+  if (value.startsWith("0x")) return value.toLowerCase();
+  return hex(decodeToBytes(value));
+}
+
+function decodeToBytes(value: string): Uint8Array {
+  if (value.startsWith("0x")) {
+    const h = value.slice(2);
+    const out = new Uint8Array(h.length / 2);
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+    return out;
+  }
+  const b64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+  return new Uint8Array(Buffer.from(b64 + pad, "base64"));
 }

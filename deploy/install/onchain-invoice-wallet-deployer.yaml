@@ -1,5 +1,7 @@
 # Deploys passkey wallets when USDC arrives (factory.createAccount).
+# Also runs guardian recovery jobs (initiate / cancel / execute after timelock).
 # WALLET_DEPLOYER_PRIVATE_KEY often matches SWEEPER_PRIVATE_KEY (needs Sepolia ETH).
+# Guardian defaults to deployer key when WALLET_GUARDIAN_PRIVATE_KEY is unset.
 serverUrl: ${SERVER_URL}
 sweeperApiKey: ${SWEEPER_API_KEY}
 intervalMs: 30000
@@ -9,5 +11,7 @@ chains:
     rpcUrl: ${EVM_RPC_URL}
     factoryAddress: ${WALLET_FACTORY_ADDRESS}
     privateKey: ${WALLET_DEPLOYER_PRIVATE_KEY}
+    guardianPrivateKey: ${WALLET_GUARDIAN_PRIVATE_KEY}
+    recoveryAddress: ${WALLET_RECOVERY_ADDRESS}
     feeTokenAddress: ${WALLET_BUNDLER_FEE_TOKEN}
     minBalanceUsdc: 1

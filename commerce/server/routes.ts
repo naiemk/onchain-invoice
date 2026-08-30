@@ -57,6 +57,7 @@ import { clientIp, resolveRateLimit, takeToken } from "./rate-limit.js";
 import { requireSweeper } from "./sweeper-auth.js";
 import { requireBundler } from "./bundler-auth.js";
 import { registerWalletRoutes } from "./wallet-routes.js";
+import { registerWalletClientRoutes } from "./wallet-client-routes.js";
 import { formatUsdFromUsdc } from "../shared/userop.js";
 import type { UserOpStatus } from "../shared/userop.js";
 
@@ -69,6 +70,12 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
   const handleWalletRoute = registerWalletRoutes(context.db, context.config, {
     sendJson,
     readJson,
+    sweeperApiKey: context.config.sweeperApiKey,
+    requireApiKey,
+  });
+  const handleWalletClientRoute = registerWalletClientRoutes(context.db, context.config, {
+    sendJson,
+    readRawBody,
     sweeperApiKey: context.config.sweeperApiKey,
     requireApiKey,
   });
@@ -110,6 +117,10 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       if (req.method === "GET" && url.pathname === "/api/ready") {
         const ok = context.db.ready();
         sendJson(res, ok ? 200 : 503, { ok, db: ok });
+        return;
+      }
+
+      if (await handleWalletClientRoute(req, res, url)) {
         return;
       }
 
@@ -1498,10 +1509,10 @@ function setCors(res: ServerResponse, config: AppConfig): void {
   const origins = config.corsOrigins;
   const allow = origins.includes("*") ? "*" : origins.join(",");
   res.setHeader("access-control-allow-origin", allow);
-  res.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+  res.setHeader("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.setHeader(
     "access-control-allow-headers",
-    "content-type,authorization,x-api-key,idempotency-key,x-merchant-address,x-merchant-message,x-merchant-signature,x-sweeper-address,x-sweeper-timestamp,x-sweeper-nonce,x-sweeper-signature,x-sweeper-body-hash"
+    "content-type,authorization,x-api-key,idempotency-key,x-merchant-address,x-merchant-message,x-merchant-signature,x-sweeper-address,x-sweeper-timestamp,x-sweeper-nonce,x-sweeper-signature,x-sweeper-body-hash,x-bundler-address,x-bundler-timestamp,x-bundler-nonce,x-bundler-signature,x-bundler-body-hash,x-client-id,x-client-timestamp,x-client-nonce,x-client-body-hash,x-client-signature"
   );
   if (allow !== "*") {
     res.setHeader("access-control-allow-credentials", "true");
