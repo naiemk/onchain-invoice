@@ -59,7 +59,7 @@ solana:
           decimals: 6
 cors:
   origins:
-    - *
+    - "*"
 rateLimit:
   createPerSecond: 1
   publicPerIpPerSecond: 20

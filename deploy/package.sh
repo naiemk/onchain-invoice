@@ -76,6 +76,24 @@ path.write_text(text, encoding="utf-8")
 print("patched packageconfig extras for nodes")
 PY
 
+  # Interim: vibed-infra dump_yaml emits bare `*` for list items (invalid YAML alias).
+  # Quote until upstream quotes special scalars in nested lists.
+  python3 - "$out/api-app.yaml" <<'PYCORS'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+if not p.is_file():
+    sys.exit(0)
+text = p.read_text(encoding="utf-8")
+fixed = text.replace("\n    - *\n", '\n    - "*"\n').replace("\n  - *\n", '\n  - "*"\n')
+# Also fix when * is alone on origins list with two-space indent variants
+import re
+fixed2 = re.sub(r"(?m)^(\s+- )\*$", r'\1"*"', text)
+if fixed2 != text:
+    p.write_text(fixed2, encoding="utf-8")
+    print("    quoted bare * in api-app.yaml cors origins")
+PYCORS
+
   echo "    done: $out"
 }
 

@@ -148,14 +148,20 @@ ACTIVITY_LOG_PATH="${ACTIVITY_LOG_PATH:-/data/logs/activity.jsonl}"
 LOGS_DIR="${LOGS_DIR:-./logs}"
 mkdir -p "$LOGS_DIR"
 LOGS_ABS="$(cd "$LOGS_DIR" && pwd)"
-if [[ "$(id -u)" -eq 0 ]]; then
-  chown -R 1000:1000 "$LOGS_ABS" || true
-elif command -v sudo >/dev/null 2>&1; then
-  sudo chown -R 1000:1000 "$LOGS_ABS" 2>/dev/null || \
-    echo "warning: could not chown $LOGS_ABS to 1000:1000 — activity log may fail to write" >&2
-else
-  echo "warning: ensure $LOGS_ABS is writable by uid 1000 (container user node)" >&2
-fi
+# Image runs as USER node (uid/gid 1000).
+chown_uid1000() {
+  local path="$1"
+  if [[ "$(id -u)" -eq 0 ]]; then
+    chown -R 1000:1000 "$path" || true
+  elif command -v sudo >/dev/null 2>&1 && sudo -n chown -R 1000:1000 "$path" 2>/dev/null; then
+    true
+  elif command -v docker >/dev/null 2>&1; then
+    docker run --rm -v "$path:/target" alpine:3.20 chown -R 1000:1000 /target
+  else
+    echo "warning: could not chown $path to 1000:1000 — activity log may fail to write" >&2
+  fi
+}
+chown_uid1000 "$LOGS_ABS"
 chmod 755 "$LOGS_ABS" 2>/dev/null || true
 
 COMPOSE_FILE="${COMPOSE_FILE:-${SCRIPT_DIR}/docker-compose.workers.yml}"

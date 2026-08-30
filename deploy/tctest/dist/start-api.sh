@@ -137,6 +137,20 @@ fi
 
 # Config is docker cp'd (works with remote/DoD Docker where host bind-mounts fail).
 # Data: host bind by default; named volume when ONCHAIN_INVOICE_SKIP_HOST_MOUNTS=1.
+# Image runs as USER node (uid/gid 1000). Root-created bind mounts otherwise cause SQLITE_CANTOPEN.
+chown_uid1000() {
+  local path="$1"
+  if [[ "$(id -u)" -eq 0 ]]; then
+    chown -R 1000:1000 "$path" || true
+  elif command -v sudo >/dev/null 2>&1 && sudo -n chown -R 1000:1000 "$path" 2>/dev/null; then
+    true
+  elif command -v docker >/dev/null 2>&1; then
+    docker run --rm -v "$path:/target" alpine:3.20 chown -R 1000:1000 /target
+  else
+    echo "warning: could not chown $path to 1000:1000 — API may fail to open SQLite" >&2
+  fi
+}
+
 VOLUME_ARGS=()
 if [[ "${ONCHAIN_INVOICE_SKIP_HOST_MOUNTS:-}" == "1" ]]; then
   DATA_VOLUME="${NAME}-data"
@@ -145,15 +159,7 @@ if [[ "${ONCHAIN_INVOICE_SKIP_HOST_MOUNTS:-}" == "1" ]]; then
 else
   mkdir -p "$DATA_DIR"
   DATA_ABS="$(cd "$DATA_DIR" && pwd)"
-  # Image runs as USER node (uid/gid 1000). Root-created bind mounts otherwise cause SQLITE_CANTOPEN.
-  if [[ "$(id -u)" -eq 0 ]]; then
-    chown -R 1000:1000 "$DATA_ABS" || true
-  elif command -v sudo >/dev/null 2>&1; then
-    sudo chown -R 1000:1000 "$DATA_ABS" 2>/dev/null || \
-      echo "warning: could not chown $DATA_ABS to 1000:1000 — fix if API fails to open SQLite" >&2
-  else
-    echo "warning: ensure $DATA_ABS is writable by uid 1000 (container user node)" >&2
-  fi
+  chown_uid1000 "$DATA_ABS"
   chmod 755 "$DATA_ABS" 2>/dev/null || true
   VOLUME_ARGS+=(-v "${DATA_ABS}:/data")
 fi
@@ -229,6 +235,7 @@ PERSIST_ARGS=()
 if [[ -n "${PERSIST_LOG_DIR:-}" ]]; then
   mkdir -p "$PERSIST_LOG_DIR"
   PERSIST_ABS="$(cd "$PERSIST_LOG_DIR" && pwd)"
+  chown_uid1000 "$PERSIST_ABS"
   PERSIST_ARGS+=(-e "PERSIST_LOG_DIR=/persist-logs" -v "${PERSIST_ABS}:/persist-logs")
 fi
 
