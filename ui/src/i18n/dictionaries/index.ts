@@ -33,9 +33,9 @@ import { zhHant } from "./zh-Hant.js";
 function withPasskeyCreate(messages: Messages): Messages {
   return {
     ...messages,
-    create: { ...messages.create, ...createPasskeyEn, ...createWizardEn },
-    pay: { ...messages.pay, ...payFaucetEn },
-    errors: { ...messages.errors, ...onrampErrorsEn },
+    create: { ...createPasskeyEn, ...createWizardEn, ...messages.create },
+    pay: { ...payFaucetEn, ...messages.pay },
+    errors: { ...onrampErrorsEn, ...messages.errors },
   };
 }
 
