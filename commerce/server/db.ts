@@ -22,6 +22,12 @@ import type {
   WalletRecoveryJobRecord,
   WalletRecoveryJobKind,
   WalletRecoveryJobStatus,
+  WalletEmailRecord,
+  WalletEmailOtpPurpose,
+  WalletRecoveryRequestRecord,
+  WalletRecoveryRequestStatus,
+  HostedRecoveryChallengePurpose,
+  HostedRecoveryChallengeRecord,
 } from "../shared/wallet.js";
 import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
 import { parsePaymentMode } from "../shared/onramper.js";
@@ -835,6 +841,82 @@ export class CommerceDb {
 
       CREATE INDEX IF NOT EXISTS idx_wallet_recovery_jobs_status
         ON wallet_recovery_jobs(status, chain_id);
+
+      CREATE TABLE IF NOT EXISTS wallet_emails (
+        wallet_address TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        verified_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_emails_email ON wallet_emails(email);
+
+      CREATE TABLE IF NOT EXISTS wallet_email_otps (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        email TEXT NOT NULL,
+        purpose TEXT NOT NULL CHECK (purpose IN ('attach','recover')),
+        code_hash TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_email_otps_wallet
+        ON wallet_email_otps(wallet_address, purpose, expires_at);
+
+      CREATE TABLE IF NOT EXISTS wallet_hosted_challenges (
+        id TEXT PRIMARY KEY,
+        purpose TEXT NOT NULL CHECK (purpose IN ('attach','recover','cancel')),
+        challenge TEXT NOT NULL,
+        wallet_address TEXT,
+        consumed INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS wallet_recovery_requests (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        email TEXT NOT NULL,
+        new_qx TEXT NOT NULL,
+        new_qy TEXT NOT NULL,
+        credential_id TEXT NOT NULL,
+        device_label TEXT,
+        status TEXT NOT NULL CHECK (status IN (
+          'awaiting_email','awaiting_guardian','queued','on_chain',
+          'completed','cancelled','rejected','archived'
+        )),
+        email_verified_at TEXT,
+        captcha_ok_at TEXT,
+        guardian_address TEXT,
+        guardian_acted_at TEXT,
+        job_id TEXT,
+        chain_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_recovery_requests_status
+        ON wallet_recovery_requests(status, created_at);
+      CREATE INDEX IF NOT EXISTS idx_wallet_recovery_requests_wallet
+        ON wallet_recovery_requests(wallet_address, status);
+
+      CREATE TABLE IF NOT EXISTS guardian_nonces (
+        address TEXT NOT NULL,
+        nonce TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        PRIMARY KEY (address, nonce)
+      );
+
+      CREATE TABLE IF NOT EXISTS guardian_sessions (
+        token_hash TEXT PRIMARY KEY,
+        address TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
     `);
 
     this.ensureColumn("invoices", "version", "INTEGER NOT NULL DEFAULT 1");
@@ -1663,6 +1745,376 @@ export class CommerceDb {
     return this.getWalletRecoveryJob(input.id)!;
   }
 
+  // --- Hosted email + recovery requests ---
+
+  upsertWalletEmail(input: {
+    walletAddress: string;
+    email: string;
+    verifiedAt?: string | null;
+  }): WalletEmailRecord {
+    const now = new Date().toISOString();
+    const addr = input.walletAddress.toLowerCase();
+    const email = normalizeEmail(input.email);
+    const verifiedAt = input.verifiedAt === undefined ? null : input.verifiedAt;
+    this.db
+      .prepare(
+        `INSERT INTO wallet_emails (wallet_address, email, verified_at, created_at, updated_at)
+         VALUES (@addr, @email, @verifiedAt, @now, @now)
+         ON CONFLICT(wallet_address) DO UPDATE SET
+           email = @email,
+           verified_at = CASE
+             WHEN @verifiedAt IS NOT NULL THEN @verifiedAt
+             WHEN excluded.email != wallet_emails.email THEN NULL
+             ELSE wallet_emails.verified_at
+           END,
+           updated_at = @now`
+      )
+      .run({ addr, email, verifiedAt, now });
+    return this.getWalletEmail(addr)!;
+  }
+
+  getWalletEmail(walletAddress: string): WalletEmailRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_emails WHERE wallet_address = ?`)
+      .get(walletAddress.toLowerCase()) as WalletEmailRow | undefined;
+    return row ? mapWalletEmail(row) : null;
+  }
+
+  findWalletByVerifiedEmail(email: string): WalletEmailRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM wallet_emails WHERE email = ? AND verified_at IS NOT NULL ORDER BY updated_at DESC LIMIT 1`
+      )
+      .get(normalizeEmail(email)) as WalletEmailRow | undefined;
+    return row ? mapWalletEmail(row) : null;
+  }
+
+  markWalletEmailVerified(walletAddress: string, email: string): WalletEmailRecord | null {
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(
+        `UPDATE wallet_emails SET verified_at = ?, email = ?, updated_at = ?
+         WHERE wallet_address = ?`
+      )
+      .run(now, normalizeEmail(email), now, walletAddress.toLowerCase());
+    if (result.changes === 0) {
+      this.upsertWalletEmail({ walletAddress, email, verifiedAt: now });
+    }
+    return this.getWalletEmail(walletAddress);
+  }
+
+  createWalletEmailOtp(input: {
+    walletAddress: string;
+    email: string;
+    purpose: WalletEmailOtpPurpose;
+    codeHash: string;
+    ttlMs?: number;
+  }): { id: string; expiresAt: string } {
+    const id = randomUUID();
+    const now = Date.now();
+    const ttl = input.ttlMs ?? 10 * 60 * 1000;
+    const createdAt = new Date(now).toISOString();
+    const expiresAt = new Date(now + ttl).toISOString();
+    // Invalidate prior OTPs for same wallet+purpose
+    this.db
+      .prepare(
+        `UPDATE wallet_email_otps SET consumed_at = ? WHERE wallet_address = ? AND purpose = ? AND consumed_at IS NULL`
+      )
+      .run(createdAt, input.walletAddress.toLowerCase(), input.purpose);
+    this.db
+      .prepare(
+        `INSERT INTO wallet_email_otps (
+           id, wallet_address, email, purpose, code_hash, attempts, expires_at, created_at
+         ) VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+      )
+      .run(
+        id,
+        input.walletAddress.toLowerCase(),
+        normalizeEmail(input.email),
+        input.purpose,
+        input.codeHash,
+        expiresAt,
+        createdAt
+      );
+    return { id, expiresAt };
+  }
+
+  /** Verify OTP; returns false on mismatch/expiry/too many attempts. */
+  consumeWalletEmailOtp(input: {
+    walletAddress: string;
+    email: string;
+    purpose: WalletEmailOtpPurpose;
+    codeHash: string;
+    maxAttempts?: number;
+  }): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM wallet_email_otps
+         WHERE wallet_address = ? AND email = ? AND purpose = ? AND consumed_at IS NULL
+         ORDER BY created_at DESC LIMIT 1`
+      )
+      .get(
+        input.walletAddress.toLowerCase(),
+        normalizeEmail(input.email),
+        input.purpose
+      ) as WalletEmailOtpRow | undefined;
+    if (!row) return false;
+    if (new Date(row.expires_at).getTime() < Date.now()) return false;
+    const max = input.maxAttempts ?? 5;
+    if (row.attempts >= max) return false;
+    this.db
+      .prepare(`UPDATE wallet_email_otps SET attempts = attempts + 1 WHERE id = ?`)
+      .run(row.id);
+    if (row.code_hash !== input.codeHash) return false;
+    this.db
+      .prepare(`UPDATE wallet_email_otps SET consumed_at = ? WHERE id = ?`)
+      .run(new Date().toISOString(), row.id);
+    return true;
+  }
+
+  /** Test helper: peek latest unconsumed OTP hash (not the plaintext code). */
+  getLatestWalletEmailOtp(
+    walletAddress: string,
+    purpose: WalletEmailOtpPurpose
+  ): { id: string; codeHash: string; email: string } | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM wallet_email_otps
+         WHERE wallet_address = ? AND purpose = ? AND consumed_at IS NULL
+         ORDER BY created_at DESC LIMIT 1`
+      )
+      .get(walletAddress.toLowerCase(), purpose) as WalletEmailOtpRow | undefined;
+    if (!row) return null;
+    return { id: row.id, codeHash: row.code_hash, email: row.email };
+  }
+
+  createHostedRecoveryChallenge(input: {
+    purpose: HostedRecoveryChallengePurpose;
+    challenge: string;
+    walletAddress?: string | null;
+    ttlMs?: number;
+  }): HostedRecoveryChallengeRecord {
+    const id = randomUUID();
+    const now = Date.now();
+    const ttl = input.ttlMs ?? 5 * 60 * 1000;
+    const createdAt = new Date(now).toISOString();
+    const expiresAt = new Date(now + ttl).toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_hosted_challenges (
+           id, purpose, challenge, wallet_address, consumed, expires_at, created_at
+         ) VALUES (?, ?, ?, ?, 0, ?, ?)`
+      )
+      .run(
+        id,
+        input.purpose,
+        input.challenge,
+        input.walletAddress?.toLowerCase() ?? null,
+        expiresAt,
+        createdAt
+      );
+    return this.getHostedRecoveryChallenge(id)!;
+  }
+
+  getHostedRecoveryChallenge(id: string): HostedRecoveryChallengeRecord | null {
+    const row = this.db.prepare(`SELECT * FROM wallet_hosted_challenges WHERE id = ?`).get(id) as
+      | HostedChallengeRow
+      | undefined;
+    return row ? mapHostedChallenge(row) : null;
+  }
+
+  consumeHostedRecoveryChallenge(input: {
+    id: string;
+    purpose: HostedRecoveryChallengePurpose;
+  }): HostedRecoveryChallengeRecord | null {
+    const row = this.getHostedRecoveryChallenge(input.id);
+    if (!row || row.purpose !== input.purpose || row.consumed) return null;
+    if (new Date(row.expiresAt).getTime() < Date.now()) return null;
+    const result = this.db
+      .prepare(`UPDATE wallet_hosted_challenges SET consumed = 1 WHERE id = ? AND consumed = 0`)
+      .run(input.id);
+    if (result.changes === 0) return null;
+    return this.getHostedRecoveryChallenge(input.id);
+  }
+
+  createWalletRecoveryRequest(input: {
+    walletAddress: string;
+    email: string;
+    newQx: string;
+    newQy: string;
+    credentialId: string;
+    deviceLabel?: string | null;
+    status: WalletRecoveryRequestStatus;
+    emailVerifiedAt?: string | null;
+    captchaOkAt?: string | null;
+    chainId: string;
+  }): WalletRecoveryRequestRecord {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_recovery_requests (
+           id, wallet_address, email, new_qx, new_qy, credential_id, device_label,
+           status, email_verified_at, captcha_ok_at, chain_id, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        input.walletAddress.toLowerCase(),
+        normalizeEmail(input.email),
+        input.newQx,
+        input.newQy,
+        input.credentialId,
+        input.deviceLabel ?? null,
+        input.status,
+        input.emailVerifiedAt ?? null,
+        input.captchaOkAt ?? null,
+        input.chainId,
+        now,
+        now
+      );
+    return this.getWalletRecoveryRequest(id)!;
+  }
+
+  getWalletRecoveryRequest(id: string): WalletRecoveryRequestRecord | null {
+    const row = this.db.prepare(`SELECT * FROM wallet_recovery_requests WHERE id = ?`).get(id) as
+      | WalletRecoveryRequestRow
+      | undefined;
+    return row ? mapWalletRecoveryRequest(row) : null;
+  }
+
+  getActiveWalletRecoveryRequest(walletAddress: string): WalletRecoveryRequestRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM wallet_recovery_requests
+         WHERE wallet_address = ?
+           AND status IN ('awaiting_email','awaiting_guardian','queued','on_chain')
+         ORDER BY created_at DESC LIMIT 1`
+      )
+      .get(walletAddress.toLowerCase()) as WalletRecoveryRequestRow | undefined;
+    return row ? mapWalletRecoveryRequest(row) : null;
+  }
+
+  listWalletRecoveryRequests(
+    statuses?: WalletRecoveryRequestStatus[]
+  ): WalletRecoveryRequestRecord[] {
+    if (!statuses?.length) {
+      return (
+        this.db
+          .prepare(`SELECT * FROM wallet_recovery_requests ORDER BY created_at DESC LIMIT 200`)
+          .all() as WalletRecoveryRequestRow[]
+      ).map(mapWalletRecoveryRequest);
+    }
+    const sql = `SELECT * FROM wallet_recovery_requests WHERE status IN (${statuses
+      .map(() => "?")
+      .join(",")}) ORDER BY created_at DESC LIMIT 200`;
+    return (this.db.prepare(sql).all(...statuses) as WalletRecoveryRequestRow[]).map(
+      mapWalletRecoveryRequest
+    );
+  }
+
+  updateWalletRecoveryRequest(
+    id: string,
+    patch: {
+      status?: WalletRecoveryRequestStatus;
+      emailVerifiedAt?: string | null;
+      guardianAddress?: string | null;
+      guardianActedAt?: string | null;
+      jobId?: string | null;
+    }
+  ): WalletRecoveryRequestRecord | null {
+    const current = this.getWalletRecoveryRequest(id);
+    if (!current) return null;
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `UPDATE wallet_recovery_requests SET
+           status = COALESCE(@status, status),
+           email_verified_at = COALESCE(@emailVerifiedAt, email_verified_at),
+           guardian_address = COALESCE(@guardianAddress, guardian_address),
+           guardian_acted_at = COALESCE(@guardianActedAt, guardian_acted_at),
+           job_id = COALESCE(@jobId, job_id),
+           updated_at = @now
+         WHERE id = @id`
+      )
+      .run({
+        status: patch.status ?? null,
+        emailVerifiedAt: patch.emailVerifiedAt ?? null,
+        guardianAddress: patch.guardianAddress ?? null,
+        guardianActedAt: patch.guardianActedAt ?? null,
+        jobId: patch.jobId ?? null,
+        now,
+        id,
+      });
+    return this.getWalletRecoveryRequest(id);
+  }
+
+  getWalletRecoveryRequestByJobId(jobId: string): WalletRecoveryRequestRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_recovery_requests WHERE job_id = ?`)
+      .get(jobId) as WalletRecoveryRequestRow | undefined;
+    return row ? mapWalletRecoveryRequest(row) : null;
+  }
+
+  consumeGuardianNonce(address: string, nonce: string, ttlMs: number): boolean {
+    const now = Date.now();
+    this.db.prepare("DELETE FROM guardian_nonces WHERE expires_at < ?").run(now);
+    try {
+      this.db
+        .prepare("INSERT INTO guardian_nonces (address, nonce, expires_at) VALUES (?, ?, ?)")
+        .run(address.toLowerCase(), nonce, now + ttlMs);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** One-time consume of an issued guardian login nonce. */
+  takeGuardianNonce(address: string, nonce: string): boolean {
+    const now = Date.now();
+    this.db.prepare("DELETE FROM guardian_nonces WHERE expires_at < ?").run(now);
+    const result = this.db
+      .prepare(`DELETE FROM guardian_nonces WHERE address = ? AND nonce = ?`)
+      .run(address.toLowerCase(), nonce);
+    return result.changes > 0;
+  }
+
+  createGuardianSession(input: {
+    tokenHash: string;
+    address: string;
+    ttlMs?: number;
+  }): void {
+    const now = Date.now();
+    const ttl = input.ttlMs ?? 12 * 60 * 60 * 1000;
+    this.db
+      .prepare(
+        `INSERT INTO guardian_sessions (token_hash, address, expires_at, created_at)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(
+        input.tokenHash,
+        input.address.toLowerCase(),
+        new Date(now + ttl).toISOString(),
+        new Date(now).toISOString()
+      );
+  }
+
+  getGuardianSession(tokenHash: string): { address: string } | null {
+    const row = this.db
+      .prepare(`SELECT * FROM guardian_sessions WHERE token_hash = ?`)
+      .get(tokenHash) as { address: string; expires_at: string } | undefined;
+    if (!row) return null;
+    if (new Date(row.expires_at).getTime() < Date.now()) {
+      this.db.prepare(`DELETE FROM guardian_sessions WHERE token_hash = ?`).run(tokenHash);
+      return null;
+    }
+    return { address: row.address };
+  }
+
+  deleteGuardianSession(tokenHash: string): void {
+    this.db.prepare(`DELETE FROM guardian_sessions WHERE token_hash = ?`).run(tokenHash);
+  }
+
   private ensureColumn(table: string, column: string, definition: string): void {
     const cols = this.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === column)) {
@@ -1788,6 +2240,98 @@ function mapWalletRecoveryJob(row: WalletRecoveryJobRow): WalletRecoveryJobRecor
     version: row.version,
     txHash: row.tx_hash,
     error: row.error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+interface WalletEmailRow {
+  wallet_address: string;
+  email: string;
+  verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface WalletEmailOtpRow {
+  id: string;
+  wallet_address: string;
+  email: string;
+  purpose: WalletEmailOtpPurpose;
+  code_hash: string;
+  attempts: number;
+  expires_at: string;
+  consumed_at: string | null;
+  created_at: string;
+}
+
+interface HostedChallengeRow {
+  id: string;
+  purpose: HostedRecoveryChallengePurpose;
+  challenge: string;
+  wallet_address: string | null;
+  consumed: 0 | 1;
+  expires_at: string;
+  created_at: string;
+}
+
+interface WalletRecoveryRequestRow {
+  id: string;
+  wallet_address: string;
+  email: string;
+  new_qx: string;
+  new_qy: string;
+  credential_id: string;
+  device_label: string | null;
+  status: WalletRecoveryRequestStatus;
+  email_verified_at: string | null;
+  captcha_ok_at: string | null;
+  guardian_address: string | null;
+  guardian_acted_at: string | null;
+  job_id: string | null;
+  chain_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapWalletEmail(row: WalletEmailRow): WalletEmailRecord {
+  return {
+    walletAddress: row.wallet_address,
+    email: row.email,
+    verifiedAt: row.verified_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapHostedChallenge(row: HostedChallengeRow): HostedRecoveryChallengeRecord {
+  return {
+    id: row.id,
+    purpose: row.purpose,
+    challenge: row.challenge,
+    walletAddress: row.wallet_address,
+    consumed: row.consumed === 1,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+  };
+}
+
+function mapWalletRecoveryRequest(row: WalletRecoveryRequestRow): WalletRecoveryRequestRecord {
+  return {
+    id: row.id,
+    walletAddress: row.wallet_address,
+    email: row.email,
+    newQx: row.new_qx,
+    newQy: row.new_qy,
+    credentialId: row.credential_id,
+    deviceLabel: row.device_label,
+    status: row.status,
+    emailVerifiedAt: row.email_verified_at,
+    captchaOkAt: row.captcha_ok_at,
+    guardianAddress: row.guardian_address,
+    guardianActedAt: row.guardian_acted_at,
+    jobId: row.job_id,
+    chainId: row.chain_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

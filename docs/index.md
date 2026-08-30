@@ -20,4 +20,4 @@ Ecommerce and creator adapters (WooCommerce, Shopify, Kajabi, Teachable) share o
 
 ## Wallet client API
 
-Partners who embed passkey smart wallets on **their own domain** use the HMAC [Wallet client API](wallet-client-api.md) (not the hosted `/wallet` UI).
+Partners who embed passkey smart wallets on **their own domain** use the HMAC [Wallet client API](wallet-client-api.md) (not the hosted `/wallet` UI). Hosted passkey recovery (email OTP + guardian dashboard) is documented under [API](api.md#hosted-wallet-recovery-public--guardian) and [Security](security.md#hosted-wallet-recovery).

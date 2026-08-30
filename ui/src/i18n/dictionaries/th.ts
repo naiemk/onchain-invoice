@@ -43,6 +43,8 @@ export const th = {
       "รับ USDC และ USDT บน WooCommerce, Shopify, Kajabi, Teachable และอื่นๆ ด้วย checkout คริปโตที่โฮสต์ไว้",
     adminTitle: "ผู้ดูแลระบบ · Trustless Commerce",
     adminDescription: "ภาพรวมสำหรับผู้ดูแลแพลตฟอร์ม",
+    guardianTitle: "Guardian · Trustless Commerce",
+    guardianDescription: "Review hosted wallet recovery requests.",
   },
 
   common: {
@@ -472,6 +474,35 @@ export const th = {
     colSwept: "กวาดแล้ว",
     colFees: "ค่าธรรมเนียม",
     noActivity: "ยังไม่มีการรับเงิน",
+  },
+
+
+  guardian: {
+    eyebrow: "Guardian",
+    title: "Recovery requests",
+    lede: "Sign in with the on-chain guardian wallet to review email-verified recovery requests.",
+    connectHint: "Connect MetaMask with the AdminGuardianRecovery guardian address.",
+    connect: "Connect MetaMask",
+    connecting: "Waiting for signature…",
+    noMetamask: "MetaMask (or another injected wallet) not found.",
+    noAccount: "No account returned",
+    signedIn: "Signed in as {address}",
+    filterAwaiting: "Awaiting",
+    filterProgress: "In progress",
+    filterArchive: "Archive",
+    refresh: "Refresh",
+    signOut: "Sign out",
+    empty: "No requests in this filter.",
+    colWallet: "Wallet",
+    colEmail: "Email",
+    colDevice: "Device",
+    colStatus: "Status",
+    colCreated: "Created",
+    detail: "Detail",
+    approve: "Approve",
+    reject: "Reject",
+    rejectConfirm: "Reject this recovery request?",
+    detailTitle: "Request detail",
   },
 
   integrations: {

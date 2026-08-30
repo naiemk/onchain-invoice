@@ -52,9 +52,29 @@ Same header pattern as sweeper (`x-bundler-*`). Register via `POST /api/admin/bu
 
 Wallet UserOps: `POST /api/wallet/userops` (public submit). Rejected/failed hashes may be **requeued** with a fresh signature; pending/included hashes return **409** `duplicate_user_op_hash`.
 
+## Hosted wallet recovery (public + guardian)
+
+User-facing recovery for the hosted `/wallet` product (not the HMAC partner API). See [Security](security.md#hosted-wallet-recovery).
+
+| Method | Path | Auth |
+|--------|------|------|
+| GET/POST | `/api/wallet/email` | Passkey + captcha (POST); public masked GET |
+| POST | `/api/wallet/email/verify` | OTP + captcha |
+| POST | `/api/wallet/recovery/challenges` | Public |
+| GET | `/api/wallet/recovery` | Public (active request + `pendingOwner`) |
+| POST | `/api/wallet/recovery/requests` | New-device passkey + captcha |
+| POST | `/api/wallet/recovery/requests/:id/verify-email` | OTP + captcha |
+| POST | `/api/wallet/recovery/requests/:id/cancel` | Owner passkey + captcha |
+| GET | `/api/guardian/nonce` | Guardian address query |
+| POST | `/api/guardian/login` | EIP-191 signature |
+| GET | `/api/guardian/me` | Guardian session |
+| GET | `/api/guardian/recovery-requests` | Guardian session |
+| POST | `/api/guardian/recovery-requests/:id/approve` | Guardian session → queue initiate job |
+| POST | `/api/guardian/recovery-requests/:id/reject` | Guardian session |
+
 ## Wallet client API (HMAC)
 
-Partner backends embedding passkey wallets on **their** WebAuthn domain. Full contract: [Wallet client API](wallet-client-api.md).
+Partner backends embedding passkey wallets on **their** WebAuthn domain. Full contract: [Wallet client API](wallet-client-api.md). Hosted recovery above is a **different** path (OTP email, MetaMask guardian UI).
 
 | Method | Path | Auth |
 |--------|------|------|

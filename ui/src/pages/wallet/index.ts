@@ -7,11 +7,16 @@ import { renderWalletReceive } from "./receive.js";
 import { renderWalletDeposit } from "./deposit.js";
 import { renderWalletWithdraw } from "./withdraw.js";
 import { renderWalletOfframpCashout } from "./offramp-cashout.js";
+import { renderWalletRecover } from "./recover.js";
 
 export async function renderWallet(root: HTMLElement): Promise<void> {
   const path = location.pathname;
   if (path === "/wallet/security") {
     await renderWalletSecurity(root);
+    return;
+  }
+  if (path === "/wallet/recover") {
+    await renderWalletRecover(root);
     return;
   }
   if (path === "/wallet/create") {

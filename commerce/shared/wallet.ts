@@ -81,6 +81,7 @@ export interface WalletPublicConfig {
   feeTokenAddress: string | null;
   feeTokenSymbol: string;
   feeTokenDecimals: number;
+  turnstileSiteKey?: string | null;
   chains: WalletChainConfig[];
 }
 
@@ -154,4 +155,56 @@ export interface WalletRecoveryJobRecord {
   error: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Hosted wallet email binding (backend only, not on-chain). */
+export interface WalletEmailRecord {
+  walletAddress: string;
+  email: string;
+  verifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type WalletEmailOtpPurpose = "attach" | "recover";
+
+export type WalletRecoveryRequestStatus =
+  | "awaiting_email"
+  | "awaiting_guardian"
+  | "queued"
+  | "on_chain"
+  | "completed"
+  | "cancelled"
+  | "rejected"
+  | "archived";
+
+export interface WalletRecoveryRequestRecord {
+  id: string;
+  walletAddress: string;
+  email: string;
+  newQx: string;
+  newQy: string;
+  credentialId: string;
+  deviceLabel: string | null;
+  status: WalletRecoveryRequestStatus;
+  emailVerifiedAt: string | null;
+  captchaOkAt: string | null;
+  guardianAddress: string | null;
+  guardianActedAt: string | null;
+  jobId: string | null;
+  chainId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type HostedRecoveryChallengePurpose = "attach" | "recover" | "cancel";
+
+export interface HostedRecoveryChallengeRecord {
+  id: string;
+  purpose: HostedRecoveryChallengePurpose;
+  challenge: string;
+  walletAddress: string | null;
+  consumed: boolean;
+  expiresAt: string;
+  createdAt: string;
 }

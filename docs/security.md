@@ -17,3 +17,14 @@
 - Challenges expire (~5 min) and are single-use
 - Cross-client list isolation: client B cannot see client A’s wallets for the same email
 - Guardian private key lives on the wallet-deployer worker, not in the HTTP API process
+
+## Hosted wallet recovery
+
+Distinct from the HMAC partner flow (`identityVerified` IdP attestation):
+
+- Hosted `/api/wallet/email*` + `/api/wallet/recovery*` use **email OTP** (Resend when `RESEND_API_KEY` is set; otherwise logged in dev)
+- Mutating routes require Turnstile when `TURNSTILE_SECRET` is set; UI loads `TURNSTILE_SITE_KEY` from wallet-config
+- Passkey assertions use the **hosted** WebAuthn `rpId` (API/public hostname), not a partner domain
+- Guardian dashboard `/guardian` (not in nav): MetaMask signs an EIP-191 login; only the on-chain `AdminGuardianRecovery.guardian` EOA (or `WALLET_ADMIN_GUARDIAN` fallback) may approve/reject
+- Approve enqueues a `wallet_recovery_jobs` initiate; the deployer still holds `guardianPrivateKey`
+- OTP codes are SHA-256 hashed at rest; never returned in HTTP JSON

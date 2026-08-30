@@ -1,6 +1,7 @@
 import "./styles.css";
 import { renderIntegrations } from "./pages/integrations.js";
 import { renderAdmin } from "./pages/admin.js";
+import { renderGuardian } from "./pages/guardian.js";
 import { renderCreate } from "./pages/create/index.js";
 import { renderHome } from "./pages/home.js";
 import { renderMerchant } from "./pages/merchant.js";
@@ -23,6 +24,7 @@ const routes: Record<string, PageRenderer> = {
   "/pay": renderPay,
   "/merchant": renderMerchant,
   "/admin": renderAdmin,
+  "/guardian": renderGuardian,
   "/wallet": renderWallet,
   "/wallet/security": renderWallet,
   "/wallet/create": renderWallet,
@@ -117,6 +119,8 @@ function pageMeta(path: string): { title: string; description: string } {
       return { title: t("meta.integrationsTitle"), description: t("meta.integrationsDescription") };
     case "/admin":
       return { title: t("meta.adminTitle"), description: t("meta.adminDescription") };
+    case "/guardian":
+      return { title: t("meta.guardianTitle"), description: t("meta.guardianDescription") };
     case "/wallet":
     case "/wallet/security":
     case "/wallet/create":
@@ -126,6 +130,7 @@ function pageMeta(path: string): { title: string; description: string } {
     case "/wallet/deposit":
     case "/wallet/withdraw":
     case "/wallet/offramp/cashout":
+    case "/wallet/recover":
       return { title: t("meta.walletTitle"), description: t("meta.walletDescription") };
     default:
       return { title: t("meta.homeTitle"), description: t("meta.homeDescription") };
