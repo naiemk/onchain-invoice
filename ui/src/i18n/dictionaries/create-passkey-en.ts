@@ -1,4 +1,4 @@
-/** Passkey wallet strings for invoice create (English); merged into all locales. */
+/** Passkey wallet strings for invoice create (English). Locales override; this is the fallback. */
 export const createPasskeyEn = {
   usePasskeyWallet: "Use my passkey wallet",
   changeWallet: "Change wallet",

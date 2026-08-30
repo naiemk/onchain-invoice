@@ -1,4 +1,4 @@
-/** Wizard-only create-invoice strings (English); merged into all locales. */
+/** Wizard-only create-invoice strings (English). Locales override; this is the fallback. */
 export const createWizardEn = {
   stepDetails: "Details",
   stepNetwork: "Receive funds",

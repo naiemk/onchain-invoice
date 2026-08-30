@@ -1,4 +1,4 @@
-/** Testnet pay-page faucet strings (English); merged into all locales. */
+/** Testnet pay-page faucet strings (English). Locales override; this is the fallback. */
 export const payFaucetEn = {
   faucetTitle: "Testnet faucet",
   faucetHint:
