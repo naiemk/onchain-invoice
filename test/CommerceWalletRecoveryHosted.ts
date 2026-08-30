@@ -32,6 +32,8 @@ const BASE_ENV = {
   TURNSTILE_SECRET: "",
   TURNSTILE_SITE_KEY: "",
   RESEND_API_KEY: "",
+  RATE_LIMIT_PUBLIC_PER_SECOND: "100",
+  RATE_LIMIT_CREATE_PER_SECOND: "100",
 } as const;
 
 async function withApp(
