@@ -46,6 +46,8 @@ export const zhHant = {
       "透過託管加密結帳，在 WooCommerce、Shopify、Kajabi、Teachable 等平台接受 USDC 與 USDT。",
     adminTitle: "管理後台 · Trustless Commerce",
     adminDescription: "平台管理總覽。",
+    guardianTitle: "Guardian · Trustless Commerce",
+    guardianDescription: "Review hosted wallet recovery requests.",
   },
 
   common: {
@@ -475,6 +477,35 @@ export const zhHant = {
     colSwept: "已歸集",
     colFees: "手續費",
     noActivity: "尚無結算活動。",
+  },
+
+
+  guardian: {
+    eyebrow: "Guardian",
+    title: "Recovery requests",
+    lede: "Sign in with the on-chain guardian wallet to review email-verified recovery requests.",
+    connectHint: "Connect MetaMask with the AdminGuardianRecovery guardian address.",
+    connect: "Connect MetaMask",
+    connecting: "Waiting for signature…",
+    noMetamask: "MetaMask (or another injected wallet) not found.",
+    noAccount: "No account returned",
+    signedIn: "Signed in as {address}",
+    filterAwaiting: "Awaiting",
+    filterProgress: "In progress",
+    filterArchive: "Archive",
+    refresh: "Refresh",
+    signOut: "Sign out",
+    empty: "No requests in this filter.",
+    colWallet: "Wallet",
+    colEmail: "Email",
+    colDevice: "Device",
+    colStatus: "Status",
+    colCreated: "Created",
+    detail: "Detail",
+    approve: "Approve",
+    reject: "Reject",
+    rejectConfirm: "Reject this recovery request?",
+    detailTitle: "Request detail",
   },
 
   integrations: {

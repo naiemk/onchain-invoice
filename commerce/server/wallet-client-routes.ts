@@ -5,6 +5,7 @@ import type { AppConfig, WalletConfig } from "./config.js";
 import type { CommerceDb } from "./db.js";
 import { generateHmacSecret, requireWalletClient } from "./client-auth.js";
 import { requireApiKey } from "./auth.js";
+import { syncRequestFromJob } from "./wallet-hosted-recovery.js";
 import {
   challengeToBase64Url,
   verifyWebAuthnAssertion,
@@ -229,6 +230,7 @@ export function registerWalletClientRoutes(
             body.expectedVersion != null ? Number(body.expectedVersion) : undefined,
           workerId: str(body.workerId),
         });
+        if (body.status) syncRequestFromJob(db, id, String(body.status));
         handlers.sendJson(res, 200, { job });
       } catch (e) {
         handlers.sendJson(res, statusOf(e), {

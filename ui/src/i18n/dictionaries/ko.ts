@@ -46,6 +46,8 @@ export const ko = {
       "WooCommerce, Shopify, Kajabi, Teachable 등에서 호스팅된 암호화폐 checkout으로 USDC와 USDT를 받으세요.",
     adminTitle: "관리자 · Trustless Commerce",
     adminDescription: "플랫폼 관리자 개요.",
+    guardianTitle: "Guardian · Trustless Commerce",
+    guardianDescription: "Review hosted wallet recovery requests.",
   },
 
   common: {
@@ -475,6 +477,35 @@ export const ko = {
     colSwept: "스윕됨",
     colFees: "수수료",
     noActivity: "아직 정산 내역이 없습니다.",
+  },
+
+
+  guardian: {
+    eyebrow: "Guardian",
+    title: "Recovery requests",
+    lede: "Sign in with the on-chain guardian wallet to review email-verified recovery requests.",
+    connectHint: "Connect MetaMask with the AdminGuardianRecovery guardian address.",
+    connect: "Connect MetaMask",
+    connecting: "Waiting for signature…",
+    noMetamask: "MetaMask (or another injected wallet) not found.",
+    noAccount: "No account returned",
+    signedIn: "Signed in as {address}",
+    filterAwaiting: "Awaiting",
+    filterProgress: "In progress",
+    filterArchive: "Archive",
+    refresh: "Refresh",
+    signOut: "Sign out",
+    empty: "No requests in this filter.",
+    colWallet: "Wallet",
+    colEmail: "Email",
+    colDevice: "Device",
+    colStatus: "Status",
+    colCreated: "Created",
+    detail: "Detail",
+    approve: "Approve",
+    reject: "Reject",
+    rejectConfirm: "Reject this recovery request?",
+    detailTitle: "Request detail",
   },
 
   integrations: {

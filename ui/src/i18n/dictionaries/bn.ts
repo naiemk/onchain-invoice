@@ -43,6 +43,8 @@ export const bn = {
       "হোস্টেড ক্রিপ্টো checkout-এর মাধ্যমে WooCommerce, Shopify, Kajabi, Teachable আরও অনেক প্ল্যাটফর্মে USDC ও USDT গ্রহণ করুন।",
     adminTitle: "অ্যাডমিন · Trustless Commerce",
     adminDescription: "প্ল্যাটফর্ম অ্যাডমিন ওভারভিউ।",
+    guardianTitle: "Guardian · Trustless Commerce",
+    guardianDescription: "Review hosted wallet recovery requests.",
   },
 
   common: {
@@ -472,6 +474,35 @@ export const bn = {
     colSwept: "সুইপ",
     colFees: "ফি",
     noActivity: "এখনো কোনো সেটলমেন্ট কার্যক্রম নেই।",
+  },
+
+
+  guardian: {
+    eyebrow: "Guardian",
+    title: "Recovery requests",
+    lede: "Sign in with the on-chain guardian wallet to review email-verified recovery requests.",
+    connectHint: "Connect MetaMask with the AdminGuardianRecovery guardian address.",
+    connect: "Connect MetaMask",
+    connecting: "Waiting for signature…",
+    noMetamask: "MetaMask (or another injected wallet) not found.",
+    noAccount: "No account returned",
+    signedIn: "Signed in as {address}",
+    filterAwaiting: "Awaiting",
+    filterProgress: "In progress",
+    filterArchive: "Archive",
+    refresh: "Refresh",
+    signOut: "Sign out",
+    empty: "No requests in this filter.",
+    colWallet: "Wallet",
+    colEmail: "Email",
+    colDevice: "Device",
+    colStatus: "Status",
+    colCreated: "Created",
+    detail: "Detail",
+    approve: "Approve",
+    reject: "Reject",
+    rejectConfirm: "Reject this recovery request?",
+    detailTitle: "Request detail",
   },
 
   integrations: {

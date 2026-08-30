@@ -77,6 +77,22 @@ export interface AppConfig {
   wallet: WalletConfig;
   /** Testnet faucet for fiat-only invoice e2e (secret-gated). */
   faucet: FaucetConfig;
+  /** Public Turnstile site key for wallet recovery UI (optional). */
+  turnstileSiteKey?: string;
+  /** Resend email for hosted wallet OTP. */
+  email: EmailConfig;
+  /**
+   * Fallback guardian EOA when RPC cannot read AdminGuardianRecovery.guardian().
+   * Prefer on-chain guardian for /guardian auth.
+   */
+  walletAdminGuardian?: string;
+  /** HMAC secret for guardian session tokens (defaults to adminApiKey). */
+  guardianSessionSecret?: string;
+}
+
+export interface EmailConfig {
+  resendApiKey?: string;
+  from?: string;
 }
 
 export interface FaucetConfig {
@@ -163,10 +179,12 @@ interface YamlFile {
     usdcMint?: string;
     usdtMint?: string;
   };
-  captcha?: { provider?: string; turnstileSecret?: string };
+  captcha?: { provider?: string; turnstileSecret?: string; turnstileSiteKey?: string };
   cors?: { origins?: string[] };
   rateLimit?: Partial<RateLimitConfig>;
   claimLeaseMs?: number;
+  email?: { resendApiKey?: string; from?: string };
+  walletAdminGuardian?: string;
   onramper?: {
     enabled?: boolean;
     apiKey?: string;
@@ -244,6 +262,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     solanaChains: loadSolanaChains(env, file.solana),
     captchaProvider: blankToUndefined(expand(env.CAPTCHA_PROVIDER ?? file.captcha?.provider ?? "")),
     turnstileSecret: blankToUndefined(expand(env.TURNSTILE_SECRET ?? file.captcha?.turnstileSecret ?? "")),
+    turnstileSiteKey: blankToUndefined(
+      expand(env.TURNSTILE_SITE_KEY ?? file.captcha?.turnstileSiteKey ?? "")
+    ),
     corsOrigins: parseOrigins(env.CORS_ORIGINS, file.cors?.origins),
     rateLimit: {
       createPerSecond: Number(env.RATE_LIMIT_CREATE_PER_SECOND ?? file.rateLimit?.createPerSecond ?? 1),
@@ -266,6 +287,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     faucet: loadFaucetConfig(env, file.faucet, {
       sweeperPrivateKey: blankToUndefined(expand(env.SWEEPER_PRIVATE_KEY ?? file.evm?.sweeperPrivateKey ?? "")),
     }),
+    email: {
+      resendApiKey: blankToUndefined(expand(env.RESEND_API_KEY ?? file.email?.resendApiKey ?? "")),
+      from: blankToUndefined(expand(env.RESEND_FROM ?? file.email?.from ?? "")) ?? "Trustless Commerce <noreply@trustless-commerce.com>",
+    },
+    walletAdminGuardian: blankToUndefined(
+      expand(env.WALLET_ADMIN_GUARDIAN ?? file.walletAdminGuardian ?? "")
+    ),
+    guardianSessionSecret: blankToUndefined(
+      expand(env.GUARDIAN_SESSION_SECRET ?? env.ADMIN_API_KEY ?? file.adminApiKey ?? "")
+    ),
   };
 }
 

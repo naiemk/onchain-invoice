@@ -150,6 +150,49 @@ export async function signUserOpHash(userOpHashHex: string, credentialId?: strin
   return encodeWebAuthnSignature(cred.response as AuthenticatorAssertionResponse);
 }
 
+/** Assert over a server challenge (base64url); returns JSON fields for API posts. */
+export async function assertPasskeyChallenge(input: {
+  challengeBase64Url: string;
+  credentialId?: string;
+}): Promise<{
+  assertion: {
+    authenticatorData: string;
+    clientDataJSON: string;
+    signature: string;
+  };
+  credentialId: string;
+}> {
+  if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
+  const challenge = base64UrlToBytes(input.challengeBase64Url);
+  const allowCredentials = input.credentialId
+    ? [{ id: base64ToBytes(input.credentialId), type: "public-key" as const }]
+    : undefined;
+  const cred = (await navigator.credentials.get({
+    publicKey: {
+      challenge,
+      rpId: rpId(),
+      userVerification: "required",
+      allowCredentials,
+    },
+  })) as PublicKeyCredential | null;
+  if (!cred) throw new Error("Passkey assertion cancelled");
+  const response = cred.response as AuthenticatorAssertionResponse;
+  return {
+    credentialId: btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),
+    assertion: {
+      authenticatorData: bufferToBase64(response.authenticatorData),
+      clientDataJSON: bufferToBase64(response.clientDataJSON),
+      signature: bufferToBase64(response.signature),
+    },
+  };
+}
+
+function base64UrlToBytes(b64url: string): Uint8Array {
+  const pad = "=".repeat((4 - (b64url.length % 4)) % 4);
+  const b64 = (b64url + pad).replace(/-/g, "+").replace(/_/g, "/");
+  return base64ToBytes(b64);
+}
+
 function hexToBytes(hex: string): Uint8Array {
   const h = hex.startsWith("0x") ? hex.slice(2) : hex;
   const out = new Uint8Array(h.length / 2);

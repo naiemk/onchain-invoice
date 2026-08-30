@@ -43,6 +43,8 @@ export const de = {
       "Nehmen Sie USDC und USDT auf WooCommerce, Shopify, Kajabi, Teachable und mehr mit gehostetem Krypto-Checkout an.",
     adminTitle: "Admin · Trustless Commerce",
     adminDescription: "Plattformübersicht für Administratoren.",
+    guardianTitle: "Guardian · Trustless Commerce",
+    guardianDescription: "Review hosted wallet recovery requests.",
   },
 
   common: {
@@ -484,6 +486,35 @@ export const de = {
     colSwept: "Ausgezahlt",
     colFees: "Gebühren",
     noActivity: "Noch keine Auszahlungen.",
+  },
+
+
+  guardian: {
+    eyebrow: "Guardian",
+    title: "Recovery requests",
+    lede: "Sign in with the on-chain guardian wallet to review email-verified recovery requests.",
+    connectHint: "Connect MetaMask with the AdminGuardianRecovery guardian address.",
+    connect: "Connect MetaMask",
+    connecting: "Waiting for signature…",
+    noMetamask: "MetaMask (or another injected wallet) not found.",
+    noAccount: "No account returned",
+    signedIn: "Signed in as {address}",
+    filterAwaiting: "Awaiting",
+    filterProgress: "In progress",
+    filterArchive: "Archive",
+    refresh: "Refresh",
+    signOut: "Sign out",
+    empty: "No requests in this filter.",
+    colWallet: "Wallet",
+    colEmail: "Email",
+    colDevice: "Device",
+    colStatus: "Status",
+    colCreated: "Created",
+    detail: "Detail",
+    approve: "Approve",
+    reject: "Reject",
+    rejectConfirm: "Reject this recovery request?",
+    detailTitle: "Request detail",
   },
 
   integrations: {

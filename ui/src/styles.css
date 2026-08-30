@@ -3102,6 +3102,37 @@ a.wallet-account-menu-item:hover,
   border-top: 1px solid var(--line);
 }
 
+.wallet-captcha {
+  margin: 0.75rem 0;
+  min-height: 1px;
+}
+
+.guardian-shell .data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.guardian-shell .data-table th,
+.guardian-shell .data-table td {
+  text-align: left;
+  padding: 0.5rem 0.4rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--tc-border, #d0d5dd) 80%, transparent);
+  vertical-align: top;
+}
+
+.guardian-detail {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  margin: 1rem 0;
+}
+
+.guardian-detail dt {
+  font-weight: 600;
+}
+
 .hint {
   color: var(--ink-muted);
   font-size: 0.9rem;

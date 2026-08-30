@@ -32,6 +32,7 @@ import {
   walletLoadingFrame,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
+import { fetchWalletEmail } from "../../shared/wallet-recovery-api.js";
 
 const WALLET_ABI = [
   "function pendingOwner() view returns (bytes32 qx, bytes32 qy, uint64 executableAt, bytes32 requestId, bool active)",
@@ -83,7 +84,16 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
     title: t("wallet.devicesTab"),
     lede: t("wallet.pairRequired"),
     body: `
-      ${pendingRecovery ? `<div class="banner warn">${escapeHtml(t("wallet.pendingRecovery"))}</div>` : ""}
+      ${
+        pendingRecovery
+          ? `<div class="banner warn">
+              <p>${escapeHtml(t("wallet.pendingRecovery"))}</p>
+              <div class="cta-row">
+                <a class="tc-btn secondary small" href="/wallet/recover" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
+              </div>
+            </div>`
+          : ""
+      }
 
       <article class="wallet-device-callout">
         <div class="wallet-device-callout-head">
@@ -131,14 +141,43 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
 
       <section class="wallet-recovery-section">
         <h2>${escapeHtml(t("wallet.recoverySection"))}</h2>
-        <p class="field-hint">${escapeHtml(t("wallet.recoveryHint"))}</p>
+        <p class="field-hint" id="security-email-status">${escapeHtml(t("wallet.recoverEmailLoading"))}</p>
         <p class="field-hint">${escapeHtml(t("wallet.recoveryTimelock", { hours: Math.round(config.recoveryTimelockSeconds / 3600) }))}</p>
+        <div class="cta-row">
+          <a class="tc-btn" href="/wallet/recover" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
+          ${
+            pendingRecovery
+              ? `<button type="button" class="tc-btn secondary" id="security-cancel-recovery">${escapeHtml(t("wallet.recoverCancel"))}</button>`
+              : ""
+          }
+        </div>
       </section>
       <p id="security-status" class="status wallet-status" role="status"></p>`,
   });
 
   bindWalletAccountBar(root);
   bindCopyButtons(root);
+
+  void (async () => {
+    const el = root.querySelector<HTMLElement>("#security-email-status");
+    if (!el) return;
+    try {
+      const email = await fetchWalletEmail(session.address);
+      if (email.verified && email.email) {
+        el.textContent = t("wallet.recoverEmailVerified", { email: email.email });
+      } else if (email.hasEmail && email.email) {
+        el.textContent = t("wallet.recoverEmailPending", { email: email.email });
+      } else {
+        el.textContent = t("wallet.recoverEmailNone");
+      }
+    } catch {
+      el.textContent = t("wallet.recoverEmailNone");
+    }
+  })();
+
+  root.querySelector("#security-cancel-recovery")?.addEventListener("click", () => {
+    spaNavigate("/wallet/recover");
+  });
 
   root.querySelector("#add-device-qr")?.addEventListener("click", async () => {
     const box = root.querySelector<HTMLElement>("#pair-qr-box");

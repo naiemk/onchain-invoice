@@ -58,6 +58,7 @@ import { requireSweeper } from "./sweeper-auth.js";
 import { requireBundler } from "./bundler-auth.js";
 import { registerWalletRoutes } from "./wallet-routes.js";
 import { registerWalletClientRoutes } from "./wallet-client-routes.js";
+import { registerHostedRecoveryRoutes } from "./wallet-hosted-recovery.js";
 import { formatUsdFromUsdc } from "../shared/userop.js";
 import type { UserOpStatus } from "../shared/userop.js";
 
@@ -78,6 +79,10 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
     readRawBody,
     sweeperApiKey: context.config.sweeperApiKey,
     requireApiKey,
+  });
+  const handleHostedRecoveryRoute = registerHostedRecoveryRoutes(context.db, context.config, {
+    sendJson,
+    readJson,
   });
 
   return async (req, res) => {
@@ -121,6 +126,10 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       }
 
       if (await handleWalletClientRoute(req, res, url)) {
+        return;
+      }
+
+      if (await handleHostedRecoveryRoute(req, res, url)) {
         return;
       }
 
@@ -177,6 +186,7 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
           feeTokenAddress: w.feeTokenAddress ?? null,
           feeTokenSymbol: w.feeTokenSymbol,
           feeTokenDecimals: w.feeTokenDecimals,
+          turnstileSiteKey: context.config.turnstileSiteKey ?? null,
           chains: w.chains.map((c) => ({
             chainId: c.chainId,
             factoryAddress: c.factoryAddress,
@@ -1512,7 +1522,7 @@ function setCors(res: ServerResponse, config: AppConfig): void {
   res.setHeader("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.setHeader(
     "access-control-allow-headers",
-    "content-type,authorization,x-api-key,idempotency-key,x-merchant-address,x-merchant-message,x-merchant-signature,x-sweeper-address,x-sweeper-timestamp,x-sweeper-nonce,x-sweeper-signature,x-sweeper-body-hash,x-bundler-address,x-bundler-timestamp,x-bundler-nonce,x-bundler-signature,x-bundler-body-hash,x-client-id,x-client-timestamp,x-client-nonce,x-client-body-hash,x-client-signature"
+    "content-type,authorization,x-api-key,idempotency-key,x-merchant-address,x-merchant-message,x-merchant-signature,x-sweeper-address,x-sweeper-timestamp,x-sweeper-nonce,x-sweeper-signature,x-sweeper-body-hash,x-bundler-address,x-bundler-timestamp,x-bundler-nonce,x-bundler-signature,x-bundler-body-hash,x-client-id,x-client-timestamp,x-client-nonce,x-client-body-hash,x-client-signature,x-guardian-session"
   );
   if (allow !== "*") {
     res.setHeader("access-control-allow-credentials", "true");

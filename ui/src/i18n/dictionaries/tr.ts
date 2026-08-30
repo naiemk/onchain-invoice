@@ -47,6 +47,8 @@ export const tr = {
       "WooCommerce, Shopify, Kajabi, Teachable ve daha fazlasında barındırılan kripto checkout ile USDC ve USDT kabul edin.",
     adminTitle: "Yönetim · Trustless Commerce",
     adminDescription: "Platform yönetim özeti.",
+    guardianTitle: "Guardian · Trustless Commerce",
+    guardianDescription: "Review hosted wallet recovery requests.",
   },
 
   common: {
@@ -488,6 +490,35 @@ export const tr = {
     colSwept: "Aktarılan",
     colFees: "Komisyonlar",
     noActivity: "Henüz ödeme hareketi yok.",
+  },
+
+
+  guardian: {
+    eyebrow: "Guardian",
+    title: "Recovery requests",
+    lede: "Sign in with the on-chain guardian wallet to review email-verified recovery requests.",
+    connectHint: "Connect MetaMask with the AdminGuardianRecovery guardian address.",
+    connect: "Connect MetaMask",
+    connecting: "Waiting for signature…",
+    noMetamask: "MetaMask (or another injected wallet) not found.",
+    noAccount: "No account returned",
+    signedIn: "Signed in as {address}",
+    filterAwaiting: "Awaiting",
+    filterProgress: "In progress",
+    filterArchive: "Archive",
+    refresh: "Refresh",
+    signOut: "Sign out",
+    empty: "No requests in this filter.",
+    colWallet: "Wallet",
+    colEmail: "Email",
+    colDevice: "Device",
+    colStatus: "Status",
+    colCreated: "Created",
+    detail: "Detail",
+    approve: "Approve",
+    reject: "Reject",
+    rejectConfirm: "Reject this recovery request?",
+    detailTitle: "Request detail",
   },
 
   integrations: {
