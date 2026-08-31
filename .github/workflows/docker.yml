@@ -121,9 +121,9 @@ jobs:
         continue-on-error: true
         run: |
           for d in deploy/tctest/dist deploy/tcmain/dist; do
-            python3 "$d/notify-vps-pull.py" --image "${{ env.IMAGE_API }}" --tag main || true
-            python3 "$d/notify-vps-pull.py" --image "${{ env.IMAGE_UI }}" --tag main || true
-            python3 "$d/notify-vps-pull.py" --image "${{ env.IMAGE_SWEEPER }}" --tag main || true
+            python3 "$d/notify-vps-pull.py" --config "$d/packageconfig.yaml" --image "${{ env.IMAGE_API }}" --tag main || true
+            python3 "$d/notify-vps-pull.py" --config "$d/packageconfig.yaml" --image "${{ env.IMAGE_UI }}" --tag main || true
+            python3 "$d/notify-vps-pull.py" --config "$d/packageconfig.yaml" --image "${{ env.IMAGE_SWEEPER }}" --tag main || true
           done
 
       - name: Local compose smoke
