@@ -1008,8 +1008,8 @@ describe("commerce Onramper / fiat invoices", function () {
   });
 
   it("returns demo wallet onramp/offramp sessions for registered wallets", async function () {
-    const factory = "0x2b245a20589c745B11F8a69C677F891e8175a550";
-    const impl = "0x297CF0F47e9f6dAd3903694dE531abaD83CE8AAA";
+    const factory = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
+    const impl = "0xe024cE8ed1878dBdd3ca8E73B1e586c4E46dC85C";
     const qx = zeroPadValue("0x0a", 32);
     const qy = zeroPadValue("0x0b", 32);
     const salt = deriveWalletSalt(qx, qy);
@@ -1020,7 +1020,7 @@ describe("commerce Onramper / fiat invoices", function () {
         ONRAMPER_ENABLED: "1",
         WALLET_FACTORY_ADDRESS: factory,
         WALLET_IMPLEMENTATION_ADDRESS: impl,
-        WALLET_RECOVERY_ADDRESS: "0x87CB1c5eD04959A51A7CACe8eA2787791F9cE347",
+        WALLET_RECOVERY_ADDRESS: "0x72739889bcce2B08a23212bae6C7B9F1C29e7873",
       },
       async (baseUrl) => {
         const reg = await fetch(`${baseUrl}/api/wallet/accounts`, {

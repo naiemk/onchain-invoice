@@ -16,6 +16,14 @@ export const WALLET_EXECUTE_ABI = [
   "function execute(bytes32 mode, bytes executionData)",
   "function addOwner(bytes32 qx, bytes32 qy)",
   "function removeOwner(bytes32 qx, bytes32 qy)",
+  "function enableAdvanced(bytes32 adminEntityId)",
+  "function configureMultisig(bytes32[] removeKeyIds, bytes32[] entityIds, bytes32[] entityIdsForKeys, uint8[] keyTypes, bytes32[] qx, bytes32[] qy, address[] eoa, uint8 threshold, bytes32[] vetoEntityIds)",
+  "function addEntity(bytes32 entityId)",
+  "function removeEntity(bytes32 entityId)",
+  "function addKey(bytes32 entityId, uint8 keyType, bytes32 qx, bytes32 qy, address eoa)",
+  "function removeKey(bytes32 keyId)",
+  "function setThreshold(uint8 m)",
+  "function setVeto(bytes32 entityId, bool isVeto)",
 ];
 
 export const ENTRYPOINT_ABI = [
@@ -123,6 +131,52 @@ export function encodeAddOwner(qx: string, qy: string): string {
 
 export function encodeRemoveOwner(qx: string, qy: string): string {
   return walletIface.encodeFunctionData("removeOwner", [qx, qy]);
+}
+
+export function encodeEnableAdvanced(adminEntityId: string): string {
+  return walletIface.encodeFunctionData("enableAdvanced", [adminEntityId]);
+}
+
+export function encodeAddEntity(entityId: string): string {
+  return walletIface.encodeFunctionData("addEntity", [entityId]);
+}
+
+export function encodeAddKey(
+  entityId: string,
+  keyType: number,
+  qx: string,
+  qy: string,
+  eoa: string
+): string {
+  return walletIface.encodeFunctionData("addKey", [entityId, keyType, qx, qy, eoa]);
+}
+
+export function encodeSetThreshold(m: number): string {
+  return walletIface.encodeFunctionData("setThreshold", [m]);
+}
+
+export function encodeConfigureMultisig(input: {
+  removeKeyIds: string[];
+  entityIds: string[];
+  entityIdsForKeys: string[];
+  keyTypes: number[];
+  qx: string[];
+  qy: string[];
+  eoa: string[];
+  threshold: number;
+  vetoEntityIds: string[];
+}): string {
+  return walletIface.encodeFunctionData("configureMultisig", [
+    input.removeKeyIds,
+    input.entityIds,
+    input.entityIdsForKeys,
+    input.keyTypes,
+    input.qx,
+    input.qy,
+    input.eoa,
+    input.threshold,
+    input.vetoEntityIds,
+  ]);
 }
 
 /** ABI-encode Execution[] batch per ERC-7579 / ERC-7821. */

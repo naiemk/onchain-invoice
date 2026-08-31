@@ -9,8 +9,8 @@ import { CommerceDb } from "../commerce/server/db.js";
 import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
 import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
 
-const FACTORY = "0x2b245a20589c745B11F8a69C677F891e8175a550";
-const IMPL = "0x297CF0F47e9f6dAd3903694dE531abaD83CE8AAA";
+const FACTORY = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
+const IMPL = "0xe024cE8ed1878dBdd3ca8E73B1e586c4E46dC85C";
 const QX = ethersLib.zeroPadValue("0x0a", 32);
 const QY = ethersLib.zeroPadValue("0x0b", 32);
 
@@ -20,7 +20,7 @@ const BASE_ENV = {
   SWEEPER_API_KEY: "sweeper-wallet-test",
   WALLET_FACTORY_ADDRESS: FACTORY,
   WALLET_IMPLEMENTATION_ADDRESS: IMPL,
-  WALLET_RECOVERY_ADDRESS: "0x87CB1c5eD04959A51A7CACe8eA2787791F9cE347",
+  WALLET_RECOVERY_ADDRESS: "0x72739889bcce2B08a23212bae6C7B9F1C29e7873",
   WALLET_RPC_URL: "",
   EVM_RPC_URL: "",
 } as const;
@@ -96,10 +96,12 @@ describe("commerce wallet accounts API", function () {
         factoryAddress: string | null;
         implementationAddress: string | null;
         chains: unknown[];
+        advancedWalletAbi?: string[];
       };
       expect(body.factoryAddress?.toLowerCase()).to.equal(FACTORY.toLowerCase());
       expect(body.implementationAddress?.toLowerCase()).to.equal(IMPL.toLowerCase());
       expect(body.chains.length).to.be.greaterThan(0);
+      expect(body.advancedWalletAbi?.length).to.be.greaterThan(0);
     });
   });
 

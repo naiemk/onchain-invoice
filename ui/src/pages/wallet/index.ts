@@ -11,6 +11,8 @@ import { renderWalletRecover } from "./recover.js";
 import { renderWalletCash } from "./cash.js";
 import { renderWalletGetPaid } from "./get-paid.js";
 import { renderWalletDevelopers } from "./developers.js";
+import { renderWalletSuperWallet } from "./super-wallet.js";
+import { renderWalletProposals } from "./proposals.js";
 
 export async function renderWallet(root: HTMLElement): Promise<void> {
   const path = location.pathname;
@@ -48,6 +50,14 @@ export async function renderWallet(root: HTMLElement): Promise<void> {
   }
   if (path === "/wallet/developers") {
     await renderWalletDevelopers(root);
+    return;
+  }
+  if (path === "/wallet/super-wallet") {
+    await renderWalletSuperWallet(root);
+    return;
+  }
+  if (path === "/wallet/proposals") {
+    await renderWalletProposals(root);
     return;
   }
   if (path === "/wallet/deposit") {

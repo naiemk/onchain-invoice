@@ -19,6 +19,7 @@ import {
 } from "../shared/onramper.js";
 import { confirmOnramperOfframpTransaction } from "../shared/onramper-confirm.js";
 import type { CommerceDb } from "./db.js";
+import { registerWalletAdvancedRoutes } from "./wallet-advanced-routes.js";
 
 const PAIRING_TTL_MS = 5 * 60 * 1000;
 
@@ -37,12 +38,16 @@ export function registerWalletRoutes(
   }
 ) {
   const walletConfig = appConfig.wallet;
+  const handleAdvanced = registerWalletAdvancedRoutes(db, appConfig, handlers);
   return async function handleWalletRoute(
     req: import("node:http").IncomingMessage,
     res: import("node:http").ServerResponse,
     url: URL,
     ip: string
   ): Promise<boolean> {
+    if (await handleAdvanced(req, res, url)) {
+      return true;
+    }
     if (req.method === "POST" && url.pathname === "/api/wallet/onramp-session") {
       await createWalletOnrampSession(req, res, db, appConfig, handlers);
       return true;

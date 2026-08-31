@@ -24,6 +24,7 @@ import {
   walletLoadingFrame,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
+import { fetchAdvancedPolicy } from "../../shared/wallet-advanced-api.js";
 
 export async function renderWalletSend(root: HTMLElement): Promise<void> {
   const gen = currentSpaRender();
@@ -38,6 +39,14 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
 
   const config = await fetchWalletConfig();
   if (!isSpaRenderCurrent(gen)) return;
+
+  const policy = await fetchAdvancedPolicy(session.address).catch(() => null);
+  if (!isSpaRenderCurrent(gen)) return;
+  if (policy?.advanced && policy.threshold > 1) {
+    spaNavigate("/wallet/proposals?create=1", "replace");
+    return;
+  }
+
   const feeAtoms = BigInt(config.bundlerFeeUsdc || "0");
   let balance = { totalUsd: "0.00", chains: [] as Awaited<ReturnType<typeof fetchWalletBalance>>["chains"] };
   let deployedOnPrimary = false;

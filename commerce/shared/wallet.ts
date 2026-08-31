@@ -83,6 +83,51 @@ export interface WalletPublicConfig {
   feeTokenDecimals: number;
   turnstileSiteKey?: string | null;
   chains: WalletChainConfig[];
+  /** ABI fragments for advanced entity M-of-N policy (Super Wallet). */
+  advancedWalletAbi?: string[];
+}
+
+export interface WalletEntityRecord {
+  walletAddress: string;
+  entityId: string;
+  label: string | null;
+  createdAt: string;
+}
+
+export interface WalletEntityKeyRecord {
+  walletAddress: string;
+  entityId: string;
+  keyId: string;
+  keyType: number;
+  qx: string | null;
+  qy: string | null;
+  eoa: string | null;
+  credentialId: string | null;
+  createdAt: string;
+}
+
+export type WalletProposalStatus = "draft" | "signing" | "ready" | "executed" | "cancelled";
+
+export interface WalletProposalRecord {
+  id: string;
+  walletAddress: string;
+  chainId: string;
+  target: string;
+  value: string;
+  data: string;
+  nonce: string | null;
+  status: WalletProposalStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WalletProposalSigRecord {
+  proposalId: string;
+  entityId: string;
+  keyId: string;
+  keyType: number;
+  signature: string;
+  createdAt: string;
 }
 
 export type { PackedUserOperationJson, WalletUserOpRecord, UserOpStatus } from "./userop.js";
