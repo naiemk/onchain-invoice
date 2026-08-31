@@ -33,6 +33,8 @@ import {
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 import { fetchWalletEmail } from "../../shared/wallet-recovery-api.js";
+import { fetchAdvancedPolicy } from "../../shared/wallet-advanced-api.js";
+import { isAdvancedMode } from "../../shared/wallet-mode.js";
 
 const WALLET_ABI = [
   "function pendingOwner() view returns (bytes32 qx, bytes32 qy, uint64 executableAt, bytes32 requestId, bool active)",
@@ -51,16 +53,10 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
 
   let devices: Awaited<ReturnType<typeof listDevices>> = [];
   let pendingRecovery = false;
+  let onChainAdvanced = false;
   const config = await fetchWalletConfig();
   if (!isSpaRenderCurrent(gen)) return;
   const chain = primaryChain(config);
-
-  try {
-    devices = await listDevices(session.address, session.chainId);
-  } catch {
-    devices = [];
-  }
-  if (!isSpaRenderCurrent(gen)) return;
 
   if (chain.rpcUrl) {
     try {
@@ -70,6 +66,20 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
     } catch {
       pendingRecovery = false;
     }
+    try {
+      const policy = await fetchAdvancedPolicy(session.address);
+      onChainAdvanced = policy.advanced;
+      if (onChainAdvanced) pendingRecovery = false;
+    } catch {
+      onChainAdvanced = false;
+    }
+  }
+  if (!isSpaRenderCurrent(gen)) return;
+
+  try {
+    devices = await listDevices(session.address, session.chainId);
+  } catch {
+    devices = [];
   }
   if (!isSpaRenderCurrent(gen)) return;
 
@@ -139,7 +149,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
         <div id="pair-qr-box" class="wallet-qr-wrap hidden"></div>
       </section>
 
-      <section class="wallet-recovery-section">
+      <section class="wallet-recovery-section ${onChainAdvanced ? "hidden" : ""}">
         <h2>${escapeHtml(t("wallet.recoverySection"))}</h2>
         <p class="field-hint" id="security-email-status">${escapeHtml(t("wallet.recoverEmailLoading"))}</p>
         <p class="field-hint">${escapeHtml(t("wallet.recoveryTimelock", { hours: Math.round(config.recoveryTimelockSeconds / 3600) }))}</p>
@@ -152,6 +162,15 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
           }
         </div>
       </section>
+      ${
+        isAdvancedMode()
+          ? `<section class="wallet-super-section">
+              <h2>${escapeHtml(t("wallet.superWalletTitle"))}</h2>
+              <p class="field-hint">${escapeHtml(onChainAdvanced ? t("wallet.superWalletActiveShort") : t("wallet.superWalletUpgradeShort"))}</p>
+              <a class="tc-btn secondary" href="/wallet/super-wallet" data-route>${escapeHtml(t("wallet.superWalletManage"))}</a>
+            </section>`
+          : ""
+      }
       <p id="security-status" class="status wallet-status" role="status"></p>`,
   });
 
@@ -160,7 +179,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
 
   void (async () => {
     const el = root.querySelector<HTMLElement>("#security-email-status");
-    if (!el) return;
+    if (!el || onChainAdvanced) return;
     try {
       const email = await fetchWalletEmail(session.address);
       if (email.verified && email.email) {

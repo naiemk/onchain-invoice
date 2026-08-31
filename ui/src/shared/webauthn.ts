@@ -57,9 +57,19 @@ export function webAuthnSupported(): boolean {
   return typeof window !== "undefined" && !!window.PublicKeyCredential;
 }
 
-export async function createPasskey(displayName: string): Promise<PasskeyOwner> {
+export async function createPasskey(
+  displayName: string,
+  options?: { attachment?: "platform" | "cross-platform" }
+): Promise<PasskeyOwner> {
   if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
   const challenge = randomChallenge();
+  const authenticatorSelection: AuthenticatorSelectionCriteria = {
+    residentKey: options?.attachment === "cross-platform" ? "discouraged" : "required",
+    userVerification: "required",
+  };
+  if (options?.attachment) {
+    authenticatorSelection.authenticatorAttachment = options.attachment;
+  }
   const cred = (await navigator.credentials.create({
     publicKey: {
       challenge,
@@ -70,10 +80,7 @@ export async function createPasskey(displayName: string): Promise<PasskeyOwner> 
         displayName,
       },
       pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-      authenticatorSelection: {
-        residentKey: "required",
-        userVerification: "required",
-      },
+      authenticatorSelection,
     },
   })) as PublicKeyCredential | null;
   if (!cred) throw new Error("Passkey creation cancelled");

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { WalletDeployerWorker, type WalletDeployerConfig } from "../commerce/wallet-deployer/worker.js";
 
-const FACTORY = "0x2b245a20589c745B11F8a69C677F891e8175a550";
+const FACTORY = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
 const TOKEN = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 const DEPLOYER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 

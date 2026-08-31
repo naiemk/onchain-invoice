@@ -61,6 +61,7 @@ import { registerWalletClientRoutes } from "./wallet-client-routes.js";
 import { registerHostedRecoveryRoutes } from "./wallet-hosted-recovery.js";
 import { formatUsdFromUsdc } from "../shared/userop.js";
 import type { UserOpStatus } from "../shared/userop.js";
+import { WALLET_ADVANCED_ABI } from "../shared/advanced-wallet.js";
 
 interface RouteContext {
   config: AppConfig;
@@ -187,6 +188,7 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
           feeTokenSymbol: w.feeTokenSymbol,
           feeTokenDecimals: w.feeTokenDecimals,
           turnstileSiteKey: context.config.turnstileSiteKey ?? null,
+          advancedWalletAbi: [...WALLET_ADVANCED_ABI],
           chains: w.chains.map((c) => ({
             chainId: c.chainId,
             factoryAddress: c.factoryAddress,

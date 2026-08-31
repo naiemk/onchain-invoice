@@ -28,6 +28,11 @@ import type {
   WalletRecoveryRequestStatus,
   HostedRecoveryChallengePurpose,
   HostedRecoveryChallengeRecord,
+  WalletEntityRecord,
+  WalletEntityKeyRecord,
+  WalletProposalRecord,
+  WalletProposalSigRecord,
+  WalletProposalStatus,
 } from "../shared/wallet.js";
 import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
 import { parsePaymentMode } from "../shared/onramper.js";
@@ -138,6 +143,47 @@ interface WalletUserOpRow {
   gas_spent_wei: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface WalletEntityRow {
+  wallet_address: string;
+  entity_id: string;
+  label: string | null;
+  created_at: string;
+}
+
+interface WalletEntityKeyRow {
+  wallet_address: string;
+  entity_id: string;
+  key_id: string;
+  key_type: number;
+  qx: string | null;
+  qy: string | null;
+  eoa: string | null;
+  credential_id: string | null;
+  created_at: string;
+}
+
+interface WalletProposalRow {
+  id: string;
+  wallet_address: string;
+  chain_id: string;
+  target: string;
+  value: string;
+  data: string;
+  nonce: string | null;
+  status: WalletProposalStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+interface WalletProposalSigRow {
+  proposal_id: string;
+  entity_id: string;
+  key_id: string;
+  key_type: number;
+  signature: string;
+  created_at: string;
 }
 
 interface BundlerRow {
@@ -904,6 +950,57 @@ export class CommerceDb {
       CREATE INDEX IF NOT EXISTS idx_wallet_recovery_requests_wallet
         ON wallet_recovery_requests(wallet_address, status);
 
+      CREATE TABLE IF NOT EXISTS wallet_entities (
+        wallet_address TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        label TEXT,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (wallet_address, entity_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS wallet_entity_keys (
+        wallet_address TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        key_id TEXT NOT NULL,
+        key_type INTEGER NOT NULL,
+        qx TEXT,
+        qy TEXT,
+        eoa TEXT,
+        credential_id TEXT,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (wallet_address, key_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_entity_keys_entity
+        ON wallet_entity_keys(wallet_address, entity_id);
+
+      CREATE TABLE IF NOT EXISTS wallet_proposals (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        chain_id TEXT NOT NULL,
+        target TEXT NOT NULL,
+        value TEXT NOT NULL,
+        data TEXT NOT NULL,
+        nonce TEXT,
+        status TEXT NOT NULL CHECK (status IN ('draft','signing','ready','executed','cancelled')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_proposals_wallet
+        ON wallet_proposals(wallet_address, status);
+
+      CREATE TABLE IF NOT EXISTS wallet_proposal_sigs (
+        proposal_id TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        key_id TEXT NOT NULL,
+        key_type INTEGER NOT NULL,
+        signature TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (proposal_id, entity_id),
+        FOREIGN KEY (proposal_id) REFERENCES wallet_proposals(id) ON DELETE CASCADE
+      );
+
       CREATE TABLE IF NOT EXISTS guardian_nonces (
         address TEXT NOT NULL,
         nonce TEXT NOT NULL,
@@ -1177,6 +1274,209 @@ export class CommerceDb {
         now
       );
     return this.getWalletUserOpByHash(input.userOpHash)!;
+  }
+
+  upsertWalletEntity(input: {
+    walletAddress: string;
+    entityId: string;
+    label?: string | null;
+  }): WalletEntityRecord {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_entities (wallet_address, entity_id, label, created_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(wallet_address, entity_id) DO UPDATE SET label = COALESCE(excluded.label, wallet_entities.label)`
+      )
+      .run(input.walletAddress.toLowerCase(), input.entityId, input.label ?? null, now);
+    return this.getWalletEntity(input.walletAddress, input.entityId)!;
+  }
+
+  getWalletEntity(walletAddress: string, entityId: string): WalletEntityRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_entities WHERE wallet_address = ? AND entity_id = ?`)
+      .get(walletAddress.toLowerCase(), entityId) as WalletEntityRow | undefined;
+    return row ? mapWalletEntity(row) : null;
+  }
+
+  listWalletEntities(walletAddress: string): WalletEntityRecord[] {
+    return (
+      this.db
+        .prepare(`SELECT * FROM wallet_entities WHERE wallet_address = ? ORDER BY created_at ASC`)
+        .all(walletAddress.toLowerCase()) as WalletEntityRow[]
+    ).map(mapWalletEntity);
+  }
+
+  upsertWalletEntityKey(input: {
+    walletAddress: string;
+    entityId: string;
+    keyId: string;
+    keyType: number;
+    qx?: string | null;
+    qy?: string | null;
+    eoa?: string | null;
+    credentialId?: string | null;
+  }): WalletEntityKeyRecord {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_entity_keys (
+           wallet_address, entity_id, key_id, key_type, qx, qy, eoa, credential_id, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(wallet_address, key_id) DO UPDATE SET
+           entity_id = excluded.entity_id,
+           key_type = excluded.key_type,
+           qx = excluded.qx,
+           qy = excluded.qy,
+           eoa = excluded.eoa,
+           credential_id = excluded.credential_id`
+      )
+      .run(
+        input.walletAddress.toLowerCase(),
+        input.entityId,
+        input.keyId,
+        input.keyType,
+        input.qx ?? null,
+        input.qy ?? null,
+        input.eoa ?? null,
+        input.credentialId ?? null,
+        now
+      );
+    return this.getWalletEntityKey(input.walletAddress, input.keyId)!;
+  }
+
+  getWalletEntityKey(walletAddress: string, keyId: string): WalletEntityKeyRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_entity_keys WHERE wallet_address = ? AND key_id = ?`)
+      .get(walletAddress.toLowerCase(), keyId) as WalletEntityKeyRow | undefined;
+    return row ? mapWalletEntityKey(row) : null;
+  }
+
+  listWalletEntityKeys(walletAddress: string, entityId?: string): WalletEntityKeyRecord[] {
+    if (entityId) {
+      return (
+        this.db
+          .prepare(
+            `SELECT * FROM wallet_entity_keys WHERE wallet_address = ? AND entity_id = ? ORDER BY created_at ASC`
+          )
+          .all(walletAddress.toLowerCase(), entityId) as WalletEntityKeyRow[]
+      ).map(mapWalletEntityKey);
+    }
+    return (
+      this.db
+        .prepare(`SELECT * FROM wallet_entity_keys WHERE wallet_address = ? ORDER BY created_at ASC`)
+        .all(walletAddress.toLowerCase()) as WalletEntityKeyRow[]
+    ).map(mapWalletEntityKey);
+  }
+
+  createWalletProposal(input: {
+    walletAddress: string;
+    chainId: string;
+    target: string;
+    value: string;
+    data: string;
+  }): WalletProposalRecord {
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_proposals (
+           id, wallet_address, chain_id, target, value, data, nonce, status, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, NULL, 'draft', ?, ?)`
+      )
+      .run(
+        id,
+        input.walletAddress.toLowerCase(),
+        input.chainId,
+        input.target.toLowerCase(),
+        input.value,
+        input.data,
+        now,
+        now
+      );
+    return this.getWalletProposal(id)!;
+  }
+
+  prepareWalletProposal(id: string, nonce: string): WalletProposalRecord | null {
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(
+        `UPDATE wallet_proposals SET nonce = ?, status = 'signing', updated_at = ?
+         WHERE id = ? AND status IN ('draft', 'signing')`
+      )
+      .run(nonce, now, id);
+    if (result.changes === 0) return null;
+    return this.getWalletProposal(id);
+  }
+
+  getWalletProposal(id: string): WalletProposalRecord | null {
+    const row = this.db.prepare(`SELECT * FROM wallet_proposals WHERE id = ?`).get(id) as
+      | WalletProposalRow
+      | undefined;
+    return row ? mapWalletProposal(row) : null;
+  }
+
+  listWalletProposals(walletAddress: string, status?: WalletProposalStatus): WalletProposalRecord[] {
+    if (status) {
+      return (
+        this.db
+          .prepare(
+            `SELECT * FROM wallet_proposals WHERE wallet_address = ? AND status = ? ORDER BY created_at DESC`
+          )
+          .all(walletAddress.toLowerCase(), status) as WalletProposalRow[]
+      ).map(mapWalletProposal);
+    }
+    return (
+      this.db
+        .prepare(`SELECT * FROM wallet_proposals WHERE wallet_address = ? ORDER BY created_at DESC`)
+        .all(walletAddress.toLowerCase()) as WalletProposalRow[]
+    ).map(mapWalletProposal);
+  }
+
+  updateWalletProposalStatus(id: string, status: WalletProposalStatus): WalletProposalRecord | null {
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(`UPDATE wallet_proposals SET status = ?, updated_at = ? WHERE id = ?`)
+      .run(status, now, id);
+    if (result.changes === 0) return null;
+    return this.getWalletProposal(id);
+  }
+
+  addWalletProposalSig(input: {
+    proposalId: string;
+    entityId: string;
+    keyId: string;
+    keyType: number;
+    signature: string;
+  }): WalletProposalSigRecord {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_proposal_sigs (proposal_id, entity_id, key_id, key_type, signature, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(proposal_id, entity_id) DO UPDATE SET
+           key_id = excluded.key_id,
+           key_type = excluded.key_type,
+           signature = excluded.signature,
+           created_at = excluded.created_at`
+      )
+      .run(input.proposalId, input.entityId, input.keyId, input.keyType, input.signature, now);
+    return this.getWalletProposalSig(input.proposalId, input.entityId)!;
+  }
+
+  getWalletProposalSig(proposalId: string, entityId: string): WalletProposalSigRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_proposal_sigs WHERE proposal_id = ? AND entity_id = ?`)
+      .get(proposalId, entityId) as WalletProposalSigRow | undefined;
+    return row ? mapWalletProposalSig(row) : null;
+  }
+
+  listWalletProposalSigs(proposalId: string): WalletProposalSigRecord[] {
+    return (
+      this.db
+        .prepare(`SELECT * FROM wallet_proposal_sigs WHERE proposal_id = ? ORDER BY created_at ASC`)
+        .all(proposalId) as WalletProposalSigRow[]
+    ).map(mapWalletProposalSig);
   }
 
   /**
@@ -2448,6 +2748,55 @@ function mapWalletPairing(row: WalletPairingRow): WalletPairingRecord {
     deviceLabel: row.device_label,
     status: row.status,
     expiresAt: row.expires_at,
+    createdAt: row.created_at,
+  };
+}
+
+function mapWalletEntity(row: WalletEntityRow): WalletEntityRecord {
+  return {
+    walletAddress: row.wallet_address,
+    entityId: row.entity_id,
+    label: row.label,
+    createdAt: row.created_at,
+  };
+}
+
+function mapWalletEntityKey(row: WalletEntityKeyRow): WalletEntityKeyRecord {
+  return {
+    walletAddress: row.wallet_address,
+    entityId: row.entity_id,
+    keyId: row.key_id,
+    keyType: row.key_type,
+    qx: row.qx,
+    qy: row.qy,
+    eoa: row.eoa,
+    credentialId: row.credential_id,
+    createdAt: row.created_at,
+  };
+}
+
+function mapWalletProposal(row: WalletProposalRow): WalletProposalRecord {
+  return {
+    id: row.id,
+    walletAddress: row.wallet_address,
+    chainId: row.chain_id,
+    target: row.target,
+    value: row.value,
+    data: row.data,
+    nonce: row.nonce,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapWalletProposalSig(row: WalletProposalSigRow): WalletProposalSigRecord {
+  return {
+    proposalId: row.proposal_id,
+    entityId: row.entity_id,
+    keyId: row.key_id,
+    keyType: row.key_type,
+    signature: row.signature,
     createdAt: row.created_at,
   };
 }
