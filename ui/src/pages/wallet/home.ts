@@ -132,7 +132,7 @@ function paintDashboard(
           attention.classList.remove("hidden");
           attention.innerHTML = `
             <p class="banner warn">${escapeHtml(t("wallet.pendingRecovery"))}
-              <a href="/wallet/recover" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
+              <a href="/wallet/security#recovery" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
             </p>`;
         }
       }
@@ -177,11 +177,11 @@ function paintDashboard(
           <strong>${escapeHtml(t("wallet.advancedDevicesTitle"))}</strong>
           <span>${escapeHtml(t(devicesBodyKey, { count: deviceCount }))}</span>
         </a>
-        <a class="wallet-advanced-card" href="/wallet/recover" data-route>
+        <a class="wallet-advanced-card" href="/wallet/security#recovery" data-route>
           <strong>${escapeHtml(t("wallet.advancedRecoveryTitle"))}</strong>
           <span>${escapeHtml(t("wallet.advancedRecoveryBody"))}</span>
         </a>
-        <a class="wallet-advanced-card" href="/merchant" data-route>
+        <a class="wallet-advanced-card" href="/wallet/invoices" data-route>
           <strong>${escapeHtml(t("wallet.advancedInvoicesTitle"))}</strong>
           <span>${escapeHtml(t("wallet.advancedInvoicesBody"))}</span>
         </a>

@@ -2,8 +2,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Copy, Lock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHero } from "@/components/PageHero";
 import { ScrollSubnav } from "@/components/ScrollSubnav";
+import { ExplorerLink } from "@/components/ExplorerLink";
+import { WalletAddressQrDialog } from "@/components/WalletAddressQrDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,12 +18,14 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/LocaleProvider";
 import { copyText } from "@/shared/dom.js";
+import { deploymentMode, isTestnet } from "@/shared/networks.js";
 import {
   clearActiveWallet,
-  listWalletRegistry,
+  listWalletRegistryForDeployment,
   loadWalletSession,
   setActiveWallet,
   shortAddress,
+  WALLET_SESSION_EVENT,
   type WalletSession,
 } from "@/shared/wallet-session.js";
 import { isAdvancedMode, loadWalletMode, saveWalletMode, type WalletMode } from "@/shared/wallet-mode.js";
@@ -74,7 +79,6 @@ function WalletAccountChip({
   const { t } = useLocale();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
-  const multiple = registry.length > 1;
 
   const copyAddress = useCallback(async () => {
     try {
@@ -105,41 +109,39 @@ function WalletAccountChip({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {multiple ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-2 px-2">
-              <WalletIdenticon session={session} />
-              <span className="max-w-[8rem] truncate text-sm">{session.label}</span>
-              <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel>{t("wallet.switchWallet")}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {registry.map((w) => (
-              <DropdownMenuItem key={w.address} onClick={() => switchWallet(w.address)}>
-                {w.label}
-                <span className="ms-auto font-mono text-[10px] text-muted-foreground">{shortAddress(w.address)}</span>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate("/wallet/create")}>
-              <Plus className="h-3.5 w-3.5" />
-              {t("wallet.createAnother")}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 gap-2 px-2">
+            <WalletIdenticon session={session} />
+            <span className="max-w-[8rem] truncate text-sm">{session.label}</span>
+            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuLabel>{t("wallet.switchWallet")}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {registry.map((w) => (
+            <DropdownMenuItem key={w.address} onClick={() => switchWallet(w.address)}>
+              {w.label}
+              <span className="ms-auto font-mono text-[10px] text-muted-foreground">{shortAddress(w.address)}</span>
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : (
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1">
-          <WalletIdenticon session={session} />
-          <span className="text-sm font-medium">{session.label}</span>
-        </div>
-      )}
-      <Button type="button" variant="outline" size="sm" className="font-mono text-[10px]" onClick={() => void copyAddress()}>
-        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-        {shortAddress(session.address)}
-      </Button>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={lock}>{t("wallet.allWallets")}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate("/wallet/create")}>
+            <Plus className="h-3.5 w-3.5" />
+            {t("wallet.createAnother")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <div className="inline-flex items-center gap-0.5">
+        <Button type="button" variant="outline" size="sm" className="font-mono text-[10px]" onClick={() => void copyAddress()}>
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {shortAddress(session.address)}
+        </Button>
+        <WalletAddressQrDialog address={session.address} />
+        <ExplorerLink chainId={session.chainId} value={session.address} className="h-8 w-8 rounded-md border border-border" />
+      </div>
       <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t("wallet.lock")} onClick={lock}>
         <Lock className="h-3.5 w-3.5" />
       </Button>
@@ -178,7 +180,6 @@ function WalletModeToggle() {
 
 function WalletSubnav({ current }: { current: WalletTab }) {
   const { t } = useLocale();
-  const session = loadWalletSession();
   const advanced = isAdvancedMode();
 
   const links = useMemo(() => {
@@ -192,15 +193,11 @@ function WalletSubnav({ current }: { current: WalletTab }) {
     if (advanced) {
       items.push(
         { href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") },
-        { href: "/merchant", key: "invoices", label: t("wallet.invoicesTab") },
-        { href: "/wallet/recover", key: "recover", label: t("wallet.recoverTab") },
-        { href: "/wallet/developers", key: "developers", label: t("wallet.developersTab") }
+        { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
       );
-    } else if (session || current === "recover") {
-      items.push({ href: "/wallet/recover", key: "recover", label: t("wallet.recoverTab") });
     }
     return items;
-  }, [t, advanced, session, current]);
+  }, [t, advanced]);
 
   return (
     <ScrollSubnav
@@ -224,6 +221,7 @@ const TAB_BREADCRUMBS: Partial<Record<WalletTab, string>> = {
   proposals: "WALLET / PROPOSALS",
   getPaid: "WALLET / GET PAID",
   developers: "WALLET / DEVELOPERS",
+  invoices: "WALLET / INVOICES",
 };
 
 export function WalletFrame({
@@ -243,14 +241,26 @@ export function WalletFrame({
 }) {
   const { t } = useLocale();
   const [session, setSession] = useState<WalletSession | null>(() => loadWalletSession());
-  const registry = useMemo(() => listWalletRegistry(), [session]);
-
-  useEffect(() => {
-    setSession(loadWalletSession());
-  }, [current]);
+  const mode = deploymentMode();
+  const registry = useMemo(
+    () => listWalletRegistryForDeployment(isTestnet, mode === "testnet"),
+    [session]
+  );
 
   const refreshSession = useCallback(() => setSession(loadWalletSession()), []);
+
+  useEffect(() => {
+    refreshSession();
+  }, [current, refreshSession]);
+
+  useEffect(() => {
+    const handler = () => refreshSession();
+    window.addEventListener(WALLET_SESSION_EVENT, handler);
+    return () => window.removeEventListener(WALLET_SESSION_EVENT, handler);
+  }, [refreshSession]);
+
   const crumb = breadcrumb ?? TAB_BREADCRUMBS[current] ?? t("wallet.eyebrow");
+  const showTestnetWarning = mode === "testnet" || (session != null && isTestnet(session.chainId));
 
   if (!showChrome || !session) {
     return (
@@ -265,6 +275,11 @@ export function WalletFrame({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 md:px-8">
+      {showTestnetWarning && (
+        <Alert variant="destructive" className="mb-4 border-destructive bg-destructive/10">
+          <AlertDescription className="font-medium">{t("wallet.testnetAddressWarning")}</AlertDescription>
+        </Alert>
+      )}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <WalletAccountChip session={session} registry={registry} onSessionChange={refreshSession} />
         <WalletModeToggle />

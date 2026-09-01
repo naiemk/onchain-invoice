@@ -24,6 +24,13 @@ const LEGACY_SESSION_KEY = "tc-wallet-session";
 const REGISTRY_KEY = "tc-wallet-registry";
 const ACTIVE_KEY = "tc-wallet-active";
 
+export const WALLET_SESSION_EVENT = "tc-wallet-session";
+
+function notifyWalletSessionChange(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(WALLET_SESSION_EVENT));
+}
+
 function normalizeAddress(address: string): string {
   return address.toLowerCase();
 }
@@ -73,6 +80,14 @@ export function listWalletRegistry(): WalletSession[] {
   return readRegistryRaw();
 }
 
+/** Registry entries matching the current deployment (testnet vs mainnet). */
+export function listWalletRegistryForDeployment(
+  isTestnetChain: (chainId: string) => boolean,
+  deploymentIsTestnet: boolean
+): WalletSession[] {
+  return listWalletRegistry().filter((w) => isTestnetChain(w.chainId) === deploymentIsTestnet);
+}
+
 export function upsertWalletSession(session: WalletSession): void {
   migrateWalletSessionStorage();
   const addr = normalizeAddress(session.address);
@@ -82,6 +97,7 @@ export function upsertWalletSession(session: WalletSession): void {
   writeRegistry(registry);
   localStorage.setItem(ACTIVE_KEY, addr);
   localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(next));
+  notifyWalletSessionChange();
 }
 
 export function saveMemberWalletSession(input: {
@@ -121,6 +137,7 @@ export function setActiveWallet(address: string): boolean {
   if (!found) return false;
   localStorage.setItem(ACTIVE_KEY, addr);
   localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(found));
+  notifyWalletSessionChange();
   return true;
 }
 
@@ -137,6 +154,7 @@ export function clearActiveWallet(): void {
   migrateWalletSessionStorage();
   localStorage.removeItem(ACTIVE_KEY);
   localStorage.removeItem(LEGACY_SESSION_KEY);
+  notifyWalletSessionChange();
 }
 
 /** Clear active and remove one wallet from the registry. */

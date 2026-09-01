@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { KeyRound, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageCard } from "@/components/PageSplit";
@@ -11,15 +12,21 @@ import { webAuthnSupported } from "@/shared/webauthn.js";
 import { copyText } from "@/shared/dom.js";
 import { deploymentMode } from "@/shared/networks.js";
 import { WalletFrame } from "./WalletFrame";
+import { CreateDisclaimerWizard } from "./CreateDisclaimerWizard";
 
 export function CreatePage() {
   const { t } = useLocale();
+  const navigate = useNavigate();
   const [deviceName, setDeviceName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedSecurityChecks, setAcceptedSecurityChecks] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [status, setStatus] = useState<{ kind: "info" | "error" | "success"; message: string } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const supported = webAuthnSupported();
   const mode = deploymentMode();
+  const canCreate = supported && acceptedTerms && acceptedSecurityChecks && !loading;
 
   const runCreate = async () => {
     const label = deviceName.trim() || t("wallet.defaultDevice");
@@ -29,6 +36,7 @@ export function CreatePage() {
       const result = await createCounterfactualWallet(label);
       setAddress(result.address);
       setStatus({ kind: "success", message: t("wallet.createdCounterfactual") });
+      navigate("/wallet", { replace: true });
     } catch (error) {
       setStatus({
         kind: "error",
@@ -37,6 +45,11 @@ export function CreatePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreateClick = () => {
+    if (!canCreate) return;
+    setWizardOpen(true);
   };
 
   return (
@@ -87,17 +100,54 @@ export function CreatePage() {
           {supported ? t("wallet.webauthnOk") : t("wallet.webauthnNo")}
         </p>
 
+        <div className="mt-6 space-y-3">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="accept-terms"
+              data-testid="wallet-accept-terms"
+              checked={acceptedTerms}
+              onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+            />
+            <Label htmlFor="accept-terms" className="text-sm font-normal leading-snug">
+              {t("wallet.createAcceptTerms")}{" "}
+              <Link to="/terms" className="font-medium text-foreground underline underline-offset-2">
+                Terms of Use
+              </Link>
+            </Label>
+          </div>
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="accept-security-checks"
+              data-testid="wallet-accept-security-checks"
+              checked={acceptedSecurityChecks}
+              onCheckedChange={(checked) => setAcceptedSecurityChecks(checked === true)}
+            />
+            <Label htmlFor="accept-security-checks" className="text-sm font-normal leading-snug">
+              {t("wallet.createAcceptSecurityChecks")}{" "}
+              <Link to="/security-checks" className="font-medium text-foreground underline underline-offset-2">
+                Security checks
+              </Link>
+            </Label>
+          </div>
+        </div>
+
         <Button
           id="wallet-create-btn"
           data-testid="wallet-create-btn"
           type="button"
           className="mt-6 w-full"
           size="lg"
-          disabled={loading || !supported}
-          onClick={() => void runCreate()}
+          disabled={!canCreate}
+          onClick={handleCreateClick}
         >
           {loading ? t("wallet.creatingPasskey") : t("wallet.createTestnetWallet")}
         </Button>
+
+        <CreateDisclaimerWizard
+          open={wizardOpen}
+          onOpenChange={setWizardOpen}
+          onComplete={() => void runCreate()}
+        />
 
         <details className="mt-4 text-xs text-muted-foreground">
           <summary className="cursor-pointer">{t("wallet.counterfactualShort")}</summary>

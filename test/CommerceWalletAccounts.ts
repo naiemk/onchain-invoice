@@ -174,6 +174,33 @@ describe("commerce wallet accounts API", function () {
     });
   });
 
+  it("looks up account by credentialId encoding variants", async function () {
+    await withApp(async (baseUrl) => {
+      const salt = deriveWalletSalt(QX, QY);
+      const address = predictWalletAddress(FACTORY, IMPL, salt);
+      const credentialId = Buffer.from("raw-credential-bytes-xyz").toString("base64");
+      const credentialIdUrl = credentialId.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      await fetch(`${baseUrl}/api/wallet/accounts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          address,
+          salt,
+          ownerQx: QX,
+          ownerQy: QY,
+          credentialId,
+        }),
+      });
+
+      const found = await fetch(
+        `${baseUrl}/api/wallet/accounts?credentialId=${encodeURIComponent(credentialIdUrl)}`
+      );
+      expect(found.status).to.equal(200);
+      const body = (await found.json()) as { account: { address: string } };
+      expect(body.account.address).to.equal(address.toLowerCase());
+    });
+  });
+
   it("balance endpoint returns aggregation shape", async function () {
     await withApp(async (baseUrl) => {
       const salt = deriveWalletSalt(QX, QY);

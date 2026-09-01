@@ -10,11 +10,12 @@ import { SecurityPage } from "./SecurityPage";
 import { PairPage } from "./PairPage";
 import { RecoverPage } from "./RecoverPage";
 import { GetPaidPage } from "./GetPaidPage";
-import { DevelopersPage } from "./DevelopersPage";
+import { WalletDevelopersRedirect } from "./WalletDevelopersRedirect";
 import { SuperWalletPage } from "./SuperWalletPage";
 import { ProposalsPage } from "./ProposalsPage";
 import { JoinSuperPage } from "./JoinSuperPage";
 import { OfframpCashoutPage } from "./OfframpCashoutPage";
+import { InvoicesPage } from "./InvoicesPage";
 
 export function WalletRouter() {
   return (
@@ -29,7 +30,8 @@ export function WalletRouter() {
       <Route path="receive" element={<ReceivePage />} />
       <Route path="cash" element={<CashPage />} />
       <Route path="get-paid" element={<GetPaidPage />} />
-      <Route path="developers" element={<DevelopersPage />} />
+      <Route path="developers" element={<WalletDevelopersRedirect />} />
+      <Route path="invoices" element={<InvoicesPage />} />
       <Route path="super-wallet" element={<SuperWalletPage />} />
       <Route path="proposals" element={<ProposalsPage />} />
       <Route path="deposit" element={<DepositPage />} />

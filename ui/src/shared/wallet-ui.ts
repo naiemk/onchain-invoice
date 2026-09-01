@@ -326,7 +326,6 @@ export function bindWalletModeToggle(root: HTMLElement, onChange?: (mode: Wallet
 }
 
 export function walletSubnav(current: WalletTab): string {
-  const session = loadWalletSession();
   const advanced = isAdvancedMode();
   const links: Array<{ href: string; key: WalletTab; label: string }> = [
     { href: "/wallet", key: "home", label: t("wallet.homeTab") },
@@ -337,11 +336,7 @@ export function walletSubnav(current: WalletTab): string {
   ];
   if (advanced) {
     links.push({ href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") });
-    links.push({ href: "/merchant", key: "invoices", label: t("wallet.invoicesTab") });
-    links.push({ href: "/wallet/recover", key: "recover", label: t("wallet.recoverTab") });
-    links.push({ href: "/wallet/developers", key: "developers", label: t("wallet.developersTab") });
-  } else if (session || current === "recover") {
-    links.push({ href: "/wallet/recover", key: "recover", label: t("wallet.recoverTab") });
+    links.push({ href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") });
   }
   return `
     <div class="wallet-subnav-row">

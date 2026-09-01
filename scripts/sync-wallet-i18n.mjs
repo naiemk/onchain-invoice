@@ -13,6 +13,16 @@ function extractKey(text, key) {
 
 /** Keys to copy from wallet-en.ts when absent in other locales (English fallback). */
 const keysToSync = [
+  "unlockWrongWallet",
+  "openWalletFailed",
+  "fundsSafeAtAddress",
+  "walletNeedsPasskeyUnlock",
+  "superWalletRestoreEmailTitle",
+  "superWalletRestoreEmailHint",
+  "superWalletRestoreEmailCta",
+  "chooseWalletLede",
+  "passkeyMissingOnDevice",
+  "passkeyPromptPending",
   "yubikeyPinRequiredTitle",
   "yubikeyPinRequiredWhy",
   "yubikeyPinSetupSteps",
@@ -48,18 +58,56 @@ const keysToSync = [
   "keyPublicHint",
   "advancedDevicesBodySuper",
   "advancedDevicesBodySimple",
+  "lock",
+  "allWallets",
+  "emailAttachHint",
+  "emailAttachCta",
+  "testnetAddressWarning",
+  "showAddressQr",
+  "addressQrTitle",
+  "viewAddressExplorer",
+  "viewTxExplorer",
+  "sendScanTitle",
+  "sendScanHint",
+  "cashPartnersTitle",
+  "cashPartnersBody",
+  "otherDevicesHint",
+  "noticeDismiss",
+  "noticePrev",
+  "noticeNext",
+  "networkMismatchLede",
+  "networkMismatchBody",
+  "createAcceptTerms",
+  "createAcceptSecurityChecks",
+  "createDisclaimerStep1Title",
+  "createDisclaimerStep1Body",
+  "createDisclaimerStep2Title",
+  "createDisclaimerStep2Body",
+  "createDisclaimerStep3Title",
+  "createDisclaimerStep3Body",
+  "createDisclaimerProgress",
+  "createDisclaimerNext",
+  "createDisclaimerBack",
+  "createDisclaimerSkip",
+  "createDisclaimerFinish",
 ];
+
+function hasKey(text, key) {
+  return new RegExp(`^\\s+${key}:`, "m").test(text);
+}
 
 for (const file of fs.readdirSync(dir).filter((f) => f.startsWith("wallet-") && f !== "wallet-en.ts")) {
   const p = path.join(dir, file);
   let text = fs.readFileSync(p, "utf8");
-  const missing = keysToSync.filter((k) => !text.includes(`${k}:`));
+  const missing = keysToSync.filter((k) => !hasKey(text, k));
   if (missing.length === 0) {
     console.log("skip", file);
     continue;
   }
   const insert = missing.map((k) => `  ${k}: ${extractKey(enText, k)},`).join("\n");
-  if (text.includes("superWalletNoSigningKey:")) {
+  if (text.includes("signInFailed:")) {
+    text = text.replace(/(^\s+signInFailed:[\s\S]*?,)(\n)/m, `$1\n${insert}$2`);
+  } else if (text.includes("superWalletNoSigningKey:")) {
     text = text.replace(/(^\s+superWalletNoSigningKey:[\s\S]*?,)(\n)/m, `$1\n${insert}$2`);
   } else {
     text = text.replace(/\n\};\s*$/, `\n${insert}\n};\n`);

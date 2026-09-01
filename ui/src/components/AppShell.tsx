@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Menu, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ const NAV_LINKS = [
   { href: "/wallet", labelKey: "nav.wallet" as const },
   { href: "/get-paid", labelKey: "nav.getPaid" as const },
   { href: "/integrations", labelKey: "nav.integrations" as const },
+  { href: "/developers", labelKey: "nav.developers" as const },
   { href: "/security", labelKey: "nav.security" as const },
 ];
 
@@ -23,6 +24,7 @@ function isActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   if (href !== "/" && pathname.startsWith(href)) return true;
   if (href === "/get-paid" && (pathname.startsWith("/create") || pathname.startsWith("/merchant"))) return true;
+  if (href === "/developers" && pathname.startsWith("/developers")) return true;
   if (href === "/wallet" && pathname.startsWith("/wallet")) return true;
   return false;
 }
@@ -111,33 +113,105 @@ function FooterEnvLine() {
   );
 }
 
+function OpenWorkspaceButton({
+  className,
+  onAfterNavigate,
+}: {
+  className?: string;
+  onAfterNavigate?: () => void;
+}) {
+  const { t } = useLocale();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const openWorkspace = () => {
+    onAfterNavigate?.();
+    const onWalletHome = location.pathname === "/wallet";
+    if (onWalletHome) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("main-content")?.focus();
+      return;
+    }
+    navigate("/wallet");
+  };
+
+  return (
+    <Button type="button" size="sm" className={className} onClick={openWorkspace}>
+      {t("nav.openWorkspace")}
+      <ArrowUpRight className="h-3.5 w-3.5" />
+    </Button>
+  );
+}
+
+function FooterLinkSep() {
+  return <span aria-hidden="true">·</span>;
+}
+
+function LegalFooterLinks() {
+  const { t } = useLocale();
+  return (
+    <>
+      <Link to="/terms" className="hover:text-foreground">
+        {t("footer.terms")}
+      </Link>
+      <FooterLinkSep />
+      <Link to="/privacy" className="hover:text-foreground">
+        {t("footer.privacy")}
+      </Link>
+      <FooterLinkSep />
+      <Link to="/cookies" className="hover:text-foreground">
+        {t("footer.cookies")}
+      </Link>
+      <FooterLinkSep />
+      <Link to="/risks" className="hover:text-foreground">
+        {t("footer.risks")}
+      </Link>
+      <FooterLinkSep />
+      <Link to="/security-checks" className="hover:text-foreground">
+        {t("footer.securityChecks")}
+      </Link>
+    </>
+  );
+}
+
 function FullFooter() {
   const { t } = useLocale();
   return (
     <footer className="border-t bg-background/80 px-4 py-8 text-sm text-muted-foreground md:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <span className="font-medium text-foreground">{t("brand")}</span>
-        <FooterEnvLine />
-        <div className="flex flex-wrap gap-x-3 gap-y-1 sm:justify-end">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span className="font-medium text-foreground">{t("brand")}</span>
+          <FooterEnvLine />
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
           <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.docs")}
           </a>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
+          <Link to="/developers" className="hover:text-foreground">
+            {t("nav.developers")}
+          </Link>
+          <FooterLinkSep />
           <a href={SITE.agentSkillUrl} rel="alternate noopener noreferrer" target="_blank" className="hover:text-foreground">
             {t("nav.aiSkill")}
           </a>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
           <a href={SITE.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.github")}
           </a>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
           <a href={SITE.telegramChannel} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.telegram")}
           </a>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
           <a href={SITE.telegramSupport} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.support")}
           </a>
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <span className="font-medium text-foreground">{t("footer.legal")}</span>
+          <FooterLinkSep />
+          <LegalFooterLinks />
         </div>
       </div>
     </footer>
@@ -173,12 +247,7 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
               <div data-app-nav className="flex items-center gap-2 max-md:!hidden">
                 <LocaleSelect />
                 <ThemeToggle />
-                <Button asChild size="sm" className="ms-1">
-                  <Link to="/wallet">
-                    {t("nav.openWorkspace")}
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </Link>
-                </Button>
+                <OpenWorkspaceButton className="ms-1" />
               </div>
               <div data-app-nav-mobile className="ml-auto flex items-center gap-2 md:!hidden">
                 <ThemeToggle />
@@ -197,12 +266,7 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
                     </div>
                     <div className="mt-6 space-y-4">
                       <LocaleSelect />
-                      <Button asChild className="w-full">
-                        <Link to="/wallet" onClick={() => setMobileOpen(false)}>
-                          {t("nav.openWorkspace")}
-                          <ArrowUpRight className="h-3.5 w-3.5" />
-                        </Link>
-                      </Button>
+                      <OpenWorkspaceButton className="w-full" onAfterNavigate={() => setMobileOpen(false)} />
                     </div>
                   </SheetContent>
                 </Sheet>
@@ -222,11 +286,21 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
       </main>
       {minimal ? (
         <footer className="border-t px-4 py-4 text-sm text-muted-foreground">
-          <div className="mx-auto flex max-w-6xl justify-between">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span>{t("brand")}</span>
-            <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
-              {t("nav.docs")}
-            </a>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
+                {t("nav.docs")}
+              </a>
+              <FooterLinkSep />
+              <Link to="/terms" className="hover:text-foreground">
+                {t("footer.terms")}
+              </Link>
+              <FooterLinkSep />
+              <Link to="/privacy" className="hover:text-foreground">
+                {t("footer.privacy")}
+              </Link>
+            </div>
           </div>
         </footer>
       ) : (

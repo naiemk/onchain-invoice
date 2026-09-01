@@ -19,6 +19,13 @@ async function addVirtualAuthenticator(page: Page, attachment: "platform" | "cro
   return client;
 }
 
+async function acceptCreateConsentAndSkipWizard(page: Page): Promise<void> {
+  await page.getByTestId("wallet-accept-terms").click();
+  await page.getByTestId("wallet-accept-security-checks").click();
+  await page.getByTestId("wallet-create-btn").click();
+  await page.getByTestId("wallet-create-disclaimer-skip").click();
+}
+
 async function injectMockEthereum(page: Page): Promise<void> {
   await page.addInitScript(
     ({ address, privateKey }) => {
@@ -55,7 +62,7 @@ test.describe("Super Wallet UI", () => {
     await addVirtualAuthenticator(page, "platform");
     await page.goto("/wallet/create");
     await page.getByTestId("device-name").fill("E2E Passkey");
-    await page.getByTestId("wallet-create-btn").click();
+    await acceptCreateConsentAndSkipWizard(page);
     await expect(page.locator("#wallet-create-result")).toBeVisible();
     await expect(page.locator("#created-address")).toContainText("0x");
 
@@ -68,7 +75,7 @@ test.describe("Super Wallet UI", () => {
     await addVirtualAuthenticator(page, "platform");
     await page.goto("/wallet/create");
     await page.getByTestId("device-name").fill("E2E Passkey");
-    await page.getByTestId("wallet-create-btn").click();
+    await acceptCreateConsentAndSkipWizard(page);
     await expect(page.locator("#created-address")).toContainText("0x");
 
     await page.goto("/wallet/super-wallet");
@@ -87,7 +94,7 @@ test.describe("Super Wallet UI", () => {
     await addVirtualAuthenticator(page, "platform");
     await page.goto("/wallet/create");
     await page.getByTestId("device-name").fill("E2E Passkey");
-    await page.getByTestId("wallet-create-btn").click();
+    await acceptCreateConsentAndSkipWizard(page);
     await expect(page.locator("#created-address")).toContainText("0x");
 
     await page.route("**/api/wallet/**/advanced-policy", async (route) => {
@@ -126,7 +133,7 @@ test.describe("Super Wallet UI", () => {
   test("shows entity key enrollment controls after upgrade section", async ({ page }) => {
     await addVirtualAuthenticator(page, "platform");
     await page.goto("/wallet/create");
-    await page.getByTestId("wallet-create-btn").click();
+    await acceptCreateConsentAndSkipWizard(page);
     await expect(page.locator("#wallet-create-result")).toBeVisible();
 
     await page.goto("/wallet/super-wallet");

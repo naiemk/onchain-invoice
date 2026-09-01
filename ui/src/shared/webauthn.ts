@@ -1,5 +1,11 @@
 import { encodeWebAuthnSignature } from "../../../commerce/shared/webauthn-signature.js";
-import { listWalletRegistry } from "./wallet-session.js";
+import { credentialIdToBytes, credentialIdsMatch } from "./credential-id.js";
+import {
+  listWalletRegistry,
+  upsertWalletSession,
+  type WalletSession,
+} from "./wallet-session.js";
+import { t } from "../i18n/t.js";
 
 export type { WalletSession } from "./wallet-session.js";
 export {
@@ -80,6 +86,48 @@ export function webAuthnSupported(): boolean {
   return typeof window !== "undefined" && !!window.PublicKeyCredential;
 }
 
+function credentialIdFromRawId(rawId: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(rawId)));
+}
+
+function platformRequestOptions(
+  challenge: BufferSource,
+  allowCredentials?: PublicKeyCredentialDescriptor[]
+): PublicKeyCredentialRequestOptions {
+  return {
+    challenge,
+    rpId: rpId(),
+    userVerification: "required",
+    ...(allowCredentials ? { allowCredentials } : { hints: ["client-device"] as PublicKeyCredentialRequestOptions["hints"] }),
+  };
+}
+
+let webAuthnInFlight: Promise<PublicKeyCredential | null> | null = null;
+
+async function webAuthnGet(
+  options: PublicKeyCredentialRequestOptions
+): Promise<PublicKeyCredential | null> {
+  if (webAuthnInFlight) {
+    await webAuthnInFlight.catch(() => undefined);
+  }
+  const op = (async () => {
+    try {
+      return (await navigator.credentials.get({ publicKey: options })) as PublicKeyCredential | null;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "NotAllowedError") {
+        throw new Error(t("wallet.passkeyPromptPending"));
+      }
+      throw error;
+    }
+  })();
+  webAuthnInFlight = op;
+  try {
+    return await op;
+  } finally {
+    if (webAuthnInFlight === op) webAuthnInFlight = null;
+  }
+}
+
 export async function createPasskey(
   displayName: string,
   options?: { attachment?: "platform" | "cross-platform" }
@@ -119,7 +167,7 @@ export async function createPasskey(
   return {
     qx,
     qy,
-    credentialId: btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),
+    credentialId: credentialIdFromRawId(cred.rawId),
     rawId: bufferToHex(cred.rawId),
     attestation: {
       clientDataJSON: bufferToBase64(clientData),
@@ -139,18 +187,11 @@ export async function createSecurityKey(displayName: string): Promise<PasskeyOwn
  */
 export async function authenticatePasskey(): Promise<(PasskeyOwner & { fromRegistry: boolean }) | null> {
   if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
-  const challenge = randomChallenge();
-  const cred = (await navigator.credentials.get({
-    publicKey: {
-      challenge,
-      rpId: rpId(),
-      userVerification: "required",
-    },
-  })) as PublicKeyCredential | null;
+  const cred = await webAuthnGet(platformRequestOptions(randomChallenge()));
   if (!cred) return null;
-  const credentialId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+  const credentialId = credentialIdFromRawId(cred.rawId);
   const rawId = bufferToHex(cred.rawId);
-  const match = listWalletRegistry().find((w) => w.credentialId === credentialId);
+  const match = listWalletRegistry().find((w) => credentialIdsMatch(w.credentialId, credentialId));
   if (match) {
     return {
       qx: match.qx,
@@ -169,29 +210,68 @@ export async function authenticatePasskey(): Promise<(PasskeyOwner & { fromRegis
   };
 }
 
-/** Sign an ERC-4337 userOpHash with the passkey (OZ WebAuthnAuth encoding). */
+/** Restore credentialId from local registry or server before a pinned-credential ceremony. */
+export async function ensureSessionCredential(session: WalletSession): Promise<WalletSession> {
+  if (session.credentialId?.trim()) return session;
+
+  const reg = listWalletRegistry().find(
+    (w) => w.address.toLowerCase() === session.address.toLowerCase() && w.credentialId?.trim()
+  );
+  if (reg?.credentialId) {
+    const next = { ...session, credentialId: reg.credentialId, rawId: reg.rawId || session.rawId };
+    upsertWalletSession(next);
+    return next;
+  }
+
+  const { listDevices } = await import("./wallet-api.js");
+  const devices = await listDevices(session.address, session.chainId);
+  const match = devices.find(
+    (d) => d.credentialId && d.ownerQx === session.qx && d.ownerQy === session.qy
+  );
+  if (match?.credentialId) {
+    const next = { ...session, credentialId: match.credentialId };
+    upsertWalletSession(next);
+    return next;
+  }
+
+  return session;
+}
+
+/** Keep registry in sync when the platform passkey id differs from what we stored. */
+export function syncSessionCredentialId(session: WalletSession, rawId: ArrayBuffer): WalletSession {
+  const credentialId = credentialIdFromRawId(rawId);
+  if (session.credentialId === credentialId) return session;
+  const next = { ...session, credentialId, rawId: bufferToHex(rawId) };
+  upsertWalletSession(next);
+  return next;
+}
+
+/**
+ * Sign an ERC-4337 userOpHash with the passkey (OZ WebAuthnAuth encoding).
+ * Platform passkeys use discoverable + client-device (Touch ID). YubiKeys pin credentialId.
+ */
 export async function signUserOpHash(
   userOpHashHex: string,
   credentialId?: string,
-  options?: { requireUv?: boolean }
+  options?: { requireUv?: boolean; session?: WalletSession }
 ): Promise<string> {
   if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
   const hashBytes = hexToBytes(userOpHashHex);
-  const allowCredentials = credentialId
-    ? [{ id: base64ToBytes(credentialId), type: "public-key" as const }]
-    : undefined;
-  const cred = (await navigator.credentials.get({
-    publicKey: {
-      challenge: hashBytes,
-      rpId: rpId(),
-      userVerification: "required",
-      allowCredentials,
-    },
-  })) as PublicKeyCredential | null;
+  const pinCredential = options?.requireUv && credentialId?.trim();
+  const publicKey = pinCredential
+    ? platformRequestOptions(hashBytes, [
+        { id: credentialIdToBytesLocal(credentialId!), type: "public-key" },
+      ])
+    : platformRequestOptions(hashBytes);
+
+  const cred = await webAuthnGet(publicKey);
   if (!cred) throw new Error("Passkey signing cancelled");
   const response = cred.response as AuthenticatorAssertionResponse;
   if (options?.requireUv) {
     assertAuthenticatorUvSet(response.authenticatorData);
+  }
+  if (options?.session) {
+    syncSessionCredentialId(options.session, cred.rawId);
   }
   return encodeWebAuthnSignature(response);
 }
@@ -210,27 +290,24 @@ export async function assertPasskeyChallenge(input: {
 }> {
   if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
   const challenge = base64UrlToBytes(input.challengeBase64Url);
-  const allowCredentials = input.credentialId
-    ? [{ id: base64ToBytes(input.credentialId), type: "public-key" as const }]
+  const allowCredentials = input.credentialId?.trim()
+    ? [{ id: credentialIdToBytesLocal(input.credentialId), type: "public-key" as const }]
     : undefined;
-  const cred = (await navigator.credentials.get({
-    publicKey: {
-      challenge,
-      rpId: rpId(),
-      userVerification: "required",
-      allowCredentials,
-    },
-  })) as PublicKeyCredential | null;
+  const cred = await webAuthnGet(platformRequestOptions(challenge, allowCredentials));
   if (!cred) throw new Error("Passkey assertion cancelled");
   const response = cred.response as AuthenticatorAssertionResponse;
   return {
-    credentialId: btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),
+    credentialId: credentialIdFromRawId(cred.rawId),
     assertion: {
       authenticatorData: bufferToBase64(response.authenticatorData),
       clientDataJSON: bufferToBase64(response.clientDataJSON),
       signature: bufferToBase64(response.signature),
     },
   };
+}
+
+function credentialIdToBytesLocal(credentialId: string): Uint8Array {
+  return credentialIdToBytes(credentialId);
 }
 
 function base64UrlToBytes(b64url: string): Uint8Array {

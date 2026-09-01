@@ -10,12 +10,16 @@ import type {
   WalletEntityRecord,
   WalletKeyEnrollmentRequestRecord,
 } from "../../../../../commerce/shared/wallet.js";
-import type { WalletPublicConfig } from "../../../../../commerce/shared/wallet.js";
 import { buildSignedAddKeyUserOp } from "@/shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
-import { waitForUserOp } from "@/shared/wallet-api.js";
-import { registerWalletEntityKey } from "@/shared/wallet-advanced-api.js";
-import type { WalletSession } from "@/shared/wallet-session.js";
+import { fetchWalletBalance, primaryChain, waitForUserOp, type WalletPublicConfig } from "@/shared/wallet-api.js";
+import {
+  registerWalletEntityKey,
+  waitForAdvancedPolicy,
+  type AdvancedPolicy,
+} from "@/shared/wallet-advanced-api.js";
+import { saveWalletSession, type WalletSession } from "@/shared/wallet-session.js";
+import { t } from "@/i18n/t.js";
 
 export function keyTypeLabel(keyType: number, t: (k: string) => string): string {
   if (keyType === KEY_YUBIKEY) return t("wallet.superWalletKeyYubiKey");
@@ -37,6 +41,60 @@ export function shortKeyDisplayFromRequest(r: WalletKeyEnrollmentRequestRecord):
 
 export function shortEntity(entityId: string): string {
   return `${entityId.slice(0, 10)}…${entityId.slice(-6)}`;
+}
+
+export function formatUserOpRejectReason(reason: string | null | undefined): string {
+  switch (reason) {
+    case "insufficient_balance":
+      return t("wallet.userOpInsufficientBalance");
+    case "simulation_revert":
+      return t("wallet.userOpSimulationRevert");
+    case "execution_reverted":
+      return t("wallet.userOpExecutionReverted");
+    case "prefund_failed":
+      return t("wallet.userOpSimulationRevert");
+    default:
+      return reason ?? t("wallet.sendFailed");
+  }
+}
+
+export async function assertUpgradePreflight(session: WalletSession, config: WalletPublicConfig): Promise<void> {
+  const feeAtoms = BigInt(config.bundlerFeeUsdc || "0");
+  if (feeAtoms <= 0n) return;
+  const balance = await fetchWalletBalance(session.address).catch(() => null);
+  const chain = primaryChain(config);
+  const primary = balance?.chains.find((c) => c.chainId === chain.chainId);
+  const balanceAtoms = BigInt(primary?.balance ?? "0");
+  if (balanceAtoms < feeAtoms) {
+    throw new Error(t("wallet.superWalletUpgradeNeedFunds"));
+  }
+}
+
+export function persistSessionAfterUpgrade(
+  session: WalletSession,
+  adminEntityId: string,
+  email: string
+): WalletSession {
+  const keyId = computeKeyId(adminEntityId, KEY_WEBAUTHN, session.qx, session.qy, zeroPadValue("0x00", 20));
+  const next: WalletSession = {
+    ...session,
+    entityId: adminEntityId,
+    keyId,
+    keyType: KEY_WEBAUTHN,
+    label: session.label || email,
+  };
+  saveWalletSession(next);
+  return next;
+}
+
+export async function confirmAdvancedUpgrade(
+  walletAddress: string
+): Promise<AdvancedPolicy> {
+  try {
+    return await waitForAdvancedPolicy(walletAddress);
+  } catch {
+    throw new Error(t("wallet.superWalletUpgradeFailed"));
+  }
 }
 
 export async function submitAddKey(input: {

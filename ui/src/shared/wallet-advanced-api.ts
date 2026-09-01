@@ -48,6 +48,22 @@ export async function resolveAdvancedPolicy(walletAddress: string, deployed: boo
   }
 }
 
+/** Poll until advanced() flips true after enableAdvanced (RPC lag). */
+export async function waitForAdvancedPolicy(
+  walletAddress: string,
+  timeoutMs = 45_000
+): Promise<AdvancedPolicy> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const pol = await resolveAdvancedPolicy(walletAddress, true);
+    if (pol.advanced) return pol;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  const last = await resolveAdvancedPolicy(walletAddress, true);
+  if (last.advanced) return last;
+  throw new Error("advanced_policy_timeout");
+}
+
 export async function listWalletEntities(walletAddress: string): Promise<{
   entities: WalletEntityRecord[];
   keys: WalletEntityKeyRecord[];

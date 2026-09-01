@@ -42,7 +42,9 @@ import {
   passkeyToKeyFields,
 } from "@/shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
-import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
+import { loadWalletSession, saveWalletSession, type WalletSession } from "@/shared/wallet-session.js";
+import { healSuperWalletFromEmail, healWalletSession } from "@/shared/wallet-session-heal.js";
+import { ensureSessionCredential } from "@/shared/webauthn.js";
 import { isAdvancedMode, saveWalletMode } from "@/shared/wallet-mode.js";
 import {
   createPasskey,
@@ -65,6 +67,10 @@ import {
   shortKeyDisplay,
   shortKeyDisplayFromRequest,
   submitAddKey,
+  assertUpgradePreflight,
+  confirmAdvancedUpgrade,
+  formatUserOpRejectReason,
+  persistSessionAfterUpgrade,
 } from "./super-wallet-helpers";
 
 type StatusKind = "info" | "error" | "success";
@@ -106,6 +112,8 @@ export function SuperWalletPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [restoreEmail, setRestoreEmail] = useState("");
+  const [needsSigningRestore, setNeedsSigningRestore] = useState(false);
 
   const adminEntity = entities[0] ?? null;
 
@@ -123,6 +131,32 @@ export function SuperWalletPage() {
       setKeys(roster.keys);
       const pending = await listKeyEnrollmentRequests(sess.address, "pending").catch(() => []);
       setPendingEnrollments(pending);
+
+      if (!sess.entityId && roster.keys.length > 0) {
+        const mine =
+          roster.keys.find((k) => k.credentialId && k.credentialId === sess.credentialId) ??
+          roster.keys.find((k) => k.qx === sess.qx && k.qy === sess.qy);
+        if (mine) {
+          const healed: WalletSession = {
+            ...sess,
+            entityId: mine.entityId,
+            keyId: mine.keyId,
+            keyType: mine.keyType,
+            ...(mine.credentialId && !sess.credentialId?.trim()
+              ? { credentialId: mine.credentialId }
+              : {}),
+          };
+          saveWalletSession(healed);
+          setSession(healed);
+        }
+      } else if (!sess.credentialId?.trim() && roster.keys.length > 0) {
+        const mine = roster.keys.find((k) => k.qx === sess.qx && k.qy === sess.qy && k.credentialId);
+        if (mine?.credentialId) {
+          const healed = { ...sess, credentialId: mine.credentialId };
+          saveWalletSession(healed);
+          setSession(healed);
+        }
+      }
     } else {
       setEntities([]);
       setKeys([]);
@@ -149,7 +183,15 @@ export function SuperWalletPage() {
         await initEoaConnector(cfg);
         if (cancelled) return;
         setConfig(cfg);
-        await refresh(sess, cfg);
+        const healed = await healWalletSession(sess);
+        if (cancelled) return;
+        if (healed.session !== sess) {
+          setSession(healed.session);
+          await refresh(healed.session, cfg);
+        } else {
+          await refresh(sess, cfg);
+        }
+        setNeedsSigningRestore(healed.needsSuperWalletEmail ?? false);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -173,29 +215,46 @@ export function SuperWalletPage() {
     setConfirmOpen(true);
   };
 
+  const restoreSigning = () => {
+    if (!session) return;
+    const email = restoreEmail.trim();
+    if (!email) {
+      setStatus({ kind: "error", message: t("wallet.superWalletEmailRequired") });
+      return;
+    }
+    const next = healSuperWalletFromEmail(session, email);
+    setSession(next);
+    setNeedsSigningRestore(false);
+    setStatus({ kind: "success", message: t("wallet.superWalletRestoreEmailCta") });
+  };
+
   const runUpgrade = async () => {
     if (!session || !config) return;
     setConfirmOpen(false);
     setBusy("upgrade");
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
+      await assertUpgradePreflight(session, config);
+      const signingSession = await ensureSessionCredential(session);
+      if (signingSession !== session) setSession(signingSession);
       const email = adminEmail.trim();
       const adminEntityId = hashEntityEmail(email);
       const fee = BigInt(config.bundlerFeeUsdc || "0");
       const { userOp, userOpHash } = await buildSignedEnableAdvancedUserOp({
         config,
-        walletAddress: session.address,
+        walletAddress: signingSession.address,
         adminEntityId,
-        qx: session.qx,
-        qy: session.qy,
+        qx: signingSession.qx,
+        qy: signingSession.qy,
         feeAmount: fee,
-        credentialId: session.credentialId,
+        credentialId: signingSession.credentialId,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
-      if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
-      const confirmed = await resolveAdvancedPolicy(session.address, true);
-      if (!confirmed.advanced) throw new Error(t("wallet.superWalletUpgradeFailed"));
+      if (result.status !== "included") {
+        throw new Error(formatUserOpRejectReason(result.rejectReason ?? result.status));
+      }
+      await confirmAdvancedUpgrade(session.address);
       await registerWalletEntity({ walletAddress: session.address, entityId: adminEntityId, label: email });
       await registerWalletEntityKey({
         walletAddress: session.address,
@@ -204,9 +263,11 @@ export function SuperWalletPage() {
         keyType: KEY_WEBAUTHN,
         qx: session.qx,
         qy: session.qy,
-        credentialId: session.credentialId ?? null,
+        credentialId: signingSession.credentialId ?? null,
       });
-      setStatus(null);
+      const nextSession = persistSessionAfterUpgrade(session, adminEntityId, email);
+      setSession(nextSession);
+      setStatus({ kind: "success", message: t("wallet.superWalletUpgradeSuccess") });
       await runRefresh();
     } catch (error) {
       setStatus({
@@ -449,6 +510,25 @@ export function SuperWalletPage() {
   return (
     <WalletFrame current="superWallet" title={t("wallet.superWalletPageTitle")} lede={t("wallet.superWalletPageLede")}>
       {status && <StatusMessage kind={status.kind} message={status.message} />}
+      {needsSigningRestore && (
+        <Alert className="mb-4 border-warn/40 bg-warn/10">
+          <AlertDescription className="space-y-3">
+            <p>{t("wallet.superWalletRestoreEmailHint")}</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                type="email"
+                value={restoreEmail}
+                onChange={(e) => setRestoreEmail(e.target.value)}
+                placeholder="you@company.com"
+                autoComplete="email"
+              />
+              <Button type="button" onClick={restoreSigning}>
+                {t("wallet.superWalletRestoreEmailCta")}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
       {loading ? (
         <div className="space-y-4">
           <Skeleton className="h-8 w-2/3" />
@@ -615,6 +695,7 @@ function UpgradeSection({
       <Alert variant="warn">
         <AlertDescription>{t("wallet.superWalletUpgradeWarning")}</AlertDescription>
       </Alert>
+      <p className="text-sm text-muted-foreground">{t("wallet.superWalletUpgradeNeedFunds")}</p>
 
       <section className="space-y-3">
         <div>

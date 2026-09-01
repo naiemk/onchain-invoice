@@ -13,9 +13,11 @@ import { IntegrationsPage } from "@/pages/react/IntegrationsPage";
 import { CreatePage } from "@/pages/react/CreatePage";
 import { PayPage } from "@/pages/react/PayPage";
 import { MerchantPage } from "@/pages/react/MerchantPage";
+import { DevelopersPage } from "@/pages/react/DevelopersPage";
 import { AdminPage } from "@/pages/react/AdminPage";
 import { GuardianPage } from "@/pages/react/GuardianPage";
 import { WalletRouter } from "@/pages/react/wallet/WalletRouter";
+import { LegalHubPage, LegalPage } from "@/pages/react/LegalPage";
 import type { MessageKey } from "@/i18n/t.js";
 
 function usePageMeta() {
@@ -50,6 +52,18 @@ function pageMeta(path: string, t: (key: MessageKey) => string): { title: string
       return { title: t("meta.adminTitle"), description: t("meta.adminDescription") };
     case "/guardian":
       return { title: t("meta.guardianTitle"), description: t("meta.guardianDescription") };
+    case "/legal":
+      return { title: t("meta.legalTitle"), description: t("meta.legalDescription") };
+    case "/terms":
+      return { title: t("meta.termsTitle"), description: t("meta.termsDescription") };
+    case "/privacy":
+      return { title: t("meta.privacyTitle"), description: t("meta.privacyDescription") };
+    case "/cookies":
+      return { title: t("meta.cookiesTitle"), description: t("meta.cookiesDescription") };
+    case "/risks":
+      return { title: t("meta.risksTitle"), description: t("meta.risksDescription") };
+    case "/security-checks":
+      return { title: t("meta.securityChecksTitle"), description: t("meta.securityChecksDescription") };
     default:
       if (path.startsWith("/wallet")) {
         return { title: t("meta.walletTitle"), description: t("meta.walletDescription") };
@@ -112,8 +126,15 @@ function AppRoutes() {
         <Route path="/pay" element={<PayPage />} />
         <Route path="/merchant" element={<MerchantPage />} />
         <Route path="/merchant/*" element={<MerchantPage />} />
+        <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/guardian" element={<GuardianPage />} />
+        <Route path="/legal" element={<LegalHubPage />} />
+        <Route path="/terms" element={<LegalPage docId="terms" />} />
+        <Route path="/privacy" element={<LegalPage docId="privacy" />} />
+        <Route path="/cookies" element={<LegalPage docId="cookies" />} />
+        <Route path="/risks" element={<LegalPage docId="risks" />} />
+        <Route path="/security-checks" element={<LegalPage docId="security-checks" />} />
         <Route path="/wallet/*" element={<WalletRouter />} />
         <Route path="*" element={<HomePage />} />
       </Routes>

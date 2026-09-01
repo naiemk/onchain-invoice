@@ -5,6 +5,7 @@ import {
   ENTRYPOINT_ABI,
   buildFeeTransferCall,
   buildPackedUserOperation,
+  buildSendBatchCalls,
   encodeAddEntity,
   encodeAddKey,
   encodeConfigureMultisig,
@@ -92,6 +93,52 @@ export async function buildAdvancedWebAuthnSignature(input: {
     ...input,
     keyType: input.keyType ?? KEY_WEBAUTHN,
   });
+}
+
+export async function buildSignedAdvancedSendUserOp(input: {
+  config: WalletPublicConfig;
+  walletAddress: string;
+  entityId: string;
+  qx: string;
+  qy: string;
+  recipient: string;
+  sendAmount: bigint;
+  feeAmount: bigint;
+  credentialId?: string;
+  chainId?: string;
+  sendTokenAddress?: string;
+}): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
+  const chain =
+    input.chainId != null
+      ? input.config.chains.find((c) => c.chainId === input.chainId) ?? primaryChain(input.config)
+      : primaryChain(input.config);
+  if (!chain.feeTokenAddress || !input.config.bundlerBeneficiary) {
+    throw new Error("Bundler fee not configured");
+  }
+  if (!chain.rpcUrl) throw new Error("RPC not configured");
+  const provider = new JsonRpcProvider(chain.rpcUrl);
+  const entryPoint = new Contract(input.config.entryPointAddress, ENTRYPOINT_ABI, provider);
+  const nonce = BigInt(await entryPoint.getNonce(input.walletAddress, 0));
+  const callData = encodeExecuteCallData(
+    buildSendBatchCalls({
+      feeToken: chain.feeTokenAddress,
+      beneficiary: input.config.bundlerBeneficiary,
+      feeAmount: input.feeAmount,
+      recipient: getAddress(input.recipient),
+      sendAmount: input.sendAmount,
+      sendToken: input.sendTokenAddress ?? chain.feeTokenAddress,
+    })
+  );
+  const unsigned = buildPackedUserOperation({ sender: input.walletAddress, nonce, callData });
+  const userOpHash = await entryPoint.getUserOpHash(userOpToTuple(unsigned));
+  const signature = await buildAdvancedWebAuthnSignature({
+    userOpHash,
+    entityId: input.entityId,
+    qx: input.qx,
+    qy: input.qy,
+    credentialId: input.credentialId,
+  });
+  return { userOp: { ...unsigned, signature }, userOpHash };
 }
 
 export async function buildSignedEnableAdvancedUserOp(input: {
