@@ -5,7 +5,7 @@ type LegacyRenderer = (root: HTMLElement, opts?: WalletRenderOptions) => void | 
 
 /**
  * Remove React-duplicated chrome without destroying event listeners.
- * Move live nodes — never assign innerHTML from another tree.
+ * Never clone via innerHTML — that drops addEventListener bindings.
  */
 function stripLegacyWalletChrome(container: HTMLElement): void {
   for (const sel of [
@@ -19,13 +19,17 @@ function stripLegacyWalletChrome(container: HTMLElement): void {
   }
 
   const panel = container.querySelector(".wallet-panel, .wallet-panel-unlocked, .wallet-panel-empty");
-  if (!panel) return;
+  if (!panel || panel.parentElement !== container) return;
 
   const children = Array.from(panel.childNodes);
   container.replaceChildren(...children);
 }
 
-/** Mount legacy wallet page body during React migration (preserves bound listeners). */
+/**
+ * Mount legacy wallet page body during React migration.
+ * Render into the host node so click handlers that query `root` still see the live form
+ * (a nested mount + move left `#admin-email` / `#enable-advanced` on a detached tree).
+ */
 export function WalletBodyMount({ render }: { render: LegacyRenderer }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -33,16 +37,23 @@ export function WalletBodyMount({ render }: { render: LegacyRenderer }) {
     const el = ref.current;
     if (!el) return;
     el.replaceChildren();
-    const mount = document.createElement("div");
-    el.appendChild(mount);
 
     let cancelled = false;
-    void Promise.resolve(render(mount, { frameless: true })).then(() => {
-      if (cancelled || !el.isConnected) return;
-      stripLegacyWalletChrome(mount);
-      // Keep the same DOM nodes that received addEventListener
-      el.replaceChildren(...Array.from(mount.childNodes));
-    });
+    void Promise.resolve(render(el, { frameless: true }))
+      .then(() => {
+        if (cancelled || !el.isConnected) return;
+        stripLegacyWalletChrome(el);
+      })
+      .catch((error: unknown) => {
+        if (cancelled || !el.isConnected) return;
+        const message = error instanceof Error ? error.message : String(error);
+        el.replaceChildren();
+        const p = document.createElement("p");
+        p.className = "status wallet-status error";
+        p.setAttribute("role", "status");
+        p.textContent = message;
+        el.appendChild(p);
+      });
 
     return () => {
       cancelled = true;

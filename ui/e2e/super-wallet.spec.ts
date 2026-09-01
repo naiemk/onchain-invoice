@@ -64,6 +64,26 @@ test.describe("Super Wallet UI", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Super Wallet" })).toBeVisible();
   });
 
+  test("Convert to Super Wallet prompts confirm when email is filled", async ({ page }) => {
+    await addVirtualAuthenticator(page, "platform");
+    await page.goto("/wallet/create");
+    await page.getByTestId("device-name").fill("E2E Passkey");
+    await page.getByTestId("wallet-create-btn").click();
+    await expect(page.locator("#created-address")).toContainText("0x");
+
+    await page.goto("/wallet/super-wallet");
+    await expect(page.locator("#enable-advanced")).toBeVisible();
+    await page.locator("#admin-email").fill("admin@example.com");
+
+    const dialogPromise = page.waitForEvent("dialog");
+    const clickPromise = page.locator("#enable-advanced").click();
+    const dialog = await dialogPromise;
+    expect(dialog.type()).toBe("confirm");
+    expect(dialog.message()).toMatch(/Email recovery/i);
+    await dialog.dismiss();
+    await clickPromise;
+  });
+
   test("shows entity key enrollment controls after upgrade section", async ({ page }) => {
     await addVirtualAuthenticator(page, "platform");
     await page.goto("/wallet/create");
