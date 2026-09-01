@@ -48,33 +48,59 @@ export async function createRecordChallenge(
 export async function recoverWalletFromChain(input: {
   walletAddress: string;
   chainId: string;
-  ownerQx: string;
-  ownerQy: string;
+  ownerQx?: string;
+  ownerQy?: string;
   credentialId?: string;
   label?: string;
-}): Promise<{ account: WalletAccountRecord; recovered: boolean }> {
+}): Promise<{ account: WalletAccountRecord; recovered: boolean; credentialId: string }> {
   const { challengeId, challenge } = await createRecordChallenge(input.walletAddress);
   const { credentialId, assertion } = await assertPasskeyChallenge({
     challengeBase64Url: challenge,
     credentialId: input.credentialId,
   });
+  const body: Record<string, unknown> = {
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    credentialId,
+    challengeId,
+    assertion,
+    label: input.label,
+  };
+  if (input.ownerQx?.trim() && input.ownerQy?.trim()) {
+    body.ownerQx = input.ownerQx;
+    body.ownerQy = input.ownerQy;
+  }
   const res = await fetch(apiUrl("/api/wallet/accounts/recover"), {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      walletAddress: input.walletAddress,
-      chainId: input.chainId,
-      ownerQx: input.ownerQx,
-      ownerQy: input.ownerQy,
-      credentialId,
-      challengeId,
-      assertion,
-      label: input.label,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await readError(res));
   const body = (await res.json()) as { account: WalletAccountRecord; recovered: boolean };
-  return body;
+  return { ...body, credentialId };
+}
+
+export function pickRecoveryOwnerCoords(input: {
+  accountOwner?: { ownerQx?: string; ownerQy?: string } | null;
+  registryEntry?: { qx?: string; qy?: string } | null;
+  ownersOnChain?: { qx: string; qy: string }[];
+}): { ownerQx?: string; ownerQy?: string; canRecoverFromChain: boolean } {
+  const ownerQx =
+    input.accountOwner?.ownerQx?.trim() ||
+    input.registryEntry?.qx?.trim() ||
+    input.ownersOnChain?.[0]?.qx?.trim();
+  const ownerQy =
+    input.accountOwner?.ownerQy?.trim() ||
+    input.registryEntry?.qy?.trim() ||
+    input.ownersOnChain?.[0]?.qy?.trim();
+  const canRecoverFromChain = Boolean(
+    (ownerQx && ownerQy) || (input.ownersOnChain?.length ?? 0) > 0
+  );
+  return {
+    ownerQx: ownerQx || undefined,
+    ownerQy: ownerQy || undefined,
+    canRecoverFromChain,
+  };
 }
 
 export function buildSupportRequestText(input: {

@@ -14,6 +14,7 @@ import { fetchWalletConfig, getWalletAccount } from "@/shared/wallet-api.js";
 import {
   buildSupportRequestText,
   fetchRecoverInfo,
+  pickRecoveryOwnerCoords,
   recoverWalletFromChain,
   type WalletRecoverInfo,
 } from "@/shared/wallet-recover-local.js";
@@ -132,9 +133,12 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
 
   const recoverFromChain = async () => {
     const entry = initialEntry;
-    const ownerQx = info?.account?.ownerQx ?? entry?.qx;
-    const ownerQy = info?.account?.ownerQy ?? entry?.qy;
-    if (!ownerQx || !ownerQy) {
+    const { ownerQx, ownerQy, canRecoverFromChain } = pickRecoveryOwnerCoords({
+      accountOwner: info?.account,
+      registryEntry: entry,
+      ownersOnChain: info?.ownersOnChain,
+    });
+    if (!canRecoverFromChain) {
       setStatus(t("wallet.localRecoveryNeedKeys"));
       return;
     }
@@ -150,14 +154,22 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
         credentialId: prepared?.credentialId,
         label: entry?.label,
       });
-      if (entry) {
+      if (entry || result.credentialId) {
         saveWalletSession({
-          ...entry,
+          ...(entry ?? {
+            address: result.account.address,
+            chainId,
+            salt: result.account.salt,
+            qx: result.account.ownerQx,
+            qy: result.account.ownerQy,
+            rawId: "",
+            label: t("wallet.defaultDevice"),
+          }),
           address: result.account.address,
           salt: result.account.salt,
           qx: result.account.ownerQx,
           qy: result.account.ownerQy,
-          credentialId: prepared?.credentialId ?? entry.credentialId,
+          credentialId: result.credentialId || prepared?.credentialId || entry?.credentialId || "",
         });
       }
       onRecovered();

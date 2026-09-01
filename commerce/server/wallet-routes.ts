@@ -466,6 +466,44 @@ function normalizeHex32(value: string | undefined): string | null {
   return v;
 }
 
+function ownerCoordKey(qx: string, qy: string): string {
+  return `${qx.toLowerCase()}:${qy.toLowerCase()}`;
+}
+
+function pushOwnerCandidate(
+  list: { qx: string; qy: string }[],
+  seen: Set<string>,
+  qxRaw: string | undefined,
+  qyRaw: string | undefined
+): void {
+  const qx = normalizeHex32(qxRaw);
+  const qy = normalizeHex32(qyRaw);
+  if (!qx || !qy) return;
+  const key = ownerCoordKey(qx, qy);
+  if (seen.has(key)) return;
+  seen.add(key);
+  list.push({ qx, qy });
+}
+
+async function readWalletOwnersOnChain(
+  walletAddress: string,
+  chain: WalletConfig["chains"][number] | undefined
+): Promise<{ qx: string; qy: string }[]> {
+  if (!chain?.rpcUrl) return [];
+  const provider = new JsonRpcProvider(chain.rpcUrl);
+  const code = await provider.getCode(walletAddress);
+  if (code === "0x") return [];
+  const contract = new Contract(walletAddress, WALLET_OWNER_ABI, provider);
+  const count = Number(await contract.ownerCount());
+  const owners: { qx: string; qy: string }[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < count; i++) {
+    const [qx, qy] = await contract.ownerAt(i);
+    pushOwnerCandidate(owners, seen, String(qx), String(qy));
+  }
+  return owners;
+}
+
 function str(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const t = value.trim();
@@ -802,12 +840,7 @@ async function getWalletRecoverInfo(
       const code = await provider.getCode(wallet);
       if (code !== "0x") {
         deployed = true;
-        const contract = new Contract(wallet, WALLET_OWNER_ABI, provider);
-        const count = Number(await contract.ownerCount());
-        for (let i = 0; i < count; i++) {
-          const [qx, qy] = await contract.ownerAt(i);
-          ownersOnChain.push({ qx: String(qx), qy: String(qy) });
-        }
+        ownersOnChain.push(...(await readWalletOwnersOnChain(wallet, chain)));
       }
       if (chain.feeTokenAddress) {
         const token = new Contract(chain.feeTokenAddress, ERC20_ABI, provider);
@@ -860,9 +893,9 @@ async function recoverWalletAccount(
   const challengeId = str(body.challengeId);
   const assertion = body.assertion as WebAuthnAssertionJson | undefined;
 
-  if (!walletAddress || !isAddress(walletAddress) || !ownerQx || !ownerQy || !credentialId || !challengeId) {
+  if (!walletAddress || !isAddress(walletAddress) || !credentialId || !challengeId) {
     handlers.sendJson(res, 400, {
-      error: "walletAddress, ownerQx, ownerQy, credentialId, challengeId required",
+      error: "walletAddress, credentialId, challengeId required",
     });
     return;
   }
@@ -871,93 +904,93 @@ async function recoverWalletAccount(
     return;
   }
 
-  const challenge = db.consumeHostedRecoveryChallenge({ id: challengeId, purpose: "record" });
-  if (!challenge) {
+  const challenge = db.getHostedRecoveryChallenge(challengeId);
+  if (!challenge || challenge.purpose !== "record" || challenge.consumed) {
+    handlers.sendJson(res, 400, { error: "invalid_or_expired_challenge" });
+    return;
+  }
+  if (new Date(challenge.expiresAt).getTime() < Date.now()) {
     handlers.sendJson(res, 400, { error: "invalid_or_expired_challenge" });
     return;
   }
 
-  try {
-    verifyWebAuthnAssertion(assertion, {
-      expectedChallengeBase64Url: challenge.challenge,
-      rpId: walletRpId(appConfig),
-      origins: appConfig.corsOrigins.includes("*") ? null : appConfig.corsOrigins,
-      ownerQx,
-      ownerQy,
-    });
-  } catch (error) {
-    const code =
-      error && typeof error === "object" && "statusCode" in error
-        ? Number((error as { statusCode: number }).statusCode)
-        : 400;
-    handlers.sendJson(res, code, {
-      error: error && typeof error === "object" && "code" in error ? (error as { code: string }).code : "invalid_assertion",
-      message: error instanceof Error ? error.message : String(error),
-    });
+  const chain = walletConfig.chains.find((c) => c.chainId === chainId) ?? walletConfig.chains[0];
+  const onChainOwners = await readWalletOwnersOnChain(walletAddress, chain);
+  const candidates: { qx: string; qy: string }[] = [];
+  const seen = new Set<string>();
+  pushOwnerCandidate(candidates, seen, ownerQx ?? undefined, ownerQy ?? undefined);
+  for (const owner of onChainOwners) pushOwnerCandidate(candidates, seen, owner.qx, owner.qy);
+
+  if (candidates.length === 0) {
+    handlers.sendJson(res, 400, { error: "owner_coordinates_required" });
     return;
   }
 
-  const derivedSalt = deriveWalletSalt(ownerQx, ownerQy);
   if (!walletConfig.factoryAddress || !walletConfig.implementationAddress) {
     handlers.sendJson(res, 503, { error: "wallet_factory_not_configured" });
     return;
   }
-  const predicted = predictWalletAddress(
-    walletConfig.factoryAddress,
-    walletConfig.implementationAddress,
-    derivedSalt
-  );
-  if (predicted.toLowerCase() !== walletAddress) {
-    handlers.sendJson(res, 400, { error: "address_mismatch", expected: predicted });
+
+  const verifyOpts = {
+    expectedChallengeBase64Url: challenge.challenge,
+    rpId: walletRpId(appConfig),
+    origins: appConfig.corsOrigins.includes("*") ? null : appConfig.corsOrigins,
+  };
+
+  let matched: { qx: string; qy: string } | null = null;
+  for (const candidate of candidates) {
+    try {
+      verifyWebAuthnAssertion(assertion, {
+        ...verifyOpts,
+        ownerQx: candidate.qx,
+        ownerQy: candidate.qy,
+      });
+    } catch {
+      continue;
+    }
+    const derivedSalt = deriveWalletSalt(candidate.qx, candidate.qy);
+    const predicted = predictWalletAddress(
+      walletConfig.factoryAddress,
+      walletConfig.implementationAddress,
+      derivedSalt
+    );
+    if (predicted.toLowerCase() !== walletAddress) continue;
+    if (onChainOwners.length > 0) {
+      const onChain = onChainOwners.some(
+        (owner) =>
+          owner.qx.toLowerCase() === candidate.qx.toLowerCase() &&
+          owner.qy.toLowerCase() === candidate.qy.toLowerCase()
+      );
+      if (!onChain) continue;
+    }
+    matched = candidate;
+    break;
+  }
+
+  if (!matched) {
+    handlers.sendJson(res, 400, { error: "passkey_owner_mismatch" });
     return;
   }
 
-  const chain = walletConfig.chains.find((c) => c.chainId === chainId) ?? walletConfig.chains[0];
-  if (chain?.rpcUrl) {
-    try {
-      const provider = new JsonRpcProvider(chain.rpcUrl);
-      const code = await provider.getCode(walletAddress);
-      if (code !== "0x") {
-        const contract = new Contract(walletAddress, WALLET_OWNER_ABI, provider);
-        const count = Number(await contract.ownerCount());
-        let onChain = false;
-        for (let i = 0; i < count; i++) {
-          const [qx, qy] = await contract.ownerAt(i);
-          if (
-            String(qx).toLowerCase() === ownerQx.toLowerCase() &&
-            String(qy).toLowerCase() === ownerQy.toLowerCase()
-          ) {
-            onChain = true;
-            break;
-          }
-        }
-        if (!onChain) {
-          handlers.sendJson(res, 400, { error: "owner_not_on_chain" });
-          return;
-        }
-      }
-    } catch (error) {
-      handlers.sendJson(res, 502, {
-        error: "on_chain_verify_failed",
-        message: error instanceof Error ? error.message : String(error),
-      });
-      return;
-    }
+  const consumed = db.consumeHostedRecoveryChallenge({ id: challengeId, purpose: "record" });
+  if (!consumed) {
+    handlers.sendJson(res, 400, { error: "invalid_or_expired_challenge" });
+    return;
   }
 
   const account = db.upsertWalletAccount({
     address: walletAddress,
-    salt: derivedSalt,
-    ownerQx,
-    ownerQy,
+    salt: deriveWalletSalt(matched.qx, matched.qy),
+    ownerQx: matched.qx,
+    ownerQy: matched.qy,
     credentialId,
     webauthnAttestation: null,
   });
   const device = db.upsertWalletDevice({
     walletAddress,
     chainId,
-    ownerQx,
-    ownerQy,
+    ownerQx: matched.qx,
+    ownerQy: matched.qy,
     label: str(body.label) || "Recovered passkey",
     credentialId,
   });
