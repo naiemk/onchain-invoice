@@ -167,7 +167,9 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
           ? `<section class="wallet-super-section">
               <h2>${escapeHtml(t("wallet.superWalletTitle"))}</h2>
               <p class="field-hint">${escapeHtml(onChainAdvanced ? t("wallet.superWalletActiveShort") : t("wallet.superWalletUpgradeShort"))}</p>
-              <a class="tc-btn secondary" href="/wallet/super-wallet" data-route>${escapeHtml(t("wallet.superWalletManage"))}</a>
+              <div class="cta-row">
+                <a class="tc-btn${onChainAdvanced ? " secondary" : ""}" href="/wallet/super-wallet" data-route>${escapeHtml(onChainAdvanced ? t("wallet.superWalletManage") : t("wallet.superWalletConvertCta"))}</a>
+              </div>
             </section>`
           : ""
       }

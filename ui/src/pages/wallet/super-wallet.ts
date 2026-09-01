@@ -48,7 +48,7 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
     return;
   }
 
-  root.innerHTML = walletLoadingFrame("security", t("wallet.superWalletTitle"));
+  root.innerHTML = walletLoadingFrame("superWallet", t("wallet.superWalletTitle"));
   bindWalletAccountBar(root);
 
   const config = await fetchWalletConfig();
@@ -72,21 +72,13 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
   const adminEntity = roster.entities[0] ?? null;
 
   root.innerHTML = walletFrame({
-    current: "security",
+    current: "superWallet",
     title: t("wallet.superWalletTitle"),
     lede: t("wallet.superWalletLede"),
     body: `
       ${
         !policy.advanced
-          ? `<section class="wallet-super-upgrade">
-              <h2>${escapeHtml(t("wallet.superWalletUpgradeTitle"))}</h2>
-              <p class="field-hint">${escapeHtml(t("wallet.superWalletUpgradeWarning"))}</p>
-              <div class="field">
-                <label for="admin-email">${escapeHtml(t("wallet.superWalletAdminEmail"))}</label>
-                <input id="admin-email" type="email" autocomplete="email" placeholder="you@company.com" />
-              </div>
-              <button type="button" class="tc-btn" id="enable-advanced">${escapeHtml(t("wallet.superWalletUpgradeCta"))}</button>
-            </section>`
+          ? renderUpgradeSection()
           : `<section>
               <p>${escapeHtml(t("wallet.superWalletActive", { threshold: String(policy.threshold), entities: String(policy.entityCount) }))}</p>
               <div class="cta-row">
@@ -121,6 +113,43 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
     bindEntities(root, session, config, roster, adminEntity);
     bindKeyActions(root, session, config, roster, adminEntity);
   }
+}
+
+function renderUpgradeSection(): string {
+  return `<section class="wallet-super-upgrade">
+      <h2>${escapeHtml(t("wallet.superWalletUpgradeTitle"))}</h2>
+      <div class="wallet-super-features">
+        <h3>${escapeHtml(t("wallet.superWalletFeaturesTitle"))}</h3>
+        <ul class="wallet-feature-list">
+          <li>${escapeHtml(t("wallet.superWalletFeatureMultisig"))}</li>
+          <li>${escapeHtml(t("wallet.superWalletFeatureMixedKeys"))}</li>
+          <li>${escapeHtml(t("wallet.superWalletFeatureProposals"))}</li>
+          <li>${escapeHtml(t("wallet.superWalletFeatureIrreversible"))}</li>
+        </ul>
+      </div>
+      <div class="banner warn wallet-super-warning">
+        <p>${escapeHtml(t("wallet.superWalletUpgradeWarning"))}</p>
+      </div>
+      <div class="wallet-super-email">
+        <h3>${escapeHtml(t("wallet.superWalletEmailWhyTitle"))}</h3>
+        <p class="field-hint">${escapeHtml(t("wallet.superWalletEmailWhy"))}</p>
+        <div class="field">
+          <label for="admin-email">${escapeHtml(t("wallet.superWalletAdminEmail"))}</label>
+          <input id="admin-email" type="email" autocomplete="email" placeholder="you@company.com" />
+        </div>
+      </div>
+      <button type="button" class="tc-btn" id="enable-advanced">${escapeHtml(t("wallet.superWalletConvertCta"))}</button>
+      <div class="wallet-super-team">
+        <h3>${escapeHtml(t("wallet.superWalletTeamJoinTitle"))}</h3>
+        <p class="field-hint">${escapeHtml(t("wallet.superWalletTeamJoinIntro"))}</p>
+        <ol class="wallet-pair-steps">
+          <li>${escapeHtml(t("wallet.superWalletTeamJoinStep1"))}</li>
+          <li>${escapeHtml(t("wallet.superWalletTeamJoinStep2"))}</li>
+          <li>${escapeHtml(t("wallet.superWalletTeamJoinStep3"))}</li>
+        </ol>
+        <p class="field-hint"><a href="/wallet/security" data-route>${escapeHtml(t("wallet.securityTab"))}</a> · ${escapeHtml(t("wallet.pairStepsTitle"))}</p>
+      </div>
+    </section>`;
 }
 
 function renderEntityList(entities: WalletEntityRecord[], keys: WalletEntityKeyRecord[]): string {

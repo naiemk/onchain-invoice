@@ -15,6 +15,7 @@ import { isAdvancedMode, loadWalletMode, saveWalletMode, type WalletMode } from 
 export type WalletTab =
   | "home"
   | "security"
+  | "superWallet"
   | "send"
   | "receive"
   | "create"
@@ -294,6 +295,7 @@ export function walletSubnav(current: WalletTab): string {
     { href: "/wallet/security", key: "security", label: t("wallet.securityTab") },
   ];
   if (advanced) {
+    links.push({ href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") });
     links.push({ href: "/merchant", key: "invoices", label: t("wallet.invoicesTab") });
     links.push({ href: "/wallet/recover", key: "recover", label: t("wallet.recoverTab") });
     links.push({ href: "/wallet/developers", key: "developers", label: t("wallet.developersTab") });
