@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 64" role="img" aria-label="Teachable">
-  <rect width="200" height="64" rx="12" fill="#0190FF"/>
-  <text x="100" y="40" text-anchor="middle" fill="#fff" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700">Teachable</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Teachable">
+  <rect width="32" height="32" rx="8" fill="#0190FF"/>
+  <g transform="translate(7 2) scale(0.48)">
+    <path fill="#fff" d="M11.162,0H3.667v4.827H0v7.436h3.667v15.256c0,9.939,8.101,17.997,18.095,17.997v-7.454c-5.855,0-10.6-4.719-10.6-10.543v-15.256h10.6v-7.436h-10.6V0Z"/>
+  </g>
 </svg>
