@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, Moon, Sun } from "lucide-react";
+import { ArrowUpRight, Menu, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -9,6 +9,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 import { LOCALES, LOCALE_NATIVE_NAMES, type Locale } from "@/i18n/locales.js";
 import { SITE } from "@/shared/site.js";
 import type { PayChrome } from "@/shared/pay-chrome.js";
+import { deploymentMode } from "@/shared/networks.js";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -36,8 +37,8 @@ function NavLinks({ pathname, t, onNavigate }: { pathname: string; t: (k: string
           onClick={onNavigate}
           aria-current={isActive(pathname, href) ? "page" : undefined}
           className={cn(
-            "rounded-md px-2 py-1 text-xs font-medium transition-colors hover:text-foreground",
-            isActive(pathname, href) ? "bg-muted text-foreground" : "text-muted-foreground"
+            "text-sm font-medium transition-colors hover:text-foreground",
+            isActive(pathname, href) ? "text-primary underline decoration-primary/40 underline-offset-4" : "text-muted-foreground"
           )}
         >
           {t(labelKey)}
@@ -100,13 +101,24 @@ function BrandLink() {
   );
 }
 
+function FooterEnvLine() {
+  const { t } = useLocale();
+  const mode = deploymentMode();
+  return (
+    <span className="text-xs text-muted-foreground">
+      {mode === "testnet" ? t("common.testnet") : t("common.mainnet")} · {t("footer.settlementLine")}
+    </span>
+  );
+}
+
 function FullFooter() {
   const { t } = useLocale();
   return (
     <footer className="border-t bg-background/80 px-4 py-8 text-sm text-muted-foreground md:px-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <span className="font-medium text-foreground">{t("brand")}</span>
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
+        <FooterEnvLine />
+        <div className="flex flex-wrap gap-x-3 gap-y-1 sm:justify-end">
           <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.docs")}
           </a>
@@ -161,6 +173,12 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
               <div data-app-nav className="flex items-center gap-2 max-md:!hidden">
                 <LocaleSelect />
                 <ThemeToggle />
+                <Button asChild size="sm" className="ms-1">
+                  <Link to="/wallet">
+                    {t("nav.openWorkspace")}
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
               </div>
               <div data-app-nav-mobile className="ml-auto flex items-center gap-2 md:!hidden">
                 <ThemeToggle />
@@ -177,8 +195,14 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
                     <div role="navigation" className="mt-6 flex flex-col gap-4">
                       <NavLinks pathname={location.pathname} t={t} onNavigate={() => setMobileOpen(false)} />
                     </div>
-                    <div className="mt-6">
+                    <div className="mt-6 space-y-4">
                       <LocaleSelect />
+                      <Button asChild className="w-full">
+                        <Link to="/wallet" onClick={() => setMobileOpen(false)}>
+                          {t("nav.openWorkspace")}
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
                     </div>
                   </SheetContent>
                 </Sheet>

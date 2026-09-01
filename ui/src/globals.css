@@ -31,6 +31,7 @@
   --color-ok-foreground: var(--ok-foreground);
   --color-warn: var(--warn);
   --color-warn-foreground: var(--warn-foreground);
+  --color-emphasis: var(--emphasis);
   --color-brand-panel: var(--brand-panel);
   --color-brand-panel-foreground: var(--brand-panel-foreground);
 
@@ -40,65 +41,66 @@
   --radius-xl: calc(var(--radius) * 1.5);
 }
 
-/* Quiet Operator — light */
+/* Calmer Commerce — light (warm cream / forest teal) */
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.985 0.004 250);
-  --foreground: oklch(0.24 0.03 255);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.24 0.03 255);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.24 0.03 255);
-  --primary: oklch(0.5 0.18 255);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.008 250);
-  --secondary-foreground: oklch(0.28 0.03 255);
-  --muted: oklch(0.955 0.008 250);
-  --muted-foreground: oklch(0.45 0.02 255);
-  --accent: oklch(0.955 0.012 255);
-  --accent-foreground: oklch(0.28 0.03 255);
+  --radius: 0.75rem;
+  --background: oklch(0.965 0.012 85);
+  --foreground: oklch(0.22 0.03 175);
+  --card: oklch(0.995 0.004 85);
+  --card-foreground: oklch(0.22 0.03 175);
+  --popover: oklch(0.995 0.004 85);
+  --popover-foreground: oklch(0.22 0.03 175);
+  --primary: oklch(0.28 0.05 175);
+  --primary-foreground: oklch(0.98 0.005 85);
+  --secondary: oklch(0.92 0.04 155);
+  --secondary-foreground: oklch(0.28 0.05 175);
+  --muted: oklch(0.94 0.015 85);
+  --muted-foreground: oklch(0.48 0.025 175);
+  --accent: oklch(0.92 0.04 155);
+  --accent-foreground: oklch(0.28 0.05 175);
   --destructive: oklch(0.52 0.19 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.9 0.01 250);
-  --input: oklch(0.9 0.01 250);
-  --ring: oklch(0.5 0.18 255);
+  --border: oklch(0.88 0.015 85);
+  --input: oklch(0.88 0.015 85);
+  --ring: oklch(0.28 0.05 175);
   --ok: oklch(0.52 0.11 175);
   --ok-foreground: oklch(0.99 0 0);
   --warn: oklch(0.62 0.14 70);
   --warn-foreground: oklch(0.28 0.05 70);
-  --brand-panel: oklch(0.26 0.04 255);
-  --brand-panel-foreground: oklch(0.98 0.005 250);
+  --emphasis: oklch(0.58 0.14 35);
+  --brand-panel: oklch(0.28 0.05 175);
+  --brand-panel-foreground: oklch(0.97 0.008 85);
 }
 
-/* Quiet Operator — dark: clear elevation ladder */
+/* Calmer Commerce — dark (deep forest) */
 .dark,
 html[data-theme="dark"] {
-  --background: oklch(0.16 0.018 255);
-  --foreground: oklch(0.96 0.008 250);
-  --card: oklch(0.22 0.02 255);
-  --card-foreground: oklch(0.96 0.008 250);
-  --popover: oklch(0.24 0.022 255);
-  --popover-foreground: oklch(0.96 0.008 250);
-  --primary: oklch(0.68 0.15 255);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.26 0.02 255);
-  --secondary-foreground: oklch(0.94 0.008 250);
-  --muted: oklch(0.24 0.02 255);
-  --muted-foreground: oklch(0.78 0.018 255);
-  --accent: oklch(0.28 0.025 255);
-  --accent-foreground: oklch(0.96 0.008 250);
+  --background: oklch(0.17 0.025 175);
+  --foreground: oklch(0.95 0.01 85);
+  --card: oklch(0.22 0.028 175);
+  --card-foreground: oklch(0.95 0.01 85);
+  --popover: oklch(0.24 0.03 175);
+  --popover-foreground: oklch(0.95 0.01 85);
+  --primary: oklch(0.72 0.1 175);
+  --primary-foreground: oklch(0.17 0.025 175);
+  --secondary: oklch(0.32 0.04 155);
+  --secondary-foreground: oklch(0.94 0.01 85);
+  --muted: oklch(0.26 0.028 175);
+  --muted-foreground: oklch(0.72 0.02 175);
+  --accent: oklch(0.32 0.04 155);
+  --accent-foreground: oklch(0.94 0.01 85);
   --destructive: oklch(0.62 0.2 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.34 0.025 255);
-  --input: oklch(0.3 0.022 255);
-  --ring: oklch(0.68 0.15 255);
+  --border: oklch(0.32 0.03 175);
+  --input: oklch(0.28 0.028 175);
+  --ring: oklch(0.72 0.1 175);
   --ok: oklch(0.72 0.12 175);
-  --ok-foreground: oklch(0.16 0.02 255);
+  --ok-foreground: oklch(0.17 0.025 175);
   --warn: oklch(0.8 0.12 85);
   --warn-foreground: oklch(0.22 0.04 85);
-  /* Elevated navy band — distinct from page bg */
-  --brand-panel: oklch(0.28 0.04 255);
-  --brand-panel-foreground: oklch(0.97 0.008 250);
+  --emphasis: oklch(0.72 0.12 35);
+  --brand-panel: oklch(0.24 0.04 175);
+  --brand-panel-foreground: oklch(0.96 0.01 85);
 }
 
 @layer base {
@@ -108,9 +110,7 @@ html[data-theme="dark"] {
   body {
     @apply bg-background text-foreground font-sans antialiased;
     min-height: 100vh;
-    background:
-      radial-gradient(ellipse 70% 40% at 50% -15%, color-mix(in oklch, var(--primary) 8%, transparent), transparent),
-      var(--background);
+    background: var(--background);
   }
   h1, h2, h3 {
     @apply tracking-tight text-foreground;
@@ -126,6 +126,10 @@ html[data-theme="dark"] {
 
 .font-mono {
   font-family: var(--font-mono);
+}
+
+.text-emphasis {
+  color: var(--emphasis);
 }
 
 .visually-hidden {

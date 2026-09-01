@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageCard, PageSplit } from "@/components/PageSplit";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletConfig, parseSuperJoinFromUrl } from "@/shared/wallet-api.js";
 import {
@@ -206,145 +207,166 @@ export function JoinSuperPage() {
 
   return (
     <WalletFrame current="pair" title={t("wallet.joinSuperTitle")} lede={t("wallet.joinSuperLede")}>
-      <div className="space-y-6">
-        {walletAddress && (
-          <p className="font-mono text-xs text-muted-foreground">{walletAddress}</p>
-        )}
+      <PageSplit>
+        <PageCard>
+          <div className="space-y-6">
+            {walletAddress && (
+              <p className="font-mono text-xs text-muted-foreground">{walletAddress}</p>
+            )}
 
-        <div className="space-y-2">
-          <Label htmlFor="join-email">{t("wallet.joinSuperEmail")}</Label>
-          <Input
-            id="join-email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={waiting}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="join-email">{t("wallet.joinSuperEmail")}</Label>
+              <Input
+                id="join-email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={waiting}
+              />
+            </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            id="join-passkey"
-            type="button"
-            disabled={waiting || busy !== null}
-            onClick={async () => {
-              setBusy("passkey");
-              try {
-                const passkey = await createPasskey(t("wallet.joinSuperPasskeyLabel"), { attachment: "platform" });
-                const fields = passkeyToKeyFields(passkey);
-                await enroll(KEY_WEBAUTHN, {
-                  qx: fields.qx,
-                  qy: fields.qy,
-                  eoa: zeroPadValue("0x00", 20),
-                  credentialId: fields.credentialId,
-                  rawId: passkey.rawId,
-                });
-              } catch (error) {
-                setStatus({
-                  kind: "error",
-                  message: error instanceof Error ? error.message : String(error),
-                });
-              } finally {
-                setBusy(null);
-              }
-            }}
-          >
-            {t("wallet.joinSuperPasskey")}
-          </Button>
-          <Button
-            id="join-yubikey"
-            type="button"
-            variant="outline"
-            disabled={waiting || busy !== null}
-            onClick={async () => {
-              setBusy("yubikey");
-              try {
-                const passkey = await createSecurityKey(t("wallet.joinSuperYubiKeyLabel"));
-                const fields = passkeyToKeyFields(passkey);
-                await enroll(KEY_YUBIKEY, {
-                  qx: fields.qx,
-                  qy: fields.qy,
-                  eoa: zeroPadValue("0x00", 20),
-                  credentialId: fields.credentialId,
-                  rawId: passkey.rawId,
-                });
-              } catch (error) {
-                if (isYubiKeyPinRequiredError(error)) {
-                  setShowYubiHelp(true);
-                  setStatus({ kind: "error", message: t("wallet.yubikeyPinRequiredTitle") });
-                } else {
-                  setStatus({
-                    kind: "error",
-                    message: error instanceof Error ? error.message : String(error),
-                  });
+            <div className="flex flex-wrap gap-2">
+              <Button
+                id="join-passkey"
+                type="button"
+                disabled={waiting || busy !== null}
+                onClick={async () => {
+                  setBusy("passkey");
+                  try {
+                    const passkey = await createPasskey(t("wallet.joinSuperPasskeyLabel"), { attachment: "platform" });
+                    const fields = passkeyToKeyFields(passkey);
+                    await enroll(KEY_WEBAUTHN, {
+                      qx: fields.qx,
+                      qy: fields.qy,
+                      eoa: zeroPadValue("0x00", 20),
+                      credentialId: fields.credentialId,
+                      rawId: passkey.rawId,
+                    });
+                  } catch (error) {
+                    setStatus({
+                      kind: "error",
+                      message: error instanceof Error ? error.message : String(error),
+                    });
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+              >
+                {t("wallet.joinSuperPasskey")}
+              </Button>
+              <Button
+                id="join-yubikey"
+                type="button"
+                variant="outline"
+                disabled={waiting || busy !== null}
+                onClick={async () => {
+                  setBusy("yubikey");
+                  try {
+                    const passkey = await createSecurityKey(t("wallet.joinSuperYubiKeyLabel"));
+                    const fields = passkeyToKeyFields(passkey);
+                    await enroll(KEY_YUBIKEY, {
+                      qx: fields.qx,
+                      qy: fields.qy,
+                      eoa: zeroPadValue("0x00", 20),
+                      credentialId: fields.credentialId,
+                      rawId: passkey.rawId,
+                    });
+                  } catch (error) {
+                    if (isYubiKeyPinRequiredError(error)) {
+                      setShowYubiHelp(true);
+                      setStatus({ kind: "error", message: t("wallet.yubikeyPinRequiredTitle") });
+                    } else {
+                      setStatus({
+                        kind: "error",
+                        message: error instanceof Error ? error.message : String(error),
+                      });
+                    }
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+              >
+                {t("wallet.joinSuperYubiKey")}
+              </Button>
+              <Button
+                id="join-eoa"
+                type="button"
+                variant="outline"
+                disabled={waiting || busy !== null}
+                onClick={async () => {
+                  setBusy("eoa");
+                  try {
+                    const eoa = getAddress(await connectEoaWallet());
+                    await enroll(KEY_EOA, {
+                      qx: zeroPadValue("0x00", 32),
+                      qy: zeroPadValue("0x00", 32),
+                      eoa,
+                      credentialId: "",
+                      rawId: "",
+                    });
+                  } catch (error) {
+                    setStatus({
+                      kind: "error",
+                      message: error instanceof Error ? error.message : String(error),
+                    });
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+              >
+                {t("wallet.joinSuperEoa")}
+              </Button>
+            </div>
+
+            {showYubiHelp && (
+              <Alert variant="warn">
+                <AlertDescription>{t("wallet.yubikeyPinRequiredWhy")}</AlertDescription>
+              </Alert>
+            )}
+
+            {waiting && (
+              <p id="join-wait" className="text-sm text-muted-foreground">
+                {t("wallet.joinSuperWaiting")}
+              </p>
+            )}
+
+            {status && (
+              <p
+                id="join-status"
+                role="status"
+                className={
+                  status.kind === "error"
+                    ? "text-sm text-destructive"
+                    : status.kind === "success"
+                      ? "text-sm text-ok"
+                      : "text-sm text-muted-foreground"
                 }
-              } finally {
-                setBusy(null);
-              }
-            }}
-          >
-            {t("wallet.joinSuperYubiKey")}
-          </Button>
-          <Button
-            id="join-eoa"
-            type="button"
-            variant="outline"
-            disabled={waiting || busy !== null}
-            onClick={async () => {
-              setBusy("eoa");
-              try {
-                const eoa = getAddress(await connectEoaWallet());
-                await enroll(KEY_EOA, {
-                  qx: zeroPadValue("0x00", 32),
-                  qy: zeroPadValue("0x00", 32),
-                  eoa,
-                  credentialId: "",
-                  rawId: "",
-                });
-              } catch (error) {
-                setStatus({
-                  kind: "error",
-                  message: error instanceof Error ? error.message : String(error),
-                });
-              } finally {
-                setBusy(null);
-              }
-            }}
-          >
-            {t("wallet.joinSuperEoa")}
-          </Button>
-        </div>
+              >
+                {status.message}
+              </p>
+            )}
+          </div>
+        </PageCard>
 
-        {showYubiHelp && (
-          <Alert variant="warn">
-            <AlertDescription>{t("wallet.yubikeyPinRequiredWhy")}</AlertDescription>
-          </Alert>
-        )}
-
-        {waiting && (
-          <p id="join-wait" className="text-sm text-muted-foreground">
-            {t("wallet.joinSuperWaiting")}
-          </p>
-        )}
-
-        {status && (
-          <p
-            id="join-status"
-            role="status"
-            className={
-              status.kind === "error"
-                ? "text-sm text-destructive"
-                : status.kind === "success"
-                  ? "text-sm text-ok"
-                  : "text-sm text-muted-foreground"
-            }
-          >
-            {status.message}
-          </p>
-        )}
-      </div>
+        <PageCard>
+          <h2 className="text-base font-semibold">{t("wallet.superWalletTeamJoinTitle")}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{t("wallet.superWalletTeamJoinIntro")}</p>
+          <ol className="mt-4 space-y-4">
+            {[t("wallet.superWalletTeamJoinStep1"), t("wallet.superWalletTeamJoinStep2"), t("wallet.superWalletTeamJoinStep3")].map(
+              (step, i) => (
+                <li key={step} className="flex gap-3 text-sm">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    {i + 1}
+                  </span>
+                  <span className="text-muted-foreground">{step}</span>
+                </li>
+              )
+            )}
+          </ol>
+        </PageCard>
+      </PageSplit>
     </WalletFrame>
   );
 }

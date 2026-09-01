@@ -1,73 +1,62 @@
 import { Link } from "react-router-dom";
+import { ArrowUpRight, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Surface } from "@/components/Surface";
+import { PageHero } from "@/components/PageHero";
+import { PageCard, PageSplit } from "@/components/PageSplit";
+import { TrustNotice } from "@/components/TrustNotice";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useLocale } from "@/providers/LocaleProvider";
-import { SITE } from "@/shared/site.js";
 
 export function SecurityPage() {
   const { t } = useLocale();
 
-  const blocks = [
-    { title: t("securityPage.passkeyTitle"), body: t("securityPage.passkeyBody") },
-    { title: t("securityPage.settlementTitle"), body: t("securityPage.settlementBody") },
-    {
-      title: t("securityPage.recoveryTitle"),
-      body: t("securityPage.recoveryBody"),
-      cta: { href: "/wallet/recover", label: t("securityPage.recoveryCta") },
-    },
-  ];
-
-  const advancedItems = [
-    { label: t("securityPage.advDevices"), available: true },
-    { label: t("securityPage.advRecovery"), available: true },
-    { label: t("securityPage.advRoles"), available: false },
-    { label: t("securityPage.advPolicies"), available: false },
-    { label: t("securityPage.advMultisig"), available: false },
+  const recoveryItems = [
+    { label: t("securityPage.mapPasskeys"), tone: "active" as const, detail: "2" },
+    { label: t("securityPage.mapEmail"), tone: "verified" as const, detail: t("securityPage.verified") },
+    { label: t("securityPage.mapGuardian"), tone: "muted" as const, detail: t("securityPage.notAdded") },
   ];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 md:px-8">
-      <header className="mb-8 space-y-1.5">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("securityPage.eyebrow")}</p>
-        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{t("securityPage.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("securityPage.lede")}</p>
-      </header>
-      <div className="space-y-3">
-        {blocks.map(({ title, body, cta }) => (
-          <Surface key={title} className="p-5">
-            <h2 className="text-sm font-semibold">{title}</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">{body}</p>
-            {cta && (
-              <Button asChild variant="outline" size="sm" className="mt-4">
-                <Link to={cta.href}>{cta.label}</Link>
-              </Button>
-            )}
-          </Surface>
-        ))}
-        <Surface className="p-5">
-          <h2 className="text-sm font-semibold">{t("securityPage.advancedTitle")}</h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">{t("securityPage.advancedBody")}</p>
-          <ul className="mt-4 space-y-2">
-            {advancedItems.map(({ label, available }) => (
-              <li key={label} className="flex items-center gap-2 text-sm">
-                <Badge variant={available ? "ok" : "secondary"}>
-                  {available ? t("securityPage.available") : t("securityPage.coming")}
-                </Badge>
-                {label}
+    <div className="mx-auto max-w-5xl px-4 py-10 md:px-8">
+      <PageHero
+        breadcrumb={t("securityPage.breadcrumb")}
+        title={t("securityPage.title")}
+        lede={t("securityPage.lede")}
+      />
+
+      <PageSplit>
+        <PageCard className="bg-brand-panel text-brand-panel-foreground">
+          <Shield className="mb-3 h-5 w-5 text-brand-panel-foreground/80" aria-hidden />
+          <h2 className="text-lg font-semibold">{t("securityPage.protectedTitle")}</h2>
+          <p className="mt-2 text-sm text-brand-panel-foreground/80">{t("securityPage.protectedBody")}</p>
+          <Button asChild variant="secondary" className="mt-6">
+            <Link to="/wallet/security">
+              {t("securityPage.addPasskeyCta")}
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </PageCard>
+
+        <PageCard>
+          <h2 className="text-lg font-semibold">{t("securityPage.recoveryMapTitle")}</h2>
+          <ul className="mt-4 space-y-3">
+            {recoveryItems.map(({ label, tone, detail }) => (
+              <li key={label} className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium">{label}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">{detail}</span>
+                  <StatusBadge tone={tone}>{detail === t("securityPage.notAdded") ? t("securityPage.notAdded") : tone === "verified" ? t("securityPage.verified") : t("securityPage.active")}</StatusBadge>
+                </div>
               </li>
             ))}
           </ul>
-        </Surface>
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button asChild>
-            <Link to="/wallet">{t("securityPage.openWallet")}</Link>
+          <Button asChild variant="secondary" className="mt-6">
+            <Link to="/wallet/recover">{t("securityPage.reviewRecoveryCta")}</Link>
           </Button>
-          <Button asChild variant="outline">
-            <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer">{t("nav.docs")}</a>
-          </Button>
-        </div>
-      </div>
+        </PageCard>
+      </PageSplit>
+
+      <TrustNotice className="mt-8">{t("securityPage.transparencyNotice")}</TrustNotice>
     </div>
   );
 }
