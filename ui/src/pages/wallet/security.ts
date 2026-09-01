@@ -116,7 +116,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
           ? `<div class="banner warn">
               <p>${escapeHtml(t("wallet.pendingRecovery"))}</p>
               <div class="cta-row">
-                <a class="tc-btn secondary small" href="/wallet/recover" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
+                <a class="tc-btn secondary small" href="/wallet/security#recovery" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
               </div>
             </div>`
           : ""
@@ -144,7 +144,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
         </details>
       </article>
 
-      <section class="wallet-other-devices">
+        <section class="wallet-other-devices" id="devices">
         <h2>${escapeHtml(onChainAdvanced ? t("wallet.superWalletEntitiesTitle") : t("wallet.otherDevicesTitle"))}</h2>
         ${
           onChainAdvanced
@@ -193,12 +193,12 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
         }
       </section>
 
-      <section class="wallet-recovery-section ${onChainAdvanced ? "hidden" : ""}">
+      <section class="wallet-recovery-section hidden">
         <h2>${escapeHtml(t("wallet.recoverySection"))}</h2>
         <p class="field-hint" id="security-email-status">${escapeHtml(t("wallet.recoverEmailLoading"))}</p>
         <p class="field-hint">${escapeHtml(t("wallet.recoveryTimelock", { hours: Math.round(config.recoveryTimelockSeconds / 3600) }))}</p>
         <div class="cta-row">
-          <a class="tc-btn" href="/wallet/recover" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
+          <a class="tc-btn" href="/wallet/security#recovery" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
           ${
             pendingRecovery
               ? `<button type="button" class="tc-btn secondary" id="security-cancel-recovery">${escapeHtml(t("wallet.recoverCancel"))}</button>`
@@ -241,7 +241,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
   })();
 
   r.querySelector("#security-cancel-recovery")?.addEventListener("click", () => {
-    spaNavigate("/wallet/recover");
+    spaNavigate("/wallet/security#recovery");
   });
 
   r.querySelector("#invite-teammate-qr")?.addEventListener("click", async () => {

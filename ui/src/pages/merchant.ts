@@ -386,14 +386,14 @@ function detailFields(invoice: InvoiceWithEvents): string {
       <div><dt>${t("merchant.paymentAddress")}</dt><dd class="mono wrap">${
         invoice.invoiceAddress
           ? addressUrl
-            ? `<a href="${escapeHtml(addressUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(invoice.invoiceAddress)}</a>`
+            ? `<a href="${escapeHtml(addressUrl)}" target="_blank" rel="noopener noreferrer" class="explorer-link">${escapeHtml(invoice.invoiceAddress)} <span aria-hidden="true">↗</span></a>`
             : escapeHtml(invoice.invoiceAddress)
           : t("common.emDash")
       }</dd></div>
       <div><dt>${t("merchant.sweepTx")}</dt><dd class="mono wrap">${
         invoice.sweepTx
           ? txUrl
-            ? `<a href="${escapeHtml(txUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(invoice.sweepTx)}</a>`
+            ? `<a href="${escapeHtml(txUrl)}" target="_blank" rel="noopener noreferrer" class="explorer-link">${escapeHtml(invoice.sweepTx)} <span aria-hidden="true">↗</span></a>`
             : escapeHtml(invoice.sweepTx)
           : t("common.emDash")
       }</dd></div>

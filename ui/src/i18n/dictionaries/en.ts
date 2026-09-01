@@ -26,6 +26,7 @@ export const en = {
     wallet: "Wallet",
     getPaid: "Get paid",
     security: "Security",
+    developers: "Developers",
     openWorkspace: "Open workspace",
   },
 

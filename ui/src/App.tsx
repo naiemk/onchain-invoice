@@ -13,6 +13,7 @@ import { IntegrationsPage } from "@/pages/react/IntegrationsPage";
 import { CreatePage } from "@/pages/react/CreatePage";
 import { PayPage } from "@/pages/react/PayPage";
 import { MerchantPage } from "@/pages/react/MerchantPage";
+import { DevelopersPage } from "@/pages/react/DevelopersPage";
 import { AdminPage } from "@/pages/react/AdminPage";
 import { GuardianPage } from "@/pages/react/GuardianPage";
 import { WalletRouter } from "@/pages/react/wallet/WalletRouter";
@@ -112,6 +113,7 @@ function AppRoutes() {
         <Route path="/pay" element={<PayPage />} />
         <Route path="/merchant" element={<MerchantPage />} />
         <Route path="/merchant/*" element={<MerchantPage />} />
+        <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/guardian" element={<GuardianPage />} />
         <Route path="/wallet/*" element={<WalletRouter />} />

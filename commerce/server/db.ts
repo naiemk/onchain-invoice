@@ -10,6 +10,7 @@ import type {
   PaymentMode,
   SweeperRecord,
 } from "../shared/types.js";
+import { credentialIdLookupVariants, credentialIdsMatch } from "../shared/credential-id.js";
 import type {
   WalletDeviceRecord,
   WalletPairingRecord,
@@ -1110,20 +1111,36 @@ export class CommerceDb {
 
   /** Lookup by WebAuthn credential id (account row or paired device). */
   getWalletAccountByCredentialId(credentialId: string): WalletAccountRecord | null {
-    const id = credentialId.trim();
-    if (!id) return null;
-    const byAccount = this.db
-      .prepare(`SELECT * FROM wallet_accounts WHERE credential_id = ? LIMIT 1`)
-      .get(id) as WalletAccountRow | undefined;
-    if (byAccount) return mapWalletAccount(byAccount);
+    const variants = credentialIdLookupVariants(credentialId);
+    for (const id of variants) {
+      const byAccount = this.db
+        .prepare(`SELECT * FROM wallet_accounts WHERE credential_id = ? LIMIT 1`)
+        .get(id) as WalletAccountRow | undefined;
+      if (byAccount) return mapWalletAccount(byAccount);
+    }
 
-    const device = this.db
-      .prepare(
-        `SELECT wallet_address FROM wallet_devices WHERE credential_id = ? ORDER BY last_used_at DESC LIMIT 1`
-      )
-      .get(id) as { wallet_address: string } | undefined;
-    if (!device) return null;
-    return this.getWalletAccount(device.wallet_address);
+    for (const id of variants) {
+      const device = this.db
+        .prepare(
+          `SELECT wallet_address FROM wallet_devices WHERE credential_id = ? ORDER BY last_used_at DESC LIMIT 1`
+        )
+        .get(id) as { wallet_address: string } | undefined;
+      if (device) return this.getWalletAccount(device.wallet_address);
+    }
+
+    const rows = this.db
+      .prepare(`SELECT * FROM wallet_accounts WHERE credential_id IS NOT NULL AND credential_id != ''`)
+      .all() as WalletAccountRow[];
+    const accountRow = rows.find((row) => credentialIdsMatch(row.credential_id, credentialId));
+    if (accountRow) return mapWalletAccount(accountRow);
+
+    const deviceRows = this.db
+      .prepare(`SELECT * FROM wallet_devices WHERE credential_id IS NOT NULL AND credential_id != ''`)
+      .all() as WalletDeviceRow[];
+    const deviceRow = deviceRows.find((row) => credentialIdsMatch(row.credential_id, credentialId));
+    if (deviceRow) return this.getWalletAccount(deviceRow.wallet_address);
+
+    return null;
   }
 
   getWalletDeviceByCredentialId(

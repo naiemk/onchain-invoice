@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SendScanButton } from "@/components/SendScanDialog";
+import { ExplorerLink } from "@/components/ExplorerLink";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +27,9 @@ import {
   type WalletPublicConfig,
 } from "@/shared/wallet-api.js";
 import { fetchAdvancedPolicy } from "@/shared/wallet-advanced-api.js";
+import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
+import { buildSignedAdvancedSendUserOp } from "@/shared/advanced-userop-client.js";
 import { buildSignedSendUserOp, submitSignedUserOp } from "@/shared/userop-client.js";
 import { parseUsdcInput } from "../../../../../commerce/shared/userop.js";
 import { WalletFrame } from "./WalletFrame";
@@ -33,16 +37,17 @@ import { WalletFrame } from "./WalletFrame";
 export function SendPage() {
   const { t } = useLocale();
   const navigate = useNavigate();
-  const session = loadWalletSession();
+  const [session, setSession] = useState<WalletSession | null>(() => loadWalletSession());
   const [config, setConfig] = useState<WalletPublicConfig | null>(null);
   const [balanceUsd, setBalanceUsd] = useState("0.00");
   const [deployed, setDeployed] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
-  const [status, setStatus] = useState<{ kind: "info" | "error" | "success"; message: string } | null>(null);
+  const [status, setStatus] = useState<{ kind: "info" | "error" | "success"; message: string; txHash?: string } | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [advancedEntityId, setAdvancedEntityId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) {
@@ -50,19 +55,29 @@ export function SendPage() {
       return;
     }
     void (async () => {
+      const healed = await healWalletSession(session);
+      if (healed.session !== session) setSession(healed.session);
+      const active = healed.session;
       const cfg = await fetchWalletConfig();
-      const policy = await fetchAdvancedPolicy(session.address).catch(() => null);
+      const policy = await fetchAdvancedPolicy(active.address).catch(() => null);
       if (policy?.advanced && policy.threshold > 1) {
         navigate("/wallet/proposals?create=1", { replace: true });
         return;
       }
+      if (policy?.advanced) {
+        if (healed.needsSuperWalletEmail) {
+          navigate("/wallet/super-wallet", { replace: true });
+          return;
+        }
+        if (active.entityId) setAdvancedEntityId(active.entityId);
+      }
       setConfig(cfg);
       try {
-        const balance = await fetchWalletBalance(session.address);
+        const balance = await fetchWalletBalance(active.address);
         setBalanceUsd(balance.totalUsd);
         const primary = balance.chains.find((c) => c.chainId === cfg.chainId);
         let isDeployed = primary?.deployed ?? false;
-        const account = await getWalletAccount(session.address).catch(() => null);
+        const account = await getWalletAccount(active.address).catch(() => null);
         if (account?.deployedChains.includes(cfg.chainId)) isDeployed = true;
         setDeployed(isDeployed);
       } catch {
@@ -72,6 +87,13 @@ export function SendPage() {
   }, [session, navigate]);
 
   const feeUsd = config?.bundlerFeeUsd ?? "—";
+  const tokenDecimals = config ? primaryChain(config).feeTokenDecimals : 6;
+
+  const handleScan = useCallback((result: { recipient: string; amount?: string }) => {
+    setRecipient(result.recipient);
+    if (result.amount) setAmount(result.amount);
+    setStatus(null);
+  }, []);
 
   const openReview = () => {
     if (!config || !session) return;
@@ -100,6 +122,12 @@ export function SendPage() {
     setReviewOpen(false);
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
+      const policy = await fetchAdvancedPolicy(session.address).catch(() => null);
+      if (policy?.advanced && !advancedEntityId) {
+        setStatus({ kind: "error", message: t("wallet.superWalletRestoreEmailHint") });
+        navigate("/wallet/super-wallet");
+        return;
+      }
       const balance = await fetchWalletBalance(session.address);
       const primary = balance.chains.find((c) => c.chainId === config.chainId);
       const balanceAtoms = BigInt(primary?.balance ?? "0");
@@ -108,14 +136,27 @@ export function SendPage() {
         setStatus({ kind: "error", message: t("wallet.sendInsufficientBalance") });
         return;
       }
-      const { userOp, userOpHash } = await buildSignedSendUserOp({
-        config,
-        walletAddress: session.address,
-        recipient: getAddress(recipient),
-        sendAmount,
-        feeAmount: feeAtoms,
-        credentialId: session.credentialId,
-      });
+      const { userOp, userOpHash } =
+        advancedEntityId != null
+          ? await buildSignedAdvancedSendUserOp({
+              config,
+              walletAddress: session.address,
+              entityId: advancedEntityId,
+              qx: session.qx,
+              qy: session.qy,
+              recipient: getAddress(recipient),
+              sendAmount,
+              feeAmount: feeAtoms,
+              credentialId: session.credentialId,
+            })
+          : await buildSignedSendUserOp({
+              config,
+              walletAddress: session.address,
+              recipient: getAddress(recipient),
+              sendAmount,
+              feeAmount: feeAtoms,
+              credentialId: session.credentialId,
+            });
       setStatus({ kind: "info", message: t("wallet.sendSubmitting") });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
@@ -123,6 +164,7 @@ export function SendPage() {
         setStatus({
           kind: "success",
           message: t("wallet.sendSuccess", { hash: result.txHash ?? userOpHash }),
+          txHash: result.txHash ?? undefined,
         });
         setRecipient("");
         setAmount("");
@@ -138,7 +180,7 @@ export function SendPage() {
     } finally {
       setBusy(false);
     }
-  }, [amount, config, recipient, session, t]);
+  }, [advancedEntityId, amount, config, navigate, recipient, session, t]);
 
   if (!session) return null;
 
@@ -158,14 +200,17 @@ export function SendPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="send-recipient">{t("wallet.sendRecipient")}</Label>
-              <Input
-                id="send-recipient"
-                className="font-mono"
-                placeholder="0x…"
-                value={recipient}
-                disabled={!deployed || busy}
-                onChange={(e) => setRecipient(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="send-recipient"
+                  className="font-mono"
+                  placeholder="0x…"
+                  value={recipient}
+                  disabled={!deployed || busy}
+                  onChange={(e) => setRecipient(e.target.value)}
+                />
+                <SendScanButton onScan={handleScan} tokenDecimals={tokenDecimals} disabled={!deployed || busy} />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="send-amount">{t("wallet.sendAmountUsdc")}</Label>
@@ -196,11 +241,14 @@ export function SendPage() {
           {status && (
             <p
               role="status"
-              className={`mt-4 text-sm ${
+              className={`mt-4 flex flex-wrap items-center gap-2 text-sm ${
                 status.kind === "error" ? "text-destructive" : status.kind === "success" ? "text-ok" : "text-muted-foreground"
               }`}
             >
-              {status.message}
+              <span>{status.message}</span>
+              {status.txHash && config && (
+                <ExplorerLink chainId={config.chainId} value={status.txHash} kind="tx" />
+              )}
             </p>
           )}
         </PageCard>

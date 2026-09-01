@@ -13,6 +13,16 @@ function extractKey(text, key) {
 
 /** Keys to copy from wallet-en.ts when absent in other locales (English fallback). */
 const keysToSync = [
+  "unlockWrongWallet",
+  "openWalletFailed",
+  "fundsSafeAtAddress",
+  "walletNeedsPasskeyUnlock",
+  "superWalletRestoreEmailTitle",
+  "superWalletRestoreEmailHint",
+  "superWalletRestoreEmailCta",
+  "chooseWalletLede",
+  "passkeyMissingOnDevice",
+  "passkeyPromptPending",
   "yubikeyPinRequiredTitle",
   "yubikeyPinRequiredWhy",
   "yubikeyPinSetupSteps",
@@ -48,6 +58,25 @@ const keysToSync = [
   "keyPublicHint",
   "advancedDevicesBodySuper",
   "advancedDevicesBodySimple",
+  "lock",
+  "allWallets",
+  "emailAttachHint",
+  "emailAttachCta",
+  "testnetAddressWarning",
+  "showAddressQr",
+  "addressQrTitle",
+  "viewAddressExplorer",
+  "viewTxExplorer",
+  "sendScanTitle",
+  "sendScanHint",
+  "cashPartnersTitle",
+  "cashPartnersBody",
+  "otherDevicesHint",
+  "noticeDismiss",
+  "noticePrev",
+  "noticeNext",
+  "networkMismatchLede",
+  "networkMismatchBody",
 ];
 
 for (const file of fs.readdirSync(dir).filter((f) => f.startsWith("wallet-") && f !== "wallet-en.ts")) {
@@ -59,7 +88,9 @@ for (const file of fs.readdirSync(dir).filter((f) => f.startsWith("wallet-") && 
     continue;
   }
   const insert = missing.map((k) => `  ${k}: ${extractKey(enText, k)},`).join("\n");
-  if (text.includes("superWalletNoSigningKey:")) {
+  if (text.includes("signInFailed:")) {
+    text = text.replace(/(^\s+signInFailed:[\s\S]*?,)(\n)/m, `$1\n${insert}$2`);
+  } else if (text.includes("superWalletNoSigningKey:")) {
     text = text.replace(/(^\s+superWalletNoSigningKey:[\s\S]*?,)(\n)/m, `$1\n${insert}$2`);
   } else {
     text = text.replace(/\n\};\s*$/, `\n${insert}\n};\n`);

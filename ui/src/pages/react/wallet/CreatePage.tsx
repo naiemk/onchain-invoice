@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { KeyRound, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { WalletFrame } from "./WalletFrame";
 
 export function CreatePage() {
   const { t } = useLocale();
+  const navigate = useNavigate();
   const [deviceName, setDeviceName] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ kind: "info" | "error" | "success"; message: string } | null>(null);
@@ -29,6 +30,7 @@ export function CreatePage() {
       const result = await createCounterfactualWallet(label);
       setAddress(result.address);
       setStatus({ kind: "success", message: t("wallet.createdCounterfactual") });
+      navigate("/wallet", { replace: true });
     } catch (error) {
       setStatus({
         kind: "error",

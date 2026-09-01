@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, ArrowUp, Building2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageCard, PageSplit } from "@/components/PageSplit";
 import { Money } from "@/components/Money";
@@ -29,12 +29,9 @@ export function CashPage() {
     <WalletFrame current="cash" title={t("wallet.cashPageTitle")} lede={t("wallet.cashPageLede")}>
       <PageSplit>
         <PageCard>
-          <Building2 className="mb-3 h-5 w-5 text-emphasis" aria-hidden />
-          <h2 className="text-base font-semibold">{t("wallet.cashBankTitle")}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{t("wallet.cashBankDetail")}</p>
-          <Button asChild variant="secondary" className="mt-4" size="sm">
-            <Link to="/wallet/deposit">{t("wallet.manageBankAccounts")}</Link>
-          </Button>
+          <CreditCard className="mb-3 h-5 w-5 text-emphasis" aria-hidden />
+          <h2 className="text-base font-semibold">{t("wallet.cashPartnersTitle")}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t("wallet.cashPartnersBody")}</p>
         </PageCard>
 
         <PageCard>

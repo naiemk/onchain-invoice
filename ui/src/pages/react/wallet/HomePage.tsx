@@ -1,23 +1,28 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ActionTile } from "@/components/ActionTile";
+import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { NoticeCarousel, type NoticeItem } from "@/components/NoticeCarousel";
+import { ExplorerLink } from "@/components/ExplorerLink";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletBalance, listDevices } from "@/shared/wallet-api.js";
-import { fetchWalletRecovery } from "@/shared/wallet-recovery-api.js";
+import { fetchWalletEmail, fetchWalletRecovery } from "@/shared/wallet-recovery-api.js";
 import { resolveAdvancedPolicy, listWalletEntities } from "@/shared/wallet-advanced-api.js";
+import { deploymentMode, isTestnet } from "@/shared/networks.js";
 import {
   listWalletRegistry,
+  listWalletRegistryForDeployment,
   loadWalletSession,
-  setActiveWallet,
   shortAddress,
+  WALLET_SESSION_EVENT,
   type WalletSession,
 } from "@/shared/wallet-session.js";
 import { webAuthnSupported } from "@/shared/webauthn.js";
-import { unlockWalletWithPasskey } from "@/shared/wallet-unlock.js";
+import { unlockRegistryWallet, unlockWalletWithPasskey } from "@/shared/wallet-unlock.js";
+import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { isAdvancedMode } from "@/shared/wallet-mode.js";
 import type { WalletBalanceChain } from "../../../../../commerce/shared/wallet.js";
 import { WalletFrame } from "./WalletFrame";
@@ -45,17 +50,56 @@ function ChainBalanceList({ chains, t }: { chains: WalletBalanceChain[]; t: (k: 
   );
 }
 
-function WalletDashboard({ session }: { session: WalletSession }) {
+function EmailAttachCard() {
+  const { t } = useLocale();
+  return (
+    <Alert className="border-primary/30 bg-primary/5">
+      <Mail className="h-4 w-4" />
+      <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <span>{t("wallet.emailAttachHint")}</span>
+        <Button asChild size="sm" variant="secondary">
+          <Link to="/wallet/security#recovery">{t("wallet.emailAttachCta")}</Link>
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function WalletDashboard({ session: initialSession }: { session: WalletSession }) {
   const { t } = useLocale();
   const advanced = isAdvancedMode();
+  const [session, setSession] = useState(initialSession);
+  const [healNotice, setHealNotice] = useState<string | null>(null);
   const [totalUsd, setTotalUsd] = useState(t("wallet.balanceLoading"));
   const [chains, setChains] = useState<WalletBalanceChain[]>([]);
   const [loading, setLoading] = useState(true);
   const [balanceError, setBalanceError] = useState(false);
   const [pendingRecovery, setPendingRecovery] = useState(false);
-  const [advancedHtml, setAdvancedHtml] = useState<ReactNode>(
-    <p className="text-sm text-muted-foreground">{t("wallet.advancedHomeLoading")}</p>
-  );
+  const [showEmailCard, setShowEmailCard] = useState(false);
+  const [notices, setNotices] = useState<NoticeItem[]>([]);
+
+  useEffect(() => {
+    setSession(initialSession);
+  }, [initialSession]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const healed = await healWalletSession(initialSession);
+        if (cancelled) return;
+        setSession(healed.session);
+        if (healed.needsSuperWalletEmail) {
+          setHealNotice(t("wallet.superWalletRestoreEmailHint"));
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSession, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +135,20 @@ function WalletDashboard({ session }: { session: WalletSession }) {
   }, [session.address]);
 
   useEffect(() => {
+    if (advanced) return;
+    void (async () => {
+      try {
+        const policy = await resolveAdvancedPolicy(session.address, false);
+        if (policy.advanced) return;
+        const email = await fetchWalletEmail(session.address);
+        if (!email.hasEmail && !email.verified) setShowEmailCard(true);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [advanced, session.address]);
+
+  useEffect(() => {
     if (!advanced) return;
     void (async () => {
       let deviceCount = 1;
@@ -115,53 +173,57 @@ function WalletDashboard({ session }: { session: WalletSession }) {
         }
       }
       const devicesBodyKey = onChainAdvanced ? "wallet.advancedDevicesBodySuper" : "wallet.advancedDevicesBodySimple";
-      setAdvancedHtml(
-        <div className="grid gap-3 sm:grid-cols-2">
-          {superUnsupported ? (
-            <ActionTile
-              href="/wallet/create"
-              title={t("wallet.superWalletUnsupportedTitle")}
-              description={t("wallet.superWalletUnsupportedBody")}
-              cta={t("wallet.createAnother")}
-            />
-          ) : !onChainAdvanced ? (
-            <ActionTile
-              href="/wallet/super-wallet"
-              title={t("wallet.superWalletHomeCta")}
-              description={t("wallet.superWalletHomeBanner")}
-              cta={t("wallet.superWalletConvertCta")}
-              className="border-primary/30 bg-primary/5"
-            />
-          ) : (
-            <ActionTile
-              href="/wallet/super-wallet"
-              title={t("wallet.superWalletTitle")}
-              description={t("wallet.superWalletActiveShort")}
-              cta={t("wallet.superWalletManage")}
-            />
-          )}
-          <ActionTile
-            href="/wallet/security"
-            title={t("wallet.advancedDevicesTitle")}
-            description={t(devicesBodyKey, { count: deviceCount })}
-          />
-          <ActionTile
-            href="/wallet/recover"
-            title={t("wallet.advancedRecoveryTitle")}
-            description={t("wallet.advancedRecoveryBody")}
-          />
-          <ActionTile
-            href="/merchant"
-            title={t("wallet.advancedInvoicesTitle")}
-            description={t("wallet.advancedInvoicesBody")}
-          />
-          <ActionTile
-            href="/wallet/developers"
-            title={t("wallet.developersTab")}
-            description={t("wallet.advancedDevBody")}
-          />
-        </div>
+      const items: NoticeItem[] = [];
+
+      if (superUnsupported) {
+        items.push({
+          id: "super-unsupported",
+          title: t("wallet.superWalletUnsupportedTitle"),
+          description: t("wallet.superWalletUnsupportedBody"),
+          href: "/wallet/create",
+          cta: t("wallet.createAnother"),
+        });
+      } else if (!onChainAdvanced) {
+        items.push({
+          id: "super-convert",
+          title: t("wallet.superWalletHomeCta"),
+          description: t("wallet.superWalletHomeBanner"),
+          href: "/wallet/super-wallet",
+          cta: t("wallet.superWalletConvertCta"),
+          className: "border-primary/30 bg-primary/5",
+        });
+      } else {
+        items.push({
+          id: "super-manage",
+          title: t("wallet.superWalletTitle"),
+          description: t("wallet.superWalletActiveShort"),
+          href: "/wallet/super-wallet",
+          cta: t("wallet.superWalletManage"),
+        });
+      }
+
+      items.push(
+        {
+          id: "devices",
+          title: t("wallet.advancedDevicesTitle"),
+          description: t(devicesBodyKey, { count: deviceCount }),
+          href: "/wallet/security",
+        },
+        {
+          id: "recovery",
+          title: t("wallet.advancedRecoveryTitle"),
+          description: t("wallet.advancedRecoveryBody"),
+          href: "/wallet/security#recovery",
+        },
+        {
+          id: "invoices",
+          title: t("wallet.advancedInvoicesTitle"),
+          description: t("wallet.advancedInvoicesBody"),
+          href: "/wallet/invoices",
+        }
       );
+
+      setNotices(items);
     })();
   }, [advanced, session.address, session.chainId, t]);
 
@@ -189,17 +251,28 @@ function WalletDashboard({ session }: { session: WalletSession }) {
             </Button>
           </div>
         </div>
+        {!advanced && showEmailCard && <EmailAttachCard />}
+        {healNotice && (
+          <Alert variant="warn">
+            <AlertDescription>
+              {healNotice}{" "}
+              <Link to="/wallet/super-wallet" className="font-medium underline">
+                {t("wallet.superWalletRestoreEmailCta")}
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
         {pendingRecovery && (
           <Alert variant="warn">
             <AlertDescription>
               {t("wallet.pendingRecovery")}{" "}
-              <Link to="/wallet/recover" className="font-medium underline">
+              <Link to="/wallet/security#recovery" className="font-medium underline">
                 {t("wallet.recoverOpen")}
               </Link>
             </AlertDescription>
           </Alert>
         )}
-        {advanced && <div>{advancedHtml}</div>}
+        {advanced && notices.length > 0 && <NoticeCarousel items={notices} />}
         <p className="text-sm text-muted-foreground">
           <span className="font-medium">{t("wallet.thisDeviceChip")}</span>{" "}
           <Link to="/wallet/security" className="text-primary hover:underline">
@@ -234,6 +307,8 @@ function WalletPicker({
   const [status, setStatus] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
 
+  const [openingAddress, setOpeningAddress] = useState<string | null>(null);
+
   useEffect(() => {
     void Promise.all(
       registry.map(async (w) => {
@@ -249,8 +324,17 @@ function WalletPicker({
     });
   }, [registry]);
 
-  const openWallet = (addr: string) => {
-    if (setActiveWallet(addr)) onOpened();
+  const openWallet = async (entry: WalletSession) => {
+    setOpeningAddress(entry.address);
+    setStatus(t("wallet.sendSigning"));
+    try {
+      await unlockRegistryWallet(entry);
+      onOpened();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOpeningAddress(null);
+    }
   };
 
   const unlock = async () => {
@@ -278,12 +362,21 @@ function WalletPicker({
           <button
             key={w.address}
             type="button"
-            onClick={() => openWallet(w.address)}
-            className="flex w-full items-center justify-between gap-4 rounded-lg border p-4 text-left transition-colors hover:border-primary/40"
+            disabled={Boolean(openingAddress) || unlocking}
+            onClick={() => void openWallet(w)}
+            className="flex w-full items-center justify-between gap-4 rounded-lg border p-4 text-left transition-colors hover:border-primary/40 disabled:opacity-60"
           >
             <div>
               <h3 className="font-medium">{w.label}</h3>
-              <p className="font-mono text-sm text-muted-foreground">{shortAddress(w.address)}</p>
+              <p className="flex items-center gap-1 font-mono text-sm text-muted-foreground">
+                {shortAddress(w.address)}
+                <ExplorerLink chainId={w.chainId} value={w.address} />
+              </p>
+              {balances[w.address] != null && Number(balances[w.address]) > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("wallet.fundsSafeAtAddress", { address: shortAddress(w.address) })}
+                </p>
+              )}
             </div>
             <div className="text-right">
               <p className="text-sm">
@@ -291,7 +384,9 @@ function WalletPicker({
                   ? `${balances[w.address]} ${t("wallet.usd")}`
                   : t("wallet.balanceUnavailableShort")}
               </p>
-              <span className="text-xs text-primary">{t("wallet.openWallet")}</span>
+              <span className="text-xs text-primary">
+                {openingAddress === w.address ? t("wallet.sendSigning") : t("wallet.signIn")}
+              </span>
             </div>
           </button>
         ))}
@@ -300,7 +395,7 @@ function WalletPicker({
         <Button asChild variant="outline">
           <Link to="/wallet/create">{t("wallet.createAnother")}</Link>
         </Button>
-        <Button type="button" variant="outline" disabled={unlocking} onClick={() => void unlock()}>
+        <Button type="button" variant="outline" disabled={unlocking || Boolean(openingAddress)} onClick={() => void unlock()}>
           {t("wallet.unlockAnother")}
         </Button>
       </div>
@@ -362,9 +457,34 @@ function WalletEmpty({ onOpened }: { onOpened: () => void }) {
   );
 }
 
+function WalletNetworkMismatch({ count, deploymentIsTestnet }: { count: number; deploymentIsTestnet: boolean }) {
+  const { t } = useLocale();
+  const modeLabel = deploymentIsTestnet ? t("common.testnet") : t("common.mainnet");
+  const otherMode = deploymentIsTestnet ? t("common.mainnet") : t("common.testnet");
+  return (
+    <WalletFrame current="home" showChrome={false} title={t("wallet.chooseWallet")} lede={t("wallet.networkMismatchLede", { mode: modeLabel, other: otherMode })}>
+      <Alert variant="warn">
+        <AlertDescription>
+          {t("wallet.networkMismatchBody", { count, other: otherMode, mode: modeLabel })}
+        </AlertDescription>
+      </Alert>
+      <div className="mt-6">
+        <Button asChild variant="outline">
+          <Link to="/wallet/create">{t("wallet.createAnother")}</Link>
+        </Button>
+      </div>
+    </WalletFrame>
+  );
+}
+
 export function HomePage() {
   const [session, setSession] = useState(() => loadWalletSession());
-  const registry = listWalletRegistry();
+  const deploymentIsTestnet = deploymentMode() === "testnet";
+  const allRegistry = useMemo(() => listWalletRegistry(), [session]);
+  const registry = useMemo(
+    () => listWalletRegistryForDeployment(isTestnet, deploymentIsTestnet),
+    [session, deploymentIsTestnet]
+  );
 
   const refresh = useCallback(() => setSession(loadWalletSession()), []);
 
@@ -372,7 +492,16 @@ export function HomePage() {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const handler = () => refresh();
+    window.addEventListener(WALLET_SESSION_EVENT, handler);
+    return () => window.removeEventListener(WALLET_SESSION_EVENT, handler);
+  }, [refresh]);
+
   if (session) return <WalletDashboard session={session} />;
   if (registry.length > 0) return <WalletPicker registry={registry} onOpened={refresh} />;
+  if (allRegistry.length > 0) {
+    return <WalletNetworkMismatch count={allRegistry.length} deploymentIsTestnet={deploymentIsTestnet} />;
+  }
   return <WalletEmpty onOpened={refresh} />;
 }

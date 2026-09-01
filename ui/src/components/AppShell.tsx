@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Menu, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ const NAV_LINKS = [
   { href: "/wallet", labelKey: "nav.wallet" as const },
   { href: "/get-paid", labelKey: "nav.getPaid" as const },
   { href: "/integrations", labelKey: "nav.integrations" as const },
+  { href: "/developers", labelKey: "nav.developers" as const },
   { href: "/security", labelKey: "nav.security" as const },
 ];
 
@@ -23,6 +24,7 @@ function isActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   if (href !== "/" && pathname.startsWith(href)) return true;
   if (href === "/get-paid" && (pathname.startsWith("/create") || pathname.startsWith("/merchant"))) return true;
+  if (href === "/developers" && pathname.startsWith("/developers")) return true;
   if (href === "/wallet" && pathname.startsWith("/wallet")) return true;
   return false;
 }
@@ -111,6 +113,36 @@ function FooterEnvLine() {
   );
 }
 
+function OpenWorkspaceButton({
+  className,
+  onAfterNavigate,
+}: {
+  className?: string;
+  onAfterNavigate?: () => void;
+}) {
+  const { t } = useLocale();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const openWorkspace = () => {
+    onAfterNavigate?.();
+    const onWalletHome = location.pathname === "/wallet";
+    if (onWalletHome) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("main-content")?.focus();
+      return;
+    }
+    navigate("/wallet");
+  };
+
+  return (
+    <Button type="button" size="sm" className={className} onClick={openWorkspace}>
+      {t("nav.openWorkspace")}
+      <ArrowUpRight className="h-3.5 w-3.5" />
+    </Button>
+  );
+}
+
 function FullFooter() {
   const { t } = useLocale();
   return (
@@ -122,6 +154,10 @@ function FullFooter() {
           <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.docs")}
           </a>
+          <span aria-hidden="true">·</span>
+          <Link to="/developers" className="hover:text-foreground">
+            {t("nav.developers")}
+          </Link>
           <span aria-hidden="true">·</span>
           <a href={SITE.agentSkillUrl} rel="alternate noopener noreferrer" target="_blank" className="hover:text-foreground">
             {t("nav.aiSkill")}
@@ -173,12 +209,7 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
               <div data-app-nav className="flex items-center gap-2 max-md:!hidden">
                 <LocaleSelect />
                 <ThemeToggle />
-                <Button asChild size="sm" className="ms-1">
-                  <Link to="/wallet">
-                    {t("nav.openWorkspace")}
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </Link>
-                </Button>
+                <OpenWorkspaceButton className="ms-1" />
               </div>
               <div data-app-nav-mobile className="ml-auto flex items-center gap-2 md:!hidden">
                 <ThemeToggle />
@@ -197,12 +228,7 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
                     </div>
                     <div className="mt-6 space-y-4">
                       <LocaleSelect />
-                      <Button asChild className="w-full">
-                        <Link to="/wallet" onClick={() => setMobileOpen(false)}>
-                          {t("nav.openWorkspace")}
-                          <ArrowUpRight className="h-3.5 w-3.5" />
-                        </Link>
-                      </Button>
+                      <OpenWorkspaceButton className="w-full" onAfterNavigate={() => setMobileOpen(false)} />
                     </div>
                   </SheetContent>
                 </Sheet>
