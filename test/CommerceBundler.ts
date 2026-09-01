@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { Wallet, getAddress } from "ethers";
+import { Wallet, getAddress, Interface, ZeroAddress } from "ethers";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +11,8 @@ import {
   buildSendBatchCalls,
   encodeExecuteCallData,
   estimateUserOpPrefund,
+  ENTRYPOINT_ABI,
+  userOpExecutionSucceeded,
   type PackedUserOperationJson,
 } from "../commerce/shared/userop.js";
 import { validateSendUserOp, validateUserOpFee } from "../commerce/shared/userop-fee.js";
@@ -77,6 +79,17 @@ describe("commerce bundler + userOp fee", function () {
     });
     // (500k + 350k + 50k) * 1 gwei
     expect(estimateUserOpPrefund(userOp)).to.equal(900_000n * 1_000_000_000n);
+  });
+
+  it("reads UserOperationEvent.success from handleOps logs", function () {
+    const iface = new Interface(ENTRYPOINT_ABI);
+    const hash = "0x" + "ab".repeat(32);
+    const event = iface.getEvent("UserOperationEvent");
+    const failed = iface.encodeEventLog(event, [hash, WALLET, ZeroAddress, 0n, false, 0n, 0n]);
+    const ok = iface.encodeEventLog(event, [hash, WALLET, ZeroAddress, 0n, true, 1n, 1n]);
+    expect(userOpExecutionSucceeded([failed], hash)).to.equal(false);
+    expect(userOpExecutionSucceeded([ok], hash)).to.equal(true);
+    expect(userOpExecutionSucceeded([], hash)).to.equal(false);
   });
 
   it("validates fee-first batch on send userOp", function () {

@@ -10,16 +10,42 @@ import { apiUrl } from "./site.js";
 export interface AdvancedPolicy {
   wallet: string;
   advanced: boolean;
+  /** False when the on-chain clone predates Super Wallet (no `advanced()`). */
+  supportsAdvanced?: boolean;
   threshold: number;
   entityCount: number;
   vetoCount: number;
   vetoBitmap: string;
 }
 
+export function emptyAdvancedPolicy(walletAddress: string, supportsAdvanced: boolean): AdvancedPolicy {
+  return {
+    wallet: walletAddress,
+    advanced: false,
+    supportsAdvanced,
+    threshold: 1,
+    entityCount: 0,
+    vetoCount: 0,
+    vetoBitmap: "0",
+  };
+}
+
 export async function fetchAdvancedPolicy(walletAddress: string): Promise<AdvancedPolicy> {
   const res = await fetch(apiUrl(`/api/wallet/${walletAddress}/advanced-policy`));
   if (!res.ok) throw new Error(`advanced_policy_${res.status}`);
-  return (await res.json()) as AdvancedPolicy;
+  const pol = (await res.json()) as AdvancedPolicy;
+  return { ...pol, supportsAdvanced: pol.supportsAdvanced !== false };
+}
+
+/** Read on-chain policy; a deployed wallet that fails the read is an old implementation. */
+export async function resolveAdvancedPolicy(walletAddress: string, deployed: boolean): Promise<AdvancedPolicy> {
+  try {
+    return await fetchAdvancedPolicy(walletAddress);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "";
+    if (msg === "advanced_policy_503") return emptyAdvancedPolicy(walletAddress, true);
+    return emptyAdvancedPolicy(walletAddress, !deployed);
+  }
 }
 
 export async function listWalletEntities(walletAddress: string): Promise<{

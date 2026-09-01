@@ -16,15 +16,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLocale } from "@/providers/LocaleProvider";
-import { fetchWalletConfig, waitForUserOp } from "@/shared/wallet-api.js";
+import { fetchWalletBalance, fetchWalletConfig, waitForUserOp } from "@/shared/wallet-api.js";
 import {
   approveKeyEnrollmentRequest,
-  fetchAdvancedPolicy,
   listKeyEnrollmentRequests,
   listWalletEntities,
   registerWalletEntity,
   registerWalletEntityKey,
   rejectKeyEnrollmentRequest,
+  resolveAdvancedPolicy,
   type AdvancedPolicy,
 } from "@/shared/wallet-advanced-api.js";
 import {
@@ -69,6 +69,7 @@ type StatusKind = "info" | "error" | "success";
 function StatusMessage({ kind, message }: { kind: StatusKind; message: string }) {
   return (
     <p
+      id="super-status"
       role="status"
       className={
         kind === "error"
@@ -103,17 +104,10 @@ export function SuperWalletPage() {
 
   const adminEntity = entities[0] ?? null;
 
-  const refresh = useCallback(async (sess: WalletSession, cfg: WalletPublicConfig) => {
-    const pol =
-      (await fetchAdvancedPolicy(sess.address).catch(() => null)) ??
-      ({
-        wallet: sess.address,
-        advanced: false,
-        threshold: 1,
-        entityCount: 0,
-        vetoCount: 0,
-        vetoBitmap: "0",
-      } satisfies AdvancedPolicy);
+  const refresh = useCallback(async (sess: WalletSession, _cfg: WalletPublicConfig) => {
+    const balance = await fetchWalletBalance(sess.address).catch(() => null);
+    const deployed = balance?.chains.some((c) => c.deployed) ?? false;
+    const pol = await resolveAdvancedPolicy(sess.address, deployed);
 
     setPolicy(pol);
     setThreshold(pol.threshold);
@@ -195,6 +189,8 @@ export function SuperWalletPage() {
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
       if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
+      const confirmed = await resolveAdvancedPolicy(session.address, true);
+      if (!confirmed.advanced) throw new Error(t("wallet.superWalletUpgradeFailed"));
       await registerWalletEntity({ walletAddress: session.address, entityId: adminEntityId, label: email });
       await registerWalletEntityKey({
         walletAddress: session.address,
@@ -443,14 +439,19 @@ export function SuperWalletPage() {
 
   if (!session) return null;
 
+  const canUpgrade = Boolean(policy?.supportsAdvanced !== false);
+
   return (
     <WalletFrame current="superWallet" title={t("wallet.superWalletTitle")} lede={t("wallet.superWalletLede")}>
+      {status && <StatusMessage kind={status.kind} message={status.message} />}
       {loading ? (
         <div className="space-y-4">
           <Skeleton className="h-8 w-2/3" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-10 w-40" />
         </div>
+      ) : !policy?.advanced && !canUpgrade ? (
+        <UnsupportedSection t={t} />
       ) : !policy?.advanced ? (
         <UpgradeSection
           t={t}
@@ -481,8 +482,6 @@ export function SuperWalletPage() {
           busy={busy}
         />
       )}
-
-      {status && <StatusMessage kind={status.kind} message={status.message} />}
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
@@ -579,6 +578,20 @@ function UpgradeSection({
           · {t("wallet.pairStepsTitle")}
         </p>
       </section>
+    </div>
+  );
+}
+
+function UnsupportedSection({ t }: { t: (k: string) => string }) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-lg font-semibold">{t("wallet.superWalletUnsupportedTitle")}</h2>
+      <Alert variant="warn">
+        <AlertDescription>{t("wallet.superWalletUnsupportedBody")}</AlertDescription>
+      </Alert>
+      <Button asChild>
+        <Link to="/wallet/create">{t("wallet.createAnother")}</Link>
+      </Button>
     </div>
   );
 }

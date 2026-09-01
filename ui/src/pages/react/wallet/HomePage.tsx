@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletBalance, listDevices } from "@/shared/wallet-api.js";
 import { fetchWalletRecovery } from "@/shared/wallet-recovery-api.js";
-import { fetchAdvancedPolicy, listWalletEntities } from "@/shared/wallet-advanced-api.js";
+import { resolveAdvancedPolicy, listWalletEntities } from "@/shared/wallet-advanced-api.js";
 import {
   listWalletRegistry,
   loadWalletSession,
@@ -95,25 +95,36 @@ function WalletDashboard({ session }: { session: WalletSession }) {
     void (async () => {
       let deviceCount = 1;
       let onChainAdvanced = false;
+      let superUnsupported = false;
       try {
         deviceCount = (await listDevices(session.address, session.chainId)).length || 1;
       } catch {
         deviceCount = 1;
       }
-      try {
-        const policy = await fetchAdvancedPolicy(session.address);
-        onChainAdvanced = policy.advanced;
-        if (onChainAdvanced) {
+      const balance = await fetchWalletBalance(session.address).catch(() => null);
+      const deployed = balance?.chains.some((c) => c.deployed) ?? false;
+      const policy = await resolveAdvancedPolicy(session.address, deployed);
+      onChainAdvanced = policy.advanced;
+      superUnsupported = !onChainAdvanced && policy.supportsAdvanced === false;
+      if (onChainAdvanced) {
+        try {
           const roster = await listWalletEntities(session.address);
           deviceCount = Math.max(roster.keys.length, roster.entities.length, 1);
+        } catch {
+          /* keep deviceCount */
         }
-      } catch {
-        onChainAdvanced = false;
       }
       const devicesBodyKey = onChainAdvanced ? "wallet.advancedDevicesBodySuper" : "wallet.advancedDevicesBodySimple";
       setAdvancedHtml(
         <div className="grid gap-3 sm:grid-cols-2">
-          {!onChainAdvanced ? (
+          {superUnsupported ? (
+            <ActionTile
+              href="/wallet/create"
+              title={t("wallet.superWalletUnsupportedTitle")}
+              description={t("wallet.superWalletUnsupportedBody")}
+              cta={t("wallet.createAnother")}
+            />
+          ) : !onChainAdvanced ? (
             <ActionTile
               href="/wallet/super-wallet"
               title={t("wallet.superWalletHomeCta")}

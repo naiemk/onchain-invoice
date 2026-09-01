@@ -320,6 +320,29 @@ async function getAdvancedPolicy(
     return;
   }
   const provider = new JsonRpcProvider(chain.rpcUrl);
+  let code: string;
+  try {
+    code = await provider.getCode(wallet);
+  } catch (error) {
+    handlers.sendJson(res, 400, {
+      error: "policy_read_failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+  const undeployed = code === "0x" || code === "0x0";
+  if (undeployed) {
+    handlers.sendJson(res, 200, {
+      wallet,
+      advanced: false,
+      supportsAdvanced: true,
+      threshold: 1,
+      entityCount: 0,
+      vetoCount: 0,
+      vetoBitmap: "0",
+    });
+    return;
+  }
   const contract = new Contract(wallet, WALLET_POLICY_ABI, provider);
   try {
     const [advanced, threshold, entityCount, vetoCount, vetoBitmap] = await Promise.all([
@@ -332,15 +355,22 @@ async function getAdvancedPolicy(
     handlers.sendJson(res, 200, {
       wallet,
       advanced: Boolean(advanced),
+      supportsAdvanced: true,
       threshold: Number(threshold),
       entityCount: Number(entityCount),
       vetoCount: Number(vetoCount),
       vetoBitmap: vetoBitmap.toString(),
     });
-  } catch (error) {
-    handlers.sendJson(res, 400, {
-      error: "policy_read_failed",
-      message: error instanceof Error ? error.message : String(error),
+  } catch {
+    // Clones of the pre-Super-Wallet implementation revert on advanced().
+    handlers.sendJson(res, 200, {
+      wallet,
+      advanced: false,
+      supportsAdvanced: false,
+      threshold: 1,
+      entityCount: 0,
+      vetoCount: 0,
+      vetoBitmap: "0",
     });
   }
 }

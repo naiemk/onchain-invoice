@@ -83,6 +83,46 @@ test.describe("Super Wallet UI", () => {
     await expect(dialog).not.toBeVisible();
   });
 
+  test("hides convert when the wallet implementation lacks Super Wallet", async ({ page }) => {
+    await addVirtualAuthenticator(page, "platform");
+    await page.goto("/wallet/create");
+    await page.getByTestId("device-name").fill("E2E Passkey");
+    await page.getByTestId("wallet-create-btn").click();
+    await expect(page.locator("#created-address")).toContainText("0x");
+
+    await page.route("**/api/wallet/**/advanced-policy", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          wallet: "0x96aa0c5a047a3602882d72ad0ab4b080f3c0bc7b",
+          advanced: false,
+          supportsAdvanced: false,
+          threshold: 1,
+          entityCount: 0,
+          vetoCount: 0,
+          vetoBitmap: "0",
+        }),
+      });
+    });
+    await page.route("**/api/wallet/balance**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          wallet: "0x96aa0c5a047a3602882d72ad0ab4b080f3c0bc7b",
+          totalUsdc: "0",
+          totalUsd: "$0",
+          chains: [{ chainId: "11155111", networkLabel: "Sepolia", balance: "0", balanceUsd: "$0", deployed: true, feeTokenSymbol: "USDC" }],
+        }),
+      });
+    });
+
+    await page.goto("/wallet/super-wallet");
+    await expect(page.getByRole("heading", { name: "This wallet cannot become a Super Wallet" })).toBeVisible();
+    await expect(page.locator("#enable-advanced")).toHaveCount(0);
+  });
+
   test("shows entity key enrollment controls after upgrade section", async ({ page }) => {
     await addVirtualAuthenticator(page, "platform");
     await page.goto("/wallet/create");
