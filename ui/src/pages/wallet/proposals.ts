@@ -3,11 +3,11 @@ import { t } from "../../i18n/t.js";
 import { loadWalletSession } from "../../shared/webauthn.js";
 import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import {
-  bindWalletAccountBar,
+  paintWalletLoading,
+  paintWalletPage,
   setButtonLoading,
   showStatus,
-  walletFrame,
-  walletLoadingFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 import {
@@ -27,7 +27,7 @@ import { KEY_EOA } from "../../../../commerce/shared/advanced-wallet.js";
 import { isAdvancedMode } from "../../shared/wallet-mode.js";
 import { connectEoaWallet, getConnectedEoaAddress, initEoaConnector } from "../../shared/eoa-connector.js";
 
-export async function renderWalletProposals(root: HTMLElement): Promise<void> {
+export async function renderWalletProposals(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
@@ -35,8 +35,7 @@ export async function renderWalletProposals(root: HTMLElement): Promise<void> {
     return;
   }
 
-  root.innerHTML = walletLoadingFrame("send", t("wallet.proposalsTitle"));
-  bindWalletAccountBar(root);
+  paintWalletLoading(root, "send", t("wallet.proposalsTitle"), undefined, opts);
 
   const config = await fetchWalletConfig();
   await initEoaConnector(config);
@@ -54,11 +53,13 @@ export async function renderWalletProposals(root: HTMLElement): Promise<void> {
   const params = new URLSearchParams(location.search);
   const showCreate = params.get("create") === "1";
 
-  root.innerHTML = walletFrame({
-    current: "send",
-    title: t("wallet.proposalsTitle"),
-    lede: t("wallet.proposalsLede", { threshold: String(policy.threshold) }),
-    body: `
+  paintWalletPage(
+    root,
+    {
+      current: "send",
+      title: t("wallet.proposalsTitle"),
+      lede: t("wallet.proposalsLede", { threshold: String(policy.threshold) }),
+      body: `
       <section>
         <h2>${escapeHtml(t("wallet.proposalsInbox"))}</h2>
         ${
@@ -99,50 +100,51 @@ export async function renderWalletProposals(root: HTMLElement): Promise<void> {
       }
       <div id="proposal-detail" class="hidden"></div>
       <p id="proposal-status" class="status wallet-status" role="status"></p>`,
-  });
-
-  bindWalletAccountBar(root);
-
-  root.querySelector("#create-proposal")?.addEventListener("click", async () => {
-    const status = root.querySelector<HTMLElement>("#proposal-status");
-    const recipient = (root.querySelector<HTMLInputElement>("#prop-recipient")?.value ?? "").trim();
-    const amountRaw = (root.querySelector<HTMLInputElement>("#prop-amount")?.value ?? "").trim();
-    if (!isAddress(recipient)) {
-      showStatus(status, t("wallet.sendInvalidRecipient"), "error");
-      return;
-    }
-    const chain = config.chains.find((c) => c.chainId === config.chainId)!;
-    if (!chain.feeTokenAddress) {
-      showStatus(status, t("wallet.sendNotDeployed"), "error");
-      return;
-    }
-    try {
-      const sendAmount = parseUsdcInput(amountRaw, config.feeTokenDecimals);
-      const data = encodeErc20Transfer(getAddress(recipient), sendAmount);
-      const proposal = await createProposal({
-        walletAddress: session.address,
-        chainId: config.chainId,
-        target: chain.feeTokenAddress,
-        value: "0",
-        data,
+    },
+    opts,
+    (r) => {
+      r.querySelector("#create-proposal")?.addEventListener("click", async () => {
+        const status = r.querySelector<HTMLElement>("#proposal-status");
+        const recipient = (r.querySelector<HTMLInputElement>("#prop-recipient")?.value ?? "").trim();
+        const amountRaw = (r.querySelector<HTMLInputElement>("#prop-amount")?.value ?? "").trim();
+        if (!isAddress(recipient)) {
+          showStatus(status, t("wallet.sendInvalidRecipient"), "error");
+          return;
+        }
+        const chain = config.chains.find((c) => c.chainId === config.chainId)!;
+        if (!chain.feeTokenAddress) {
+          showStatus(status, t("wallet.sendNotDeployed"), "error");
+          return;
+        }
+        try {
+          const sendAmount = parseUsdcInput(amountRaw, config.feeTokenDecimals);
+          const data = encodeErc20Transfer(getAddress(recipient), sendAmount);
+          const proposal = await createProposal({
+            walletAddress: session.address,
+            chainId: config.chainId,
+            target: chain.feeTokenAddress,
+            value: "0",
+            data,
+          });
+          spaNavigate(`/wallet/proposals?id=${proposal.id}`, "replace");
+        } catch (error) {
+          showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        }
       });
-      spaNavigate(`/wallet/proposals?id=${proposal.id}`, "replace");
-    } catch (error) {
-      showStatus(status, error instanceof Error ? error.message : String(error), "error");
+
+      r.querySelectorAll("[data-open]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = (btn as HTMLElement).dataset.open!;
+          void openProposalDetail(r, session, config, id, policy.threshold);
+        });
+      });
+
+      const openId = params.get("id");
+      if (openId) {
+        void openProposalDetail(r, session, config, openId, policy.threshold);
+      }
     }
-  });
-
-  root.querySelectorAll("[data-open]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = (btn as HTMLElement).dataset.open!;
-      void openProposalDetail(root, session, config, id, policy.threshold);
-    });
-  });
-
-  const openId = params.get("id");
-  if (openId) {
-    void openProposalDetail(root, session, config, openId, policy.threshold);
-  }
+  );
 }
 
 async function openProposalDetail(

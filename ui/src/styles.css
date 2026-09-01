@@ -87,7 +87,8 @@ html[data-theme="dark"] {
   box-sizing: border-box;
 }
 
-body {
+/* body styles neutralized — Quiet Operator owns document chrome */
+body.tc-legacy-unused {
   margin: 0;
   min-height: 100vh;
   background:
@@ -97,12 +98,12 @@ body {
   color: var(--ink);
 }
 
-a {
+.legacy-page a {
   color: var(--accent);
   text-decoration: none;
 }
 
-a:hover {
+.legacy-page a:hover {
   text-decoration: underline;
 }
 
@@ -203,7 +204,7 @@ html[dir="rtl"] .locale-switch select {
 }
 
 .brand,
-nav {
+.legacy-page nav {
   align-items: center;
   display: flex;
   gap: 0.85rem;
@@ -236,19 +237,19 @@ nav {
   width: 100%;
 }
 
-nav a {
+.legacy-page nav a {
   color: var(--ink-muted);
   font-size: 0.95rem;
   font-weight: 500;
   text-decoration: none;
 }
 
-nav a:hover {
+.legacy-page nav a:hover {
   color: var(--ink);
   text-decoration: none;
 }
 
-main {
+.legacy-page-main-unused {
   padding: 0 clamp(1rem, 4vw, 3rem) 4rem;
 }
 
@@ -935,8 +936,8 @@ select {
 }
 
 /* Buttons */
-button,
-.tc-btn {
+.legacy-page button,
+.legacy-page .tc-btn {
   align-items: center;
   background: var(--accent);
   border: 1px solid transparent;
@@ -953,38 +954,38 @@ button,
   transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-button:hover,
-.tc-btn:hover {
+.legacy-page button:hover,
+.legacy-page .tc-btn:hover {
   background: var(--accent-hover);
   text-decoration: none;
   transform: translateY(-1px);
 }
 
-button:active,
-.tc-btn:active {
+.legacy-page button:active,
+.legacy-page .tc-btn:active {
   transform: none;
 }
 
-button.secondary,
-.tc-btn.secondary {
+.legacy-page button.secondary,
+.legacy-page .tc-btn.secondary {
   background: var(--bg-elevated);
   border-color: var(--line-strong);
   color: var(--ink);
 }
 
-button.secondary:hover,
-.tc-btn.secondary:hover {
+.legacy-page button.secondary:hover,
+.legacy-page .tc-btn.secondary:hover {
   background: var(--surface-muted);
 }
 
-button.ghost,
-.tc-btn.ghost {
+.legacy-page button.ghost,
+.legacy-page .tc-btn.ghost {
   background: transparent;
   border-color: transparent;
   color: var(--accent);
 }
 
-button:disabled {
+.legacy-page button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
   transform: none;
@@ -1371,7 +1372,7 @@ button:disabled {
 }
 
 .pay-more-item,
-button.pay-more-item {
+.legacy-page button.pay-more-item {
   background: transparent;
   border: none;
   border-radius: 7px;
@@ -1391,7 +1392,7 @@ button.pay-more-item {
 }
 
 .pay-more-item:hover,
-button.pay-more-item:hover {
+.legacy-page button.pay-more-item:hover {
   background: var(--surface-muted);
   transform: none;
 }
@@ -1965,7 +1966,7 @@ body.modal-open {
   padding: 1rem 1.35rem 1.25rem;
 }
 
-nav a[aria-current="page"] {
+.legacy-page nav a[aria-current="page"] {
   color: var(--ink);
   font-weight: 600;
 }

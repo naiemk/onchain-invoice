@@ -6,7 +6,7 @@ import { WalletBodyMount } from "./WalletBodyMount";
 export function ProposalsPage() {
   const { t } = useLocale();
   return (
-    <WalletFrame current="send" title={t("wallet.proposalsTitle")}>
+    <WalletFrame current="superWallet" title={t("wallet.proposalsTitle")}>
       <WalletBodyMount render={renderWalletProposals} />
     </WalletFrame>
   );

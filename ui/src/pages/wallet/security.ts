@@ -30,14 +30,14 @@ import {
 } from "../../shared/userop-client.js";
 import {
   bindCopyButtons,
-  bindWalletAccountBar,
   formatKeyFingerprint,
+  paintWalletLoading,
+  paintWalletPage,
   renderYubiKeyPinRequiredPanel,
   setButtonLoading,
   shortKey,
   showStatus,
-  walletFrame,
-  walletLoadingFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 import { fetchWalletEmail } from "../../shared/wallet-recovery-api.js";
@@ -48,7 +48,7 @@ const WALLET_ABI = [
   "function pendingOwner() view returns (bytes32 qx, bytes32 qy, uint64 executableAt, bytes32 requestId, bool active)",
 ];
 
-export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
+export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
@@ -56,8 +56,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
     return;
   }
 
-  root.innerHTML = walletLoadingFrame("security", t("wallet.devicesTab"), t("wallet.pairRequired"));
-  bindWalletAccountBar(root);
+  paintWalletLoading(root, "security", t("wallet.devicesTab"), t("wallet.pairRequired"), opts);
 
   let devices: Awaited<ReturnType<typeof listDevices>> = [];
   let pendingRecovery = false;
@@ -105,7 +104,9 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
     null;
   const others = devices.filter((d) => d !== current);
 
-  root.innerHTML = walletFrame({
+  paintWalletPage(
+    root,
+    {
     current: "security",
     title: t("wallet.devicesTab"),
     lede: t("wallet.pairRequired"),
@@ -217,13 +218,13 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
           : ""
       }
       <p id="security-status" class="status wallet-status" role="status"></p>`,
-  });
-
-  bindWalletAccountBar(root);
-  bindCopyButtons(root);
+    },
+    opts,
+    (r) => {
+  bindCopyButtons(r);
 
   void (async () => {
-    const el = root.querySelector<HTMLElement>("#security-email-status");
+    const el = r.querySelector<HTMLElement>("#security-email-status");
     if (!el || onChainAdvanced) return;
     try {
       const email = await fetchWalletEmail(session.address);
@@ -239,13 +240,13 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
     }
   })();
 
-  root.querySelector("#security-cancel-recovery")?.addEventListener("click", () => {
+  r.querySelector("#security-cancel-recovery")?.addEventListener("click", () => {
     spaNavigate("/wallet/recover");
   });
 
-  root.querySelector("#invite-teammate-qr")?.addEventListener("click", async () => {
-    const box = root.querySelector<HTMLElement>("#join-qr-box");
-    const btn = root.querySelector<HTMLButtonElement>("#invite-teammate-qr");
+  r.querySelector("#invite-teammate-qr")?.addEventListener("click", async () => {
+    const box = r.querySelector<HTMLElement>("#join-qr-box");
+    const btn = r.querySelector<HTMLButtonElement>("#invite-teammate-qr");
     if (!box) return;
     setButtonLoading(btn, true);
     try {
@@ -275,10 +276,10 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
     }
   });
 
-  root.querySelector("#add-security-key")?.addEventListener("click", async () => {
+  r.querySelector("#add-security-key")?.addEventListener("click", async () => {
     if (onChainAdvanced) return;
-    const status = root.querySelector<HTMLElement>("#security-status");
-    const btn = root.querySelector<HTMLButtonElement>("#add-security-key");
+    const status = r.querySelector<HTMLElement>("#security-status");
+    const btn = r.querySelector<HTMLButtonElement>("#add-security-key");
     setButtonLoading(btn, true);
     try {
       showStatus(status, t("wallet.superWalletEnrollYubiKey"));
@@ -307,10 +308,10 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
       });
       const { upsertWalletSession } = await import("../../shared/wallet-session.js");
       upsertWalletSession({ ...session, securityKeyCredentialId: key.credentialId });
-      await renderWalletSecurity(root);
+      await renderWalletSecurity(r, opts);
     } catch (error) {
       if (isYubiKeyPinRequiredError(error)) {
-        const help = root.querySelector<HTMLElement>("#yubikey-pin-help");
+        const help = r.querySelector<HTMLElement>("#yubikey-pin-help");
         if (help) {
           help.classList.remove("hidden");
           help.innerHTML = renderYubiKeyPinRequiredPanel();
@@ -325,9 +326,9 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
   });
 
   if (!onChainAdvanced) {
-  root.querySelector("#add-device-qr")?.addEventListener("click", async () => {
-    const box = root.querySelector<HTMLElement>("#pair-qr-box");
-    const btn = root.querySelector<HTMLButtonElement>("#add-device-qr");
+  r.querySelector("#add-device-qr")?.addEventListener("click", async () => {
+    const box = r.querySelector<HTMLElement>("#pair-qr-box");
+    const btn = r.querySelector<HTMLButtonElement>("#add-device-qr");
     if (!box) return;
     setButtonLoading(btn, true);
     try {
@@ -375,7 +376,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
         closed = true;
         if (interval != null) clearInterval(interval);
         if (countdownTimer != null) clearInterval(countdownTimer);
-        const status = root.querySelector<HTMLElement>("#security-status");
+        const status = r.querySelector<HTMLElement>("#security-status");
         showStatus(status, message, kind);
         box.innerHTML = "";
         box.classList.add("hidden");
@@ -419,7 +420,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
           }
           if (p.status === "consumed") {
             await stopPairingUi(t("wallet.pairConsumed"), "info");
-            await renderWalletSecurity(root);
+            await renderWalletSecurity(r, opts);
             return;
           }
           if (p.status === "approved" && p.newOwnerQx && p.newOwnerQy && approve && !approve.dataset.armed) {
@@ -443,7 +444,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
               })();
             });
             approve.querySelector("#confirm-add-owner")?.addEventListener("click", async () => {
-              const status = root.querySelector<HTMLElement>("#security-status");
+              const status = r.querySelector<HTMLElement>("#security-status");
               try {
                 showStatus(status, t("wallet.sendSigning"));
                 const cfg = await fetchWalletConfig();
@@ -470,7 +471,7 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
                 });
                 closed = true;
                 if (interval != null) clearInterval(interval);
-                await renderWalletSecurity(root);
+                await renderWalletSecurity(r, opts);
               } catch (error) {
                 showStatus(status, error instanceof Error ? error.message : String(error), "error");
               }
@@ -487,9 +488,9 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
   }
 
   if (!onChainAdvanced) {
-  root.querySelectorAll("[data-remove]").forEach((btn) => {
+  r.querySelectorAll("[data-remove]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const status = root.querySelector<HTMLElement>("#security-status");
+      const status = r.querySelector<HTMLElement>("#security-status");
       const [qx, qy] = (btn as HTMLElement).dataset.remove!.split("|");
       if (!window.confirm(t("wallet.removeConfirm"))) return;
       try {
@@ -508,13 +509,15 @@ export async function renderWalletSecurity(root: HTMLElement): Promise<void> {
         const result = await waitForUserOp(userOpHash);
         if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
         await deleteDevice(session.address, session.chainId, qx, qy);
-        await renderWalletSecurity(root);
+        await renderWalletSecurity(r, opts);
       } catch (error) {
         showStatus(status, error instanceof Error ? error.message : String(error), "error");
       }
     });
   });
   }
+    }
+  );
 }
 
 function renderAdvancedKeys(keys: Awaited<ReturnType<typeof listWalletEntities>>["keys"]): string {

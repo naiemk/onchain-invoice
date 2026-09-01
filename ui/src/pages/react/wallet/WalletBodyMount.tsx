@@ -3,46 +3,50 @@ import type { WalletRenderOptions } from "@/shared/wallet-ui.js";
 
 type LegacyRenderer = (root: HTMLElement, opts?: WalletRenderOptions) => void | Promise<void>;
 
-/** Strip wallet chrome duplicated by React WalletFrame after a full legacy render. */
+/**
+ * Remove React-duplicated chrome without destroying event listeners.
+ * Move live nodes — never assign innerHTML from another tree.
+ */
 function stripLegacyWalletChrome(container: HTMLElement): void {
-  container.querySelector(".wallet-account-bar")?.remove();
-  container.querySelector(".wallet-subnav-row")?.remove();
-  container.querySelector(".wallet-panel-title")?.remove();
-  container.querySelector(".wallet-panel-lede")?.remove();
-  container.querySelector(".page-header.wallet-page-header")?.remove();
+  for (const sel of [
+    ".wallet-account-bar",
+    ".wallet-subnav-row",
+    ".wallet-panel-title",
+    ".wallet-panel-lede",
+    ".page-header.wallet-page-header",
+  ]) {
+    container.querySelector(sel)?.remove();
+  }
 
   const panel = container.querySelector(".wallet-panel, .wallet-panel-unlocked, .wallet-panel-empty");
-  if (panel && panel.parentElement === container) {
-    container.innerHTML = panel.innerHTML;
-    return;
-  }
-  if (panel) {
-    const body = document.createElement("div");
-    body.innerHTML = panel.innerHTML;
-    container.innerHTML = "";
-    while (body.firstChild) container.appendChild(body.firstChild);
-  }
+  if (!panel) return;
+
+  const children = Array.from(panel.childNodes);
+  container.replaceChildren(...children);
 }
 
-/** Mount legacy wallet page body during React migration. */
+/** Mount legacy wallet page body during React migration (preserves bound listeners). */
 export function WalletBodyMount({ render }: { render: LegacyRenderer }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.innerHTML = "";
+    el.replaceChildren();
     const mount = document.createElement("div");
     el.appendChild(mount);
 
+    let cancelled = false;
     void Promise.resolve(render(mount, { frameless: true })).then(() => {
-      if (!el.isConnected) return;
+      if (cancelled || !el.isConnected) return;
       stripLegacyWalletChrome(mount);
-      el.innerHTML = mount.innerHTML;
+      // Keep the same DOM nodes that received addEventListener
+      el.replaceChildren(...Array.from(mount.childNodes));
     });
 
     return () => {
-      el.innerHTML = "";
+      cancelled = true;
+      el.replaceChildren();
     };
   }, [render]);
 

@@ -8,11 +8,11 @@ import {
 import { saveMemberWalletSession } from "../../shared/wallet-session.js";
 import { spaNavigate } from "../../shared/spa-render.js";
 import {
-  bindWalletAccountBar,
+  paintWalletPage,
   renderYubiKeyPinRequiredPanel,
   setButtonLoading,
   showStatus,
-  walletFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 import {
@@ -37,7 +37,7 @@ import { passkeyToKeyFields } from "../../shared/advanced-userop-client.js";
 
 const POLL_MS = 2500;
 
-export async function renderWalletJoinSuper(root: HTMLElement): Promise<void> {
+export async function renderWalletJoinSuper(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const join = parseSuperJoinFromUrl();
   if (!join) {
     spaNavigate("/wallet", "replace");
@@ -56,20 +56,26 @@ export async function renderWalletJoinSuper(root: HTMLElement): Promise<void> {
   await initEoaConnector(config);
   const policy = await fetchAdvancedPolicy(walletAddress).catch(() => null);
   if (!policy?.advanced) {
-    root.innerHTML = walletFrame({
-      current: "pair",
-      title: t("wallet.joinSuperTitle"),
-      lede: t("wallet.joinSuperNotAdvanced"),
-      body: `<p class="field-hint">${escapeHtml(t("wallet.joinSuperNotAdvancedHint"))}</p>`,
-    });
+    paintWalletPage(
+      root,
+      {
+        current: "pair",
+        title: t("wallet.joinSuperTitle"),
+        lede: t("wallet.joinSuperNotAdvanced"),
+        body: `<p class="field-hint">${escapeHtml(t("wallet.joinSuperNotAdvancedHint"))}</p>`,
+      },
+      opts
+    );
     return;
   }
 
-  root.innerHTML = walletFrame({
-    current: "pair",
-    title: t("wallet.joinSuperTitle"),
-    lede: t("wallet.joinSuperLede"),
-    body: `
+  paintWalletPage(
+    root,
+    {
+      current: "pair",
+      title: t("wallet.joinSuperTitle"),
+      lede: t("wallet.joinSuperLede"),
+      body: `
       <p class="field-hint mono faint">${escapeHtml(walletAddress)}</p>
       <div class="field">
         <label for="join-email">${escapeHtml(t("wallet.joinSuperEmail"))}</label>
@@ -85,126 +91,127 @@ export async function renderWalletJoinSuper(root: HTMLElement): Promise<void> {
         <p class="field-hint">${escapeHtml(t("wallet.joinSuperWaiting"))}</p>
       </div>
       <p id="join-status" class="status wallet-status" role="status"></p>`,
-  });
+    },
+    opts,
+    (r) => {
+      const showYubiHelp = () => {
+        const box = r.querySelector<HTMLElement>("#join-yubikey-help");
+        if (box) {
+          box.classList.remove("hidden");
+          box.innerHTML = renderYubiKeyPinRequiredPanel();
+        }
+      };
 
-  bindWalletAccountBar(root);
+      const enroll = async (
+        keyType: number,
+        material: {
+          qx: string;
+          qy: string;
+          eoa: string;
+          credentialId?: string;
+          rawId?: string;
+        }
+      ) => {
+        const status = r.querySelector<HTMLElement>("#join-status");
+        const email = (r.querySelector<HTMLInputElement>("#join-email")?.value ?? "").trim();
+        if (!email) {
+          showStatus(status, t("wallet.superWalletEmailRequired"), "error");
+          return;
+        }
+        const entityId = hashEntityEmail(email);
+        const roster = await listWalletEntities(walletAddress);
+        if (!roster.entities.some((e) => e.entityId === entityId)) {
+          showStatus(status, t("wallet.joinSuperEntityMissing"), "error");
+          return;
+        }
+        showStatus(status, t("wallet.joinSuperSubmitting"));
+        const request = await createKeyEnrollmentRequest({
+          walletAddress,
+          entityId,
+          keyType,
+          qx: material.qx,
+          qy: material.qy,
+          eoa: material.eoa,
+          credentialId: material.credentialId ?? null,
+          label: email,
+        });
+        r.querySelector("#join-wait")?.classList.remove("hidden");
+        await pollUntilApproved(r, walletAddress, join.chainId, request.id, {
+          entityId,
+          keyType,
+          ...material,
+          label: email,
+        });
+      };
 
-  const showYubiHelp = () => {
-    const box = root.querySelector<HTMLElement>("#join-yubikey-help");
-    if (box) {
-      box.classList.remove("hidden");
-      box.innerHTML = renderYubiKeyPinRequiredPanel();
-    }
-  };
-
-  const enroll = async (
-    keyType: number,
-    material: {
-      qx: string;
-      qy: string;
-      eoa: string;
-      credentialId?: string;
-      rawId?: string;
-    }
-  ) => {
-    const status = root.querySelector<HTMLElement>("#join-status");
-    const email = (root.querySelector<HTMLInputElement>("#join-email")?.value ?? "").trim();
-    if (!email) {
-      showStatus(status, t("wallet.superWalletEmailRequired"), "error");
-      return;
-    }
-    const entityId = hashEntityEmail(email);
-    const roster = await listWalletEntities(walletAddress);
-    if (!roster.entities.some((e) => e.entityId === entityId)) {
-      showStatus(status, t("wallet.joinSuperEntityMissing"), "error");
-      return;
-    }
-    showStatus(status, t("wallet.joinSuperSubmitting"));
-    const request = await createKeyEnrollmentRequest({
-      walletAddress,
-      entityId,
-      keyType,
-      qx: material.qx,
-      qy: material.qy,
-      eoa: material.eoa,
-      credentialId: material.credentialId ?? null,
-      label: email,
-    });
-    root.querySelector("#join-wait")?.classList.remove("hidden");
-    await pollUntilApproved(root, walletAddress, join.chainId, request.id, {
-      entityId,
-      keyType,
-      ...material,
-      label: email,
-    });
-  };
-
-  root.querySelector("#join-passkey")?.addEventListener("click", async () => {
-    const btn = root.querySelector<HTMLButtonElement>("#join-passkey");
-    setButtonLoading(btn, true);
-    try {
-      const passkey = await createPasskey(t("wallet.joinSuperPasskeyLabel"), { attachment: "platform" });
-      const fields = passkeyToKeyFields(passkey);
-      await enroll(KEY_WEBAUTHN, {
-        qx: fields.qx,
-        qy: fields.qy,
-        eoa: zeroPadValue("0x00", 20),
-        credentialId: fields.credentialId,
-        rawId: passkey.rawId,
+      r.querySelector("#join-passkey")?.addEventListener("click", async () => {
+        const btn = r.querySelector<HTMLButtonElement>("#join-passkey");
+        setButtonLoading(btn, true);
+        try {
+          const passkey = await createPasskey(t("wallet.joinSuperPasskeyLabel"), { attachment: "platform" });
+          const fields = passkeyToKeyFields(passkey);
+          await enroll(KEY_WEBAUTHN, {
+            qx: fields.qx,
+            qy: fields.qy,
+            eoa: zeroPadValue("0x00", 20),
+            credentialId: fields.credentialId,
+            rawId: passkey.rawId,
+          });
+        } catch (error) {
+          const status = r.querySelector<HTMLElement>("#join-status");
+          showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        } finally {
+          setButtonLoading(btn, false);
+        }
       });
-    } catch (error) {
-      const status = root.querySelector<HTMLElement>("#join-status");
-      showStatus(status, error instanceof Error ? error.message : String(error), "error");
-    } finally {
-      setButtonLoading(btn, false);
-    }
-  });
 
-  root.querySelector("#join-yubikey")?.addEventListener("click", async () => {
-    const btn = root.querySelector<HTMLButtonElement>("#join-yubikey");
-    setButtonLoading(btn, true);
-    try {
-      const passkey = await createSecurityKey(t("wallet.joinSuperYubiKeyLabel"));
-      const fields = passkeyToKeyFields(passkey);
-      await enroll(KEY_YUBIKEY, {
-        qx: fields.qx,
-        qy: fields.qy,
-        eoa: zeroPadValue("0x00", 20),
-        credentialId: fields.credentialId,
-        rawId: passkey.rawId,
+      r.querySelector("#join-yubikey")?.addEventListener("click", async () => {
+        const btn = r.querySelector<HTMLButtonElement>("#join-yubikey");
+        setButtonLoading(btn, true);
+        try {
+          const passkey = await createSecurityKey(t("wallet.joinSuperYubiKeyLabel"));
+          const fields = passkeyToKeyFields(passkey);
+          await enroll(KEY_YUBIKEY, {
+            qx: fields.qx,
+            qy: fields.qy,
+            eoa: zeroPadValue("0x00", 20),
+            credentialId: fields.credentialId,
+            rawId: passkey.rawId,
+          });
+        } catch (error) {
+          const status = r.querySelector<HTMLElement>("#join-status");
+          if (isYubiKeyPinRequiredError(error)) {
+            showYubiHelp();
+            showStatus(status, t("wallet.yubikeyPinRequiredTitle"), "error");
+          } else {
+            showStatus(status, error instanceof Error ? error.message : String(error), "error");
+          }
+        } finally {
+          setButtonLoading(btn, false);
+        }
       });
-    } catch (error) {
-      const status = root.querySelector<HTMLElement>("#join-status");
-      if (isYubiKeyPinRequiredError(error)) {
-        showYubiHelp();
-        showStatus(status, t("wallet.yubikeyPinRequiredTitle"), "error");
-      } else {
-        showStatus(status, error instanceof Error ? error.message : String(error), "error");
-      }
-    } finally {
-      setButtonLoading(btn, false);
-    }
-  });
 
-  root.querySelector("#join-eoa")?.addEventListener("click", async () => {
-    const btn = root.querySelector<HTMLButtonElement>("#join-eoa");
-    setButtonLoading(btn, true);
-    try {
-      const eoa = getAddress(await connectEoaWallet());
-      await enroll(KEY_EOA, {
-        qx: zeroPadValue("0x00", 32),
-        qy: zeroPadValue("0x00", 32),
-        eoa,
-        credentialId: "",
-        rawId: "",
+      r.querySelector("#join-eoa")?.addEventListener("click", async () => {
+        const btn = r.querySelector<HTMLButtonElement>("#join-eoa");
+        setButtonLoading(btn, true);
+        try {
+          const eoa = getAddress(await connectEoaWallet());
+          await enroll(KEY_EOA, {
+            qx: zeroPadValue("0x00", 32),
+            qy: zeroPadValue("0x00", 32),
+            eoa,
+            credentialId: "",
+            rawId: "",
+          });
+        } catch (error) {
+          const status = r.querySelector<HTMLElement>("#join-status");
+          showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        } finally {
+          setButtonLoading(btn, false);
+        }
       });
-    } catch (error) {
-      const status = root.querySelector<HTMLElement>("#join-status");
-      showStatus(status, error instanceof Error ? error.message : String(error), "error");
-    } finally {
-      setButtonLoading(btn, false);
     }
-  });
+  );
 }
 
 async function pollUntilApproved(

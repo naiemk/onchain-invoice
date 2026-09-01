@@ -66,7 +66,7 @@ export function CreatePage() {
         >
           {loading ? t("wallet.creatingPasskey") : t("wallet.createPasskey")}
         </Button>
-        <Button asChild variant="secondary">
+        <Button asChild variant="outline">
           <Link to="/wallet">{t("wallet.cancel")}</Link>
         </Button>
       </div>
@@ -77,7 +77,7 @@ export function CreatePage() {
             <code id="created-address" className="break-all font-mono text-sm">
               {address}
             </code>
-            <Button type="button" variant="secondary" size="sm" onClick={() => void copyText(address)}>
+            <Button type="button" variant="outline" size="sm" onClick={() => void copyText(address)}>
               {t("wallet.copy")}
             </Button>
           </div>

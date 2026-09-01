@@ -116,10 +116,10 @@ export function GuardianPage() {
   if (!address) {
     return (
       <div className="mx-auto max-w-lg px-4 py-10 md:px-8">
-        <header className="mb-8 space-y-2">
-          <p className="text-sm font-medium uppercase tracking-wider text-primary">{t("guardian.eyebrow")}</p>
-          <h1 className="text-3xl font-semibold tracking-tight">{t("guardian.title")}</h1>
-          <p className="text-muted-foreground">{t("guardian.lede")}</p>
+        <header className="mb-6 space-y-1.5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("guardian.eyebrow")}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("guardian.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("guardian.lede")}</p>
         </header>
         <Card>
           <CardContent className="space-y-4 pt-6">
@@ -151,7 +151,7 @@ export function GuardianPage() {
             {(["awaiting", "progress", "archive"] as const).map((f) => (
               <Button
                 key={f}
-                variant={filter === f ? "default" : "secondary"}
+                variant={filter === f ? "default" : "outline"}
                 size="sm"
                 onClick={() => {
                   setFilter(f);
