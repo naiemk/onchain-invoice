@@ -77,12 +77,29 @@ const keysToSync = [
   "noticeNext",
   "networkMismatchLede",
   "networkMismatchBody",
+  "createAcceptTerms",
+  "createAcceptSecurityChecks",
+  "createDisclaimerStep1Title",
+  "createDisclaimerStep1Body",
+  "createDisclaimerStep2Title",
+  "createDisclaimerStep2Body",
+  "createDisclaimerStep3Title",
+  "createDisclaimerStep3Body",
+  "createDisclaimerProgress",
+  "createDisclaimerNext",
+  "createDisclaimerBack",
+  "createDisclaimerSkip",
+  "createDisclaimerFinish",
 ];
+
+function hasKey(text, key) {
+  return new RegExp(`^\\s+${key}:`, "m").test(text);
+}
 
 for (const file of fs.readdirSync(dir).filter((f) => f.startsWith("wallet-") && f !== "wallet-en.ts")) {
   const p = path.join(dir, file);
   let text = fs.readFileSync(p, "utf8");
-  const missing = keysToSync.filter((k) => !text.includes(`${k}:`));
+  const missing = keysToSync.filter((k) => !hasKey(text, k));
   if (missing.length === 0) {
     console.log("skip", file);
     continue;

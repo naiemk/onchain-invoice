@@ -252,6 +252,22 @@ export const walletEn = {
   createStepPasskey: "Create a passkey",
   createStepPasskeyHint: "Your device becomes the key — no seed phrase to store.",
   createStepWorkspace: "Name your workspace",
+  createAcceptTerms: "I agree to the Terms of Use",
+  createAcceptSecurityChecks: "I have read the Security checks",
+  createDisclaimerStep1Title: "Non-custodial wallet",
+  createDisclaimerStep1Body:
+    "This is software, not a bank. USDC and USDT sit on-chain at your wallet address. Trustless Commerce cannot see, freeze, or send your funds. The passkey on this device is the authority to sign.",
+  createDisclaimerStep2Title: "Protect your funds",
+  createDisclaimerStep2Body:
+    "If this is your only device, losing it can mean losing the wallet. Add another device via pairing before you need it. iCloud or Google passkey sync alone is not enough.",
+  createDisclaimerStep3Title: "WebAuthn security",
+  createDisclaimerStep3Body:
+    "Wallet signing keys are created in this device's secure hardware (platform authenticator). They are unlocked only by this device's biometrics or PIN. We never receive fingerprint, face data, or the private key.",
+  createDisclaimerProgress: "Step {current} of {total}",
+  createDisclaimerNext: "Next",
+  createDisclaimerBack: "Back",
+  createDisclaimerSkip: "Skip",
+  createDisclaimerFinish: "Create wallet",
   createTestnetWallet: "Create testnet wallet",
   counterfactualShort: "How counterfactual deployment works",
   receiveLede: "Share this address or QR to receive USDC. Same address on every configured EVM network.",

@@ -143,37 +143,75 @@ function OpenWorkspaceButton({
   );
 }
 
+function FooterLinkSep() {
+  return <span aria-hidden="true">·</span>;
+}
+
+function LegalFooterLinks() {
+  const { t } = useLocale();
+  return (
+    <>
+      <Link to="/terms" className="hover:text-foreground">
+        {t("footer.terms")}
+      </Link>
+      <FooterLinkSep />
+      <Link to="/privacy" className="hover:text-foreground">
+        {t("footer.privacy")}
+      </Link>
+      <FooterLinkSep />
+      <Link to="/cookies" className="hover:text-foreground">
+        {t("footer.cookies")}
+      </Link>
+      <FooterLinkSep />
+      <Link to="/risks" className="hover:text-foreground">
+        {t("footer.risks")}
+      </Link>
+      <FooterLinkSep />
+      <Link to="/security-checks" className="hover:text-foreground">
+        {t("footer.securityChecks")}
+      </Link>
+    </>
+  );
+}
+
 function FullFooter() {
   const { t } = useLocale();
   return (
     <footer className="border-t bg-background/80 px-4 py-8 text-sm text-muted-foreground md:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <span className="font-medium text-foreground">{t("brand")}</span>
-        <FooterEnvLine />
-        <div className="flex flex-wrap gap-x-3 gap-y-1 sm:justify-end">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span className="font-medium text-foreground">{t("brand")}</span>
+          <FooterEnvLine />
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
           <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.docs")}
           </a>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
           <Link to="/developers" className="hover:text-foreground">
             {t("nav.developers")}
           </Link>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
           <a href={SITE.agentSkillUrl} rel="alternate noopener noreferrer" target="_blank" className="hover:text-foreground">
             {t("nav.aiSkill")}
           </a>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
           <a href={SITE.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.github")}
           </a>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
           <a href={SITE.telegramChannel} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.telegram")}
           </a>
-          <span aria-hidden="true">·</span>
+          <FooterLinkSep />
           <a href={SITE.telegramSupport} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             {t("nav.support")}
           </a>
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <span className="font-medium text-foreground">{t("footer.legal")}</span>
+          <FooterLinkSep />
+          <LegalFooterLinks />
         </div>
       </div>
     </footer>
@@ -248,11 +286,21 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
       </main>
       {minimal ? (
         <footer className="border-t px-4 py-4 text-sm text-muted-foreground">
-          <div className="mx-auto flex max-w-6xl justify-between">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span>{t("brand")}</span>
-            <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
-              {t("nav.docs")}
-            </a>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
+                {t("nav.docs")}
+              </a>
+              <FooterLinkSep />
+              <Link to="/terms" className="hover:text-foreground">
+                {t("footer.terms")}
+              </Link>
+              <FooterLinkSep />
+              <Link to="/privacy" className="hover:text-foreground">
+                {t("footer.privacy")}
+              </Link>
+            </div>
           </div>
         </footer>
       ) : (

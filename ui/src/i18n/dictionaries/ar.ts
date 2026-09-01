@@ -17,6 +17,7 @@ export const ar = {
     support: "الدعم",
     getPaid: "استلم المدفوعات",
     security: "الأمان",
+    developers: "Developers",
     openWorkspace: "Open workspace",
   },
 
@@ -52,6 +53,18 @@ export const ar = {
     adminDescription: "نظرة عامة على إدارة المنصة.",
     guardianTitle: "Guardian · Trustless Commerce",
     guardianDescription: "راجع طلبات استعادة المحفظة المستضافة.",
+    legalTitle: "Legal · Trustless Commerce",
+    legalDescription: "Legal documents for Trustless Commerce.",
+    termsTitle: "Terms of Use · Trustless Commerce",
+    termsDescription: "Terms governing use of Trustless Commerce software and services.",
+    privacyTitle: "Privacy Policy · Trustless Commerce",
+    privacyDescription: "How Trustless Commerce handles your information.",
+    cookiesTitle: "Cookie Notice · Trustless Commerce",
+    cookiesDescription: "How Trustless Commerce uses browser storage.",
+    risksTitle: "Risk Disclosures · Trustless Commerce",
+    risksDescription: "Important risks when using non-custodial crypto wallets.",
+    securityChecksTitle: "Security checks · Trustless Commerce",
+    securityChecksDescription: "How Trustless Commerce handles wallets and what to verify.",
   },
 
   common: {
@@ -748,5 +761,20 @@ export const ar = {
   wallet: walletAr,
   footer: {
     settlementLine: "Settlement bound to your merchant wallet",
+    legal: "Legal",
+    terms: "Terms",
+    privacy: "Privacy",
+    cookies: "Cookies",
+    risks: "Risks",
+    securityChecks: "Security checks",
+  },
+
+  legal: {
+    breadcrumb: "Legal",
+    hubTitle: "Legal documents",
+    hubLede: "Terms, privacy, and security information for Trustless Commerce.",
+    hubLink: "← All legal documents",
+    lastUpdated: "Last updated",
+    englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
 } satisfies Messages;
