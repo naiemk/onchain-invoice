@@ -90,6 +90,7 @@ export const walletRu = {
     "Адрес кошелька детерминирован во всех EVM-сетях. Он активируется автоматически при поступлении USDC — транзакция деплоя не нужна.",
   defaultDevice: "Моё устройство",
   signInFailed: "Разблокировка не удалась или отменена.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

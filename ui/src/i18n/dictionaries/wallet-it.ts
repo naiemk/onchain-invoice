@@ -91,6 +91,7 @@ export const walletIt = {
     "Il tuo indirizzo wallet è deterministico su tutte le catene EVM. Si attiva automaticamente all’arrivo di USDC — nessuna transazione di deploy necessaria.",
   defaultDevice: "Il mio dispositivo",
   signInFailed: "Sblocco non riuscito o annullato.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

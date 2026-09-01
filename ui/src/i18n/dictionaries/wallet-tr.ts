@@ -89,6 +89,7 @@ export const walletTr = {
     "Cüzdan adresiniz tüm EVM zincirlerinde deterministiktir. USDC geldiğinde otomatik etkinleşir — deploy işlemi gerekmez.",
   defaultDevice: "Cihazım",
   signInFailed: "Kilit açma başarısız veya iptal edildi.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

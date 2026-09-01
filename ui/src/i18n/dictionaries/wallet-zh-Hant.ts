@@ -82,6 +82,7 @@ export const walletZhHant = {
   counterfactualCallout: "您的錢包地址在所有 EVM 鏈上是確定性的。USDC 到達後自動啟用 — 無需部署交易。",
   defaultDevice: "我的裝置",
   signInFailed: "解鎖失敗或已取消。",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

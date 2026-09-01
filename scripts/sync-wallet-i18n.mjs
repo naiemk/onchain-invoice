@@ -90,6 +90,7 @@ const keysToSync = [
   "createDisclaimerBack",
   "createDisclaimerSkip",
   "createDisclaimerFinish",
+  "createCaptchaRequired",
 ];
 
 function hasKey(text, key) {

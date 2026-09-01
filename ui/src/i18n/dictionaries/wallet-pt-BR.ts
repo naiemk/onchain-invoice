@@ -89,6 +89,7 @@ export const walletPtBR = {
     "Seu endereço de carteira é determinístico em todas as redes EVM. Ativa automaticamente quando o USDC chega — sem transação de deploy.",
   defaultDevice: "Meu dispositivo",
   signInFailed: "Desbloqueio falhou ou foi cancelado.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

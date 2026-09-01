@@ -87,6 +87,7 @@ export const walletTh = {
     "ที่อยู่วอลเล็ตของคุณเป็นแบบกำหนดได้บนทุกเชน EVM จะเปิดใช้งานอัตโนมัติเมื่อ USDC มาถึง — ไม่ต้องทำธุรกรรม deploy",
   defaultDevice: "อุปกรณ์ของฉัน",
   signInFailed: "ปลดล็อกล้มเหลวหรือถูกยกเลิก",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

@@ -90,6 +90,7 @@ export const walletDe = {
     "Ihre Wallet-Adresse ist auf allen EVM-Chains deterministisch. Sie aktiviert sich automatisch, wenn USDC ankommt — keine Deploy-Transaktion nötig.",
   defaultDevice: "Mein Gerät",
   signInFailed: "Entsperren fehlgeschlagen oder abgebrochen.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

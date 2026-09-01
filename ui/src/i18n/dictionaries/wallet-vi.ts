@@ -87,6 +87,7 @@ export const walletVi = {
     "Địa chỉ ví của bạn xác định trên mọi chuỗi EVM. Tự động kích hoạt khi USDC đến — không cần giao dịch deploy.",
   defaultDevice: "Thiết bị của tôi",
   signInFailed: "Mở khóa thất bại hoặc đã hủy.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

@@ -89,6 +89,7 @@ export const walletMs = {
     "Alamat dompet anda adalah deterministik merentas semua rantai EVM. Ia diaktifkan secara automatik apabila USDC tiba — tiada transaksi deploy diperlukan.",
   defaultDevice: "Peranti saya",
   signInFailed: "Pembukaan kunci gagal atau dibatalkan.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

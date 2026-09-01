@@ -90,6 +90,7 @@ export const walletNl = {
     "Je walletadres is deterministisch op alle EVM-chains. Het activeert automatisch wanneer USDC aankomt — geen deploy-transactie nodig.",
   defaultDevice: "Mijn apparaat",
   signInFailed: "Ontgrendelen mislukt of geannuleerd.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

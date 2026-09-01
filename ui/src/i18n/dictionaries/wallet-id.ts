@@ -90,6 +90,7 @@ export const walletId = {
     "Alamat dompet Anda deterministik di semua rantai EVM. Aktif otomatis saat USDC tiba — tidak perlu transaksi deploy.",
   defaultDevice: "Perangkat saya",
   signInFailed: "Pembukaan kunci gagal atau dibatalkan.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

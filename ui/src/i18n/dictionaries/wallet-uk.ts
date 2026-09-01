@@ -90,6 +90,7 @@ export const walletUk = {
     "Адреса гаманця детермінована в усіх EVM-мережах. Вона активується автоматично після надходження USDC — транзакція деплою не потрібна.",
   defaultDevice: "Мій пристрій",
   signInFailed: "Розблокування не вдалося або скасовано.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

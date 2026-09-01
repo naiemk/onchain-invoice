@@ -89,6 +89,7 @@ export const walletHi = {
     "आपका वॉलेट पता सभी EVM चेन पर निर्धारक है। USDC आने पर स्वतः सक्रिय होता है — कोई डिप्लॉय ट्रांज़ैक्शन आवश्यक नहीं।",
   defaultDevice: "मेरा डिवाइस",
   signInFailed: "अनलॉक विफल या रद्द।",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

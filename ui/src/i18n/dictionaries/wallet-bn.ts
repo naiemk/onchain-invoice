@@ -88,6 +88,7 @@ export const walletBn = {
     "আপনার ওয়ালেট ঠিকানা সব EVM চেইনে নির্ধারিত। USDC এলে স্বয়ংক্রিয়ভাবে সক্রিয় হয় — কোনো ডিপ্লয় লেনদেন লাগে না।",
   defaultDevice: "আমার ডিভাইস",
   signInFailed: "আনলক ব্যর্থ বা বাতিল।",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

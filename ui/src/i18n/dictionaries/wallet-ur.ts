@@ -88,6 +88,7 @@ export const walletUr = {
     "آپ کا والیٹ ایڈریس تمام EVM چینز پر تعیناتی ہے۔ USDC آنے پر خود کار فعال ہوتا ہے — ڈپلائے ٹرانزیکشن کی ضرورت نہیں۔",
   defaultDevice: "میری ڈیوائس",
   signInFailed: "ان لاک ناکام یا منسوخ۔",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

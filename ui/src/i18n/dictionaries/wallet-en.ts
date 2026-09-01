@@ -199,6 +199,7 @@ export const walletEn = {
   recoverCancelled: "Recovery cancelled.",
   recoverInvalidEmail: "Enter a valid email address.",
   recoverCaptchaRequired: "Complete the captcha first.",
+  createCaptchaRequired: "Complete the captcha first.",
   recoverNeedWalletOrEmail: "Enter a wallet address or verified email.",
   recoverNeedRequest: "Submit a recovery request first.",
   recoverRequestStatus: "Recovery request: {status}",

@@ -19,6 +19,7 @@ import {
 } from "../shared/onramper.js";
 import { confirmOnramperOfframpTransaction } from "../shared/onramper-confirm.js";
 import type { CommerceDb } from "./db.js";
+import { verifyCaptcha } from "./captcha.js";
 import { registerWalletAdvancedRoutes } from "./wallet-advanced-routes.js";
 
 const PAIRING_TTL_MS = 5 * 60 * 1000;
@@ -118,6 +119,13 @@ export function registerWalletRoutes(
 
     if (req.method === "POST" && url.pathname === "/api/wallet/accounts") {
       const body = await handlers.readJson(req);
+      if (appConfig.turnstileSecret) {
+        const captchaOk = await verifyCaptcha(appConfig, body.captchaToken, req.socket.remoteAddress);
+        if (!captchaOk) {
+          handlers.sendJson(res, 400, { error: "captcha_failed" });
+          return true;
+        }
+      }
       const ownerQx = normalizeHex32(str(body.ownerQx));
       const ownerQy = normalizeHex32(str(body.ownerQy));
       const salt = normalizeHex32(str(body.salt));

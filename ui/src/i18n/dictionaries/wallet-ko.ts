@@ -82,6 +82,7 @@ export const walletKo = {
   counterfactualCallout: "지갑 주소는 모든 EVM 체인에서 결정론적입니다. USDC가 도착하면 자동으로 활성화되며 — 배포 트랜잭션이 필요 없습니다.",
   defaultDevice: "내 기기",
   signInFailed: "잠금 해제에 실패했거나 취소되었습니다.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

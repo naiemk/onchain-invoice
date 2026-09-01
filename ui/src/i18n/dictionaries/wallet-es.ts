@@ -91,6 +91,7 @@ export const walletEs = {
     "Tu dirección de cartera es determinista en todas las cadenas EVM. Se activa automáticamente cuando llega USDC — no hace falta una transacción de despliegue.",
   defaultDevice: "Mi dispositivo",
   signInFailed: "Desbloqueo fallido o cancelado.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

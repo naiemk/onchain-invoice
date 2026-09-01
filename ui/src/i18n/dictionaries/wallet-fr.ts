@@ -94,6 +94,7 @@ export const walletFr = {
     "Votre adresse est déterministe sur toutes les chaînes EVM. Elle s’active automatiquement à l’arrivée d’USDC — aucune transaction de déploiement nécessaire.",
   defaultDevice: "Mon appareil",
   signInFailed: "Déverrouillage échoué ou annulé.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

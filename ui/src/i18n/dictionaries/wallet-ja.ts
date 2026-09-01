@@ -82,6 +82,7 @@ export const walletJa = {
   counterfactualCallout: "ウォレットアドレスはすべての EVM チェーンで決定論的です。USDC が届くと自動的に有効化され — デプロイトランザクションは不要です。",
   defaultDevice: "マイデバイス",
   signInFailed: "ロック解除に失敗したか、キャンセルされました。",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

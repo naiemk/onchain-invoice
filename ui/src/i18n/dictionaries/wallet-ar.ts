@@ -87,6 +87,7 @@ export const walletAr = {
     "عنوان محفظتك حتمي عبر كل شبكات EVM. يُفعَّل تلقائيًا عند وصول USDC — بلا معاملة نشر.",
   defaultDevice: "جهازي",
   signInFailed: "فشل الفتح أو أُلغي.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

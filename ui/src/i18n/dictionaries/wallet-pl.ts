@@ -90,6 +90,7 @@ export const walletPl = {
     "Adres portfela jest deterministyczny we wszystkich sieciach EVM. Aktywuje się automatycznie po nadejściu USDC — bez transakcji wdrożenia.",
   defaultDevice: "Moje urządzenie",
   signInFailed: "Odblokowanie nie powiodło się lub zostało anulowane.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

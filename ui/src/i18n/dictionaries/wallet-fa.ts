@@ -89,6 +89,7 @@ export const walletFa = {
     "آدرس کیف پول شما در همه زنجیره‌های EVM قطعی است. با رسیدن USDC خودکار فعال می‌شود — بدون تراکنش استقرار.",
   defaultDevice: "دستگاه من",
   signInFailed: "باز کردن ناموفق یا لغو شد.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",

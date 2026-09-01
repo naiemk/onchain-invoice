@@ -83,6 +83,7 @@ export const walletHe = {
     "כתובת הארנק דטרמיניסטית בכל רשתות EVM. מופעלת אוטומטית כשמגיע USDC — בלי עסקת פריסה.",
   defaultDevice: "המכשיר שלי",
   signInFailed: "הפתיחה נכשלה או בוטלה.",
+  createCaptchaRequired: "Complete the captcha first.",
   lock: "Lock wallet",
   createAcceptTerms: "I agree to the Terms of Use",
   createAcceptSecurityChecks: "I have read the Security checks",
