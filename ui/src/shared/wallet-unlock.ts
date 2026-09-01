@@ -109,7 +109,7 @@ async function sessionFromAuth(
       ));
 
     if (!credKnown && !ownerMatch) {
-      throw new Error(t("wallet.unlockWrongWallet"));
+      throw Object.assign(new Error(t("wallet.unlockWrongWallet")), { code: "wrong_wallet" });
     }
 
     const session: WalletSession = {
@@ -186,7 +186,7 @@ async function sessionFromAuth(
  */
 export async function unlockWalletWithPasskey(): Promise<WalletSession> {
   const auth = await authenticatePasskey();
-  if (!auth) throw new Error(t("wallet.signInFailed"));
+  if (!auth) throw new Error(t("wallet.passkeyCancelled"));
   return sessionFromAuth(auth);
 }
 
@@ -196,6 +196,6 @@ export async function unlockRegistryWallet(entry: WalletSession): Promise<Wallet
   const auth = await authenticatePasskey(
     prepared.credentialId?.trim() ? { credentialId: prepared.credentialId } : undefined
   );
-  if (!auth) throw new Error(t("wallet.signInFailed"));
+  if (!auth) throw new Error(t("wallet.passkeyCancelled"));
   return sessionFromAuth(auth, prepared);
 }

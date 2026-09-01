@@ -5,6 +5,7 @@ import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/
 import {
   listWalletRegistry,
   loadWalletSession,
+  formatPasskeyError,
   webAuthnSupported,
 } from "../../shared/webauthn.js";
 import { unlockRegistryWallet, unlockWalletWithPasskey } from "../../shared/wallet-unlock.js";
@@ -281,7 +282,7 @@ function bindPickerActions(root: HTMLElement): void {
       await unlockRegistryWallet(entry);
       spaNavigate("/wallet", "replace");
     } catch (error) {
-      showStatus(status, error instanceof Error ? error.message : String(error), "error");
+      showStatus(status, formatPasskeyError(error), "error");
     }
   };
   root.querySelector(".wallet-picker-list")?.addEventListener("click", (ev) => {
@@ -308,7 +309,7 @@ function bindUnlock(root: HTMLElement): void {
       await unlockWalletWithPasskey();
       spaNavigate("/wallet", "replace");
     } catch (error) {
-      showStatus(status, error instanceof Error ? error.message : String(error), "error");
+      showStatus(status, formatPasskeyError(error), "error");
     }
   });
 }

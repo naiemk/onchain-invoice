@@ -20,7 +20,7 @@ import {
 } from "@/shared/wallet-recover-local.js";
 import { unlockRegistryWallet } from "@/shared/wallet-unlock.js";
 import { saveWalletSession, shortAddress, type WalletSession } from "@/shared/wallet-session.js";
-import { ensureSessionCredential } from "@/shared/webauthn.js";
+import { ensureSessionCredential, formatPasskeyError } from "@/shared/webauthn.js";
 
 type Props = {
   open: boolean;
@@ -38,13 +38,11 @@ function isLocalRecoveryError(error: unknown): boolean {
 
 export function isUnlockRecoveryError(error: unknown): boolean {
   if (isLocalRecoveryError(error)) return true;
-  if (!(error instanceof Error)) return false;
-  const msg = error.message;
-  return (
-    msg.includes("No wallet found for this passkey") ||
-    msg.includes("different wallet") ||
-    msg.includes("does not have your wallet passkey")
-  );
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: string }).code;
+    return code === "wrong_wallet" || code === "passkey_missing";
+  }
+  return false;
 }
 
 export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecovered }: Props) {
@@ -105,7 +103,7 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
         setStatus(t("wallet.localRecoveryDbFound"));
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(formatPasskeyError(error));
     } finally {
       setBusy(false);
     }
@@ -125,7 +123,7 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
       onRecovered();
       onOpenChange(false);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(formatPasskeyError(error));
     } finally {
       setBusy(false);
     }
@@ -175,7 +173,7 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
       onRecovered();
       onOpenChange(false);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(formatPasskeyError(error));
     } finally {
       setBusy(false);
     }

@@ -20,7 +20,7 @@ import {
   WALLET_SESSION_EVENT,
   type WalletSession,
 } from "@/shared/wallet-session.js";
-import { webAuthnSupported } from "@/shared/webauthn.js";
+import { formatPasskeyError, webAuthnSupported } from "@/shared/webauthn.js";
 import { unlockRegistryWallet, unlockWalletWithPasskey } from "@/shared/wallet-unlock.js";
 import { LocalRecoverySheet, isUnlockRecoveryError } from "@/components/LocalRecoverySheet";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
@@ -343,7 +343,7 @@ function WalletPicker({
         openRecovery(entry);
         setStatus(null);
       } else {
-        setStatus(error instanceof Error ? error.message : String(error));
+        setStatus(formatPasskeyError(error));
       }
     } finally {
       setOpeningAddress(null);
@@ -361,7 +361,7 @@ function WalletPicker({
         openRecovery();
         setStatus(null);
       } else {
-        setStatus(error instanceof Error ? error.message : String(error));
+        setStatus(formatPasskeyError(error));
       }
     } finally {
       setUnlocking(false);
@@ -444,7 +444,7 @@ function WalletEmpty({ onOpened }: { onOpened: () => void }) {
       await unlockWalletWithPasskey();
       onOpened();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(formatPasskeyError(error));
     } finally {
       setUnlocking(false);
     }

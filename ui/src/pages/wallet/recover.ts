@@ -3,6 +3,7 @@ import { fetchWalletConfig } from "../../shared/wallet-api.js";
 import {
   assertPasskeyChallenge,
   createPasskey,
+  formatPasskeyError,
   loadWalletSession,
   webAuthnSupported,
 } from "../../shared/webauthn.js";
@@ -258,7 +259,7 @@ async function bindRecoverBody(
         showStatus(status, t("wallet.recoverOtpSent"), "info");
         captchas.attach?.reset();
       } catch (error) {
-        showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        showStatus(status, formatPasskeyError(error), "error");
       } finally {
         setButtonLoading(btn, false);
       }
@@ -285,7 +286,7 @@ async function bindRecoverBody(
         showStatus(status, t("wallet.recoverEmailOk"), "success");
         await renderWalletRecover(root, opts);
       } catch (error) {
-        showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        showStatus(status, formatPasskeyError(error), "error");
       }
     })();
   });
@@ -339,7 +340,7 @@ async function bindRecoverBody(
         }
         captchas.lost?.reset();
       } catch (error) {
-        showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        showStatus(status, formatPasskeyError(error), "error");
       } finally {
         setButtonLoading(btn, false);
       }
@@ -364,7 +365,7 @@ async function bindRecoverBody(
         showStatus(status, t("wallet.recoverSubmitted"), "success");
         await renderWalletRecover(root, opts);
       } catch (error) {
-        showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        showStatus(status, formatPasskeyError(error), "error");
       }
     })();
   });
@@ -399,7 +400,7 @@ async function bindRecoverBody(
         showStatus(status, t("wallet.recoverCancelled"), "success");
         await renderWalletRecover(root, opts);
       } catch (error) {
-        showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        showStatus(status, formatPasskeyError(error), "error");
       } finally {
         setButtonLoading(btn, false);
       }

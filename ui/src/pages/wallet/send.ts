@@ -8,7 +8,7 @@ import {
   waitForUserOp,
 } from "../../shared/wallet-api.js";
 import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
-import { loadWalletSession } from "../../shared/webauthn.js";
+import { formatPasskeyError, loadWalletSession } from "../../shared/webauthn.js";
 import {
   buildSignedSendUserOp,
   submitSignedUserOp,
@@ -177,7 +177,7 @@ async function runSend(
     }
     showStatus(status, result.rejectReason ?? t("wallet.sendFailed"), "error");
   } catch (error) {
-    showStatus(status, error instanceof Error ? error.message : String(error), "error");
+    showStatus(status, formatPasskeyError(error), "error");
   } finally {
     setButtonLoading(btn, false);
   }
