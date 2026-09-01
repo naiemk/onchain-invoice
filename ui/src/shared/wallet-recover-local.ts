@@ -1,0 +1,93 @@
+import { apiUrl } from "./site.js";
+import { assertPasskeyChallenge } from "./webauthn.js";
+import type { WalletAccountRecord } from "../../../commerce/shared/wallet.js";
+
+export type WalletRecoverInfo = {
+  wallet: string;
+  chainId: string;
+  inDb: boolean;
+  deployed: boolean;
+  ownersOnChain: { qx: string; qy: string }[];
+  balanceUsd: string;
+  hasFunds: boolean;
+  account: {
+    address: string;
+    ownerQx: string;
+    ownerQy: string;
+    deployedChains: string[];
+  } | null;
+};
+
+async function readError(res: Response): Promise<string> {
+  const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+  return body.message ?? body.error ?? `request failed (${res.status})`;
+}
+
+export async function fetchRecoverInfo(
+  walletAddress: string,
+  chainId: string
+): Promise<WalletRecoverInfo> {
+  const q = new URLSearchParams({ chainId });
+  const res = await fetch(apiUrl(`/api/wallet/accounts/${walletAddress}/recover-info?${q}`));
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<WalletRecoverInfo>;
+}
+
+export async function createRecordChallenge(
+  walletAddress?: string
+): Promise<{ challengeId: string; challenge: string; expiresAt: string }> {
+  const res = await fetch(apiUrl("/api/wallet/recovery/challenges"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ purpose: "record", walletAddress }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ challengeId: string; challenge: string; expiresAt: string }>;
+}
+
+export async function recoverWalletFromChain(input: {
+  walletAddress: string;
+  chainId: string;
+  ownerQx: string;
+  ownerQy: string;
+  credentialId?: string;
+  label?: string;
+}): Promise<{ account: WalletAccountRecord; recovered: boolean }> {
+  const { challengeId, challenge } = await createRecordChallenge(input.walletAddress);
+  const { credentialId, assertion } = await assertPasskeyChallenge({
+    challengeBase64Url: challenge,
+    credentialId: input.credentialId,
+  });
+  const res = await fetch(apiUrl("/api/wallet/accounts/recover"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      ownerQx: input.ownerQx,
+      ownerQy: input.ownerQy,
+      credentialId,
+      challengeId,
+      assertion,
+      label: input.label,
+    }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  const body = (await res.json()) as { account: WalletAccountRecord; recovered: boolean };
+  return body;
+}
+
+export function buildSupportRequestText(input: {
+  walletAddress: string;
+  chainId: string;
+  chainLabel?: string;
+  problem: string;
+}): string {
+  const chain = input.chainLabel ? `${input.chainLabel} (${input.chainId})` : input.chainId;
+  return [
+    `Wallet address: ${input.walletAddress}`,
+    `Chain: ${chain}`,
+    `Problem: ${input.problem}`,
+    "Request: Restore owner coordinates from persist log and redeploy if needed.",
+  ].join("\n");
+}

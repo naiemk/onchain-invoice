@@ -61,8 +61,8 @@ export function registerHostedRecoveryRoutes(
     if (req.method === "POST" && url.pathname === "/api/wallet/recovery/challenges") {
       const body = await handlers.readJson(req);
       const purpose = str(body.purpose) as HostedRecoveryChallengePurpose | undefined;
-      if (purpose !== "attach" && purpose !== "recover" && purpose !== "cancel") {
-        handlers.sendJson(res, 400, { error: "purpose must be attach, recover, or cancel" });
+      if (purpose !== "attach" && purpose !== "recover" && purpose !== "cancel" && purpose !== "record") {
+        handlers.sendJson(res, 400, { error: "purpose must be attach, recover, cancel, or record" });
         return true;
       }
       const challenge = challengeToBase64Url(randomBytes(32));

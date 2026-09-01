@@ -40,6 +40,8 @@ export interface AppConfig {
   port: number;
   baseUrl: string;
   dbPath: string;
+  /** Append-only WAL for wallet disaster recovery (vibed-infra persist-logs). */
+  persistLogDir?: string;
   sweeperApiKey: string;
   adminApiKey: string;
   /**
@@ -154,6 +156,7 @@ interface YamlFile {
   port?: number;
   baseUrl?: string;
   db?: { path?: string };
+  persistLogDir?: string;
   adminApiKey?: string;
   sweeperApiKey?: string;
   evm?: {
@@ -243,10 +246,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const dbPathRaw = expand(env.DB_PATH ?? file.db?.path ?? "./trustless-commerce.db");
   // better-sqlite3 treats ":memory:" specially — do not path-resolve it into a real file.
   const dbPath = dbPathRaw === ":memory:" ? ":memory:" : resolve(dbPathRaw);
+  const persistLogDir = blankToUndefined(expand(env.PERSIST_LOG_DIR ?? file.persistLogDir ?? ""));
   return {
     port,
     baseUrl: expand(env.BASE_URL ?? file.baseUrl ?? `http://localhost:${port}`),
     dbPath,
+    persistLogDir,
     sweeperApiKey: expand(env.SWEEPER_API_KEY ?? file.sweeperApiKey ?? ""),
     adminApiKey: expand(env.ADMIN_API_KEY ?? file.adminApiKey ?? ""),
     evmChains,
