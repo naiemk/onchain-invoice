@@ -44,28 +44,33 @@ function loadTurnstileScript(): Promise<void> {
 /** Mount Turnstile into `container`. Returns null when site key is unset (captcha optional). */
 export async function mountTurnstile(
   container: HTMLElement,
-  siteKey: string | null | undefined
+  siteKey: string | null | undefined,
+  opts?: { onToken?: (token: string | null) => void }
 ): Promise<{ getToken: () => string | null; reset: () => void; destroy: () => void } | null> {
   if (!siteKey) return null;
   await loadTurnstileScript();
   if (!window.turnstile) throw new Error("Turnstile unavailable");
   let token: string | null = null;
+  const notify = (t: string | null) => {
+    token = t;
+    opts?.onToken?.(t);
+  };
   const widgetId = window.turnstile.render(container, {
     sitekey: siteKey,
     callback: (t) => {
-      token = t;
+      notify(t);
     },
     "expired-callback": () => {
-      token = null;
+      notify(null);
     },
     "error-callback": () => {
-      token = null;
+      notify(null);
     },
   });
   return {
     getToken: () => token || window.turnstile?.getResponse(widgetId) || null,
     reset: () => {
-      token = null;
+      notify(null);
       window.turnstile?.reset(widgetId);
     },
     destroy: () => {

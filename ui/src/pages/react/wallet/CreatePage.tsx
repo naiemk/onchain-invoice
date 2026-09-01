@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { KeyRound, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageCard } from "@/components/PageSplit";
+import { TurnstileWidget, type TurnstileControl } from "@/components/TurnstileWidget";
 import { useLocale } from "@/providers/LocaleProvider";
+import { fetchWalletConfig } from "@/shared/wallet-api.js";
 import { createCounterfactualWallet } from "@/shared/wallet-create.js";
 import { webAuthnSupported } from "@/shared/webauthn.js";
 import { copyText } from "@/shared/dom.js";
@@ -24,24 +26,50 @@ export function CreatePage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [status, setStatus] = useState<{ kind: "info" | "error" | "success"; message: string } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
+  const [captchaReady, setCaptchaReady] = useState(false);
+  const captchaRef = useRef<TurnstileControl | null>(null);
   const supported = webAuthnSupported();
   const mode = deploymentMode();
-  const canCreate = supported && acceptedTerms && acceptedSecurityChecks && !loading;
+  const captchaRequired = Boolean(turnstileSiteKey);
+  const canCreate =
+    supported && acceptedTerms && acceptedSecurityChecks && !loading && (!captchaRequired || captchaReady);
+
+  useEffect(() => {
+    void fetchWalletConfig().then((config) => {
+      const key = config.turnstileSiteKey ?? null;
+      setTurnstileSiteKey(key);
+      if (!key) setCaptchaReady(true);
+    });
+  }, []);
+
+  const handleCaptchaTokenChange = useCallback((ready: boolean) => {
+    setCaptchaReady(ready);
+  }, []);
 
   const runCreate = async () => {
     const label = deviceName.trim() || t("wallet.defaultDevice");
+    const captchaToken = captchaRef.current?.getToken() ?? null;
+    if (captchaRequired && !captchaToken) {
+      setStatus({ kind: "error", message: t("wallet.createCaptchaRequired") });
+      return;
+    }
     setLoading(true);
     setStatus({ kind: "info", message: t("wallet.creatingPasskey") });
     try {
-      const result = await createCounterfactualWallet(label);
+      const result = await createCounterfactualWallet(label, { captchaToken });
       setAddress(result.address);
       setStatus({ kind: "success", message: t("wallet.createdCounterfactual") });
       navigate("/wallet", { replace: true });
     } catch (error) {
-      setStatus({
-        kind: "error",
-        message: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === "captcha_failed") {
+        captchaRef.current?.reset();
+        setCaptchaReady(false);
+        setStatus({ kind: "error", message: t("wallet.createCaptchaRequired") });
+      } else {
+        setStatus({ kind: "error", message });
+      }
     } finally {
       setLoading(false);
     }
@@ -130,6 +158,12 @@ export function CreatePage() {
             </Label>
           </div>
         </div>
+
+        <TurnstileWidget
+          siteKey={turnstileSiteKey}
+          onTokenChange={handleCaptchaTokenChange}
+          controlRef={captchaRef}
+        />
 
         <Button
           id="wallet-create-btn"
