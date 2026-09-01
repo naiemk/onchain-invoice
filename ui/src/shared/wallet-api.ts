@@ -232,14 +232,6 @@ export function parseSuperJoinFromUrl(): { walletAddress: string; chainId: strin
     return null;
   }
 }
-  const padded = encoded.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = padded.length % 4 === 0 ? padded : padded + "=".repeat(4 - (padded.length % 4));
-  try {
-    return atob(pad);
-  } catch {
-    return null;
-  }
-}
 
 export async function submitUserOp(input: {
   chainId: string;

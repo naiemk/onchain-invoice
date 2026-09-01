@@ -227,10 +227,6 @@ function shortEntity(entityId: string): string {
   return `${entityId.slice(0, 10)}…${entityId.slice(-6)}`;
 }
 
-function shortEntity(entityId: string): string {
-  return `${entityId.slice(0, 10)}…${entityId.slice(-6)}`;
-}
-
 function renderPendingEnrollments(requests: WalletKeyEnrollmentRequestRecord[]): string {
   if (requests.length === 0) {
     return `<p class="field-hint">${escapeHtml(t("wallet.enrollmentPendingEmpty"))}</p>`;
