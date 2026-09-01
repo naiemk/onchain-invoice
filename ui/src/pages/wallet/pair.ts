@@ -10,10 +10,10 @@ import {
 } from "../../shared/wallet-api.js";
 import { createPasskey, saveWalletSession } from "../../shared/webauthn.js";
 import {
-  bindWalletAccountBar,
+  paintWalletPage,
   setButtonLoading,
   showStatus,
-  walletFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 
@@ -21,15 +21,17 @@ let scanner: Html5Qrcode | null = null;
 
 const PAIR_WAIT_MS = 5 * 60 * 1000;
 
-export async function renderWalletPair(root: HTMLElement): Promise<void> {
+export async function renderWalletPair(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const prefilled = parsePairingFromUrl();
 
   if (prefilled) {
-    root.innerHTML = walletFrame({
-      current: "pair",
-      title: t("wallet.pairTitle"),
-      lede: t("wallet.pairReadyFromLink"),
-      body: `
+    paintWalletPage(
+      root,
+      {
+        current: "pair",
+        title: t("wallet.pairTitle"),
+        lede: t("wallet.pairReadyFromLink"),
+        body: `
         <ol class="wallet-stepper">
           <li class="is-done">${escapeHtml(t("wallet.stepScan"))}</li>
           <li class="is-active">${escapeHtml(t("wallet.stepPasskey"))}</li>
@@ -46,17 +48,22 @@ export async function renderWalletPair(root: HTMLElement): Promise<void> {
           <a class="tc-btn secondary" href="/wallet" data-route>${escapeHtml(t("wallet.cancel"))}</a>
         </div>
         <p id="pair-status" class="status wallet-status" role="status"></p>`,
-    });
-    bindWalletAccountBar(root);
-    root.querySelector("#pair-submit")?.addEventListener("click", () => void runPair(root));
+      },
+      opts,
+      (r) => {
+        r.querySelector("#pair-submit")?.addEventListener("click", () => void runPair(r));
+      }
+    );
     return;
   }
 
-  root.innerHTML = walletFrame({
-    current: "pair",
-    title: t("wallet.pairTitle"),
-    lede: t("wallet.pairLede"),
-    body: `
+  paintWalletPage(
+    root,
+    {
+      current: "pair",
+      title: t("wallet.pairTitle"),
+      lede: t("wallet.pairLede"),
+      body: `
       <ol class="wallet-stepper">
         <li class="is-active">${escapeHtml(t("wallet.stepScan"))}</li>
         <li>${escapeHtml(t("wallet.stepPasskey"))}</li>
@@ -77,12 +84,13 @@ export async function renderWalletPair(root: HTMLElement): Promise<void> {
         <a class="tc-btn secondary" href="/wallet" data-route>${escapeHtml(t("wallet.cancel"))}</a>
       </div>
       <p id="pair-status" class="status wallet-status" role="status"></p>`,
-  });
-  bindWalletAccountBar(root);
-
-  void startScanner(root);
-
-  root.querySelector("#pair-submit")?.addEventListener("click", () => void runPair(root));
+    },
+    opts,
+    (r) => {
+      void startScanner(r);
+      r.querySelector("#pair-submit")?.addEventListener("click", () => void runPair(r));
+    }
+  );
 }
 
 async function startScanner(root: HTMLElement): Promise<void> {

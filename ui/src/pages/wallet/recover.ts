@@ -18,21 +18,20 @@ import {
 } from "../../shared/wallet-recovery-api.js";
 import { currentSpaRender, isSpaRenderCurrent } from "../../shared/spa-render.js";
 import {
-  bindWalletAccountBar,
+  paintWalletLoading,
+  paintWalletPage,
   setButtonLoading,
   showStatus,
-  walletFrame,
-  walletLoadingFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 
 type TurnstileCtl = Awaited<ReturnType<typeof mountTurnstile>>;
 
-export async function renderWalletRecover(root: HTMLElement): Promise<void> {
+export async function renderWalletRecover(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
-  root.innerHTML = walletLoadingFrame("recover", t("wallet.recoverTitle"), t("wallet.recoverLede"));
-  bindWalletAccountBar(root);
+  paintWalletLoading(root, "recover", t("wallet.recoverTitle"), t("wallet.recoverLede"), opts);
 
   const config = await fetchWalletConfig();
   if (!isSpaRenderCurrent(gen)) return;
@@ -54,7 +53,9 @@ export async function renderWalletRecover(root: HTMLElement): Promise<void> {
   const hours = Math.round(config.recoveryTimelockSeconds / 3600);
   const siteKey = config.turnstileSiteKey ?? null;
 
-  root.innerHTML = walletFrame({
+  paintWalletPage(
+    root,
+    {
     current: "recover",
     title: t("wallet.recoverTitle"),
     lede: t("wallet.recoverLede"),
@@ -163,9 +164,33 @@ export async function renderWalletRecover(root: HTMLElement): Promise<void> {
       </section>
 
       <p id="recover-status" class="status wallet-status" role="status"></p>`,
+    },
+    opts,
+    (r) => {
+  void bindRecoverBody(r, {
+    gen,
+    session,
+    active,
+    siteKey,
+    config,
+    opts,
   });
+    }
+  );
+}
 
-  bindWalletAccountBar(root);
+async function bindRecoverBody(
+  root: HTMLElement,
+  ctx: {
+    gen: number;
+    session: ReturnType<typeof loadWalletSession>;
+    active: Awaited<ReturnType<typeof fetchWalletRecovery>>["request"] | undefined;
+    siteKey: string | null;
+    config: Awaited<ReturnType<typeof fetchWalletConfig>>;
+    opts?: WalletRenderOptions;
+  }
+): Promise<void> {
+  const { gen, session, active, siteKey, config, opts } = ctx;
 
   const captchas: {
     attach: TurnstileCtl;
@@ -258,7 +283,7 @@ export async function renderWalletRecover(root: HTMLElement): Promise<void> {
           captchaToken,
         });
         showStatus(status, t("wallet.recoverEmailOk"), "success");
-        await renderWalletRecover(root);
+        await renderWalletRecover(root, opts);
       } catch (error) {
         showStatus(status, error instanceof Error ? error.message : String(error), "error");
       }
@@ -337,7 +362,7 @@ export async function renderWalletRecover(root: HTMLElement): Promise<void> {
         }
         await verifyRecoveryEmailOtp({ requestId: pendingRequestId, code, captchaToken });
         showStatus(status, t("wallet.recoverSubmitted"), "success");
-        await renderWalletRecover(root);
+        await renderWalletRecover(root, opts);
       } catch (error) {
         showStatus(status, error instanceof Error ? error.message : String(error), "error");
       }
@@ -372,7 +397,7 @@ export async function renderWalletRecover(root: HTMLElement): Promise<void> {
           captchaToken,
         });
         showStatus(status, t("wallet.recoverCancelled"), "success");
-        await renderWalletRecover(root);
+        await renderWalletRecover(root, opts);
       } catch (error) {
         showStatus(status, error instanceof Error ? error.message : String(error), "error");
       } finally {

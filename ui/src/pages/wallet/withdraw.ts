@@ -14,14 +14,14 @@ import {
   fetchWalletBalance,
 } from "../../shared/wallet-api.js";
 import {
-  bindWalletAccountBar,
   formatWalletAvailable,
+  paintWalletLoading,
+  paintWalletPage,
   showStatus,
-  walletFrame,
-  walletLoadingFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 
-export async function renderWalletWithdraw(root: HTMLElement): Promise<void> {
+export async function renderWalletWithdraw(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
@@ -29,8 +29,7 @@ export async function renderWalletWithdraw(root: HTMLElement): Promise<void> {
     return;
   }
 
-  root.innerHTML = walletLoadingFrame("send", t("wallet.withdrawTitle"));
-  bindWalletAccountBar(root);
+  paintWalletLoading(root, "send", t("wallet.withdrawTitle"), undefined, opts);
 
   let fiats = ["USD", "EUR", "GBP", "SEK"];
   let sandbox = false;
@@ -57,23 +56,28 @@ export async function renderWalletWithdraw(root: HTMLElement): Promise<void> {
   if (!isSpaRenderCurrent(gen)) return;
 
   if (!enabled) {
-    root.innerHTML = walletFrame({
-      current: "send",
-      title: t("wallet.withdrawTitle"),
-      lede: t("wallet.withdrawLede"),
-      body: `<p class="danger">${escapeHtml(t("wallet.withdrawUnavailable"))}</p>
+    paintWalletPage(
+      root,
+      {
+        current: "send",
+        title: t("wallet.withdrawTitle"),
+        lede: t("wallet.withdrawLede"),
+        body: `<p class="danger">${escapeHtml(t("wallet.withdrawUnavailable"))}</p>
         <p><a href="/wallet/send" data-route>${escapeHtml(t("wallet.withdrawBackSend"))}</a></p>`,
-    });
-    bindWalletAccountBar(root);
+      },
+      opts
+    );
     return;
   }
 
   const defaultFiat = fiats[0] ?? "USD";
-  root.innerHTML = walletFrame({
-    current: "send",
-    title: t("wallet.withdrawTitle"),
-    lede: t("wallet.withdrawLede"),
-    body: `
+  paintWalletPage(
+    root,
+    {
+      current: "send",
+      title: t("wallet.withdrawTitle"),
+      lede: t("wallet.withdrawLede"),
+      body: `
       <p class="wallet-available">${formatWalletAvailable(maxAvailable)}</p>
       <div class="field">
         <label for="wallet-withdraw-fiat">${escapeHtml(t("wallet.withdrawFiatLabel"))}</label>
@@ -93,12 +97,14 @@ export async function renderWalletWithdraw(root: HTMLElement): Promise<void> {
       ${sandbox ? `<p class="callout info">${escapeHtml(t("wallet.withdrawSandboxNote"))}</p>` : ""}
       <div id="wallet-withdraw-frame" class="onramp-frame-host" hidden></div>
       <p id="wallet-withdraw-status" class="status wallet-status" role="status"></p>`,
-  });
-  bindWalletAccountBar(root);
-
-  root.querySelector("#wallet-withdraw-start")?.addEventListener("click", () => {
-    void startWithdraw(root, session.address, maxAvailable);
-  });
+    },
+    opts,
+    (r) => {
+      r.querySelector("#wallet-withdraw-start")?.addEventListener("click", () => {
+        void startWithdraw(r, session.address, maxAvailable);
+      });
+    }
+  );
 }
 
 async function startWithdraw(

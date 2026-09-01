@@ -20,6 +20,8 @@ import { AUTO_VALUE } from "@/pages/create/fiat-rules.js";
 import type { PaymentMode } from "@/shared/types.js";
 import type { PayChrome } from "@/shared/pay-chrome.js";
 import { useCreateForm } from "@/pages/react/create/useCreateForm.js";
+import { Stepper } from "@/components/Stepper";
+import { Surface } from "@/components/Surface";
 
 function ChainLogo({ chainId, size = 20 }: { chainId: string; size?: number }) {
   return (
@@ -118,30 +120,16 @@ export function CreatePage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card>
           <CardContent className="pt-6">
-            <nav
+            <Stepper
               className="mb-6"
-              aria-label={t("create.stepOf", { current: String(state.currentStep), total: "3" })}
-            >
-              <ol className="flex flex-wrap gap-2">
-                {WIZARD_STEPS.map(({ step, labelKey }) => {
-                  if (step === 2 && omitNetworkStep) return null;
-                  const isActive = state.currentStep === step;
-                  const isDone = state.currentStep > step && !(omitNetworkStep && step === 2);
-                  return (
-                    <li key={step}>
-                      <Button
-                        type="button"
-                        variant={isActive ? "default" : isDone ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={() => gotoStepClick(step)}
-                      >
-                        {t(labelKey)}
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ol>
-            </nav>
+              current={state.currentStep}
+              onSelect={gotoStepClick}
+              steps={WIZARD_STEPS.map(({ step, labelKey }) => ({
+                id: step,
+                label: t(labelKey),
+                hidden: step === 2 && omitNetworkStep,
+              }))}
+            />
 
             <form
               onSubmit={(e) => {
@@ -282,7 +270,7 @@ export function CreatePage() {
                             <ChainLogo chainId={network.id} />
                             <span>{networkShort(network.id)}</span>
                             {locked && (
-                              <Badge variant="secondary" className="text-xs">
+                              <Badge variant="outline" className="text-xs">
                                 {t("common.required")}
                               </Badge>
                             )}
@@ -306,7 +294,7 @@ export function CreatePage() {
                       {walletRegistry.length === 0 ? (
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">{t("create.walletNoneHint")}</p>
-                          <Button type="button" variant="secondary" disabled={state.passkeyBusy} onClick={() => void usePasskeyWallet()}>
+                          <Button type="button" variant="outline" disabled={state.passkeyBusy} onClick={() => void usePasskeyWallet()}>
                             {t("create.walletCreateButton")}
                           </Button>
                         </div>
@@ -328,11 +316,11 @@ export function CreatePage() {
                             </SelectContent>
                           </Select>
                           <div className="flex flex-wrap gap-2">
-                            <Button type="button" variant="secondary" disabled={state.passkeyBusy} onClick={() => void usePasskeyWallet()}>
+                            <Button type="button" variant="outline" disabled={state.passkeyBusy} onClick={() => void usePasskeyWallet()}>
                               {t("create.usePasskeyWallet")}
                             </Button>
                             {state.passkeyWalletAddress && (
-                              <Button type="button" variant="secondary" onClick={clearPasskeyWallet}>
+                              <Button type="button" variant="outline" onClick={clearPasskeyWallet}>
                                 {t("create.changeWallet")}
                               </Button>
                             )}
@@ -629,7 +617,7 @@ export function CreatePage() {
 
               <div className="flex flex-wrap gap-2">
                 {state.currentStep > 1 && (
-                  <Button type="button" variant="secondary" onClick={wizardBack}>
+                  <Button type="button" variant="outline" onClick={wizardBack}>
                     {t("create.back")}
                   </Button>
                 )}
@@ -643,7 +631,7 @@ export function CreatePage() {
                     <Button type="submit" disabled={!previewValid}>
                       {t("create.openCheckout")}
                     </Button>
-                    <Button type="button" variant="secondary" disabled={!previewValid} onClick={() => void copyPayLink()}>
+                    <Button type="button" variant="outline" disabled={!previewValid} onClick={() => void copyPayLink()}>
                       {t("create.copyPayLink")}
                     </Button>
                   </>
@@ -681,14 +669,14 @@ export function CreatePage() {
                 </TabsContent>
                 <TabsContent value="embed" className="space-y-2">
                   <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{preview.embed}</pre>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => void copyEmbed()}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void copyEmbed()}>
                     {t("create.copyHtml")}
                   </Button>
                 </TabsContent>
                 <TabsContent value="iframe" className="space-y-2">
                   <p className="text-sm text-muted-foreground">{t("create.iframeHint")}</p>
                   <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{preview.iframe}</pre>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => void copyIframe()}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void copyIframe()}>
                     {t("create.copyHtml")}
                   </Button>
                 </TabsContent>
