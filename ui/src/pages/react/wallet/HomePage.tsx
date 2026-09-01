@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -204,9 +204,14 @@ function WalletDashboard({ session }: { session: WalletSession }) {
   );
 }
 
-function WalletPicker({ registry }: { registry: WalletSession[] }) {
+function WalletPicker({
+  registry,
+  onOpened,
+}: {
+  registry: WalletSession[];
+  onOpened: () => void;
+}) {
   const { t } = useLocale();
-  const navigate = useNavigate();
   const [balances, setBalances] = useState<Record<string, string | null>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
@@ -227,7 +232,7 @@ function WalletPicker({ registry }: { registry: WalletSession[] }) {
   }, [registry]);
 
   const openWallet = (addr: string) => {
-    if (setActiveWallet(addr)) navigate("/wallet", { replace: true });
+    if (setActiveWallet(addr)) onOpened();
   };
 
   const unlock = async () => {
@@ -235,7 +240,7 @@ function WalletPicker({ registry }: { registry: WalletSession[] }) {
     setStatus(t("wallet.sendSigning"));
     try {
       await unlockWalletWithPasskey();
-      navigate("/wallet", { replace: true });
+      onOpened();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -287,9 +292,8 @@ function WalletPicker({ registry }: { registry: WalletSession[] }) {
   );
 }
 
-function WalletEmpty() {
+function WalletEmpty({ onOpened }: { onOpened: () => void }) {
   const { t } = useLocale();
-  const navigate = useNavigate();
   const supported = webAuthnSupported();
   const [status, setStatus] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
@@ -299,7 +303,7 @@ function WalletEmpty() {
     setStatus(t("wallet.sendSigning"));
     try {
       await unlockWalletWithPasskey();
-      navigate("/wallet", { replace: true });
+      onOpened();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -351,6 +355,6 @@ export function HomePage() {
   }, [refresh]);
 
   if (session) return <WalletDashboard session={session} />;
-  if (registry.length > 0) return <WalletPicker registry={registry} />;
-  return <WalletEmpty />;
+  if (registry.length > 0) return <WalletPicker registry={registry} onOpened={refresh} />;
+  return <WalletEmpty onOpened={refresh} />;
 }
