@@ -283,6 +283,7 @@ export const walletEn = {
   createDisclaimerBack: "Back",
   createDisclaimerSkip: "Skip",
   createDisclaimerFinish: "Create wallet",
+  createCaptchaRequired: "Complete the captcha first.",
   createTestnetWallet: "Create testnet wallet",
   counterfactualShort: "How counterfactual deployment works",
   receiveLede: "Share this address or QR to receive USDC. Same address on every configured EVM network.",
