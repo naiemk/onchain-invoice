@@ -22,6 +22,7 @@ import {
 } from "@/shared/wallet-session.js";
 import { webAuthnSupported } from "@/shared/webauthn.js";
 import { unlockRegistryWallet, unlockWalletWithPasskey } from "@/shared/wallet-unlock.js";
+import { LocalRecoverySheet, isUnlockRecoveryError } from "@/components/LocalRecoverySheet";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { isAdvancedMode } from "@/shared/wallet-mode.js";
 import type { WalletBalanceChain } from "../../../../../commerce/shared/wallet.js";
@@ -306,6 +307,8 @@ function WalletPicker({
   const [balances, setBalances] = useState<Record<string, string | null>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
+  const [recoveryEntry, setRecoveryEntry] = useState<WalletSession | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
 
   const [openingAddress, setOpeningAddress] = useState<string | null>(null);
 
@@ -324,6 +327,11 @@ function WalletPicker({
     });
   }, [registry]);
 
+  const openRecovery = (entry?: WalletSession) => {
+    setRecoveryEntry(entry ?? null);
+    setRecoveryOpen(true);
+  };
+
   const openWallet = async (entry: WalletSession) => {
     setOpeningAddress(entry.address);
     setStatus(t("wallet.sendSigning"));
@@ -331,7 +339,12 @@ function WalletPicker({
       await unlockRegistryWallet(entry);
       onOpened();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      if (isUnlockRecoveryError(error)) {
+        openRecovery(entry);
+        setStatus(null);
+      } else {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
       setOpeningAddress(null);
     }
@@ -344,13 +357,19 @@ function WalletPicker({
       await unlockWalletWithPasskey();
       onOpened();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      if (isUnlockRecoveryError(error)) {
+        openRecovery();
+        setStatus(null);
+      } else {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
       setUnlocking(false);
     }
   };
 
   return (
+    <>
     <WalletFrame
       current="home"
       showChrome={false}
@@ -402,6 +421,13 @@ function WalletPicker({
       <p className="mt-4 text-sm text-muted-foreground">{t("wallet.syncHint")}</p>
       {status && <p className="mt-2 text-sm text-destructive">{status}</p>}
     </WalletFrame>
+    <LocalRecoverySheet
+      open={recoveryOpen}
+      onOpenChange={setRecoveryOpen}
+      initialEntry={recoveryEntry}
+      onRecovered={onOpened}
+    />
+    </>
   );
 }
 

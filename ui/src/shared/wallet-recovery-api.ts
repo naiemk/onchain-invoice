@@ -62,7 +62,7 @@ export async function fetchWalletRecovery(wallet: string): Promise<{
 }
 
 export async function createRecoveryChallenge(
-  purpose: "attach" | "recover" | "cancel",
+  purpose: "attach" | "recover" | "cancel" | "record",
   walletAddress?: string
 ): Promise<{ challengeId: string; challenge: string; expiresAt: string }> {
   const res = await fetch(apiUrl("/api/wallet/recovery/challenges"), {

@@ -5,10 +5,9 @@ import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/
 import {
   listWalletRegistry,
   loadWalletSession,
-  setActiveWallet,
   webAuthnSupported,
 } from "../../shared/webauthn.js";
-import { unlockWalletWithPasskey } from "../../shared/wallet-unlock.js";
+import { unlockRegistryWallet, unlockWalletWithPasskey } from "../../shared/wallet-unlock.js";
 import {
   bindCopyButtons,
   bindWalletAccountBar,
@@ -271,18 +270,29 @@ function renderEmpty(root: HTMLElement): void {
 }
 
 function bindPickerActions(root: HTMLElement): void {
-  const open = (addr: string | undefined) => {
-    if (addr && setActiveWallet(addr)) void renderWalletHome(root);
+  const open = async (addr: string | undefined) => {
+    if (!addr) return;
+    const entry = listWalletRegistry().find((w) => w.address.toLowerCase() === addr.toLowerCase());
+    if (!entry) return;
+    const status = root.querySelector<HTMLElement>("#wallet-home-status");
+    status?.removeAttribute("hidden");
+    try {
+      showStatus(status, t("wallet.sendSigning"));
+      await unlockRegistryWallet(entry);
+      spaNavigate("/wallet", "replace");
+    } catch (error) {
+      showStatus(status, error instanceof Error ? error.message : String(error), "error");
+    }
   };
   root.querySelector(".wallet-picker-list")?.addEventListener("click", (ev) => {
     const target = (ev.target as HTMLElement).closest<HTMLElement>("[data-wallet-open]");
-    open(target?.dataset.walletOpen);
+    void open(target?.dataset.walletOpen);
   });
   root.querySelectorAll<HTMLElement>("[data-wallet-open]").forEach((el) => {
     el.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") {
         ev.preventDefault();
-        open(el.dataset.walletOpen);
+        void open(el.dataset.walletOpen);
       }
     });
   });
