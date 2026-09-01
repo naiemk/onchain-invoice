@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap");
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-display: "Source Serif 4", Georgia, serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-ok: var(--ok);
+  --color-ok-foreground: var(--ok-foreground);
+  --color-warn: var(--warn);
+  --color-warn-foreground: var(--warn-foreground);
+  --color-brand-panel: var(--brand-panel);
+  --color-brand-panel-foreground: var(--brand-panel-foreground);
+
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: calc(var(--radius) * 0.875);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.5);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.002 247);
+  --foreground: oklch(0.22 0.04 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.04 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.04 260);
+  --primary: oklch(0.52 0.19 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.005 247);
+  --secondary-foreground: oklch(0.22 0.04 260);
+  --muted: oklch(0.96 0.005 247);
+  --muted-foreground: oklch(0.48 0.02 260);
+  --accent: oklch(0.96 0.01 255);
+  --accent-foreground: oklch(0.22 0.04 260);
+  --destructive: oklch(0.55 0.2 25);
+  --border: oklch(0.91 0.01 247);
+  --input: oklch(0.91 0.01 247);
+  --ring: oklch(0.52 0.19 255);
+  --chart-1: oklch(0.52 0.19 255);
+  --chart-2: oklch(0.62 0.12 180);
+  --chart-3: oklch(0.55 0.15 300);
+  --chart-4: oklch(0.7 0.15 80);
+  --chart-5: oklch(0.6 0.2 30);
+  --sidebar: oklch(0.985 0.002 247);
+  --sidebar-foreground: oklch(0.22 0.04 260);
+  --sidebar-primary: oklch(0.52 0.19 255);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.96 0.005 247);
+  --sidebar-accent-foreground: oklch(0.22 0.04 260);
+  --sidebar-border: oklch(0.91 0.01 247);
+  --sidebar-ring: oklch(0.52 0.19 255);
+  --ok: oklch(0.55 0.12 180);
+  --ok-foreground: oklch(0.99 0 0);
+  --warn: oklch(0.65 0.15 70);
+  --warn-foreground: oklch(0.25 0.05 70);
+  --brand-panel: oklch(0.22 0.04 260);
+  --brand-panel-foreground: oklch(0.98 0.005 247);
+}
+
+.dark,
+html[data-theme="dark"] {
+  --background: oklch(0.14 0.02 260);
+  --foreground: oklch(0.96 0.005 247);
+  --card: oklch(0.18 0.02 260);
+  --card-foreground: oklch(0.96 0.005 247);
+  --popover: oklch(0.18 0.02 260);
+  --popover-foreground: oklch(0.96 0.005 247);
+  --primary: oklch(0.65 0.16 255);
+  --primary-foreground: oklch(0.14 0.02 260);
+  --secondary: oklch(0.22 0.02 260);
+  --secondary-foreground: oklch(0.96 0.005 247);
+  --muted: oklch(0.22 0.02 260);
+  --muted-foreground: oklch(0.68 0.02 260);
+  --accent: oklch(0.22 0.02 260);
+  --accent-foreground: oklch(0.96 0.005 247);
+  --destructive: oklch(0.65 0.2 25);
+  --border: oklch(0.28 0.02 260);
+  --input: oklch(0.28 0.02 260);
+  --ring: oklch(0.65 0.16 255);
+  --chart-1: oklch(0.65 0.16 255);
+  --chart-2: oklch(0.7 0.12 180);
+  --chart-3: oklch(0.65 0.15 300);
+  --chart-4: oklch(0.75 0.15 80);
+  --chart-5: oklch(0.65 0.2 30);
+  --sidebar: oklch(0.16 0.02 260);
+  --sidebar-foreground: oklch(0.96 0.005 247);
+  --sidebar-primary: oklch(0.65 0.16 255);
+  --sidebar-primary-foreground: oklch(0.14 0.02 260);
+  --sidebar-accent: oklch(0.22 0.02 260);
+  --sidebar-accent-foreground: oklch(0.96 0.005 247);
+  --sidebar-border: oklch(0.28 0.02 260);
+  --sidebar-ring: oklch(0.65 0.16 255);
+  --ok: oklch(0.72 0.12 180);
+  --ok-foreground: oklch(0.14 0.02 260);
+  --warn: oklch(0.78 0.12 85);
+  --warn-foreground: oklch(0.2 0.04 85);
+  --brand-panel: oklch(0.16 0.02 260);
+  --brand-panel-foreground: oklch(0.96 0.005 247);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in oklch, var(--primary) 12%, transparent), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in oklch, var(--ok) 6%, transparent), transparent),
+      var(--background);
+  }
+  h1, h2, h3 {
+    @apply tracking-tight;
+  }
+  /* Prevent legacy styles.css from breaking React shell layout */
+  header [data-app-nav] {
+    align-items: center;
+  }
+  .legacy-page main,
+  main .legacy-page {
+    padding: 0;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+html[dir="rtl"] [data-app-nav],
+html[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+html[dir="rtl"] .ml-auto {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* Legacy wallet/invoice helpers during migration */
+.status-pill {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+.status-pill.ok { @apply bg-ok/15 text-ok; }
+.status-pill.warn { @apply bg-warn/15 text-warn; }
+.status-pill.danger { @apply bg-destructive/15 text-destructive; }

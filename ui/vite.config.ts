@@ -1,12 +1,15 @@
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   publicDir: fileURLToPath(new URL("./public", import.meta.url)),
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      // Browser-safe commerce helpers (avoids bundling Node SDK deps).
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
       "onchain-invoice": fileURLToPath(new URL("./src/onchain-invoice-browser.ts", import.meta.url)),
     },
   },
