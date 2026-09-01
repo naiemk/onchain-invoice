@@ -74,14 +74,13 @@ test.describe("Super Wallet UI", () => {
     await page.goto("/wallet/super-wallet");
     await expect(page.locator("#enable-advanced")).toBeVisible();
     await page.locator("#admin-email").fill("admin@example.com");
+    await page.locator("#enable-advanced").click();
 
-    const dialogPromise = page.waitForEvent("dialog");
-    const clickPromise = page.locator("#enable-advanced").click();
-    const dialog = await dialogPromise;
-    expect(dialog.type()).toBe("confirm");
-    expect(dialog.message()).toMatch(/Email recovery/i);
-    await dialog.dismiss();
-    await clickPromise;
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Email recovery/i)).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).not.toBeVisible();
   });
 
   test("shows entity key enrollment controls after upgrade section", async ({ page }) => {
@@ -95,7 +94,11 @@ test.describe("Super Wallet UI", () => {
     if (await upgradeBtn.isVisible()) {
       await page.fill("#admin-email", "admin@example.com");
       await upgradeBtn.click();
-      await page.waitForTimeout(2000);
+      const dialog = page.getByRole("dialog");
+      if (await dialog.isVisible()) {
+        await dialog.getByRole("button", { name: "Convert to Super Wallet" }).click();
+        await page.waitForTimeout(2000);
+      }
     }
 
     await page.goto("/wallet/super-wallet");
