@@ -164,6 +164,26 @@ chown_uid1000() {
 chown_uid1000 "$LOGS_ABS"
 chmod 755 "$LOGS_ABS" 2>/dev/null || true
 
+# HMAC wallets must exist in the API DB or every tick 401s ("Sweeper not registered
+# or disabled") and invoices stay awaiting_payment. Idempotent upsert; warn if the
+# API is down so node start still succeeds.
+register_api_wallets() {
+  if [[ -x "$SCRIPT_DIR/register-onchain-invoice-node.sh" && -n "${ADMIN_API_KEY:-}" && -n "${SWEEPER_REGISTER_ADDRESS:-}" ]]; then
+    echo "Registering sweeper ${SWEEPER_REGISTER_ADDRESS} on the API ..."
+    if ! "$SCRIPT_DIR/register-onchain-invoice-node.sh"; then
+      echo "WARNING: sweeper register failed — invoices will not be observed until: ./register-onchain-invoice-node.sh" >&2
+    fi
+  else
+    echo "Skipping sweeper register (need ADMIN_API_KEY + SWEEPER_REGISTER_ADDRESS). Run: ./register-onchain-invoice-node.sh"
+  fi
+  if [[ -x "$SCRIPT_DIR/register-onchain-invoice-bundler.sh" && -n "${ADMIN_API_KEY:-}" && -n "${BUNDLER_REGISTER_ADDRESS:-${BUNDLER_ADDRESS:-}}" ]]; then
+    echo "Registering bundler on the API ..."
+    if ! "$SCRIPT_DIR/register-onchain-invoice-bundler.sh"; then
+      echo "WARNING: bundler register failed. Run: ./register-onchain-invoice-bundler.sh" >&2
+    fi
+  fi
+}
+
 COMPOSE_FILE="${COMPOSE_FILE:-${SCRIPT_DIR}/docker-compose.workers.yml}"
 # Allow COMPOSE_FILE=docker-compose.workers.yml (relative to install dir)
 if [[ "$COMPOSE_FILE" != /* ]]; then
@@ -220,7 +240,7 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
     docker compose "${COMPOSE_ARGS[@]}" up -d --force-recreate "${PULL_ARGS[@]}"
   fi
   echo "Nodes up (container names from $COMPOSE_FILE)"
-  echo "  Register bundler once: ./register-onchain-invoice-bundler.sh"
+  register_api_wallets
   if [[ "$solana_enabled" -eq 1 ]]; then
     echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-solana.jsonl $LOGS_ABS/activity-bundler.jsonl $LOGS_ABS/activity-wallet-deployer.jsonl"
   else
@@ -295,3 +315,4 @@ docker start "$NAME" >/dev/null
 echo "Sweeper node running as $NAME"
 echo "Logs: docker logs -f $NAME"
 echo "Activity: tail -f $LOGS_ABS/activity.jsonl"
+register_api_wallets
