@@ -260,7 +260,7 @@ export interface WalletRecoveryRequestRecord {
   updatedAt: string;
 }
 
-export type HostedRecoveryChallengePurpose = "attach" | "recover" | "cancel";
+export type HostedRecoveryChallengePurpose = "attach" | "recover" | "cancel" | "record";
 
 export interface HostedRecoveryChallengeRecord {
   id: string;

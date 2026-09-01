@@ -183,11 +183,25 @@ export async function createSecurityKey(displayName: string): Promise<PasskeyOwn
 
 /**
  * Discoverable WebAuthn get — returns credentialId from the assertion.
- * If a matching session is already in the local registry, returns owner coords from it.
+ * When credentialId is provided, pins allowCredentials to that passkey.
  */
-export async function authenticatePasskey(): Promise<(PasskeyOwner & { fromRegistry: boolean }) | null> {
+export async function authenticatePasskey(input?: {
+  credentialId?: string;
+}): Promise<(PasskeyOwner & { fromRegistry: boolean }) | null> {
   if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
-  const cred = await webAuthnGet(platformRequestOptions(randomChallenge()));
+  const allowCredentials = input?.credentialId?.trim()
+    ? [{ id: credentialIdToBytesLocal(input.credentialId), type: "public-key" as const }]
+    : undefined;
+  let cred: PublicKeyCredential | null = null;
+  try {
+    cred = await webAuthnGet(platformRequestOptions(randomChallenge(), allowCredentials));
+  } catch (error) {
+    if (allowCredentials && error instanceof DOMException && error.name === "NotAllowedError") {
+      cred = await webAuthnGet(platformRequestOptions(randomChallenge()));
+    } else {
+      throw error;
+    }
+  }
   if (!cred) return null;
   const credentialId = credentialIdFromRawId(cred.rawId);
   const rawId = bufferToHex(cred.rawId);

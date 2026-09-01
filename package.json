@@ -60,6 +60,8 @@
     "deploy:console": "node --experimental-strip-types --experimental-transform-types deploy/operator/scripts/dev.mts",
     "wallet:deploy:sepolia": "hardhat run scripts/deploy-wallet.ts --network sepolia",
     "wallet:verify:sepolia": "hardhat run scripts/verify-wallet.ts --network sepolia",
+    "wallet:persist:backfill": "node scripts/backfill-wallet-persist-log.mjs",
+    "wallet:persist:replay": "node scripts/replay-wallet-persist-log.mjs",
     "test:wallet-advanced": "hardhat test test/WalletAdvanced.ts test/CommerceWalletAdvanced.ts",
     "test:ui-e2e": "npm run commerce:build && playwright test",
     "test:live-wallet-testnet": "LIVE_WALLET_TESTNET=1 hardhat test test/live/LiveWalletAdvanced.ts"

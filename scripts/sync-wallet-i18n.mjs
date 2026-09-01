@@ -90,6 +90,22 @@ const keysToSync = [
   "createDisclaimerBack",
   "createDisclaimerSkip",
   "createDisclaimerFinish",
+  "createCaptchaRequired",
+  "localRecoveryTitle",
+  "localRecoveryLede",
+  "localRecoveryChain",
+  "localRecoveryLookup",
+  "localRecoveryNeedAddress",
+  "localRecoveryDbFound",
+  "localRecoveryRetryPasskey",
+  "localRecoveryDeployed",
+  "localRecoveryFromChain",
+  "localRecoveryUndeployed",
+  "localRecoveryUndeployedFunds",
+  "localRecoverySupportCta",
+  "localRecoverySupportCopy",
+  "localRecoveryCopy",
+  "localRecoveryNeedKeys",
 ];
 
 function hasKey(text, key) {

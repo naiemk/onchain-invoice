@@ -20,6 +20,15 @@ import {
 import { confirmOnramperOfframpTransaction } from "../shared/onramper-confirm.js";
 import type { CommerceDb } from "./db.js";
 import { registerWalletAdvancedRoutes } from "./wallet-advanced-routes.js";
+import {
+  verifyWebAuthnAssertion,
+  type WebAuthnAssertionJson,
+} from "../shared/webauthn-verify.js";
+
+const WALLET_OWNER_ABI = [
+  "function ownerCount() view returns (uint256)",
+  "function ownerAt(uint256 index) view returns (bytes32 qx, bytes32 qy)",
+];
 
 const PAIRING_TTL_MS = 5 * 60 * 1000;
 
@@ -76,6 +85,14 @@ export function registerWalletRoutes(
           message: error instanceof Error ? error.message : String(error),
         });
       }
+      return true;
+    }
+
+    const recoverInfoMatch = url.pathname.match(
+      /^\/api\/wallet\/accounts\/(0x[0-9a-fA-F]{40})\/recover-info$/
+    );
+    if (req.method === "GET" && recoverInfoMatch) {
+      await getWalletRecoverInfo(res, recoverInfoMatch[1], url, db, walletConfig, handlers);
       return true;
     }
 
@@ -151,6 +168,11 @@ export function registerWalletRoutes(
         webauthnAttestation: attestation,
       });
       handlers.sendJson(res, 201, { account });
+      return true;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/wallet/accounts/recover") {
+      await recoverWalletAccount(req, res, db, appConfig, walletConfig, handlers);
       return true;
     }
 
@@ -743,4 +765,201 @@ function resolveRegisteredWallet(
   const account = db.getWalletAccount(address);
   if (!account) return null;
   return address;
+}
+
+function walletRpId(appConfig: AppConfig): string {
+  try {
+    return new URL(appConfig.baseUrl).hostname;
+  } catch {
+    return "localhost";
+  }
+}
+
+async function getWalletRecoverInfo(
+  res: import("node:http").ServerResponse,
+  walletRaw: string,
+  url: URL,
+  db: CommerceDb,
+  walletConfig: WalletConfig,
+  handlers: JsonHandlers
+): Promise<void> {
+  if (!isAddress(walletRaw)) {
+    handlers.sendJson(res, 400, { error: "invalid_address" });
+    return;
+  }
+  const wallet = getAddress(walletRaw).toLowerCase();
+  const chainId = url.searchParams.get("chainId")?.trim() ?? walletConfig.chainId;
+  const account = db.getWalletAccount(wallet);
+  const chain = walletConfig.chains.find((c) => c.chainId === chainId) ?? walletConfig.chains[0];
+  let deployed = account?.deployedChains.includes(chainId) ?? false;
+  let balanceUsd = "0";
+  let hasFunds = false;
+  const ownersOnChain: { qx: string; qy: string }[] = [];
+
+  if (chain?.rpcUrl) {
+    try {
+      const provider = new JsonRpcProvider(chain.rpcUrl);
+      const code = await provider.getCode(wallet);
+      if (code !== "0x") {
+        deployed = true;
+        const contract = new Contract(wallet, WALLET_OWNER_ABI, provider);
+        const count = Number(await contract.ownerCount());
+        for (let i = 0; i < count; i++) {
+          const [qx, qy] = await contract.ownerAt(i);
+          ownersOnChain.push({ qx: String(qx), qy: String(qy) });
+        }
+      }
+      if (chain.feeTokenAddress) {
+        const token = new Contract(chain.feeTokenAddress, ERC20_ABI, provider);
+        const balance = BigInt(await token.balanceOf(wallet));
+        balanceUsd = formatUsdFromUsdc(balance, chain.feeTokenDecimals);
+        hasFunds = balance > 0n;
+      }
+    } catch (error) {
+      handlers.sendJson(res, 502, {
+        error: "chain_lookup_failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+  }
+
+  handlers.sendJson(res, 200, {
+    wallet,
+    chainId,
+    inDb: Boolean(account),
+    deployed,
+    ownersOnChain,
+    balanceUsd,
+    hasFunds,
+    account: account
+      ? {
+          address: account.address,
+          ownerQx: account.ownerQx,
+          ownerQy: account.ownerQy,
+          deployedChains: account.deployedChains,
+        }
+      : null,
+  });
+}
+
+async function recoverWalletAccount(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  db: CommerceDb,
+  appConfig: AppConfig,
+  walletConfig: WalletConfig,
+  handlers: JsonHandlers
+): Promise<void> {
+  const body = await handlers.readJson(req);
+  const walletAddress = str(body.walletAddress)?.toLowerCase();
+  const chainId = str(body.chainId) ?? walletConfig.chainId;
+  const ownerQx = normalizeHex32(str(body.ownerQx));
+  const ownerQy = normalizeHex32(str(body.ownerQy));
+  const credentialId = str(body.credentialId);
+  const challengeId = str(body.challengeId);
+  const assertion = body.assertion as WebAuthnAssertionJson | undefined;
+
+  if (!walletAddress || !isAddress(walletAddress) || !ownerQx || !ownerQy || !credentialId || !challengeId) {
+    handlers.sendJson(res, 400, {
+      error: "walletAddress, ownerQx, ownerQy, credentialId, challengeId required",
+    });
+    return;
+  }
+  if (!assertion?.clientDataJSON || !assertion.authenticatorData || !assertion.signature) {
+    handlers.sendJson(res, 400, { error: "assertion required" });
+    return;
+  }
+
+  const challenge = db.consumeHostedRecoveryChallenge({ id: challengeId, purpose: "record" });
+  if (!challenge) {
+    handlers.sendJson(res, 400, { error: "invalid_or_expired_challenge" });
+    return;
+  }
+
+  try {
+    verifyWebAuthnAssertion(assertion, {
+      expectedChallengeBase64Url: challenge.challenge,
+      rpId: walletRpId(appConfig),
+      origins: appConfig.corsOrigins.includes("*") ? null : appConfig.corsOrigins,
+      ownerQx,
+      ownerQy,
+    });
+  } catch (error) {
+    const code =
+      error && typeof error === "object" && "statusCode" in error
+        ? Number((error as { statusCode: number }).statusCode)
+        : 400;
+    handlers.sendJson(res, code, {
+      error: error && typeof error === "object" && "code" in error ? (error as { code: string }).code : "invalid_assertion",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  const derivedSalt = deriveWalletSalt(ownerQx, ownerQy);
+  if (!walletConfig.factoryAddress || !walletConfig.implementationAddress) {
+    handlers.sendJson(res, 503, { error: "wallet_factory_not_configured" });
+    return;
+  }
+  const predicted = predictWalletAddress(
+    walletConfig.factoryAddress,
+    walletConfig.implementationAddress,
+    derivedSalt
+  );
+  if (predicted.toLowerCase() !== walletAddress) {
+    handlers.sendJson(res, 400, { error: "address_mismatch", expected: predicted });
+    return;
+  }
+
+  const chain = walletConfig.chains.find((c) => c.chainId === chainId) ?? walletConfig.chains[0];
+  if (chain?.rpcUrl) {
+    try {
+      const provider = new JsonRpcProvider(chain.rpcUrl);
+      const code = await provider.getCode(walletAddress);
+      if (code !== "0x") {
+        const contract = new Contract(walletAddress, WALLET_OWNER_ABI, provider);
+        const count = Number(await contract.ownerCount());
+        let onChain = false;
+        for (let i = 0; i < count; i++) {
+          const [qx, qy] = await contract.ownerAt(i);
+          if (
+            String(qx).toLowerCase() === ownerQx.toLowerCase() &&
+            String(qy).toLowerCase() === ownerQy.toLowerCase()
+          ) {
+            onChain = true;
+            break;
+          }
+        }
+        if (!onChain) {
+          handlers.sendJson(res, 400, { error: "owner_not_on_chain" });
+          return;
+        }
+      }
+    } catch (error) {
+      handlers.sendJson(res, 502, {
+        error: "on_chain_verify_failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+  }
+
+  const account = db.upsertWalletAccount({
+    address: walletAddress,
+    salt: derivedSalt,
+    ownerQx,
+    ownerQy,
+    credentialId,
+    webauthnAttestation: null,
+  });
+  const device = db.upsertWalletDevice({
+    walletAddress,
+    chainId,
+    ownerQx,
+    ownerQy,
+    label: str(body.label) || "Recovered passkey",
+    credentialId,
+  });
+  handlers.sendJson(res, 200, { account, device, recovered: true });
 }

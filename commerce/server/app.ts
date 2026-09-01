@@ -10,7 +10,7 @@ export interface App {
 }
 
 export function createApp(config: AppConfig): App {
-  const db = new CommerceDb(config.dbPath);
+  const db = new CommerceDb(config.dbPath, { persistLogDir: config.persistLogDir });
   const server = createServer((req, res) => {
     void createRouter({ config, db })(req, res);
   });

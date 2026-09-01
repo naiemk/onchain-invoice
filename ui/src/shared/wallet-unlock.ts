@@ -9,6 +9,7 @@ import {
 import { credentialIdsMatch } from "./credential-id.js";
 import {
   authenticatePasskey,
+  ensureSessionCredential,
   listWalletRegistry,
   saveWalletSession,
   type WalletSession,
@@ -89,7 +90,7 @@ async function sessionFromAuth(
     const account = await getWalletAccount(entry.address);
 
     if (!account) {
-      throw new Error(t("wallet.unlockNotFound"));
+      throw Object.assign(new Error(t("wallet.unlockNotFound")), { code: "local_recovery" });
     }
 
     const ownerMatch =
@@ -150,7 +151,7 @@ async function sessionFromAuth(
 
   const found = await fetchWalletAccountByCredentialId(auth.credentialId);
   if (!found) {
-    throw new Error(t("wallet.unlockNotFound"));
+    throw Object.assign(new Error(t("wallet.unlockNotFound")), { code: "local_recovery" });
   }
 
   const { account, device } = found;
@@ -191,7 +192,10 @@ export async function unlockWalletWithPasskey(): Promise<WalletSession> {
 
 /** Open a saved wallet after verifying the passkey on this device. */
 export async function unlockRegistryWallet(entry: WalletSession): Promise<WalletSession> {
-  const auth = await authenticatePasskey();
+  const prepared = await ensureSessionCredential(entry);
+  const auth = await authenticatePasskey(
+    prepared.credentialId?.trim() ? { credentialId: prepared.credentialId } : undefined
+  );
   if (!auth) throw new Error(t("wallet.signInFailed"));
-  return sessionFromAuth(auth, entry);
+  return sessionFromAuth(auth, prepared);
 }

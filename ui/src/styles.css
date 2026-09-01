@@ -3453,6 +3453,22 @@ a.wallet-account-menu-item:hover,
   border-radius: var(--radius);
 }
 
+.wallet-key-details {
+  margin-top: 0.75rem;
+}
+
+.wallet-key-details summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.wallet-key-details p.mono {
+  margin: 0.35rem 0 0;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
 .wallet-other-devices {
   margin: 1.5rem 0;
 }

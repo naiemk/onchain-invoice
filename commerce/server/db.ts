@@ -39,6 +39,7 @@ import type {
 } from "../shared/wallet.js";
 import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
 import { parsePaymentMode } from "../shared/onramper.js";
+import { PersistLog, WALLET_PERSIST_STREAM } from "./persist-log.js";
 
 interface InvoiceRow {
   id: string;
@@ -216,12 +217,33 @@ interface BundlerRow {
 
 export class CommerceDb {
   private readonly db: Database.Database;
+  private readonly persistLog: PersistLog | null;
+  private skipPersistLog = false;
 
-  constructor(path: string) {
+  constructor(path: string, options?: { persistLogDir?: string }) {
     this.db = new Database(path);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
+    this.persistLog =
+      options?.persistLogDir != null
+        ? new PersistLog(options.persistLogDir)
+        : PersistLog.fromEnv();
     this.migrate();
+  }
+
+  runWithoutPersistLog<T>(fn: () => T): T {
+    const prev = this.skipPersistLog;
+    this.skipPersistLog = true;
+    try {
+      return fn();
+    } finally {
+      this.skipPersistLog = prev;
+    }
+  }
+
+  private walletPersist(type: string, payload: Record<string, unknown>, eventId?: string): void {
+    if (this.skipPersistLog || !this.persistLog) return;
+    this.persistLog.append(WALLET_PERSIST_STREAM, type, payload, eventId);
   }
 
   close(): void {
@@ -934,7 +956,7 @@ export class CommerceDb {
 
       CREATE TABLE IF NOT EXISTS wallet_hosted_challenges (
         id TEXT PRIMARY KEY,
-        purpose TEXT NOT NULL CHECK (purpose IN ('attach','recover','cancel')),
+        purpose TEXT NOT NULL CHECK (purpose IN ('attach','recover','cancel','record')),
         challenge TEXT NOT NULL,
         wallet_address TEXT,
         consumed INTEGER NOT NULL DEFAULT 0,
@@ -1067,6 +1089,34 @@ export class CommerceDb {
     this.ensureColumn("invoices", "quote_provider", "TEXT");
     this.ensureColumn("invoices", "quote_slippage_bps", "INTEGER");
     this.ensureColumn("invoices", "lang", "TEXT");
+    this.migrateHostedChallengesRecordPurpose();
+  }
+
+  private migrateHostedChallengesRecordPurpose(): void {
+    const row = this.db
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'wallet_hosted_challenges'`
+      )
+      .get() as { sql: string } | undefined;
+    if (!row?.sql || row.sql.includes("'record'")) return;
+    this.db.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE wallet_hosted_challenges_new (
+        id TEXT PRIMARY KEY,
+        purpose TEXT NOT NULL CHECK (purpose IN ('attach','recover','cancel','record')),
+        challenge TEXT NOT NULL,
+        wallet_address TEXT,
+        consumed INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO wallet_hosted_challenges_new
+        SELECT id, purpose, challenge, wallet_address, consumed, expires_at, created_at
+        FROM wallet_hosted_challenges;
+      DROP TABLE wallet_hosted_challenges;
+      ALTER TABLE wallet_hosted_challenges_new RENAME TO wallet_hosted_challenges;
+      PRAGMA foreign_keys = ON;
+    `);
   }
 
   upsertWalletAccount(input: {
@@ -1079,6 +1129,7 @@ export class CommerceDb {
   }): WalletAccountRecord {
     const now = new Date().toISOString();
     const addr = input.address.toLowerCase();
+    const existed = this.getWalletAccount(addr);
     this.db
       .prepare(
         `INSERT INTO wallet_accounts (
@@ -1099,6 +1150,20 @@ export class CommerceDb {
         webauthnAttestation: input.webauthnAttestation,
         now,
       });
+    if (!existed) {
+      this.walletPersist("account.created", {
+        address: addr,
+        salt: input.salt,
+        ownerQx: input.ownerQx,
+        ownerQy: input.ownerQy,
+        credentialId: input.credentialId,
+      });
+    } else if (input.credentialId && input.credentialId !== existed.credentialId) {
+      this.walletPersist("account.credential_updated", {
+        address: addr,
+        credentialId: input.credentialId,
+      });
+    }
     return this.getWalletAccount(addr)!;
   }
 
@@ -1181,6 +1246,10 @@ export class CommerceDb {
     this.db
       .prepare(`UPDATE wallet_accounts SET deployed_chains = ?, updated_at = ? WHERE address = ?`)
       .run(JSON.stringify(deployed), now, address.toLowerCase());
+    this.walletPersist("account.deployed", {
+      address: address.toLowerCase(),
+      chainId,
+    });
     return this.getWalletAccount(address);
   }
 
@@ -1220,6 +1289,14 @@ export class CommerceDb {
         credentialId: input.credentialId,
         now,
       });
+    this.walletPersist("device.registered", {
+      walletAddress: input.walletAddress.toLowerCase(),
+      chainId: input.chainId,
+      ownerQx: input.ownerQx,
+      ownerQy: input.ownerQy,
+      label: input.label,
+      credentialId: input.credentialId,
+    });
     return this.listWalletDevices(input.walletAddress, input.chainId).find(
       (d) => d.ownerQx === input.ownerQx && d.ownerQy === input.ownerQy
     )!;
@@ -1231,6 +1308,12 @@ export class CommerceDb {
         `DELETE FROM wallet_devices WHERE wallet_address = ? AND chain_id = ? AND owner_qx = ? AND owner_qy = ?`
       )
       .run(walletAddress.toLowerCase(), chainId, ownerQx, ownerQy);
+    this.walletPersist("device.removed", {
+      walletAddress: walletAddress.toLowerCase(),
+      chainId,
+      ownerQx,
+      ownerQy,
+    });
   }
 
   createWalletPairing(walletAddress: string, chainId: string): WalletPairingRecord {
@@ -1343,6 +1426,11 @@ export class CommerceDb {
          ON CONFLICT(wallet_address, entity_id) DO UPDATE SET label = COALESCE(excluded.label, wallet_entities.label)`
       )
       .run(input.walletAddress.toLowerCase(), input.entityId, input.label ?? null, now);
+    this.walletPersist("entity.registered", {
+      walletAddress: input.walletAddress.toLowerCase(),
+      entityId: input.entityId,
+      label: input.label ?? null,
+    });
     return this.getWalletEntity(input.walletAddress, input.entityId)!;
   }
 
@@ -1396,6 +1484,16 @@ export class CommerceDb {
         input.credentialId ?? null,
         now
       );
+    this.walletPersist("entity_key.registered", {
+      walletAddress: input.walletAddress.toLowerCase(),
+      entityId: input.entityId,
+      keyId: input.keyId,
+      keyType: input.keyType,
+      qx: input.qx ?? null,
+      qy: input.qy ?? null,
+      eoa: input.eoa ?? null,
+      credentialId: input.credentialId ?? null,
+    });
     return this.getWalletEntityKey(input.walletAddress, input.keyId)!;
   }
 
@@ -2193,6 +2291,17 @@ export class CommerceDb {
         now,
         id: input.id,
       });
+    if (terminal && input.status) {
+      const updated = this.getWalletRecoveryJob(input.id)!;
+      this.walletPersist("recovery.job_status", {
+        jobId: updated.id,
+        walletAddress: updated.walletAddress,
+        chainId: updated.chainId,
+        kind: updated.kind,
+        status: updated.status,
+        txHash: updated.txHash,
+      });
+    }
     return this.getWalletRecoveryJob(input.id)!;
   }
 
@@ -2221,6 +2330,13 @@ export class CommerceDb {
            updated_at = @now`
       )
       .run({ addr, email, verifiedAt, now });
+    if (verifiedAt) {
+      this.walletPersist("email.verified", {
+        walletAddress: addr,
+        email,
+        verifiedAt,
+      });
+    }
     return this.getWalletEmail(addr)!;
   }
 
@@ -2250,6 +2366,12 @@ export class CommerceDb {
       .run(now, normalizeEmail(email), now, walletAddress.toLowerCase());
     if (result.changes === 0) {
       this.upsertWalletEmail({ walletAddress, email, verifiedAt: now });
+    } else {
+      this.walletPersist("email.verified", {
+        walletAddress: walletAddress.toLowerCase(),
+        email: normalizeEmail(email),
+        verifiedAt: now,
+      });
     }
     return this.getWalletEmail(walletAddress);
   }
