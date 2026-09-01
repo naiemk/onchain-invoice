@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { ActionTile } from "@/components/ActionTile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +19,7 @@ import {
 import { webAuthnSupported } from "@/shared/webauthn.js";
 import { unlockWalletWithPasskey } from "@/shared/wallet-unlock.js";
 import { isAdvancedMode } from "@/shared/wallet-mode.js";
-import type { WalletBalanceChain } from "../../../../commerce/shared/wallet.js";
+import type { WalletBalanceChain } from "../../../../../commerce/shared/wallet.js";
 import { WalletFrame } from "./WalletFrame";
 
 function ChainBalanceList({ chains, t }: { chains: WalletBalanceChain[]; t: (k: string, v?: Record<string, string | number>) => string }) {
@@ -113,32 +114,41 @@ function WalletDashboard({ session }: { session: WalletSession }) {
       setAdvancedHtml(
         <div className="grid gap-3 sm:grid-cols-2">
           {!onChainAdvanced ? (
-            <Link to="/wallet/super-wallet" className="rounded-lg border border-primary/30 bg-primary/5 p-4 no-underline hover:no-underline">
-              <strong className="block text-sm">{t("wallet.superWalletHomeCta")}</strong>
-              <span className="text-xs text-muted-foreground">{t("wallet.superWalletHomeBanner")}</span>
-            </Link>
+            <ActionTile
+              href="/wallet/super-wallet"
+              title={t("wallet.superWalletHomeCta")}
+              description={t("wallet.superWalletHomeBanner")}
+              cta={t("wallet.superWalletConvertCta")}
+              className="border-primary/30 bg-primary/5"
+            />
           ) : (
-            <Link to="/wallet/super-wallet" className="rounded-lg border p-4 no-underline hover:no-underline">
-              <strong className="block text-sm">{t("wallet.superWalletTitle")}</strong>
-              <span className="text-xs text-muted-foreground">{t("wallet.superWalletActiveShort")}</span>
-            </Link>
+            <ActionTile
+              href="/wallet/super-wallet"
+              title={t("wallet.superWalletTitle")}
+              description={t("wallet.superWalletActiveShort")}
+              cta={t("wallet.superWalletManage")}
+            />
           )}
-          <Link to="/wallet/security" className="rounded-lg border p-4 no-underline hover:no-underline">
-            <strong className="block text-sm">{t("wallet.advancedDevicesTitle")}</strong>
-            <span className="text-xs text-muted-foreground">{t(devicesBodyKey, { count: deviceCount })}</span>
-          </Link>
-          <Link to="/wallet/recover" className="rounded-lg border p-4 no-underline hover:no-underline">
-            <strong className="block text-sm">{t("wallet.advancedRecoveryTitle")}</strong>
-            <span className="text-xs text-muted-foreground">{t("wallet.advancedRecoveryBody")}</span>
-          </Link>
-          <Link to="/merchant" className="rounded-lg border p-4 no-underline hover:no-underline">
-            <strong className="block text-sm">{t("wallet.advancedInvoicesTitle")}</strong>
-            <span className="text-xs text-muted-foreground">{t("wallet.advancedInvoicesBody")}</span>
-          </Link>
-          <Link to="/wallet/developers" className="rounded-lg border p-4 no-underline hover:no-underline">
-            <strong className="block text-sm">{t("wallet.developersTab")}</strong>
-            <span className="text-xs text-muted-foreground">{t("wallet.advancedDevBody")}</span>
-          </Link>
+          <ActionTile
+            href="/wallet/security"
+            title={t("wallet.advancedDevicesTitle")}
+            description={t(devicesBodyKey, { count: deviceCount })}
+          />
+          <ActionTile
+            href="/wallet/recover"
+            title={t("wallet.advancedRecoveryTitle")}
+            description={t("wallet.advancedRecoveryBody")}
+          />
+          <ActionTile
+            href="/merchant"
+            title={t("wallet.advancedInvoicesTitle")}
+            description={t("wallet.advancedInvoicesBody")}
+          />
+          <ActionTile
+            href="/wallet/developers"
+            title={t("wallet.developersTab")}
+            description={t("wallet.advancedDevBody")}
+          />
         </div>
       );
     })();
