@@ -161,13 +161,13 @@ function WalletDashboard({ session }: { session: WalletSession }) {
           <Button asChild>
             <Link to="/wallet/get-paid">{t("wallet.actionGetPaid")}</Link>
           </Button>
-          <Button asChild variant="secondary">
+          <Button asChild variant="outline">
             <Link to="/wallet/send">{t("wallet.actionPay")}</Link>
           </Button>
-          <Button asChild variant="secondary">
+          <Button asChild variant="outline">
             <Link to="/wallet/cash">{t("wallet.actionCashIn")}</Link>
           </Button>
-          <Button asChild variant="secondary">
+          <Button asChild variant="outline">
             <Link to="/wallet/cash">{t("wallet.actionCashOut")}</Link>
           </Button>
         </div>
@@ -274,10 +274,10 @@ function WalletPicker({ registry }: { registry: WalletSession[] }) {
         ))}
       </div>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Button asChild variant="secondary">
+        <Button asChild variant="outline">
           <Link to="/wallet/create">{t("wallet.createAnother")}</Link>
         </Button>
-        <Button type="button" variant="secondary" disabled={unlocking} onClick={() => void unlock()}>
+        <Button type="button" variant="outline" disabled={unlocking} onClick={() => void unlock()}>
           {t("wallet.unlockAnother")}
         </Button>
       </div>
@@ -309,29 +309,29 @@ function WalletEmpty() {
 
   return (
     <WalletFrame current="home" showChrome={false} title={t("wallet.homeTitle")} lede={t("wallet.homeLede")}>
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>{t("wallet.createEmptyTitle")}</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{t("wallet.createEmptyTitle")}</CardTitle>
             <CardDescription>{t("wallet.createEmptyBody")}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">{supported ? t("wallet.webauthnOk") : t("wallet.webauthnNo")}</p>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">{supported ? t("wallet.webauthnOk") : t("wallet.webauthnNo")}</p>
             <Button asChild>
               <Link to="/wallet/create">{t("wallet.create")}</Link>
             </Button>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>{t("wallet.unlockSectionTitle")}</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{t("wallet.unlockSectionTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button type="button" variant="secondary" disabled={!supported || unlocking} onClick={() => void unlock()}>
+            <Button type="button" variant="outline" disabled={!supported || unlocking} onClick={() => void unlock()}>
               {t("wallet.unlock")}
             </Button>
-            <p className="text-sm text-muted-foreground">{t("wallet.unlockHint")}</p>
-            <p className="text-sm text-muted-foreground">{t("wallet.pairFromOtherHint")}</p>
+            <p className="text-xs text-muted-foreground">{t("wallet.unlockHint")}</p>
+            <p className="text-xs text-muted-foreground">{t("wallet.pairFromOtherHint")}</p>
           </CardContent>
         </Card>
       </div>

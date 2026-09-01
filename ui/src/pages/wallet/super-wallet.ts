@@ -3,12 +3,11 @@ import { t } from "../../i18n/t.js";
 import { createPasskey, createSecurityKey, isYubiKeyPinRequiredError, loadWalletSession } from "../../shared/webauthn.js";
 import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import {
-  bindWalletAccountBar,
-  renderYubiKeyPinRequiredPanel,
+  paintWalletLoading,
+  paintWalletPage,
   setButtonLoading,
   showStatus,
-  walletFrame,
-  walletLoadingFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 import { fetchWalletConfig, waitForUserOp } from "../../shared/wallet-api.js";
@@ -44,7 +43,7 @@ import type {
   WalletKeyEnrollmentRequestRecord,
 } from "../../../../commerce/shared/wallet.js";
 
-export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> {
+export async function renderWalletSuperWallet(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
@@ -56,8 +55,7 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
     return;
   }
 
-  root.innerHTML = walletLoadingFrame("superWallet", t("wallet.superWalletTitle"));
-  bindWalletAccountBar(root);
+  paintWalletLoading(root, "superWallet", t("wallet.superWalletTitle"), undefined, opts);
 
   const config = await fetchWalletConfig();
   await initEoaConnector(config);
@@ -88,11 +86,13 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
   }
   if (!isSpaRenderCurrent(gen)) return;
 
-  root.innerHTML = walletFrame({
-    current: "superWallet",
-    title: t("wallet.superWalletTitle"),
-    lede: t("wallet.superWalletLede"),
-    body: `
+  paintWalletPage(
+    root,
+    {
+      current: "superWallet",
+      title: t("wallet.superWalletTitle"),
+      lede: t("wallet.superWalletLede"),
+      body: `
       ${
         !policy.advanced
           ? renderUpgradeSection()
@@ -125,16 +125,18 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
             </section>`
       }
       <p id="super-status" class="status wallet-status" role="status"></p>`,
-  });
-
-  bindWalletAccountBar(root);
-  bindUpgrade(root, session, config);
-  if (policy.advanced) {
-    bindPolicy(root, session, config, roster, adminEntity);
-    bindEntities(root, session, config, roster, adminEntity);
-    bindKeyActions(root, session, config, roster, adminEntity);
-    bindEnrollmentApprovals(root, session, config, adminEntity);
-  }
+    },
+    opts,
+    (r) => {
+      bindUpgrade(r, session, config, opts);
+      if (policy.advanced) {
+        bindPolicy(r, session, config, roster, adminEntity, opts);
+        bindEntities(r, session, config, roster, adminEntity, opts);
+        bindKeyActions(r, session, config, roster, adminEntity, opts);
+        bindEnrollmentApprovals(r, session, config, adminEntity, opts);
+      }
+    }
+  );
 }
 
 function renderUpgradeSection(): string {
@@ -260,7 +262,8 @@ function bindEnrollmentApprovals(
   root: HTMLElement,
   session: NonNullable<ReturnType<typeof loadWalletSession>>,
   config: Awaited<ReturnType<typeof fetchWalletConfig>>,
-  adminEntity: WalletEntityRecord | null
+  adminEntity: WalletEntityRecord | null,
+  opts?: WalletRenderOptions
 ): void {
   if (!adminEntity) return;
 
@@ -288,7 +291,7 @@ function bindEnrollmentApprovals(
           credentialId: req.credentialId ?? undefined,
         });
         await approveKeyEnrollmentRequest(session.address, requestId);
-        await renderWalletSuperWallet(root);
+        await renderWalletSuperWallet(root, opts);
       } catch (error) {
         showStatus(status, error instanceof Error ? error.message : String(error), "error");
       } finally {
@@ -303,7 +306,7 @@ function bindEnrollmentApprovals(
       const status = root.querySelector<HTMLElement>("#super-status");
       try {
         await rejectKeyEnrollmentRequest(session.address, requestId);
-        await renderWalletSuperWallet(root);
+        await renderWalletSuperWallet(root, opts);
       } catch (error) {
         showStatus(status, error instanceof Error ? error.message : String(error), "error");
       }
@@ -314,7 +317,8 @@ function bindEnrollmentApprovals(
 function bindUpgrade(
   root: HTMLElement,
   session: ReturnType<typeof loadWalletSession>,
-  config: Awaited<ReturnType<typeof fetchWalletConfig>>
+  config: Awaited<ReturnType<typeof fetchWalletConfig>>,
+  opts?: WalletRenderOptions
 ): void {
   root.querySelector("#enable-advanced")?.addEventListener("click", async () => {
     if (!session) return;
@@ -353,7 +357,7 @@ function bindUpgrade(
         qy: session.qy,
         credentialId: session.credentialId ?? null,
       });
-      await renderWalletSuperWallet(root);
+      await renderWalletSuperWallet(root, opts);
     } catch (error) {
       showStatus(status, error instanceof Error ? error.message : String(error), "error");
     } finally {
@@ -367,7 +371,8 @@ function bindPolicy(
   session: NonNullable<ReturnType<typeof loadWalletSession>>,
   config: Awaited<ReturnType<typeof fetchWalletConfig>>,
   roster: { entities: WalletEntityRecord[]; keys: WalletEntityKeyRecord[] },
-  adminEntity: WalletEntityRecord | null
+  adminEntity: WalletEntityRecord | null,
+  opts?: WalletRenderOptions
 ): void {
   root.querySelector("#apply-threshold")?.addEventListener("click", async () => {
     if (!adminEntity) return;
@@ -406,7 +411,7 @@ function bindPolicy(
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
       if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
-      await renderWalletSuperWallet(root);
+      await renderWalletSuperWallet(root, opts);
     } catch (error) {
       showStatus(status, error instanceof Error ? error.message : String(error), "error");
     } finally {
@@ -420,7 +425,8 @@ function bindEntities(
   session: NonNullable<ReturnType<typeof loadWalletSession>>,
   config: Awaited<ReturnType<typeof fetchWalletConfig>>,
   _roster: { entities: WalletEntityRecord[]; keys: WalletEntityKeyRecord[] },
-  adminEntity: WalletEntityRecord | null
+  adminEntity: WalletEntityRecord | null,
+  opts?: WalletRenderOptions
 ): void {
   root.querySelector("#add-entity")?.addEventListener("click", async () => {
     const status = root.querySelector<HTMLElement>("#super-status");
@@ -449,7 +455,7 @@ function bindEntities(
       const result = await waitForUserOp(userOpHash);
       if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
       await registerWalletEntity({ walletAddress: session.address, entityId, label: email });
-      await renderWalletSuperWallet(root);
+      await renderWalletSuperWallet(root, opts);
     } catch (error) {
       showStatus(status, error instanceof Error ? error.message : String(error), "error");
     } finally {
@@ -463,7 +469,8 @@ function bindKeyActions(
   session: NonNullable<ReturnType<typeof loadWalletSession>>,
   config: Awaited<ReturnType<typeof fetchWalletConfig>>,
   _roster: { entities: WalletEntityRecord[]; keys: WalletEntityKeyRecord[] },
-  adminEntity: WalletEntityRecord | null
+  adminEntity: WalletEntityRecord | null,
+  opts?: WalletRenderOptions
 ): void {
   if (!adminEntity) return;
 
@@ -486,7 +493,7 @@ function bindKeyActions(
           eoa: zeroPadValue("0x00", 20),
           credentialId: fields.credentialId,
         });
-        await renderWalletSuperWallet(root);
+        await renderWalletSuperWallet(root, opts);
       } catch (error) {
         showStatus(status, error instanceof Error ? error.message : String(error), "error");
       }
@@ -512,7 +519,7 @@ function bindKeyActions(
           eoa: zeroPadValue("0x00", 20),
           credentialId: fields.credentialId,
         });
-        await renderWalletSuperWallet(root);
+        await renderWalletSuperWallet(root, opts);
       } catch (error) {
         if (isYubiKeyPinRequiredError(error)) {
           showStatus(status, t("wallet.yubikeyPinRequiredTitle"), "error");
@@ -540,7 +547,7 @@ function bindKeyActions(
           qy: zeroPadValue("0x00", 32),
           eoa,
         });
-        await renderWalletSuperWallet(root);
+        await renderWalletSuperWallet(root, opts);
       } catch (error) {
         showStatus(status, error instanceof Error ? error.message : String(error), "error");
       }

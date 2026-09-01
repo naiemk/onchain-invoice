@@ -36,8 +36,8 @@ function NavLinks({ pathname, t, onNavigate }: { pathname: string; t: (k: string
           onClick={onNavigate}
           aria-current={isActive(pathname, href) ? "page" : undefined}
           className={cn(
-            "text-sm font-medium transition-colors hover:text-foreground",
-            isActive(pathname, href) ? "text-foreground" : "text-muted-foreground"
+            "rounded-md px-2 py-1 text-xs font-medium transition-colors hover:text-foreground",
+            isActive(pathname, href) ? "bg-muted text-foreground" : "text-muted-foreground"
           )}
         >
           {t(labelKey)}

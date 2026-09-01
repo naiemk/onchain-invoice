@@ -7,11 +7,11 @@ import { qrThemeColors } from "../../shared/qr-colors.js";
 import {
   addressBox,
   bindCopyButtons,
-  bindWalletAccountBar,
-  walletFrame,
+  paintWalletPage,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 
-export async function renderWalletReceive(root: HTMLElement): Promise<void> {
+export async function renderWalletReceive(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
@@ -19,11 +19,13 @@ export async function renderWalletReceive(root: HTMLElement): Promise<void> {
     return;
   }
 
-  root.innerHTML = walletFrame({
-    current: "receive",
-    title: t("wallet.receiveTitle"),
-    lede: t("wallet.receiveLede"),
-    body: `
+  paintWalletPage(
+    root,
+    {
+      current: "receive",
+      title: t("wallet.receiveTitle"),
+      lede: t("wallet.receiveLede"),
+      body: `
       <div class="wallet-receive">
         <div id="wallet-receive-qr" class="wallet-receive-qr-slot" aria-busy="true"></div>
         <p class="eyebrow">${escapeHtml(t("wallet.yourAddress"))}</p>
@@ -33,9 +35,12 @@ export async function renderWalletReceive(root: HTMLElement): Promise<void> {
           <a class="tc-btn secondary" href="/wallet/deposit" data-route>${escapeHtml(t("wallet.depositCta"))}</a>
         </div>
       </div>`,
-  });
-  bindWalletAccountBar(root);
-  bindCopyButtons(root);
+    },
+    opts,
+    (r) => {
+      bindCopyButtons(r);
+    }
+  );
 
   let qrDataUrl = "";
   try {

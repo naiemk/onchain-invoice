@@ -81,11 +81,23 @@ function useFocusMainOnNavigate() {
   }, [location.pathname]);
 }
 
+function useHashScroll() {
+  const location = useLocation();
+  useEffect(() => {
+    if (!location.hash) return;
+    const id = location.hash.slice(1);
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [location.pathname, location.hash]);
+}
+
 function AppRoutes() {
   const location = useLocation();
   usePageMeta();
   useLegacyRouteBridge();
   useFocusMainOnNavigate();
+  useHashScroll();
 
   const chrome = location.pathname === "/pay" ? currentPayChromeFromLocation() : "full";
 

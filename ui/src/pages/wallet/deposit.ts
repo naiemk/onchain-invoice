@@ -11,13 +11,13 @@ import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/
 import { loadWalletSession } from "../../shared/webauthn.js";
 import { createWalletOnrampSession } from "../../shared/wallet-api.js";
 import {
-  bindWalletAccountBar,
+  paintWalletLoading,
+  paintWalletPage,
   showStatus,
-  walletFrame,
-  walletLoadingFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 
-export async function renderWalletDeposit(root: HTMLElement): Promise<void> {
+export async function renderWalletDeposit(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
@@ -25,8 +25,7 @@ export async function renderWalletDeposit(root: HTMLElement): Promise<void> {
     return;
   }
 
-  root.innerHTML = walletLoadingFrame("receive", t("wallet.depositTitle"));
-  bindWalletAccountBar(root);
+  paintWalletLoading(root, "receive", t("wallet.depositTitle"), undefined, opts);
 
   let fiats = ["USD", "EUR", "GBP", "SEK"];
   let sandbox = false;
@@ -45,23 +44,28 @@ export async function renderWalletDeposit(root: HTMLElement): Promise<void> {
   if (!isSpaRenderCurrent(gen)) return;
 
   if (!enabled) {
-    root.innerHTML = walletFrame({
-      current: "receive",
-      title: t("wallet.depositTitle"),
-      lede: t("wallet.depositLede"),
-      body: `<p class="danger">${escapeHtml(t("wallet.depositUnavailable"))}</p>
+    paintWalletPage(
+      root,
+      {
+        current: "receive",
+        title: t("wallet.depositTitle"),
+        lede: t("wallet.depositLede"),
+        body: `<p class="danger">${escapeHtml(t("wallet.depositUnavailable"))}</p>
         <p><a href="/wallet/receive" data-route>${escapeHtml(t("wallet.depositBackReceive"))}</a></p>`,
-    });
-    bindWalletAccountBar(root);
+      },
+      opts
+    );
     return;
   }
 
   const defaultFiat = fiats[0] ?? "USD";
-  root.innerHTML = walletFrame({
-    current: "receive",
-    title: t("wallet.depositTitle"),
-    lede: t("wallet.depositLede"),
-    body: `
+  paintWalletPage(
+    root,
+    {
+      current: "receive",
+      title: t("wallet.depositTitle"),
+      lede: t("wallet.depositLede"),
+      body: `
       <div class="field">
         <label for="wallet-deposit-fiat">${escapeHtml(t("wallet.depositFiatLabel"))}</label>
         <select id="wallet-deposit-fiat">${fiats
@@ -80,12 +84,14 @@ export async function renderWalletDeposit(root: HTMLElement): Promise<void> {
       ${sandbox ? `<p class="callout info">${escapeHtml(t("wallet.depositSandboxNote"))}</p>` : ""}
       <div id="wallet-deposit-frame" class="onramp-frame-host" hidden></div>
       <p id="wallet-deposit-status" class="status wallet-status" role="status"></p>`,
-  });
-  bindWalletAccountBar(root);
-
-  root.querySelector("#wallet-deposit-start")?.addEventListener("click", () => {
-    void startDeposit(root, session.address);
-  });
+    },
+    opts,
+    (r) => {
+      r.querySelector("#wallet-deposit-start")?.addEventListener("click", () => {
+        void startDeposit(r, session.address);
+      });
+    }
+  );
 }
 
 async function startDeposit(root: HTMLElement, walletAddress: string): Promise<void> {

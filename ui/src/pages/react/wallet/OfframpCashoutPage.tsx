@@ -6,7 +6,7 @@ import { WalletBodyMount } from "./WalletBodyMount";
 export function OfframpCashoutPage() {
   const { t } = useLocale();
   return (
-    <WalletFrame current="send" title={t("wallet.offrampCashoutTitle")}>
+    <WalletFrame current="cash" title={t("wallet.offrampCashoutTitle")}>
       <WalletBodyMount render={renderWalletOfframpCashout} />
     </WalletFrame>
   );

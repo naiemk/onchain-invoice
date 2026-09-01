@@ -6,7 +6,7 @@ import { WalletBodyMount } from "./WalletBodyMount";
 export function DepositPage() {
   const { t } = useLocale();
   return (
-    <WalletFrame current="receive" title={t("wallet.depositTitle")} lede={t("wallet.depositLede")}>
+    <WalletFrame current="cash" title={t("wallet.depositTitle")} lede={t("wallet.depositLede")}>
       <WalletBodyMount render={renderWalletDeposit} />
     </WalletFrame>
   );

@@ -17,14 +17,17 @@ import {
   waitForUserOp,
 } from "../../shared/wallet-api.js";
 import {
-  bindWalletAccountBar,
+  paintWalletLoading,
+  paintWalletPage,
   setButtonLoading,
   showStatus,
-  walletFrame,
-  walletLoadingFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 
-export async function renderWalletOfframpCashout(root: HTMLElement): Promise<void> {
+export async function renderWalletOfframpCashout(
+  root: HTMLElement,
+  opts?: WalletRenderOptions
+): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
@@ -39,40 +42,48 @@ export async function renderWalletOfframpCashout(root: HTMLElement): Promise<voi
   const sourceCurrency = params.get("sourceCurrency")?.trim() ?? "";
   const memoTag = params.get("providerWalletAddressTag")?.trim() ?? "";
 
-  root.innerHTML = walletLoadingFrame("send", t("wallet.offrampCashoutTitle"));
-  bindWalletAccountBar(root);
+  paintWalletLoading(root, "send", t("wallet.offrampCashoutTitle"), undefined, opts);
 
   if (memoTag) {
-    root.innerHTML = walletFrame({
-      current: "send",
-      title: t("wallet.offrampCashoutTitle"),
-      body: `<p class="danger">${escapeHtml(t("wallet.offrampCashoutMemoUnsupported"))}</p>
+    paintWalletPage(
+      root,
+      {
+        current: "send",
+        title: t("wallet.offrampCashoutTitle"),
+        body: `<p class="danger">${escapeHtml(t("wallet.offrampCashoutMemoUnsupported"))}</p>
         <p><a href="/wallet" data-route>${escapeHtml(t("wallet.goToWallet"))}</a></p>`,
-    });
-    bindWalletAccountBar(root);
+      },
+      opts
+    );
     return;
   }
 
   if (!isAddress(providerWalletAddress) || !inAmount || !transactionId || !sourceCurrency) {
-    root.innerHTML = walletFrame({
-      current: "send",
-      title: t("wallet.offrampCashoutTitle"),
-      body: `<p class="danger">${escapeHtml(t("wallet.offrampCashoutInvalid"))}</p>
+    paintWalletPage(
+      root,
+      {
+        current: "send",
+        title: t("wallet.offrampCashoutTitle"),
+        body: `<p class="danger">${escapeHtml(t("wallet.offrampCashoutInvalid"))}</p>
         <p><a href="/wallet/withdraw" data-route>${escapeHtml(t("wallet.withdrawTitle"))}</a></p>`,
-    });
-    bindWalletAccountBar(root);
+      },
+      opts
+    );
     return;
   }
 
   const mapped = resolveProductAssetFromOnramperCryptoId(sourceCurrency);
   if (!mapped) {
-    root.innerHTML = walletFrame({
-      current: "send",
-      title: t("wallet.offrampCashoutTitle"),
-      body: `<p class="danger">${escapeHtml(t("wallet.offrampCashoutUnsupportedAsset", { asset: sourceCurrency }))}</p>
+    paintWalletPage(
+      root,
+      {
+        current: "send",
+        title: t("wallet.offrampCashoutTitle"),
+        body: `<p class="danger">${escapeHtml(t("wallet.offrampCashoutUnsupportedAsset", { asset: sourceCurrency }))}</p>
         <p><a href="/wallet" data-route>${escapeHtml(t("wallet.goToWallet"))}</a></p>`,
-    });
-    bindWalletAccountBar(root);
+      },
+      opts
+    );
     return;
   }
 
@@ -88,14 +99,17 @@ export async function renderWalletOfframpCashout(root: HTMLElement): Promise<voi
     });
 
   if (!sendTokenAddress) {
-    root.innerHTML = walletFrame({
-      current: "send",
-      title: t("wallet.offrampCashoutTitle"),
-      body: `<p class="danger">${escapeHtml(
-        t("wallet.offrampCashoutUnsupportedAsset", { asset: `${mapped.token} (${mapped.chainId})` })
-      )}</p>`,
-    });
-    bindWalletAccountBar(root);
+    paintWalletPage(
+      root,
+      {
+        current: "send",
+        title: t("wallet.offrampCashoutTitle"),
+        body: `<p class="danger">${escapeHtml(
+          t("wallet.offrampCashoutUnsupportedAsset", { asset: `${mapped.token} (${mapped.chainId})` })
+        )}</p>`,
+      },
+      opts
+    );
     return;
   }
 
@@ -104,23 +118,28 @@ export async function renderWalletOfframpCashout(root: HTMLElement): Promise<voi
   try {
     sendAmount = parseUnits(inAmount, decimals);
   } catch {
-    root.innerHTML = walletFrame({
-      current: "send",
-      title: t("wallet.offrampCashoutTitle"),
-      body: `<p class="danger">${escapeHtml(t("wallet.offrampCashoutInvalid"))}</p>`,
-    });
-    bindWalletAccountBar(root);
+    paintWalletPage(
+      root,
+      {
+        current: "send",
+        title: t("wallet.offrampCashoutTitle"),
+        body: `<p class="danger">${escapeHtml(t("wallet.offrampCashoutInvalid"))}</p>`,
+      },
+      opts
+    );
     return;
   }
 
   const feeAtoms = BigInt(config.bundlerFeeUsdc || "0");
   const recipient = getAddress(providerWalletAddress);
 
-  root.innerHTML = walletFrame({
-    current: "send",
-    title: t("wallet.offrampCashoutTitle"),
-    lede: t("wallet.offrampCashoutLede"),
-    body: `
+  paintWalletPage(
+    root,
+    {
+      current: "send",
+      title: t("wallet.offrampCashoutTitle"),
+      lede: t("wallet.offrampCashoutLede"),
+      body: `
       <dl class="wallet-fee-summary">
         <div><dt>${escapeHtml(t("wallet.offrampCashoutAmount"))}</dt><dd>${escapeHtml(inAmount)} ${escapeHtml(mapped.token)}</dd></div>
         <div><dt>${escapeHtml(t("wallet.offrampCashoutDestination"))}</dt><dd class="mono">${escapeHtml(recipient)}</dd></div>
@@ -129,22 +148,24 @@ export async function renderWalletOfframpCashout(root: HTMLElement): Promise<voi
       <button type="button" class="tc-btn" id="offramp-cashout-confirm">${escapeHtml(t("wallet.offrampCashoutConfirm"))}</button>
       <p id="offramp-cashout-status" class="status wallet-status" role="status"></p>
       <p class="field-hint"><a href="/wallet" data-route>${escapeHtml(t("wallet.goToWallet"))}</a></p>`,
-  });
-  bindWalletAccountBar(root);
-
-  root.querySelector("#offramp-cashout-confirm")?.addEventListener("click", () => {
-    void runCashout(root, {
-      session,
-      config,
-      recipient,
-      sendAmount,
-      feeAtoms,
-      sendTokenAddress,
-      chainId: mapped.chainId,
-      transactionId,
-      sourceCurrency,
-    });
-  });
+    },
+    opts,
+    (r) => {
+      r.querySelector("#offramp-cashout-confirm")?.addEventListener("click", () => {
+        void runCashout(r, {
+          session,
+          config,
+          recipient,
+          sendAmount,
+          feeAtoms,
+          sendTokenAddress,
+          chainId: mapped.chainId,
+          transactionId,
+          sourceCurrency,
+        });
+      });
+    }
+  );
 }
 
 async function runCashout(

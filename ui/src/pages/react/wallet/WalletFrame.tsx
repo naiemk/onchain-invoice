@@ -1,8 +1,9 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Copy, Lock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Surface } from "@/components/Surface";
+import { ScrollSubnav } from "@/components/ScrollSubnav";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,7 +56,7 @@ function WalletIdenticon({ session }: { session: WalletSession }) {
   const { h, s, l } = addressPalette(session.address);
   return (
     <span
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
       style={{ backgroundColor: `hsl(${h} ${s}% ${l}%)` }}
       aria-hidden
     >
@@ -75,7 +76,6 @@ function WalletAccountBar({
 }) {
   const { t } = useLocale();
   const navigate = useNavigate();
-  const location = useLocation();
   const [copied, setCopied] = useState(false);
   const multiple = registry.length > 1;
 
@@ -100,67 +100,51 @@ function WalletAccountBar({
       if (addr.toLowerCase() === session.address.toLowerCase()) return;
       if (setActiveWallet(addr)) {
         onSessionChange();
-        navigate(location.pathname + location.search, { replace: true });
+        navigate("/wallet", { replace: true });
       }
     },
-    [session.address, onSessionChange, navigate, location.pathname, location.search]
+    [session.address, onSessionChange, navigate]
   );
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {multiple ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-auto gap-2 px-2 py-1.5">
-                <WalletIdenticon session={session} />
-                <span className="font-medium">{session.label}</span>
-                <ChevronDown className="h-4 w-4 opacity-60" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-64">
-              <DropdownMenuLabel>{t("wallet.walletsOnDevice")}</DropdownMenuLabel>
-              {registry.map((w) => {
-                const active = w.address.toLowerCase() === session.address.toLowerCase();
-                return (
-                  <DropdownMenuItem key={w.address} onClick={() => switchWallet(w.address)} className="gap-2">
-                    <WalletIdenticon session={w} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{w.label}</div>
-                      <div className="truncate font-mono text-xs text-muted-foreground">{shortAddress(w.address)}</div>
-                    </div>
-                    {active && <Check className="h-4 w-4 shrink-0 text-primary" />}
-                  </DropdownMenuItem>
-                );
-              })}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/wallet/create" className="gap-2">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                    <Plus className="h-4 w-4" />
-                  </span>
-                  {t("wallet.createAnother")}
-                </Link>
+    <div className="mb-4 flex items-center gap-2 border-b border-border pb-3">
+      {multiple ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 gap-2 px-1.5">
+              <WalletIdenticon session={session} />
+              <span className="max-w-[8rem] truncate text-sm">{session.label}</span>
+              <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>{t("wallet.switchWallet")}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {registry.map((w) => (
+              <DropdownMenuItem key={w.address} onClick={() => switchWallet(w.address)}>
+                {w.label}
+                <span className="ms-auto font-mono text-[10px] text-muted-foreground">{shortAddress(w.address)}</span>
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <div className="flex items-center gap-2 px-2 py-1.5">
-            <WalletIdenticon session={session} />
-            <span className="font-medium">{session.label}</span>
-          </div>
-        )}
-        <Button variant="ghost" size="sm" className="font-mono text-xs" onClick={() => void copyAddress()}>
-          {shortAddress(session.address)}
-          {copied ? <Check className="ml-1 h-3.5 w-3.5 text-ok" /> : <Copy className="ml-1 h-3.5 w-3.5 opacity-60" />}
-        </Button>
-        <span className="sr-only" aria-live="polite">
-          {copied ? t("wallet.addressCopied") : ""}
-        </span>
-      </div>
-      <Button variant="outline" size="sm" onClick={lock}>
-        <Lock className="mr-1.5 h-3.5 w-3.5" />
-        {t("wallet.signOut")}
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/wallet/create")}>
+              <Plus className="h-3.5 w-3.5" />
+              {t("wallet.createAnother")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <div className="flex items-center gap-2 px-1">
+          <WalletIdenticon session={session} />
+          <span className="text-sm font-medium">{session.label}</span>
+        </div>
+      )}
+      <Button type="button" variant="outline" size="sm" className="ms-auto font-mono text-[10px]" onClick={() => void copyAddress()}>
+        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        {shortAddress(session.address)}
+      </Button>
+      <Button type="button" variant="ghost" size="icon" aria-label={t("wallet.lock")} onClick={lock}>
+        <Lock className="h-3.5 w-3.5" />
       </Button>
     </div>
   );
@@ -172,23 +156,21 @@ function WalletModeToggle() {
   const location = useLocation();
   const [mode, setMode] = useState<WalletMode>(() => loadWalletMode());
 
-  const selectMode = (next: WalletMode) => {
-    saveWalletMode(next);
-    setMode(next);
-    navigate(location.pathname + location.search, { replace: true });
-  };
-
   return (
-    <div className="inline-flex rounded-lg border bg-muted p-0.5" role="group" aria-label={t("wallet.modeLabel")}>
+    <div className="inline-flex rounded-md border border-border p-0.5" role="group" aria-label={t("wallet.modeLabel")}>
       {(["simple", "advanced"] as const).map((m) => (
         <button
           key={m}
           type="button"
-          onClick={() => selectMode(m)}
           className={cn(
-            "rounded-md px-3 py-1 text-sm font-medium transition-colors",
-            mode === m ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            "rounded px-2 py-1 text-xs font-medium transition-colors",
+            mode === m ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
           )}
+          onClick={() => {
+            saveWalletMode(m);
+            setMode(m);
+            navigate(location.pathname + location.search, { replace: true });
+          }}
         >
           {m === "simple" ? t("wallet.modeSimple") : t("wallet.modeAdvanced")}
         </button>
@@ -203,7 +185,7 @@ function WalletSubnav({ current }: { current: WalletTab }) {
   const advanced = isAdvancedMode();
 
   const links = useMemo(() => {
-    const items: Array<{ href: string; key: WalletTab; label: string }> = [
+    const items: Array<{ href: string; key: string; label: string }> = [
       { href: "/wallet", key: "home", label: t("wallet.homeTab") },
       { href: "/wallet/get-paid", key: "getPaid", label: t("wallet.getPaidTab") },
       { href: "/wallet/send", key: "send", label: t("wallet.payTab") },
@@ -223,29 +205,7 @@ function WalletSubnav({ current }: { current: WalletTab }) {
     return items;
   }, [t, advanced, session, current]);
 
-  return (
-    <nav className="mb-6 flex flex-wrap gap-1 border-b pb-1" aria-label={t("wallet.navLabel")}>
-      {links.map((l) =>
-        l.key === current ? (
-          <span
-            key={l.href}
-            aria-current="page"
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-foreground"
-          >
-            {l.label}
-          </span>
-        ) : (
-          <Link
-            key={l.href}
-            to={l.href}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {l.label}
-          </Link>
-        )
-      )}
-    </nav>
-  );
+  return <ScrollSubnav items={links} current={current} label={t("wallet.navLabel")} className="mb-4 border-b border-border" />;
 }
 
 export function WalletFrame({
@@ -259,7 +219,6 @@ export function WalletFrame({
   title?: string;
   lede?: string;
   children: ReactNode;
-  /** When false, skip account bar + subnav (empty/picker states). */
   showChrome?: boolean;
 }) {
   const { t } = useLocale();
@@ -274,31 +233,31 @@ export function WalletFrame({
 
   if (!showChrome || !session) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 md:px-8">
+      <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
         {!session && title && (
-          <header className="mb-8 space-y-2">
-            <p className="text-sm font-medium uppercase tracking-wider text-primary">{t("wallet.eyebrow")}</p>
-            <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-            {lede && <p className="text-lg text-muted-foreground">{lede}</p>}
+          <header className="mb-6 space-y-1.5">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("wallet.eyebrow")}</p>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            {lede && <p className="text-sm text-muted-foreground">{lede}</p>}
           </header>
         )}
-        <Card className="p-6">{children}</Card>
+        <Surface className="p-5">{children}</Surface>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 md:px-8">
-      <Card className="p-6">
+    <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
+      <Surface className="p-4 sm:p-5">
         <WalletAccountBar session={session} registry={registry} onSessionChange={refreshSession} />
-        <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <WalletModeToggle />
           <WalletSubnav current={current} />
         </div>
-        {title && <h1 className="mb-2 text-2xl font-semibold tracking-tight">{title}</h1>}
-        {lede && <p className="mb-6 text-muted-foreground">{lede}</p>}
+        {title && <h1 className="mb-1 text-xl font-semibold tracking-tight">{title}</h1>}
+        {lede && <p className="mb-4 text-sm text-muted-foreground">{lede}</p>}
         {children}
-      </Card>
+      </Surface>
     </div>
   );
 }
