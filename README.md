@@ -332,6 +332,8 @@ npm install
 npm run compile
 npm test
 npm run build
+npm run hooks:install   # once: pre-commit runs npm test + ui:build (CI parity)
+npm run precommit       # manual run before opening a PR
 ```
 
 Trustless Commerce (API + UI):

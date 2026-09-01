@@ -76,8 +76,8 @@ export async function recoverWalletFromChain(input: {
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await readError(res));
-  const body = (await res.json()) as { account: WalletAccountRecord; recovered: boolean };
-  return { ...body, credentialId };
+  const payload = (await res.json()) as { account: WalletAccountRecord; recovered: boolean };
+  return { ...payload, credentialId };
 }
 
 export function pickRecoveryOwnerCoords(input: {

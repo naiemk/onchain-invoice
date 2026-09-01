@@ -4,9 +4,10 @@
 
 This repo is the `onchain-invoice` payment-infrastructure library (Solidity contracts + TypeScript SDK + optional web server/client + sweep node) **and** the Trustless Commerce product (API under `commerce/`, UI under `ui/`, Docker under `deploy/`). Contract tests spin up Hardhat's in-process EVM network. The legacy `InvoiceWebServer` and the commerce API both use embedded SQLite (`better-sqlite3`) plus Node's built-in `http`.
 
-Standard commands live in `package.json` `scripts` (`compile`, `build`, `test`, `test:contracts`, `commerce:server`, `commerce:sweeper`, `ui`, `docker:test`, `system-test`, `sweep-node`) and the README `## Development` section. Prefer those instead of ad-hoc invocations.
+Standard commands live in `package.json` `scripts` (`compile`, `build`, `test`, `test:contracts`, `commerce:server`, `commerce:sweeper`, `ui`, `docker:test`, `system-test`, `sweep-node`, `precommit`, `hooks:install`) and the README `## Development` section. Prefer those instead of ad-hoc invocations.
 
 Non-obvious notes:
+- **Pre-commit / CI parity:** `npm run hooks:install` once per clone (`git config core.hooksPath .githooks`). Each commit runs `npm test` + `npm run ui:build` (matches `.github/workflows/ci.yml`; skips Docker/GHCR/system-tests). Run `npm run precommit` manually before opening a PR; use `git commit --no-verify` only when you intend to skip checks.
 - Node 22 and dependencies are already installed by the startup update script (`npm install`). `better-sqlite3` is a native module; if it ever fails to load, run `npm rebuild better-sqlite3`.
 - `npm test` runs both the Solidity/Tron contract tests and the `InvoiceWebServer` tests (all Hardhat/Mocha `.ts` files under `test/`). The web-server tests bind an ephemeral port and use in-memory/temp SQLite, so no service needs to be running first.
 - Run one-off scripts (e.g. `scripts/deploy.ts`) with `npx hardhat run <path>`; they call `network.create()` to get an in-process EVM network, so no external RPC/node is required.
