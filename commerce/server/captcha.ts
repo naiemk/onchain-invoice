@@ -7,6 +7,10 @@ export async function verifyCaptcha(config: AppConfig, token: unknown, remoteIp?
   if (typeof token !== "string" || token.length === 0) {
     return false;
   }
+  // CI/tests use TURNSTILE_SECRET=test-secret with captchaToken=test-pass (no Cloudflare call).
+  if (config.turnstileSecret === "test-secret" && token === "test-pass") {
+    return true;
+  }
   if (config.captchaProvider && config.captchaProvider !== "turnstile") {
     throw new Error(`Unsupported captcha provider: ${config.captchaProvider}`);
   }

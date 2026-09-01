@@ -116,7 +116,11 @@ function signAssertion(input: {
   };
 }
 
-async function registerWallet(baseUrl: string, pk: PasskeyFixture): Promise<string> {
+async function registerWallet(
+  baseUrl: string,
+  pk: PasskeyFixture,
+  captchaToken?: string
+): Promise<string> {
   const salt = deriveWalletSalt(pk.qx, pk.qy);
   const address = predictWalletAddress(FACTORY, IMPL, salt);
   const res = await fetch(`${baseUrl}/api/wallet/accounts`, {
@@ -128,6 +132,7 @@ async function registerWallet(baseUrl: string, pk: PasskeyFixture): Promise<stri
       ownerQx: pk.qx,
       ownerQy: pk.qy,
       credentialId: pk.credentialId,
+      ...(captchaToken ? { captchaToken } : {}),
     }),
   });
   expect(res.status).to.equal(201);
@@ -425,7 +430,7 @@ describe("commerce hosted wallet recovery", function () {
     await withApp(
       async (baseUrl) => {
         const pk = createPasskeyFixture();
-        const wallet = await registerWallet(baseUrl, pk);
+        const wallet = await registerWallet(baseUrl, pk, "test-pass");
         const ch = await (
           await fetch(`${baseUrl}/api/wallet/recovery/challenges`, {
             method: "POST",

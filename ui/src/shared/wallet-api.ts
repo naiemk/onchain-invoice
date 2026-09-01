@@ -31,6 +31,7 @@ export async function registerWalletAccount(input: {
   ownerQy: string;
   credentialId: string;
   webauthnAttestation?: unknown;
+  captchaToken?: string | null;
 }): Promise<WalletAccountRecord> {
   const res = await fetch(apiUrl("/api/wallet/accounts"), {
     method: "POST",

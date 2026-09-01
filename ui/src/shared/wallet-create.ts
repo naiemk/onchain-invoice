@@ -18,10 +18,16 @@ export interface WalletCreateResult {
 }
 
 /** Counterfactual wallet create: passkey → predict address → register in API (no on-chain deploy). */
-export async function createCounterfactualWallet(label: string): Promise<WalletCreateResult> {
+export async function createCounterfactualWallet(
+  label: string,
+  opts?: { captchaToken?: string | null }
+): Promise<WalletCreateResult> {
   const config = await fetchWalletConfig();
   if (!config.factoryAddress || !config.implementationAddress) {
     throw new Error(t("wallet.noFactory"));
+  }
+  if (config.turnstileSiteKey && !opts?.captchaToken) {
+    throw new Error(t("wallet.createCaptchaRequired"));
   }
   const owner = await createPasskey(label);
   const salt = deriveWalletSalt(owner.qx, owner.qy);
@@ -34,6 +40,7 @@ export async function createCounterfactualWallet(label: string): Promise<WalletC
     ownerQy: owner.qy,
     credentialId: owner.credentialId,
     webauthnAttestation: owner.attestation,
+    captchaToken: opts?.captchaToken ?? null,
   });
 
   const session: WalletSession = {

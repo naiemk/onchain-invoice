@@ -1,5 +1,7 @@
 import { t } from "../../i18n/t.js";
+import { fetchWalletConfig } from "../../shared/wallet-api.js";
 import { createCounterfactualWallet } from "../../shared/wallet-create.js";
+import { mountTurnstile } from "../../shared/turnstile.js";
 import { webAuthnSupported } from "../../shared/webauthn.js";
 import {
   addressBox,
@@ -24,6 +26,7 @@ export async function renderWalletCreate(root: HTMLElement): Promise<void> {
         <input id="device-name" type="text" placeholder="${escapeHtml(t("wallet.deviceNamePlaceholder"))}" />
       </div>
       <p class="field-hint">${webAuthnSupported() ? escapeHtml(t("wallet.webauthnOk")) : escapeHtml(t("wallet.webauthnNo"))}</p>
+      <div id="wallet-create-captcha" class="wallet-captcha"></div>
       <div class="cta-row">
         <button type="button" class="tc-btn" id="wallet-create-btn">${escapeHtml(t("wallet.createPasskey"))}</button>
         <a class="tc-btn secondary" href="/wallet" data-route>${escapeHtml(t("wallet.cancel"))}</a>
@@ -33,10 +36,19 @@ export async function renderWalletCreate(root: HTMLElement): Promise<void> {
   });
   bindWalletAccountBar(root);
 
-  root.querySelector("#wallet-create-btn")?.addEventListener("click", () => void runCreate(root));
+  const config = await fetchWalletConfig();
+  const siteKey = config.turnstileSiteKey ?? null;
+  const captchaEl = root.querySelector<HTMLElement>("#wallet-create-captcha");
+  const captcha = captchaEl ? await mountTurnstile(captchaEl, siteKey) : null;
+
+  root.querySelector("#wallet-create-btn")?.addEventListener("click", () => void runCreate(root, siteKey, captcha));
 }
 
-async function runCreate(root: HTMLElement): Promise<void> {
+async function runCreate(
+  root: HTMLElement,
+  siteKey: string | null,
+  captcha: Awaited<ReturnType<typeof mountTurnstile>>
+): Promise<void> {
   const status = root.querySelector<HTMLElement>("#wallet-create-status");
   const resultBox = root.querySelector<HTMLElement>("#wallet-create-result");
   const btn = root.querySelector<HTMLButtonElement>("#wallet-create-btn");
@@ -47,7 +59,12 @@ async function runCreate(root: HTMLElement): Promise<void> {
   try {
     setButtonLoading(btn, true, t("wallet.creatingPasskey"));
     status.textContent = t("wallet.creatingPasskey");
-    const { address } = await createCounterfactualWallet(label);
+    const captchaToken = captcha?.getToken() ?? null;
+    if (siteKey && !captchaToken) {
+      showStatus(status, t("wallet.createCaptchaRequired"), "error");
+      return;
+    }
+    const { address } = await createCounterfactualWallet(label, { captchaToken });
     showStatus(status, t("wallet.createdCounterfactual"), "success");
     if (resultBox) {
       resultBox.classList.remove("hidden");
@@ -60,7 +77,13 @@ async function runCreate(root: HTMLElement): Promise<void> {
       bindCopyButtons(resultBox);
     }
   } catch (error) {
-    showStatus(status, error instanceof Error ? error.message : String(error), "error");
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === "captcha_failed") {
+      captcha?.reset();
+      showStatus(status, t("wallet.createCaptchaRequired"), "error");
+    } else {
+      showStatus(status, message, "error");
+    }
   } finally {
     setButtonLoading(btn, false);
   }

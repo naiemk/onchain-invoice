@@ -23,6 +23,7 @@ const BASE_ENV = {
   WALLET_RECOVERY_ADDRESS: "0x72739889bcce2B08a23212bae6C7B9F1C29e7873",
   WALLET_RPC_URL: "",
   EVM_RPC_URL: "",
+  TURNSTILE_SECRET: "",
 } as const;
 
 async function withApp(
@@ -86,6 +87,31 @@ describe("commerce wallet accounts API", function () {
       const patched = (await patch.json()) as { account: { deployedChains: string[] } };
       expect(patched.account.deployedChains).to.include("11155111");
     });
+  });
+
+  it("requires captcha when TURNSTILE_SECRET is set", async function () {
+    await withApp(
+      async (baseUrl) => {
+        const salt = deriveWalletSalt(QX, QY);
+        const address = predictWalletAddress(FACTORY, IMPL, salt);
+        const res = await fetch(`${baseUrl}/api/wallet/accounts`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            address,
+            salt,
+            ownerQx: QX,
+            ownerQy: QY,
+            credentialId: "cred-captcha-test",
+            webauthnAttestation: { clientDataJSON: "abc", attestationObject: "def" },
+          }),
+        });
+        expect(res.status).to.equal(400);
+        const body = (await res.json()) as { error?: string };
+        expect(body.error).to.equal("captcha_failed");
+      },
+      { TURNSTILE_SECRET: "test-secret" }
+    );
   });
 
   it("wallet-config exposes chains and implementation", async function () {
