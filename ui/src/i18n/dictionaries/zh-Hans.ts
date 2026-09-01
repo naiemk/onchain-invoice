@@ -20,6 +20,7 @@ export const zhHans = {
     support: "技术支持",
     getPaid: "收款",
     security: "安全",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -129,6 +130,7 @@ export const zhHans = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "阅读安全说明",
     trustBody: "平台无法改发票打款去向。恢复需要已验证邮箱和监护人批准，然后才进入可取消的链上时间锁。",
     trustTitle: "结算绑定到你的地址。恢复过程可见。",
@@ -253,9 +255,23 @@ export const zhHans = {
     readyLede: "打开钱包处理日常资金，或在客户需要支付链接时创建发票。",
     ctaApiDocs: "查看 API 文档",
     footerCreate: "创建",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "收款",
     title: "按你的方式收款",
     lede: "向客户开具发票、管理未结发票，或分享钱包收款地址。",
@@ -273,6 +289,7 @@ export const zhHans = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "安全",
     title: "可运营的通行密钥、结算与恢复",
     lede: "为不能把丢手机当成丢公司的企业而建。",
@@ -293,6 +310,18 @@ export const zhHans = {
     advPolicies: "支出策略",
     advMultisig: "显式多签策略界面",
     openWallet: "打开钱包",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -433,6 +462,22 @@ export const zhHans = {
     docsAgentsBody:
       "使用项目自带的 Cursor 技能即可创建发票并轮询状态，无需商户后台。完整文档：",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -644,6 +689,7 @@ export const zhHans = {
 
   integrations: {
     eyebrow: "平台集成",
+    breadcrumb: "INTEGRATIONS",
     title: "在您的店铺接受加密货币",
     lede:
       "Trustless Commerce 将托管结账与一次性发票 API 结合，通过轻量适配器对接 WooCommerce、Shopify、创作者平台等。安装插件或将 AI 智能体指向平台技能——链上到账后订单自动更新。",
@@ -662,6 +708,9 @@ export const zhHans = {
     aiSkill: "AI 技能",
     ctaTitle: "从任意平台开始",
     ctaLede: "立即创建测试发票，或打开集成文档和 AI 技能，为您的店铺接入支付。",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -701,4 +750,7 @@ export const zhHans = {
     },
   },
   wallet: walletZhHans,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

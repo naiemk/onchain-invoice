@@ -2,9 +2,20 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getAddress, isAddress } from "ethers";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageCard, PageSplit } from "@/components/PageSplit";
+import { TrustNotice } from "@/components/TrustNotice";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletConfig, waitForUserOp } from "@/shared/wallet-api.js";
 import {
@@ -240,116 +251,149 @@ export function ProposalsPage() {
           <Skeleton className="h-24 w-full" />
         </div>
       ) : (
-        <div className="space-y-8">
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold">{t("wallet.proposalsInbox")}</h2>
-            {proposals.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("wallet.proposalsEmpty")}</p>
-            ) : (
-              <ul className="divide-y rounded-lg border">
-                {proposals.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between gap-4 p-4">
-                    <div>
-                      <strong className="text-sm">{p.status}</strong>
-                      <span className="ml-2 font-mono text-xs text-muted-foreground">{shortAddr(p.target)}</span>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSearchParams({ id: p.id }, { replace: true });
-                        void loadDetail(p.id, session, config!, policy!.threshold);
-                      }}
-                    >
-                      {t("wallet.proposalsOpenOne")}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+        <PageSplit>
+          <div className="space-y-6">
+            <PageCard>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">{t("wallet.proposalsInbox")}</h2>
+                {showCreate ? (
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/wallet/proposals">{t("wallet.cancel")}</Link>
+                  </Button>
+                ) : (
+                  <Button asChild variant="secondary" size="sm">
+                    <Link to="/wallet/proposals?create=1">{t("wallet.proposalsNew")}</Link>
+                  </Button>
+                )}
+              </div>
+              {proposals.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("wallet.proposalsEmpty")}</p>
+              ) : (
+                <ul className="divide-y rounded-lg border">
+                  {proposals.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-4 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge tone={p.status === "executed" ? "verified" : "pending"}>{p.status}</StatusBadge>
+                        <span className="font-mono text-xs text-muted-foreground">{shortAddr(p.target)}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSearchParams({ id: p.id }, { replace: true });
+                          void loadDetail(p.id, session, config!, policy!.threshold);
+                        }}
+                      >
+                        {t("wallet.proposalsOpenOne")}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PageCard>
+
+            {showCreate && (
+              <PageCard>
+                <h2 className="text-base font-semibold">{t("wallet.proposalsCreateTitle")}</h2>
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="prop-recipient">{t("wallet.sendRecipient")}</Label>
+                    <Input
+                      id="prop-recipient"
+                      type="text"
+                      className="font-mono"
+                      placeholder="0x…"
+                      value={recipient}
+                      onChange={(e) => setRecipient(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="prop-amount">{t("wallet.sendAmount")}</Label>
+                    <Input
+                      id="prop-amount"
+                      type="text"
+                      inputMode="decimal"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                    />
+                  </div>
+                  <Button id="create-proposal" type="button" disabled={busy === "create"} onClick={() => void createNew()}>
+                    {t("wallet.proposalsCreateCta")}
+                  </Button>
+                </div>
+              </PageCard>
             )}
-          </section>
 
-          {showCreate ? (
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold">{t("wallet.proposalsCreateTitle")}</h2>
-              <div className="space-y-2">
-                <Label htmlFor="prop-recipient">{t("wallet.sendRecipient")}</Label>
-                <Input
-                  id="prop-recipient"
-                  type="text"
-                  className="font-mono"
-                  placeholder="0x…"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prop-amount">{t("wallet.sendAmount")}</Label>
-                <Input
-                  id="prop-amount"
-                  type="text"
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-              <Button id="create-proposal" type="button" disabled={busy === "create"} onClick={() => void createNew()}>
-                {t("wallet.proposalsCreateCta")}
-              </Button>
-            </section>
-          ) : (
-            <Button asChild variant="outline">
-              <Link to="/wallet/proposals?create=1">{t("wallet.proposalsNew")}</Link>
-            </Button>
-          )}
-
-          {detail && policy && (
-            <section id="proposal-detail" className="space-y-4 rounded-lg border p-4">
-              <h2 className="text-lg font-semibold">{t("wallet.proposalsDetail")}</h2>
-              <p className="font-mono text-xs text-muted-foreground">
-                {detail.proposal.target} · {detail.proposal.status}
+            {status && (
+              <p
+                id="proposal-status"
+                role="status"
+                className={
+                  status.kind === "error"
+                    ? "text-sm text-destructive"
+                    : status.kind === "success"
+                      ? "text-sm text-ok"
+                      : "text-sm text-muted-foreground"
+                }
+              >
+                {status.message}
               </p>
-              <p className="text-sm">
-                {t("wallet.proposalsSigCount", {
-                  count: String(detail.signatures.length),
-                  threshold: String(policy.threshold),
-                })}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  id="sign-proposal"
-                  type="button"
-                  variant="outline"
-                  disabled={busy !== null}
-                  onClick={() => void signCurrent()}
-                >
-                  {t("wallet.proposalsSign")}
-                </Button>
-                <Button id="execute-proposal" type="button" disabled={busy !== null} onClick={() => void executeCurrent()}>
-                  {t("wallet.proposalsExecute")}
-                </Button>
-              </div>
-            </section>
-          )}
+            )}
+          </div>
 
-          {status && (
-            <p
-              id="proposal-status"
-              role="status"
-              className={
-                status.kind === "error"
-                  ? "text-sm text-destructive"
-                  : status.kind === "success"
-                    ? "text-sm text-ok"
-                    : "text-sm text-muted-foreground"
-              }
-            >
-              {status.message}
-            </p>
-          )}
-        </div>
+          <PageCard>
+            <h2 className="text-base font-semibold">{t("wallet.sendPauseTitle")}</h2>
+            <TrustNotice className="mt-4 border-0 bg-muted/40 p-0">{t("wallet.sendPauseBody")}</TrustNotice>
+            {policy && (
+              <p className="mt-4 text-sm text-muted-foreground">
+                {t("wallet.proposalsLede", { threshold: String(policy.threshold) })}
+              </p>
+            )}
+          </PageCard>
+        </PageSplit>
       )}
+
+      <Dialog
+        open={Boolean(detail && policy)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetail(null);
+            setSearchParams({}, { replace: true });
+          }
+        }}
+      >
+        {detail && policy && (
+          <DialogContent id="proposal-detail">
+            <DialogHeader>
+              <DialogTitle>{t("wallet.proposalsDetail")}</DialogTitle>
+              <DialogDescription className="font-mono text-xs">
+                {detail.proposal.target} · {detail.proposal.status}
+              </DialogDescription>
+            </DialogHeader>
+            <p className="text-sm">
+              {t("wallet.proposalsSigCount", {
+                count: String(detail.signatures.length),
+                threshold: String(policy.threshold),
+              })}
+            </p>
+            <DialogFooter className="flex-col gap-2 sm:flex-row">
+              <Button
+                id="sign-proposal"
+                type="button"
+                variant="outline"
+                disabled={busy !== null}
+                onClick={() => void signCurrent()}
+              >
+                {t("wallet.proposalsSign")}
+              </Button>
+              <Button id="execute-proposal" type="button" disabled={busy !== null} onClick={() => void executeCurrent()}>
+                {t("wallet.proposalsExecute")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
     </WalletFrame>
   );
 }

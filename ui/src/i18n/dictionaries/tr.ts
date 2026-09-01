@@ -20,6 +20,7 @@ export const tr = {
     support: "Destek",
     getPaid: "Ödeme al",
     security: "Güvenlik",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -129,6 +130,7 @@ export const tr = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Güvenliği oku",
     trustBody: "Fatura ödemelerini platform yönlendiremez. Kurtarma, iptal edilebilir zincir üstü timelock’tan önce doğrulanmış e-posta ve guardian onayı ister.",
     trustTitle: "Yerleşim adresinize bağlı. Görebildiğiniz kurtarma.",
@@ -256,9 +258,23 @@ export const tr = {
     readyLede: "Günlük para için cüzdanı açın veya müşteri bir ödeme bağlantısı istediğinde fatura oluşturun.",
     ctaApiDocs: "API dokümanlarını gör",
     footerCreate: "Oluştur",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Ödeme al",
     title: "Ödemeyi kendi yönteminizle alın",
     lede: "Müşteriye fatura kesin, açık faturaları yönetin veya cüzdan alım adresinizi paylaşın.",
@@ -276,6 +292,7 @@ export const tr = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Güvenlik",
     title: "İşletebileceğiniz passkey’ler, yerleşim ve kurtarma",
     lede: "Kayıp telefonu kayıp şirket sayamayan işletmeler için tasarlandı.",
@@ -296,6 +313,18 @@ export const tr = {
     advPolicies: "Harcama politikaları",
     advMultisig: "Açık multi-sig politikası UX’i",
     openWallet: "Cüzdanı aç",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -440,6 +469,22 @@ export const tr = {
     docsAgentsBody:
       "Satıcı paneli olmadan fatura oluşturup durumu sorgulamak için projedeki Cursor becerisini kullanın. Tüm dokümanlar:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -654,6 +699,7 @@ export const tr = {
 
   integrations: {
     eyebrow: "Platform entegrasyonları",
+    breadcrumb: "INTEGRATIONS",
     title: "Mağazanızda kripto kabul edin",
     lede:
       "Trustless Commerce, barındırılan checkout ve tek adımlık fatura API’sini WooCommerce, Shopify, içerik üretici platformları ve daha fazlası için ince bağdaştırıcılarla sarar. Bir eklenti kurun veya yapay zekâ ajanınızı bir platform becerisine yönlendirin — ödeme on-chain düştüğünde siparişler güncellenir.",
@@ -672,6 +718,9 @@ export const tr = {
     aiSkill: "Yapay zekâ becerisi",
     ctaTitle: "Herhangi bir platformla başlayın",
     ctaLede: "Şimdi bir test faturası oluşturun veya mağazanız için entegrasyon belgelerini ve yapay zekâ becerisini açın.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -711,4 +760,7 @@ export const tr = {
     },
   },
   wallet: walletTr,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

@@ -17,6 +17,7 @@ export const he = {
     support: "תמיכה",
     getPaid: "קבלו תשלום",
     security: "אבטחה",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const he = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "קריאת אבטחה",
     trustBody: "הפלטפורמה לא יכולה להסיט תשלומי חשבונית. שחזור דורש אימייל מאומת ואישור אפוטרופוס לפני נעילת זמן בשרשרת שניתן לבטל.",
     trustTitle: "סליקה קשורה לכתובת שלכם. שחזור שרואים.",
@@ -250,9 +252,23 @@ export const he = {
     readyLede: "פתחו את הארנק לכסף יומיומי, או צרו חשבונית כשלקוח צריך קישור תשלום.",
     ctaApiDocs: "לתיעוד ה-API",
     footerCreate: "יצירה",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "קבלו תשלום",
     title: "קבלו תשלום בדרך שלכם",
     lede: "שלחו חשבונית ללקוח, נהלו חשבוניות פתוחות, או שתפו את כתובת הקבלה של הארנק.",
@@ -270,6 +286,7 @@ export const he = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "אבטחה",
     title: "מפתחות גישה, סליקה ושחזור שאפשר להפעיל",
     lede: "נבנה לעסקים שלא יכולים להתייחס לטלפון אבוד כחברה אבודה.",
@@ -290,6 +307,18 @@ export const he = {
     advPolicies: "מדיניות הוצאות",
     advMultisig: "ממשק מדיניות רב-חתימות מפורש",
     openWallet: "פתיחת ארנק",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -429,6 +458,22 @@ export const he = {
     docsAgentsBody:
       "השתמשו במיומנות Cursor של הפרויקט כדי ליצור חשבוניות ולעקוב אחר הסטטוס בלי לוח בקרה לסוחר. תיעוד מלא:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -640,6 +685,7 @@ export const he = {
 
   integrations: {
     eyebrow: "אינטגרציות פלטפורמה",
+    breadcrumb: "INTEGRATIONS",
     title: "קבלו קריפטו בחנות שלכם",
     lede:
       "Trustless Commerce עוטף checkout מתארח ו-API חשבונית בלחיצה אחת עם מתאמים דקים ל-WooCommerce, Shopify, פלטפורמות יוצרים ועוד. התקינו תוסף או הפנו את סוכן ה-AI למיומנות פלטפורמה — ההזמנות מתעדכנות כשהתשלום נכנס on-chain.",
@@ -658,6 +704,9 @@ export const he = {
     aiSkill: "מיומנות AI",
     ctaTitle: "התחילו מכל פלטפורמה",
     ctaLede: "צרו חשבונית בדיקה עכשיו, או פתחו את תיעוד האינטגרציה ומיומנות ה-AI לחנות שלכם.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -697,4 +746,7 @@ export const he = {
     },
   },
   wallet: walletHe,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

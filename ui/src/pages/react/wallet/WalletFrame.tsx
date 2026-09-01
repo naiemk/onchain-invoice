@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Copy, Lock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Surface } from "@/components/Surface";
+import { PageHero } from "@/components/PageHero";
 import { ScrollSubnav } from "@/components/ScrollSubnav";
 import {
   DropdownMenu,
@@ -27,14 +27,11 @@ import { isAdvancedMode, loadWalletMode, saveWalletMode, type WalletMode } from 
 import type { WalletTab } from "@/shared/wallet-ui.js";
 
 const IDENT_PALETTE = [
-  { h: 211, s: 78, l: 44 },
   { h: 168, s: 56, l: 32 },
+  { h: 175, s: 45, l: 28 },
   { h: 28, s: 82, l: 44 },
-  { h: 338, s: 62, l: 44 },
-  { h: 262, s: 48, l: 48 },
   { h: 145, s: 46, l: 34 },
   { h: 198, s: 64, l: 38 },
-  { h: 12, s: 70, l: 46 },
 ] as const;
 
 function labelInitials(label: string): string {
@@ -65,7 +62,7 @@ function WalletIdenticon({ session }: { session: WalletSession }) {
   );
 }
 
-function WalletAccountBar({
+function WalletAccountChip({
   session,
   registry,
   onSessionChange,
@@ -107,11 +104,11 @@ function WalletAccountBar({
   );
 
   return (
-    <div className="mb-4 flex items-center gap-2 border-b border-border pb-3">
+    <div className="flex flex-wrap items-center gap-2">
       {multiple ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-2 px-1.5">
+            <Button variant="outline" size="sm" className="h-8 gap-2 px-2">
               <WalletIdenticon session={session} />
               <span className="max-w-[8rem] truncate text-sm">{session.label}</span>
               <ChevronDown className="h-3.5 w-3.5 opacity-60" />
@@ -134,16 +131,16 @@ function WalletAccountBar({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
-        <div className="flex items-center gap-2 px-1">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1">
           <WalletIdenticon session={session} />
           <span className="text-sm font-medium">{session.label}</span>
         </div>
       )}
-      <Button type="button" variant="outline" size="sm" className="ms-auto font-mono text-[10px]" onClick={() => void copyAddress()}>
+      <Button type="button" variant="outline" size="sm" className="font-mono text-[10px]" onClick={() => void copyAddress()}>
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
         {shortAddress(session.address)}
       </Button>
-      <Button type="button" variant="ghost" size="icon" aria-label={t("wallet.lock")} onClick={lock}>
+      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t("wallet.lock")} onClick={lock}>
         <Lock className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -157,14 +154,14 @@ function WalletModeToggle() {
   const [mode, setMode] = useState<WalletMode>(() => loadWalletMode());
 
   return (
-    <div className="inline-flex rounded-md border border-border p-0.5" role="group" aria-label={t("wallet.modeLabel")}>
+    <div className="inline-flex rounded-full border border-border p-0.5" role="group" aria-label={t("wallet.modeLabel")}>
       {(["simple", "advanced"] as const).map((m) => (
         <button
           key={m}
           type="button"
           className={cn(
-            "rounded px-2 py-1 text-xs font-medium transition-colors",
-            mode === m ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+            "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+            mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
           )}
           onClick={() => {
             saveWalletMode(m);
@@ -205,8 +202,29 @@ function WalletSubnav({ current }: { current: WalletTab }) {
     return items;
   }, [t, advanced, session, current]);
 
-  return <ScrollSubnav items={links} current={current} label={t("wallet.navLabel")} className="mb-4 border-b border-border" />;
+  return (
+    <ScrollSubnav
+      items={links}
+      current={current}
+      label={t("wallet.navLabel")}
+      className="border-b border-border pb-1"
+    />
+  );
 }
+
+const TAB_BREADCRUMBS: Partial<Record<WalletTab, string>> = {
+  home: "WALLET",
+  send: "WALLET / SEND",
+  receive: "WALLET / RECEIVE",
+  cash: "WALLET / CASH RAILS",
+  security: "WALLET / SECURITY",
+  create: "NEW WALLET",
+  recover: "WALLET / RECOVERY",
+  superWallet: "WALLET / SUPER WALLET",
+  proposals: "WALLET / PROPOSALS",
+  getPaid: "WALLET / GET PAID",
+  developers: "WALLET / DEVELOPERS",
+};
 
 export function WalletFrame({
   current,
@@ -214,12 +232,14 @@ export function WalletFrame({
   lede,
   children,
   showChrome = true,
+  breadcrumb,
 }: {
   current: WalletTab;
   title?: string;
   lede?: string;
   children: ReactNode;
   showChrome?: boolean;
+  breadcrumb?: string;
 }) {
   const { t } = useLocale();
   const [session, setSession] = useState<WalletSession | null>(() => loadWalletSession());
@@ -230,34 +250,28 @@ export function WalletFrame({
   }, [current]);
 
   const refreshSession = useCallback(() => setSession(loadWalletSession()), []);
+  const crumb = breadcrumb ?? TAB_BREADCRUMBS[current] ?? t("wallet.eyebrow");
 
   if (!showChrome || !session) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
-        {!session && title && (
-          <header className="mb-6 space-y-1.5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("wallet.eyebrow")}</p>
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-            {lede && <p className="text-sm text-muted-foreground">{lede}</p>}
-          </header>
+      <div className="mx-auto max-w-3xl px-4 py-10 md:px-8">
+        {title && (
+          <PageHero breadcrumb={crumb} title={title} lede={lede} className="mb-6" />
         )}
-        <Surface className="p-5">{children}</Surface>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm md:p-6">{children}</div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
-      <Surface className="p-4 sm:p-5">
-        <WalletAccountBar session={session} registry={registry} onSessionChange={refreshSession} />
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <WalletModeToggle />
-          <WalletSubnav current={current} />
-        </div>
-        {title && <h1 className="mb-1 text-xl font-semibold tracking-tight">{title}</h1>}
-        {lede && <p className="mb-4 text-sm text-muted-foreground">{lede}</p>}
-        {children}
-      </Surface>
+    <div className="mx-auto max-w-5xl px-4 py-10 md:px-8">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <WalletAccountChip session={session} registry={registry} onSessionChange={refreshSession} />
+        <WalletModeToggle />
+      </div>
+      {title && <PageHero breadcrumb={crumb} title={title} lede={lede} className="mb-4" />}
+      <WalletSubnav current={current} />
+      <div className="mt-6">{children}</div>
     </div>
   );
 }

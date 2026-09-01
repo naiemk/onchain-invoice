@@ -17,6 +17,7 @@ export const th = {
     support: "ฝ่ายสนับสนุน",
     getPaid: "รับชำระเงิน",
     security: "ความปลอดภัย",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const th = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "อ่านความปลอดภัย",
     trustBody: "แพลตฟอร์มเปลี่ยนเส้นทางเงินจากใบแจ้งหนี้ไม่ได้ การกู้คืนต้องมีอีเมลที่ยืนยันแล้วและการอนุมัติของผู้ดูแลก่อนไทม์ล็อกบนเชนที่ยกเลิกได้",
     trustTitle: "การชำระผูกกับที่อยู่ของคุณ การกู้คืนที่คุณเห็นได้",
@@ -250,9 +252,23 @@ export const th = {
     readyLede: "เปิดวอลเล็ตสำหรับเงินรายวัน หรือสร้างใบแจ้งหนี้เมื่อลูกค้าต้องการลิงก์ชำระ",
     ctaApiDocs: "ดูเอกสาร API",
     footerCreate: "สร้าง",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "รับชำระเงิน",
     title: "รับชำระในแบบของคุณ",
     lede: "ออกใบแจ้งหนี้ให้ลูกค้า จัดการใบที่เปิดอยู่ หรือแชร์ที่อยู่รับของวอลเล็ต",
@@ -270,6 +286,7 @@ export const th = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "ความปลอดภัย",
     title: "Passkey การชำระ และการกู้คืนที่คุณปฏิบัติการได้",
     lede: "สร้างสำหรับธุรกิจที่ถือว่าโทรศัพท์หายไม่เท่ากับบริษัทหาย",
@@ -290,6 +307,18 @@ export const th = {
     advPolicies: "นโยบายการใช้จ่าย",
     advMultisig: "UX นโยบาย multi-sig ที่ชัดเจน",
     openWallet: "เปิดวอลเล็ต",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -430,6 +459,22 @@ export const th = {
     docsAgentsBody:
       "ใช้สกิล Cursor ของโปรเจกต์เพื่อสร้างใบแจ้งหนี้และตรวจสถานะโดยไม่ต้องมีแดชบอร์ดร้านค้า เอกสารฉบับเต็ม:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -641,6 +686,7 @@ export const th = {
 
   integrations: {
     eyebrow: "การเชื่อมต่อแพลตฟอร์ม",
+    breadcrumb: "INTEGRATIONS",
     title: "รับคริปโตบนหน้าร้านของคุณ",
     lede:
       "Trustless Commerce ห่อ checkout ที่โฮสต์ไว้และ API ใบแจ้งหนี้แบบครั้งเดียวด้วยอะแดปเตอร์บางๆ สำหรับ WooCommerce, Shopify, แพลตฟอร์มครีเอเตอร์ และอื่นๆ ติดตั้งปลั๊กอินหรือชี้เอเจนต์ AI ไปที่สกิลแพลตฟอร์ม — ออเดอร์อัปเดตเมื่อการชำระเงินเข้า on-chain",
@@ -659,6 +705,9 @@ export const th = {
     aiSkill: "สกิล AI",
     ctaTitle: "เริ่มจากแพลตฟอร์มใดก็ได้",
     ctaLede: "สร้างใบแจ้งหนี้ทดสอบตอนนี้ หรือเปิดเอกสารการเชื่อมต่อและสกิล AI สำหรับหน้าร้านของคุณ",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -698,4 +747,7 @@ export const th = {
     },
   },
   wallet: walletTh,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

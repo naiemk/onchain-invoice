@@ -17,6 +17,7 @@ export const fa = {
     support: "پشتیبانی",
     getPaid: "دریافت وجه",
     security: "امنیت",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const fa = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "امنیت را بخوانید",
     trustBody: "پلتفرم نمی‌تواند پرداخت فاکتور را منحرف کند. بازیابی به ایمیل تأییدشده و تأیید نگهبان نیاز دارد، سپس قفل زمانی روی زنجیره که قابل لغو است.",
     trustTitle: "تسویه به آدرس شما گره خورده. بازیابی که می‌بینید.",
@@ -250,9 +252,23 @@ export const fa = {
     readyLede: "برای پول روزمره کیف پول را باز کنید، یا وقتی مشتری لینک پرداخت می‌خواهد فاکتور بسازید.",
     ctaApiDocs: "مشاهدهٔ مستندات API",
     footerCreate: "ایجاد",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "دریافت وجه",
     title: "پرداخت را به شیوهٔ خود بگیرید",
     lede: "برای مشتری فاکتور بفرستید، فاکتورهای باز را مدیریت کنید، یا آدرس دریافت کیف پول را به اشتراک بگذارید.",
@@ -270,6 +286,7 @@ export const fa = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "امنیت",
     title: "کلید عبور، تسویه و بازیابی که می‌توانید اداره کنید",
     lede: "برای کسب‌وکارهایی که نمی‌توانند تلفن گم‌شده را شرکت گم‌شده بدانند.",
@@ -290,6 +307,18 @@ export const fa = {
     advPolicies: "سیاست‌های هزینه",
     advMultisig: "رابط سیاست چندامضایی صریح",
     openWallet: "باز کردن کیف پول",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -429,6 +458,22 @@ export const fa = {
     docsAgentsBody:
       "برای ساخت فاکتور و پیگیری وضعیت بدون داشبورد فروشنده، از مهارت Cursor این پروژه استفاده کنید. مستندات کامل:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -640,6 +685,7 @@ export const fa = {
 
   integrations: {
     eyebrow: "یکپارچه‌سازی پلتفرم",
+    breadcrumb: "INTEGRATIONS",
     title: "رمزارز را در فروشگاه خود بپذیرید",
     lede:
       "Trustless Commerce checkout میزبانی‌شده و API فاکتور یک‌مرحله‌ای را با آداپتورهای سبک برای WooCommerce، Shopify، پلتفرم‌های خالق و بیشتر می‌پیچد. افزونه نصب کنید یا عامل هوش مصنوعی را به مهارت پلتفرم هدایت کنید — سفارش‌ها با رسیدن پرداخت on-chain به‌روز می‌شوند.",
@@ -658,6 +704,9 @@ export const fa = {
     aiSkill: "مهارت هوش مصنوعی",
     ctaTitle: "با هر پلتفرمی شروع کنید",
     ctaLede: "همین حالا یک فاکتور آزمایشی بسازید، یا مستندات یکپارچه‌سازی و مهارت هوش مصنوعی را برای فروشگاه خود باز کنید.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -697,4 +746,7 @@ export const fa = {
     },
   },
   wallet: walletFa,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

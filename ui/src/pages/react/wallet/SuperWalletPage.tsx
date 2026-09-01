@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageCard, PageSplit } from "@/components/PageSplit";
+import { StatusBadge } from "@/components/StatusBadge";
+import { TrustNotice } from "@/components/TrustNotice";
 import {
   Dialog,
   DialogContent,
@@ -100,6 +103,8 @@ export function SuperWalletPage() {
   const [entityEmail, setEntityEmail] = useState("");
   const [threshold, setThreshold] = useState(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const adminEntity = entities[0] ?? null;
@@ -442,7 +447,7 @@ export function SuperWalletPage() {
   const canUpgrade = Boolean(policy?.supportsAdvanced !== false);
 
   return (
-    <WalletFrame current="superWallet" title={t("wallet.superWalletTitle")} lede={t("wallet.superWalletLede")}>
+    <WalletFrame current="superWallet" title={t("wallet.superWalletPageTitle")} lede={t("wallet.superWalletPageLede")}>
       {status && <StatusMessage kind={status.kind} message={status.message} />}
       {loading ? (
         <div className="space-y-4">
@@ -474,6 +479,8 @@ export function SuperWalletPage() {
           onEntityEmailChange={setEntityEmail}
           onApplyThreshold={() => void applyThreshold()}
           onAddEntity={() => void addEntity()}
+          onOpenInvite={() => setInviteOpen(true)}
+          onOpenPolicy={() => setPolicyOpen(true)}
           onApprove={(id) => void approveEnrollment(id)}
           onReject={(id) => void rejectEnrollment(id)}
           onAddPasskey={(id) => void addPasskey(id)}
@@ -495,6 +502,74 @@ export function SuperWalletPage() {
             </Button>
             <Button type="button" disabled={busy === "upgrade"} onClick={() => void runUpgrade()}>
               {t("wallet.superWalletConvertCta")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("wallet.superWalletAddEntity")}</DialogTitle>
+            <DialogDescription>{t("wallet.inviteTeammateHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="entity-email-dialog">{t("wallet.superWalletEntityEmail")}</Label>
+            <Input
+              id="entity-email-dialog"
+              type="email"
+              placeholder="teammate@company.com"
+              value={entityEmail}
+              onChange={(e) => setEntityEmail(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>
+              {t("wallet.cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => {
+                void addEntity();
+                setInviteOpen(false);
+              }}
+            >
+              {t("wallet.superWalletAddEntity")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={policyOpen} onOpenChange={setPolicyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("wallet.superWalletPolicyTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="policy-threshold-dialog">{t("wallet.superWalletThreshold")}</Label>
+            <Input
+              id="policy-threshold-dialog"
+              type="number"
+              min={1}
+              max={Math.max(1, entities.length)}
+              value={threshold}
+              onChange={(e) => setThreshold(Number(e.target.value))}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPolicyOpen(false)}>
+              {t("wallet.cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => {
+                void applyThreshold();
+                setPolicyOpen(false);
+              }}
+            >
+              {t("wallet.superWalletApplyPolicy")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -562,22 +637,6 @@ function UpgradeSection({
       <Button id="enable-advanced" type="button" disabled={busy} onClick={onConvert}>
         {busy ? t("wallet.sendSigning") : t("wallet.superWalletConvertCta")}
       </Button>
-
-      <section className="space-y-2 border-t pt-6">
-        <h3 className="text-sm font-medium">{t("wallet.superWalletTeamJoinTitle")}</h3>
-        <p className="text-sm text-muted-foreground">{t("wallet.superWalletTeamJoinIntro")}</p>
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-          <li>{t("wallet.superWalletTeamJoinStep1")}</li>
-          <li>{t("wallet.superWalletTeamJoinStep2")}</li>
-          <li>{t("wallet.superWalletTeamJoinStep3")}</li>
-        </ol>
-        <p className="text-sm text-muted-foreground">
-          <Link to="/wallet/security" className="text-primary hover:underline">
-            {t("wallet.securityTab")}
-          </Link>{" "}
-          · {t("wallet.pairStepsTitle")}
-        </p>
-      </section>
     </div>
   );
 }
@@ -609,6 +668,8 @@ function ManageSection({
   onEntityEmailChange,
   onApplyThreshold,
   onAddEntity,
+  onOpenInvite,
+  onOpenPolicy,
   onApprove,
   onReject,
   onAddPasskey,
@@ -628,6 +689,8 @@ function ManageSection({
   onEntityEmailChange: (v: string) => void;
   onApplyThreshold: () => void;
   onAddEntity: () => void;
+  onOpenInvite: () => void;
+  onOpenPolicy: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onAddPasskey: (entityId: string) => void;
@@ -636,21 +699,30 @@ function ManageSection({
   busy: string | null;
 }) {
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <p className="text-sm">
-          {t("wallet.superWalletActive", {
-            threshold: String(policy.threshold),
-            entities: String(policy.entityCount),
-          })}
-        </p>
-        <Button asChild>
-          <Link to="/wallet/proposals">{t("wallet.proposalsOpen")}</Link>
-        </Button>
-      </section>
+    <PageSplit>
+      <div className="space-y-6">
+        <PageCard>
+          <p className="text-sm text-muted-foreground">
+            {t("wallet.superWalletActive", {
+              threshold: String(policy.threshold),
+              entities: String(policy.entityCount),
+            })}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="secondary" onClick={onOpenInvite}>
+              {t("wallet.superWalletAddEntity")}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={onOpenPolicy}>
+              {t("wallet.superWalletPolicyTitle")}
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/wallet/proposals">{t("wallet.proposalsOpen")}</Link>
+            </Button>
+          </div>
+        </PageCard>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">{t("wallet.enrollmentPendingTitle")}</h2>
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">{t("wallet.enrollmentPendingTitle")}</h2>
         {pendingEnrollments.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("wallet.enrollmentPendingEmpty")}</p>
         ) : (
@@ -689,30 +761,6 @@ function ManageSection({
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">{t("wallet.superWalletPolicyTitle")}</h2>
-        <div className="space-y-2">
-          <Label htmlFor="policy-threshold">{t("wallet.superWalletThreshold")}</Label>
-          <Input
-            id="policy-threshold"
-            type="number"
-            min={1}
-            max={Math.max(1, entities.length)}
-            value={threshold}
-            onChange={(e) => onThresholdChange(Number(e.target.value))}
-          />
-        </div>
-        <Button
-          id="apply-threshold"
-          type="button"
-          variant="outline"
-          disabled={busy !== null}
-          onClick={onApplyThreshold}
-        >
-          {t("wallet.superWalletApplyPolicy")}
-        </Button>
       </section>
 
       <section className="space-y-3">
@@ -778,20 +826,31 @@ function ManageSection({
             })}
           </ul>
         )}
-        <div className="space-y-2">
-          <Label htmlFor="entity-email">{t("wallet.superWalletEntityEmail")}</Label>
-          <Input
-            id="entity-email"
-            type="email"
-            placeholder="teammate@company.com"
-            value={entityEmail}
-            onChange={(e) => onEntityEmailChange(e.target.value)}
-          />
-        </div>
-        <Button id="add-entity" type="button" variant="outline" disabled={busy !== null} onClick={onAddEntity}>
-          {t("wallet.superWalletAddEntity")}
-        </Button>
       </section>
-    </div>
+      </div>
+
+      <PageCard>
+        <h2 className="text-base font-semibold">{t("wallet.superWalletMapTitle")}</h2>
+        <ul className="mt-4 space-y-3 text-sm">
+          <li className="flex items-center justify-between gap-2">
+            <span>{t("wallet.superWalletThreshold")}</span>
+            <StatusBadge tone="active">{String(policy.threshold)}</StatusBadge>
+          </li>
+          <li className="flex items-center justify-between gap-2">
+            <span>{t("wallet.superWalletEntitiesTitle")}</span>
+            <StatusBadge tone="verified">{String(entities.length)}</StatusBadge>
+          </li>
+          <li className="flex items-center justify-between gap-2">
+            <span>{t("wallet.enrollmentPendingTitle")}</span>
+            <StatusBadge tone={pendingEnrollments.length ? "pending" : "muted"}>
+              {String(pendingEnrollments.length)}
+            </StatusBadge>
+          </li>
+        </ul>
+        <TrustNotice className="mt-6 border-0 bg-muted/40 p-0 text-xs">
+          {t("wallet.superWalletMapHint")}
+        </TrustNotice>
+      </PageCard>
+    </PageSplit>
   );
 }

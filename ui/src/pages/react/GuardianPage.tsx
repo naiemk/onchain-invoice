@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { PageHero } from "@/components/PageHero";
+import { PageCard } from "@/components/PageSplit";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -116,35 +118,30 @@ export function GuardianPage() {
   if (!address) {
     return (
       <div className="mx-auto max-w-lg px-4 py-10 md:px-8">
-        <header className="mb-6 space-y-1.5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("guardian.eyebrow")}</p>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("guardian.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("guardian.lede")}</p>
-        </header>
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <p className="text-sm text-muted-foreground">{t("guardian.connectHint")}</p>
-            <Button onClick={() => void connect()} disabled={loading}>
-              {t("guardian.connect")}
-            </Button>
-            {status && (
-              <Alert>
-                <AlertDescription>{status}</AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+        <PageHero breadcrumb="GUARDIAN" title={t("guardian.title")} lede={t("guardian.lede")} className="mb-6" />
+        <PageCard className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t("guardian.connectHint")}</p>
+          <Button onClick={() => void connect()} disabled={loading}>
+            {t("guardian.connect")}
+          </Button>
+          {status && (
+            <Alert>
+              <AlertDescription>{status}</AlertDescription>
+            </Alert>
+          )}
+        </PageCard>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
-      <header className="mb-8 space-y-2">
-        <p className="text-sm font-medium uppercase tracking-wider text-primary">{t("guardian.eyebrow")}</p>
-        <h1 className="text-3xl font-semibold tracking-tight">{t("guardian.title")}</h1>
-        <p className="text-muted-foreground">{t("guardian.signedIn", { address: shortAddr(address) })}</p>
-      </header>
+      <PageHero
+        breadcrumb="GUARDIAN"
+        title={t("guardian.title")}
+        lede={t("guardian.signedIn", { address: shortAddr(address) })}
+        className="mb-8"
+      />
       <Card>
         <CardHeader>
           <div className="flex flex-wrap gap-2">

@@ -168,29 +168,26 @@ function WalletDashboard({ session }: { session: WalletSession }) {
   return (
     <WalletFrame current="home">
       <div className="space-y-6">
-        <div className={balanceError ? "text-destructive" : ""}>
-          <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">{t("wallet.totalBalance")}</p>
+        <div className="rounded-2xl bg-brand-panel p-6 text-brand-panel-foreground">
+          <p className="text-xs text-brand-panel-foreground/70">{t("wallet.totalBalance")}</p>
           {loading ? (
-            <Skeleton className="mt-2 h-10 w-48" />
+            <Skeleton className="mt-2 h-12 w-48 bg-brand-panel-foreground/10" />
           ) : (
             <p className="mt-1 text-4xl font-semibold tracking-tight">
-              {totalUsd} <span className="text-lg font-normal text-muted-foreground">{t("wallet.usd")}</span>
+              {totalUsd} <span className="text-lg font-normal text-brand-panel-foreground/70">{t("wallet.usd")}</span>
             </p>
           )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
-            <Link to="/wallet/get-paid">{t("wallet.actionGetPaid")}</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/wallet/send">{t("wallet.actionPay")}</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/wallet/cash">{t("wallet.actionCashIn")}</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/wallet/cash">{t("wallet.actionCashOut")}</Link>
-          </Button>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/wallet/get-paid">{t("wallet.actionGetPaid")}</Link>
+            </Button>
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/wallet/send">{t("wallet.actionPay")}</Link>
+            </Button>
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/wallet/cash">{t("wallet.actionCashIn")}</Link>
+            </Button>
+          </div>
         </div>
         {pendingRecovery && (
           <Alert variant="warn">
@@ -211,8 +208,8 @@ function WalletDashboard({ session }: { session: WalletSession }) {
           · {t("wallet.pairOtherDevices")}
         </p>
         {chains.length > 0 && (
-          <section>
-            <h2 className="mb-3 text-lg font-semibold">{t("wallet.byChain")}</h2>
+          <section className="rounded-xl border border-border bg-card p-5">
+            <h2 className="mb-3 text-sm font-semibold">{t("wallet.byChain")}</h2>
             {balanceError ? (
               <p className="text-sm text-destructive">{t("wallet.balanceError")}</p>
             ) : (

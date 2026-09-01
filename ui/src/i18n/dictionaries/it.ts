@@ -21,6 +21,7 @@ export const it = {
     support: "Assistenza",
     getPaid: "Incassa",
     security: "Sicurezza",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -130,6 +131,7 @@ export const it = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Leggi la sicurezza",
     trustBody: "La piattaforma non può dirottare i pagamenti delle fatture. Il recupero richiede un’email verificata e l’approvazione del tutore prima di un timelock on-chain annullabile.",
     trustTitle: "Regolamento legato al tuo indirizzo. Recupero che puoi vedere.",
@@ -257,9 +259,23 @@ export const it = {
     readyLede: "Apri il portafoglio per il denaro di tutti i giorni, o crea una fattura quando un cliente ha bisogno di un link di pagamento.",
     ctaApiDocs: "Vedi la documentazione API",
     footerCreate: "Crea",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Incassa",
     title: "Incassa a modo tuo",
     lede: "Fattura un cliente, gestisci le fatture aperte o condividi l’indirizzo di ricezione del portafoglio.",
@@ -277,6 +293,7 @@ export const it = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Sicurezza",
     title: "Passkeys, regolamento e recupero che puoi operare",
     lede: "Pensato per le attività che non possono trattare un telefono perso come un’azienda persa.",
@@ -297,6 +314,18 @@ export const it = {
     advPolicies: "Politiche di spesa",
     advMultisig: "UX esplicita di policy multi-sig",
     openWallet: "Apri il portafoglio",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -439,6 +468,22 @@ export const it = {
     docsAgentsBody:
       "Usa la skill Cursor del progetto per creare fatture e controllarne lo stato senza una dashboard per esercenti. Documentazione completa:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -651,6 +696,7 @@ export const it = {
 
   integrations: {
     eyebrow: "Integrazioni piattaforma",
+    breadcrumb: "INTEGRATIONS",
     title: "Accetta crypto nel tuo negozio",
     lede:
       "Trustless Commerce avvolge checkout ospitato e API fatture one-shot con adapter leggeri per WooCommerce, Shopify, piattaforme creator e altro. Installa un plugin o punta il tuo agente IA a uno skill di piattaforma — gli ordini si aggiornano quando il pagamento arriva on-chain.",
@@ -669,6 +715,9 @@ export const it = {
     aiSkill: "Skill IA",
     ctaTitle: "Inizia con qualsiasi piattaforma",
     ctaLede: "Crea subito una fattura di prova oppure apri la documentazione di integrazione e lo skill IA per il tuo negozio.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -708,4 +757,7 @@ export const it = {
     },
   },
   wallet: walletIt,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

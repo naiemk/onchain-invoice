@@ -20,6 +20,7 @@ export const ms = {
     support: "Sokongan",
     getPaid: "Terima bayaran",
     security: "Keselamatan",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -129,6 +130,7 @@ export const ms = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Baca keselamatan",
     trustBody: "Pembayaran invois tidak boleh dialihkan oleh platform. Pemulihan memerlukan e-mel yang disahkan dan kelulusan guardian sebelum timelock on-chain yang boleh dibatalkan.",
     trustTitle: "Penyelesaian terikat pada alamat anda. Pemulihan yang anda boleh lihat.",
@@ -257,9 +259,23 @@ export const ms = {
     readyLede: "Buka dompet untuk wang harian, atau cipta invois apabila pelanggan memerlukan pautan bayaran.",
     ctaApiDocs: "Lihat dokumentasi API",
     footerCreate: "Cipta",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Terima bayaran",
     title: "Terima bayaran cara anda",
     lede: "Cipta invois untuk pelanggan, urus invois terbuka, atau kongsikan alamat penerimaan dompet anda.",
@@ -277,6 +293,7 @@ export const ms = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Keselamatan",
     title: "Passkey, penyelesaian dan pemulihan yang anda boleh operasikan",
     lede: "Dibina untuk perniagaan yang tidak boleh menganggap telefon hilang sebagai syarikat hilang.",
@@ -297,6 +314,18 @@ export const ms = {
     advPolicies: "Dasar perbelanjaan",
     advMultisig: "UX dasar multi-sig yang eksplisit",
     openWallet: "Buka dompet",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -441,6 +470,22 @@ export const ms = {
     docsAgentsBody:
       "Gunakan kemahiran Cursor projek ini untuk mencipta invois dan menyemak status tanpa papan pemuka peniaga. Dokumentasi penuh:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -655,6 +700,7 @@ export const ms = {
 
   integrations: {
     eyebrow: "Integrasi platform",
+    breadcrumb: "INTEGRATIONS",
     title: "Terima kripto di kedai anda",
     lede:
       "Trustless Commerce membungkus checkout yang dihoskan dan API invois sekali jalan dengan penyesuai ringan untuk WooCommerce, Shopify, platform pencipta dan banyak lagi. Pasang pemalam atau arahkan ejen AI ke kemahiran platform — pesanan dikemas kini apabila bayaran masuk on-chain.",
@@ -673,6 +719,9 @@ export const ms = {
     aiSkill: "Kemahiran AI",
     ctaTitle: "Mulakan dengan mana-mana platform",
     ctaLede: "Cipta invois ujian sekarang, atau buka docs integrasi dan kemahiran AI untuk kedai anda.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -712,4 +761,7 @@ export const ms = {
     },
   },
   wallet: walletMs,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

@@ -17,6 +17,7 @@ export const ar = {
     support: "الدعم",
     getPaid: "استلم المدفوعات",
     security: "الأمان",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const ar = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "اقرأ الأمان",
     trustBody: "لا تستطيع المنصة تحويل مدفوعات الفواتير. تحتاج الاستعادة بريدًا موثَّقًا وموافقة الوصي قبل قفل زمني على السلسلة يمكن إلغاؤه.",
     trustTitle: "تسوية مربوطة بعنوانك. استعادة تراها.",
@@ -250,9 +252,23 @@ export const ar = {
     readyLede: "افتح المحفظة للمال اليومي، أو أنشئ فاتورة عندما يحتاج العميل رابط دفع.",
     ctaApiDocs: "عرض توثيق API",
     footerCreate: "إنشاء",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "استلم المدفوعات",
     title: "اقبل الدفع بطريقتك",
     lede: "أرسل فاتورة لعميل، أو أدِر الفواتير المفتوحة، أو شارك عنوان استلام محفظتك.",
@@ -270,6 +286,7 @@ export const ar = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "الأمان",
     title: "مفاتيح مرور وتسوية واستعادة يمكنك تشغيلها",
     lede: "مبني لشركات لا يمكنها معاملة هاتف مفقود كشركة مفقودة.",
@@ -290,6 +307,18 @@ export const ar = {
     advPolicies: "سياسات الإنفاق",
     advMultisig: "واجهة سياسة توقيع متعدّد صريحة",
     openWallet: "فتح المحفظة",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -429,6 +458,22 @@ export const ar = {
     docsAgentsBody:
       "استخدم مهارة Cursor الخاصة بالمشروع لإنشاء الفواتير ومتابعة حالتها دون لوحة تحكم للتاجر. التوثيق الكامل:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -640,6 +685,7 @@ export const ar = {
 
   integrations: {
     eyebrow: "تكاملات المنصات",
+    breadcrumb: "INTEGRATIONS",
     title: "اقبل العملات الرقمية في متجرك",
     lede:
       "تغلّف Trustless Commerce checkout مُستضافًا وواجهة فواتير بنقرة واحدة بمحوّلات خفيفة لـ WooCommerce وShopify ومنصات المبدعين وغيرها. ثبّت إضافة أو وجّه وكيل الذكاء الاصطناعي إلى مهارة منصة — تُحدَّث الطلبات عند وصول الدفع على السلسلة.",
@@ -658,6 +704,9 @@ export const ar = {
     aiSkill: "مهارة الذكاء الاصطناعي",
     ctaTitle: "ابدأ من أي منصة",
     ctaLede: "أنشئ فاتورة تجريبية الآن، أو افتح توثيق التكامل ومهارة الذكاء الاصطناعي لمتجرك.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -697,4 +746,7 @@ export const ar = {
     },
   },
   wallet: walletAr,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

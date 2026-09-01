@@ -20,6 +20,7 @@ export const zhHant = {
     support: "技術支援",
     getPaid: "收款",
     security: "安全",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -129,6 +130,7 @@ export const zhHant = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "閱讀安全說明",
     trustBody: "平台無法改發票撥款去向。復原需要已驗證電子郵件和監護人核准，然後才進入可取消的鏈上時間鎖。",
     trustTitle: "結算綁定到你的地址。復原過程可見。",
@@ -253,9 +255,23 @@ export const zhHant = {
     readyLede: "開啟錢包處理日常資金，或在客戶需要付款連結時建立發票。",
     ctaApiDocs: "查看 API 文件",
     footerCreate: "建立",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "收款",
     title: "按你的方式收款",
     lede: "向客戶開立發票、管理未結發票，或分享錢包收款地址。",
@@ -273,6 +289,7 @@ export const zhHant = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "安全",
     title: "可營運的通行密鑰、結算與復原",
     lede: "為不能把丟手機當成丟公司的企業而建。",
@@ -293,6 +310,18 @@ export const zhHant = {
     advPolicies: "支出策略",
     advMultisig: "明確多簽策略介面",
     openWallet: "開啟錢包",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -433,6 +462,22 @@ export const zhHant = {
     docsAgentsBody:
       "使用專案內建的 Cursor 技能即可建立發票並輪詢狀態，不需要商家後台。完整文件：",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -644,6 +689,7 @@ export const zhHant = {
 
   integrations: {
     eyebrow: "平台整合",
+    breadcrumb: "INTEGRATIONS",
     title: "在您的商店接受加密貨幣",
     lede:
       "Trustless Commerce 將託管結帳與一次性發票 API 結合，透過輕量適配器對接 WooCommerce、Shopify、創作者平台等。安裝外掛或將 AI 代理指向平台技能——鏈上到帳後訂單自動更新。",
@@ -662,6 +708,9 @@ export const zhHant = {
     aiSkill: "AI 技能",
     ctaTitle: "從任一平台開始",
     ctaLede: "立即建立測試發票，或開啟整合文件與 AI 技能，為您的商店接入付款。",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -701,4 +750,7 @@ export const zhHant = {
     },
   },
   wallet: walletZhHant,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

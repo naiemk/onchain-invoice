@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Surface } from "@/components/Surface";
+import { PageHero } from "@/components/PageHero";
+import { PageCard } from "@/components/PageSplit";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useLocale } from "@/providers/LocaleProvider";
 import { localizeError } from "@/i18n/errors.js";
 import { apiUrl } from "@/shared/site.js";
@@ -56,12 +58,8 @@ export function AdminPage() {
   if (!unlocked) {
     return (
       <div className="mx-auto max-w-lg px-4 py-10 md:px-8">
-        <header className="mb-6 space-y-1.5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("admin.eyebrow")}</p>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("admin.restrictedTitle")}</h1>
-          <p className="text-sm text-muted-foreground">{t("admin.restrictedLede")}</p>
-        </header>
-        <Surface className="space-y-4 p-5">
+        <PageHero breadcrumb="ADMIN" title={t("admin.restrictedTitle")} lede={t("admin.restrictedLede")} className="mb-6" />
+        <PageCard className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="admin-key">{t("admin.keyLabel")}</Label>
             <Input
@@ -81,19 +79,15 @@ export function AdminPage() {
               <AlertDescription>{status}</AlertDescription>
             </Alert>
           )}
-        </Surface>
+        </PageCard>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 md:px-8">
-      <header className="mb-6 space-y-1.5">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("admin.eyebrow")}</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("admin.overviewTitle")}</h1>
-        <p className="text-sm text-muted-foreground">{t("admin.overviewLede")}</p>
-      </header>
-      <Surface className="mb-6 space-y-4 p-5">
+      <PageHero breadcrumb="ADMIN" title={t("admin.overviewTitle")} lede={t("admin.overviewLede")} className="mb-6" />
+      <PageCard className="mb-6 space-y-4">
         <div className="max-w-md space-y-2">
           <Label htmlFor="admin-key">{t("admin.keyLabel")}</Label>
           <p className="text-sm text-muted-foreground">{t("admin.keyHint")}</p>
@@ -109,7 +103,7 @@ export function AdminPage() {
           {t("admin.loadStats")}
         </Button>
         {status && <p className="text-sm text-muted-foreground">{status}</p>}
-      </Surface>
+      </PageCard>
       {stats && (
         <>
           <div className="mb-6 grid gap-3 sm:grid-cols-3">
@@ -118,13 +112,13 @@ export function AdminPage() {
               { label: t("admin.gasSpent"), value: stats.gas },
               { label: t("admin.inFlight"), value: String(stats.inFlight) },
             ].map(({ label, value }) => (
-              <Surface key={label} className="p-4">
+              <PageCard key={label}>
                 <p className="text-xs text-muted-foreground">{label}</p>
                 <p className="mt-1 font-mono text-xl font-semibold">{value}</p>
-              </Surface>
+              </PageCard>
             ))}
           </div>
-          <Surface className="p-5">
+          <PageCard>
             <h2 className="mb-3 text-sm font-semibold">{t("admin.byMerchant")}</h2>
             <Table>
               <TableHeader>
@@ -156,7 +150,7 @@ export function AdminPage() {
                 )}
               </TableBody>
             </Table>
-          </Surface>
+          </PageCard>
         </>
       )}
     </div>

@@ -17,6 +17,7 @@ export const vi = {
     support: "Hỗ trợ",
     getPaid: "Nhận thanh toán",
     security: "Bảo mật",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const vi = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Đọc bảo mật",
     trustBody: "Nền tảng không thể chuyển hướng chi trả hóa đơn. Khôi phục cần email đã xác minh và phê duyệt guardian trước timelock on-chain có thể hủy.",
     trustTitle: "Tất toán gắn với địa chỉ của bạn. Khôi phục bạn thấy được.",
@@ -250,9 +252,23 @@ export const vi = {
     readyLede: "Mở ví cho tiền hàng ngày, hoặc tạo hóa đơn khi khách cần liên kết thanh toán.",
     ctaApiDocs: "Xem tài liệu API",
     footerCreate: "Tạo",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Nhận thanh toán",
     title: "Nhận thanh toán theo cách của bạn",
     lede: "Lập hóa đơn cho khách, quản lý hóa đơn đang mở, hoặc chia sẻ địa chỉ nhận của ví.",
@@ -270,6 +286,7 @@ export const vi = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Bảo mật",
     title: "Passkey, tất toán và khôi phục bạn có thể vận hành",
     lede: "Dành cho doanh nghiệp không thể coi mất điện thoại là mất công ty.",
@@ -290,6 +307,18 @@ export const vi = {
     advPolicies: "Chính sách chi tiêu",
     advMultisig: "UX chính sách multi-sig rõ ràng",
     openWallet: "Mở ví",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -430,6 +459,22 @@ export const vi = {
     docsAgentsBody:
       "Dùng kỹ năng Cursor của dự án để tạo hóa đơn và theo dõi trạng thái mà không cần bảng điều khiển người bán. Tài liệu đầy đủ:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -641,6 +686,7 @@ export const vi = {
 
   integrations: {
     eyebrow: "Tích hợp nền tảng",
+    breadcrumb: "INTEGRATIONS",
     title: "Chấp nhận crypto trên cửa hàng của bạn",
     lede:
       "Trustless Commerce gói checkout được lưu trữ và API hóa đơn một lần với các adapter mỏng cho WooCommerce, Shopify, nền tảng creator và hơn thế nữa. Cài plugin hoặc hướng tác nhân AI tới skill nền tảng — đơn hàng cập nhật khi thanh toán vào on-chain.",
@@ -659,6 +705,9 @@ export const vi = {
     aiSkill: "Kỹ năng AI",
     ctaTitle: "Bắt đầu với bất kỳ nền tảng nào",
     ctaLede: "Tạo hóa đơn thử ngay, hoặc mở tài liệu tích hợp và kỹ năng AI cho cửa hàng của bạn.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -698,4 +747,7 @@ export const vi = {
     },
   },
   wallet: walletVi,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

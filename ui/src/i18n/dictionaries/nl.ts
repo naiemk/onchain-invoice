@@ -17,6 +17,7 @@ export const nl = {
     support: "Ondersteuning",
     getPaid: "Betaald worden",
     security: "Beveiliging",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const nl = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Beveiliging lezen",
     trustBody: "Factuuruitbetalingen kan het platform niet omleiden. Herstel vereist een geverifieerde e-mail en goedkeuring van de guardian vóór een annuleerbare on-chain-timelock.",
     trustTitle: "Afrekening gebonden aan je adres. Herstel dat je kunt zien.",
@@ -253,9 +255,23 @@ export const nl = {
     readyLede: "Open de wallet voor het dagelijkse geldverkeer, of maak een factuur wanneer een klant een betaallink nodig heeft.",
     ctaApiDocs: "API-documentatie bekijken",
     footerCreate: "Maken",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Betaald worden",
     title: "Ontvang betaling op jouw manier",
     lede: "Factureer een klant, beheer openstaande facturen of deel het ontvangstadres van je wallet.",
@@ -273,6 +289,7 @@ export const nl = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Beveiliging",
     title: "Passkeys, afrekening en herstel dat je kunt bedienen",
     lede: "Gebouwd voor bedrijven die een verloren telefoon niet als een verloren bedrijf kunnen behandelen.",
@@ -293,6 +310,18 @@ export const nl = {
     advPolicies: "Uitgavenbeleid",
     advMultisig: "Expliciete multi-sig-beleid-UX",
     openWallet: "Wallet openen",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -435,6 +464,22 @@ export const nl = {
     docsAgentsBody:
       "Gebruik de Cursor-skill van het project om facturen aan te maken en de status te volgen zonder verkopersdashboard. Volledige documentatie:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -650,6 +695,7 @@ export const nl = {
 
   integrations: {
     eyebrow: "Platformintegraties",
+    breadcrumb: "INTEGRATIONS",
     title: "Accepteer crypto in je webshop",
     lede:
       "Trustless Commerce verpakt gehoste checkout en een one-shot factuur-API met lichte adapters voor WooCommerce, Shopify, creatorplatforms en meer. Installeer een plugin of richt je AI-agent op een platformskill — bestellingen worden bijgewerkt zodra de betaling on-chain binnenkomt.",
@@ -668,6 +714,9 @@ export const nl = {
     aiSkill: "AI-skill",
     ctaTitle: "Begin met elk platform",
     ctaLede: "Maak nu een testfactuur of open de integratiedocs en AI-skill voor je webshop.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -707,4 +756,7 @@ export const nl = {
     },
   },
   wallet: walletNl,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

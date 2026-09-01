@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronUp, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHero } from "@/components/PageHero";
+import { PageCard } from "@/components/PageSplit";
+import { PreviewPanel } from "@/components/PreviewPanel";
+import { Money } from "@/components/Money";
 import { useLocale } from "@/providers/LocaleProvider";
 import { cn } from "@/lib/utils";
 import { chainLogoSvg, networkShort } from "@/shared/networks.js";
@@ -20,8 +24,6 @@ import { AUTO_VALUE } from "@/pages/create/fiat-rules.js";
 import type { PaymentMode } from "@/shared/types.js";
 import type { PayChrome } from "@/shared/pay-chrome.js";
 import { useCreateForm } from "@/pages/react/create/useCreateForm.js";
-import { Stepper } from "@/components/Stepper";
-import { Surface } from "@/components/Surface";
 
 function ChainLogo({ chainId, size = 20 }: { chainId: string; size?: number }) {
   return (
@@ -32,17 +34,12 @@ function ChainLogo({ chainId, size = 20 }: { chainId: string; size?: number }) {
   );
 }
 
-const WIZARD_STEPS = [
-  { step: 1 as const, labelKey: "create.stepDetails" as const },
-  { step: 2 as const, labelKey: "create.stepNetwork" as const },
-  { step: 3 as const, labelKey: "create.stepAmount" as const },
-];
-
 const PAYMENT_MODES: PaymentMode[] = ["crypto", "crypto_or_fiat", "fiat"];
 
 export function CreatePage() {
   const { t } = useLocale();
   const [docsOpen, setDocsOpen] = useState(location.hash === "#docs");
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const form = useCreateForm();
   const {
     state,
@@ -103,33 +100,28 @@ export function CreatePage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
-      <header className="mb-8 space-y-2">
-        <p className="text-sm font-medium uppercase tracking-wider text-primary">
-          {t("create.eyebrow", { mode: modeLabel })}
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{t("create.h1")}</h1>
-        <p className="text-lg text-muted-foreground">{t("create.lede")}</p>
-        {mode === "testnet" && (
-          <Alert variant="ok">
-            <AlertDescription>{t("create.testnetCallout")}</AlertDescription>
-          </Alert>
-        )}
-      </header>
+    <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
+      <PageHero
+        breadcrumb={t("create.breadcrumb")}
+        title={t("create.h1")}
+        lede={t("create.lede")}
+        aside={
+          <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+            {t("create.usuallyUnder60")}
+          </span>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <Card>
-          <CardContent className="pt-6">
-            <Stepper
-              className="mb-6"
-              current={state.currentStep}
-              onSelect={gotoStepClick}
-              steps={WIZARD_STEPS.map(({ step, labelKey }) => ({
-                id: step,
-                label: t(labelKey),
-                hidden: step === 2 && omitNetworkStep,
-              }))}
-            />
+        <PageCard>
+            <div className="mb-6 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emphasis">01</p>
+                <h2 className="text-lg font-semibold">{t("create.essentialsTitle")}</h2>
+                <p className="text-sm text-muted-foreground">{t("create.essentialsMicro")}</p>
+              </div>
+              <Badge variant="secondary">{t("create.essentialsHint")}</Badge>
+            </div>
 
             <form
               onSubmit={(e) => {
@@ -139,40 +131,68 @@ export function CreatePage() {
               autoComplete="off"
               className="space-y-6"
             >
-              {/* Step 1 — Details */}
-              {state.currentStep === 1 && (
-                <div className="space-y-5">
+              <div className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="clientInvoiceId">{t("create.clientIdLabel")}</Label>
-                    <p className="text-sm text-muted-foreground">{t("create.clientIdHint")}</p>
-                    <Input
-                      id="clientInvoiceId"
-                      className="font-mono"
-                      placeholder={t("create.clientIdPlaceholder")}
-                      value={state.clientInvoiceId}
-                      onChange={(e) => setField("clientInvoiceId", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="title">{t("create.titleLabel")}</Label>
-                    <p className="text-sm text-muted-foreground">{t("create.titleHint")}</p>
+                    <Label htmlFor="title">{t("create.whoLabel")}</Label>
                     <Input
                       id="title"
-                      placeholder={t("create.titlePlaceholder")}
+                      placeholder={t("create.whoPlaceholder")}
                       value={state.title}
                       onChange={(e) => setField("title", e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="description">{t("create.descriptionLabel")}</Label>
-                    <p className="text-sm text-muted-foreground">{t("create.descriptionHint")}</p>
-                    <Textarea
+                    <Label htmlFor="description">{t("create.whatLabel")}</Label>
+                    <Input
                       id="description"
-                      placeholder={t("create.descriptionPlaceholder")}
+                      placeholder={t("create.whatPlaceholder")}
                       value={state.description}
                       onChange={(e) => setField("description", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="price">
+                        {t("create.amountDueLabel")}{" "}
+                        <span className="text-destructive">{t("common.required")}</span>
+                      </Label>
+                      <Input
+                        id="price"
+                        inputMode="decimal"
+                        placeholder="0.00 USDC"
+                        value={state.price}
+                        onChange={(e) => {
+                          setField("price", e.target.value);
+                          onFiatFieldChange("amount", (prev) => ({ ...prev, price: e.target.value }));
+                        }}
+                      />
+                    </div>
+                  </div>
+              </div>
+
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                onClick={() => setDetailsOpen((o) => !o)}
+                aria-expanded={detailsOpen}
+              >
+                {t("create.addDetails")}
+                {detailsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+
+              {detailsOpen && (
+                <div className="space-y-5 rounded-lg border border-border bg-muted/30 p-4">
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clientInvoiceId">{t("create.clientIdLabel")}</Label>
+                    <Input
+                      id="clientInvoiceId"
+                      className="font-mono"
+                      placeholder={t("create.clientIdPlaceholder")}
+                      value={state.clientInvoiceId}
+                      onChange={(e) => setField("clientInvoiceId", e.target.value)}
                     />
                   </div>
 
@@ -234,12 +254,7 @@ export function CreatePage() {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Step 2 — Network */}
-              {state.currentStep === 2 && (
-                <div className="space-y-5">
                   {!skipChainToken && (
                     <div className="space-y-2">
                       <Label>
@@ -449,34 +464,6 @@ export function CreatePage() {
                       )}
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Step 3 — Amount */}
-              {state.currentStep === 3 && (
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="price">
-                      {paymentMode === "fiat" ? t("create.fiatPayLabel") : t("create.amountLabel")}{" "}
-                      <span className="text-destructive">{t("common.required")}</span>
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {paymentMode === "fiat" ? t("create.fiatPayHint") : t("create.amountHint")}
-                    </p>
-                    <Input
-                      id="price"
-                      inputMode="decimal"
-                      placeholder="10.00"
-                      value={state.price}
-                      onChange={(e) => {
-                        setField("price", e.target.value);
-                        onFiatFieldChange("amount", (prev) => ({ ...prev, price: e.target.value }));
-                      }}
-                    />
-                    {state.amountLimits && (
-                      <p className="text-sm text-muted-foreground">{state.amountLimits}</p>
-                    )}
-                  </div>
 
                   {paymentMode !== "fiat" && (
                     <div className="space-y-2">
@@ -488,7 +475,6 @@ export function CreatePage() {
                         />
                         {t("create.allowPartial")}
                       </label>
-                      <p className="text-sm text-muted-foreground">{t("create.allowPartialHint")}</p>
                     </div>
                   )}
 
@@ -609,121 +595,69 @@ export function CreatePage() {
                 </div>
               )}
 
+              <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Shield className="h-3.5 w-3.5" aria-hidden />
+                  USDC · Base network · no intermediary
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={!previewValid}>
+                    {t("create.createPayLink")}
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+
               {state.formActionStatus && (
                 <p className={cn("text-sm", state.formActionError ? "text-destructive" : "text-muted-foreground")}>
                   {state.formActionStatus}
                 </p>
               )}
 
-              <div className="flex flex-wrap gap-2">
-                {state.currentStep > 1 && (
-                  <Button type="button" variant="outline" onClick={wizardBack}>
-                    {t("create.back")}
-                  </Button>
-                )}
-                {state.currentStep < 3 && (
-                  <Button type="button" onClick={wizardNext}>
-                    {t("create.next")}
-                  </Button>
-                )}
-                {state.currentStep === 3 && (
-                  <>
-                    <Button type="submit" disabled={!previewValid}>
-                      {t("create.openCheckout")}
-                    </Button>
-                    <Button type="button" variant="outline" disabled={!previewValid} onClick={() => void copyPayLink()}>
-                      {t("create.copyPayLink")}
-                    </Button>
-                  </>
-                )}
-              </div>
             </form>
-          </CardContent>
-        </Card>
+        </PageCard>
 
-        {/* Preview aside */}
-        <Card className="h-fit lg:sticky lg:top-4">
-          <CardHeader>
-            <p className="text-sm font-medium uppercase tracking-wider text-primary">{t("create.outputEyebrow")}</p>
-            <CardTitle>{t("create.outputTitle")}</CardTitle>
-            <CardDescription>{t("create.outputHint")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <PreviewPanel tag="DRAFT" className="h-fit lg:sticky lg:top-24">
+          <div className="rounded-lg bg-brand-panel-foreground/10 p-4">
+            <p className="text-xs text-brand-panel-foreground/70">{t("brand")}</p>
+            <p className="mt-4 text-xs uppercase tracking-wide text-brand-panel-foreground/60">{t("create.previewAmountDue")}</p>
             {preview?.error ? (
-              <p className="text-sm text-destructive">{preview.error}</p>
-            ) : preview ? (
-              <Tabs defaultValue="link">
-                <TabsList className="w-full">
-                  <TabsTrigger value="link" className="flex-1">
-                    {t("create.payLinkLabel")}
-                  </TabsTrigger>
-                  <TabsTrigger value="embed" className="flex-1">
-                    {t("create.embedLabel")}
-                  </TabsTrigger>
-                  <TabsTrigger value="iframe" className="flex-1">
-                    {t("create.iframeLabel")}
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="link">
-                  <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{preview.link}</pre>
-                </TabsContent>
-                <TabsContent value="embed" className="space-y-2">
-                  <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{preview.embed}</pre>
-                  <Button type="button" variant="outline" size="sm" onClick={() => void copyEmbed()}>
-                    {t("create.copyHtml")}
-                  </Button>
-                </TabsContent>
-                <TabsContent value="iframe" className="space-y-2">
-                  <p className="text-sm text-muted-foreground">{t("create.iframeHint")}</p>
-                  <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{preview.iframe}</pre>
-                  <Button type="button" variant="outline" size="sm" onClick={() => void copyIframe()}>
-                    {t("create.copyHtml")}
-                  </Button>
-                </TabsContent>
-              </Tabs>
-            ) : null}
-
-            {preview && !preview.error && (
-              <div className="space-y-2">
-                <Label>{t("create.renderedLabel")}</Label>
-                <div className="rounded-md border p-4">
-                  <a
-                    href={preview.path}
-                    className="tc-pay-button inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground no-underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {preview.payLabel}
-                  </a>
-                </div>
+              <p className="mt-2 text-sm text-destructive">{preview.error}</p>
+            ) : (
+              <div className="mt-1">
+                <Money
+                  amount={state.price || "0.00"}
+                  className="text-brand-panel-foreground"
+                  size="lg"
+                />
+                <p className="mt-1 text-sm text-brand-panel-foreground/70">USDC on Base</p>
               </div>
             )}
-
-            {state.copyStatus && <p className="text-sm text-muted-foreground">{state.copyStatus}</p>}
-
-            <div className="space-y-2">
-              <Label htmlFor="pay-chrome">{t("create.chromeLabel")}</Label>
-              <p className="text-sm text-muted-foreground">{t("create.chromeHint")}</p>
-              <Select
-                value={state.payChrome}
-                onValueChange={(v) => setField("payChrome", v as PayChrome)}
-              >
-                <SelectTrigger id="pay-chrome">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="full">{t("create.chromeFull")}</SelectItem>
-                  <SelectItem value="minimal">{t("create.chromeMinimal")}</SelectItem>
-                  <SelectItem value="none">{t("create.chromeNone")}</SelectItem>
-                </SelectContent>
-              </Select>
+            <dl className="mt-6 space-y-2 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-brand-panel-foreground/60">To</dt>
+                <dd className="text-end font-medium">{state.title || "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-brand-panel-foreground/60">For</dt>
+                <dd className="text-end font-medium">{state.description || "—"}</dd>
+              </div>
+            </dl>
+          </div>
+          <p className="mt-4 text-xs text-brand-panel-foreground/70">{t("create.previewSettlement")}</p>
+          <p className="mt-1 text-xs text-brand-panel-foreground/60">{t("create.previewCustomerPays")}</p>
+          {preview && !preview.error && (
+            <div className="mt-4 space-y-2 border-t border-brand-panel-foreground/10 pt-4">
+              <Button type="button" variant="secondary" size="sm" className="w-full" disabled={!previewValid} onClick={() => void copyPayLink()}>
+                {t("create.copyPayLink")}
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </PreviewPanel>
       </div>
 
-      {/* Collapsible API docs */}
-      <section id="create-docs" className="mt-10">
+      {/* Collapsible API docs — keep simplified */}
+      <section id="create-docs" className="mt-10 hidden">
         <Card>
           <CardHeader className="cursor-pointer" onClick={() => setDocsOpen((o) => !o)}>
             <div className="flex items-center justify-between">
