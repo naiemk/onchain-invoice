@@ -228,6 +228,21 @@ describe("commerce wallet advanced API", function () {
     });
   });
 
+  it("advanced-policy returns not-advanced for undeployed wallet when RPC is up", async function () {
+    if (!process.env.HARDHAT_RPC_URL) return;
+    await withApp(
+      async (baseUrl) => {
+        const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
+        const res = await fetch(`${baseUrl}/api/wallet/${wallet}/advanced-policy`);
+        expect(res.status).to.equal(200);
+        const body = (await res.json()) as { advanced: boolean; supportsAdvanced: boolean };
+        expect(body.advanced).to.equal(false);
+        expect(body.supportsAdvanced).to.equal(true);
+      },
+      { WALLET_RPC_URL: process.env.HARDHAT_RPC_URL, EVM_RPC_URL: process.env.HARDHAT_RPC_URL }
+    );
+  });
+
   it("encodeAdvancedSignature packs entity sigs for execute", function () {
     const keyA = computeKeyId(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), ethersLib.ZeroAddress);
     const keyB = computeKeyId(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), ethersLib.ZeroAddress);

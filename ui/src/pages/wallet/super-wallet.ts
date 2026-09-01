@@ -10,15 +10,15 @@ import {
   type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
-import { fetchWalletConfig, waitForUserOp } from "../../shared/wallet-api.js";
+import { fetchWalletBalance, fetchWalletConfig, waitForUserOp } from "../../shared/wallet-api.js";
 import {
-  fetchAdvancedPolicy,
   listWalletEntities,
   listKeyEnrollmentRequests,
   approveKeyEnrollmentRequest,
   rejectKeyEnrollmentRequest,
   registerWalletEntity,
   registerWalletEntityKey,
+  resolveAdvancedPolicy,
 } from "../../shared/wallet-advanced-api.js";
 import {
   hashEntityEmail,
@@ -60,14 +60,9 @@ export async function renderWalletSuperWallet(root: HTMLElement, opts?: WalletRe
   const config = await fetchWalletConfig();
   await initEoaConnector(config);
   if (!isSpaRenderCurrent(gen)) return;
-  const policy = await fetchAdvancedPolicy(session.address).catch(() => ({
-    wallet: session.address,
-    advanced: false,
-    threshold: 1,
-    entityCount: 0,
-    vetoCount: 0,
-    vetoBitmap: "0",
-  }));
+  const balance = await fetchWalletBalance(session.address).catch(() => null);
+  const deployed = balance?.chains.some((c) => c.deployed) ?? false;
+  const policy = await resolveAdvancedPolicy(session.address, deployed);
   if (!isSpaRenderCurrent(gen)) return;
 
   const roster = policy.advanced
@@ -93,8 +88,11 @@ export async function renderWalletSuperWallet(root: HTMLElement, opts?: WalletRe
       title: t("wallet.superWalletTitle"),
       lede: t("wallet.superWalletLede"),
       body: `
+      <p id="super-status" class="status wallet-status" role="status"></p>
       ${
-        !policy.advanced
+        !policy.advanced && policy.supportsAdvanced === false
+          ? renderUnsupportedSection()
+          : !policy.advanced
           ? renderUpgradeSection()
           : `<section>
               <p>${escapeHtml(t("wallet.superWalletActive", { threshold: String(policy.threshold), entities: String(policy.entityCount) }))}</p>
@@ -123,20 +121,30 @@ export async function renderWalletSuperWallet(root: HTMLElement, opts?: WalletRe
               </div>
               <button type="button" class="tc-btn secondary" id="add-entity">${escapeHtml(t("wallet.superWalletAddEntity"))}</button>
             </section>`
-      }
-      <p id="super-status" class="status wallet-status" role="status"></p>`,
+      }`,
     },
     opts,
     (r) => {
-      bindUpgrade(r, session, config, opts);
       if (policy.advanced) {
         bindPolicy(r, session, config, roster, adminEntity, opts);
         bindEntities(r, session, config, roster, adminEntity, opts);
         bindKeyActions(r, session, config, roster, adminEntity, opts);
         bindEnrollmentApprovals(r, session, config, adminEntity, opts);
+      } else if (policy.supportsAdvanced !== false) {
+        bindUpgrade(r, session, config, opts);
       }
     }
   );
+}
+
+function renderUnsupportedSection(): string {
+  return `<section class="wallet-super-upgrade">
+      <h2>${escapeHtml(t("wallet.superWalletUnsupportedTitle"))}</h2>
+      <div class="banner warn wallet-super-warning">
+        <p>${escapeHtml(t("wallet.superWalletUnsupportedBody"))}</p>
+      </div>
+      <a class="tc-btn" href="/wallet/create" data-route>${escapeHtml(t("wallet.createAnother"))}</a>
+    </section>`;
 }
 
 function renderUpgradeSection(): string {
@@ -347,6 +355,8 @@ function bindUpgrade(
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
       if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
+      const confirmed = await resolveAdvancedPolicy(session.address, true);
+      if (!confirmed.advanced) throw new Error(t("wallet.superWalletUpgradeFailed"));
       await registerWalletEntity({ walletAddress: session.address, entityId: adminEntityId, label: email });
       await registerWalletEntityKey({
         walletAddress: session.address,

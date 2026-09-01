@@ -291,6 +291,11 @@ export const walletEs = {
   superWalletAdminEmail: "Your work email (hashed on-chain only)",
   superWalletUpgradeCta: "Convert to Super Wallet",
   superWalletUpgradeConfirm: "Upgrade to Super Wallet? Email recovery cannot be re-enabled.",
+  superWalletUnsupportedTitle: "This wallet cannot become a Super Wallet",
+  superWalletUnsupportedBody:
+    "This wallet was created before Super Wallet existed, so the on-chain contract cannot be upgraded. Create a new wallet and send your funds there. This wallet can still send and receive.",
+  superWalletUpgradeFailed:
+    "The upgrade was signed but did not take effect on-chain. This wallet may not support Super Wallet.",
   superWalletEmailRequired: "Enter an email address",
   superWalletActive: "Active · {threshold}-of-{entities} entities",
   superWalletActiveShort: "Super Wallet is active on-chain",

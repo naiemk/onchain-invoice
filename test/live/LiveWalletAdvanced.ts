@@ -57,7 +57,11 @@ describe("Live wallet advanced (Sepolia testnet)", function () {
     const wallet = getAddress(account.address);
 
     const policyRes = await fetch(`${API_BASE}/api/wallet/${wallet}/advanced-policy`);
-    expect([200, 400, 503]).to.include(policyRes.status);
+    expect([200, 503]).to.include(policyRes.status);
+    if (policyRes.status === 200) {
+      const policy = (await policyRes.json()) as { advanced: boolean; supportsAdvanced?: boolean };
+      expect(policy.advanced).to.equal(false);
+    }
 
     const entityId = "0x" + "cc".repeat(32);
     const entityRes = await fetch(`${API_BASE}/api/wallet/${wallet}/entities`, {

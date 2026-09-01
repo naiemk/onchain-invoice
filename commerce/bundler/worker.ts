@@ -6,6 +6,7 @@ import {
   ENTRYPOINT_V09,
   ERC20_ABI,
   estimateUserOpPrefund,
+  userOpExecutionSucceeded,
   userOpToTuple,
   type BundlerFeeConfig,
   type PackedUserOperationJson,
@@ -197,16 +198,19 @@ export class BundlerWorker {
     const tx = await ep.handleOps([userOpToTuple(record.userOp)], beneficiary);
     const receipt = await tx.wait();
     const gasSpent = receipt?.gasUsed ? receipt.gasUsed.toString() : null;
+    const opSuccess =
+      receipt?.status === 1 && userOpExecutionSucceeded(receipt.logs ?? [], record.userOpHash);
 
     await this.trackWithRetry({
       userOpHash: record.userOpHash,
-      status: receipt?.status === 1 ? "included" : "failed",
+      status: opSuccess ? "included" : "failed",
+      rejectReason: opSuccess ? null : "execution_reverted",
       txHash: receipt?.hash ?? tx.hash,
       gasSpentWei: gasSpent,
       expectedVersion: claimed.version + 1,
     });
 
-    this.activity?.append("userop-included", {
+    this.activity?.append(opSuccess ? "userop-included" : "userop-execution-reverted", {
       chainId: record.chainId,
       txHash: receipt?.hash ?? tx.hash,
       payload: { userOpHash: record.userOpHash },

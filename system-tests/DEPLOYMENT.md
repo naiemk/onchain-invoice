@@ -56,8 +56,8 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/t
 
 mkdir -p ~/tc/tctest-nodes && cd ~/tc/tctest-nodes
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-nodes.sh | bash
-./register-onchain-invoice-node.sh
 ./start-nodes.sh
+# start-nodes upserts the sweeper wallet; optional manual: ./register-onchain-invoice-node.sh
 
 # Once per host (or second product only extends sites.conf):
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/tctest/dist/install-gateway.sh | bash

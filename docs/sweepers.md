@@ -10,7 +10,7 @@ Testnet nodes install runs several workers from **one** Docker image: `ghcr.io/<
 
 ## Sweeper
 
-- Register wallet: `POST /api/admin/sweepers` with admin key (`./register-onchain-invoice-node.sh`)
+- Register wallet: `POST /api/admin/sweepers` with admin key. `./start-nodes.sh` and `./start-api.sh` upsert this automatically when `ADMIN_API_KEY` + `SWEEPER_REGISTER_ADDRESS` are set; `./register-onchain-invoice-node.sh` remains the manual path.
 - Sign every request with that wallet
 - **Claim** before broadcasting on-chain (`claimed_by` / `claimed_until` lease)
 - **Optimistic version** on every write; retry on 409

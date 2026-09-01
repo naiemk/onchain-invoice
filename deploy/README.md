@@ -48,5 +48,5 @@ Gateway lives once at `~/services/gateway`; products drop site config under `app
 
 1. Package both products (`deploy/package.sh`) and commit `tctest/dist` + `tcmain/dist` when shipping installers
 2. Distinct `ADMIN_API_KEY` / `SWEEPER_API_KEY` per environment
-3. Register sweeper wallets via `register-onchain-invoice-node.sh` in each product dist
+3. `start-nodes.sh` / `start-api.sh` upsert sweeper + bundler wallets when `.env` has `ADMIN_API_KEY` and `SWEEPER_REGISTER_ADDRESS` (manual: `register-onchain-invoice-node.sh`)
 4. Mainnet: set real `SWEEPER_ADDRESS` + `FORWARDER_IMPLEMENTATION` after contract deploy

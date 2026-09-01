@@ -32,6 +32,7 @@ export const ENTRYPOINT_ABI = [
   "function depositTo(address account) payable",
   "function getUserOpHash((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature) userOp) view returns (bytes32)",
   "function handleOps((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature)[] ops, address payable beneficiary)",
+  "event UserOperationEvent(bytes32 indexed userOpHash, address indexed sender, address indexed paymaster, uint256 nonce, bool success, uint256 actualGasCost, uint256 actualGasUsed)",
 ];
 
 export interface BatchCall {
@@ -296,6 +297,26 @@ export function userOpToTuple(userOp: PackedUserOperationJson): [
     userOp.paymasterAndData,
     userOp.signature,
   ];
+}
+
+/** True when handleOps emitted UserOperationEvent.success for this hash. Inner execution can revert while the tx still succeeds. */
+export function userOpExecutionSucceeded(
+  logs: Array<{ topics: readonly string[]; data: string }>,
+  userOpHash: string
+): boolean {
+  const iface = new Interface(ENTRYPOINT_ABI);
+  const want = userOpHash.toLowerCase();
+  for (const log of logs) {
+    try {
+      const parsed = iface.parseLog({ topics: [...log.topics], data: log.data });
+      if (parsed?.name !== "UserOperationEvent") continue;
+      const hash = String(parsed.args.userOpHash ?? "").toLowerCase();
+      if (hash === want) return Boolean(parsed.args.success);
+    } catch {
+      /* log from another contract */
+    }
+  }
+  return false;
 }
 
 export function formatUsdcAmount(atoms: bigint, decimals = 6): string {

@@ -268,3 +268,28 @@ fi
 if [[ -n "$DOCKER_NETWORK" ]]; then
   echo "On network $DOCKER_NETWORK as hostname $NAME (use with install-gateway.sh)"
 fi
+
+# After recreate the SQLite DB is empty until wallets are upserted. Nodes live in
+# a sibling install dir; skip quietly when that dir is not present yet.
+register_sibling_node_wallets() {
+  local nodes_dir
+  nodes_dir="$(cd "$SCRIPT_DIR/../nodes" 2>/dev/null && pwd)" || return 0
+  if [[ ! -x "$nodes_dir/register-onchain-invoice-node.sh" ]]; then
+    return 0
+  fi
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    if docker exec "$NAME" wget -qO- http://127.0.0.1:8080/api/health >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+  echo "Registering node wallets from $nodes_dir (idempotent) ..."
+  (cd "$nodes_dir" && ./register-onchain-invoice-node.sh) || \
+    echo "WARNING: sweeper register after API start failed — run $nodes_dir/register-onchain-invoice-node.sh" >&2
+  if [[ -x "$nodes_dir/register-onchain-invoice-bundler.sh" ]]; then
+    (cd "$nodes_dir" && ./register-onchain-invoice-bundler.sh) || \
+      echo "WARNING: bundler register after API start failed — run $nodes_dir/register-onchain-invoice-bundler.sh" >&2
+  fi
+}
+register_sibling_node_wallets
