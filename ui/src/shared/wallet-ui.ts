@@ -421,4 +421,18 @@ export function shortKey(hex: string): string {
   return `${hex.slice(0, 8)}…${hex.slice(-6)}`;
 }
 
+export function renderYubiKeyPinRequiredPanel(): string {
+  return `<div class="banner warn wallet-yubikey-pin-panel">
+    <h3>${escapeHtml(t("wallet.yubikeyPinRequiredTitle"))}</h3>
+    <p>${escapeHtml(t("wallet.yubikeyPinRequiredWhy"))}</p>
+    <p class="field-hint">${escapeHtml(t("wallet.yubikeyPinSetupSteps"))}</p>
+    <p class="field-hint">${escapeHtml(t("wallet.yubikeyPinNeverStored"))}</p>
+  </div>`;
+}
+
+export function formatKeyFingerprint(qx: string, qy?: string | null): string {
+  if (!qx) return "—";
+  return qy ? `${shortKey(qx)} / ${shortKey(qy)}` : shortKey(qx);
+}
+
 export { shortAddress };

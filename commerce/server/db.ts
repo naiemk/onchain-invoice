@@ -30,6 +30,8 @@ import type {
   HostedRecoveryChallengeRecord,
   WalletEntityRecord,
   WalletEntityKeyRecord,
+  WalletKeyEnrollmentRequestRecord,
+  WalletKeyEnrollmentStatus,
   WalletProposalRecord,
   WalletProposalSigRecord,
   WalletProposalStatus,
@@ -162,6 +164,22 @@ interface WalletEntityKeyRow {
   eoa: string | null;
   credential_id: string | null;
   created_at: string;
+}
+
+interface WalletKeyEnrollmentRequestRow {
+  id: string;
+  wallet_address: string;
+  entity_id: string;
+  key_type: number;
+  qx: string | null;
+  qy: string | null;
+  eoa: string | null;
+  credential_id: string | null;
+  label: string | null;
+  status: WalletKeyEnrollmentStatus;
+  expires_at: string;
+  created_at: string;
+  resolved_at: string | null;
 }
 
 interface WalletProposalRow {
@@ -974,6 +992,25 @@ export class CommerceDb {
       CREATE INDEX IF NOT EXISTS idx_wallet_entity_keys_entity
         ON wallet_entity_keys(wallet_address, entity_id);
 
+      CREATE TABLE IF NOT EXISTS wallet_key_enrollment_requests (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        key_type INTEGER NOT NULL,
+        qx TEXT,
+        qy TEXT,
+        eoa TEXT,
+        credential_id TEXT,
+        label TEXT,
+        status TEXT NOT NULL CHECK (status IN ('pending','approved','rejected','expired')),
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        resolved_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wallet_key_enrollment_wallet
+        ON wallet_key_enrollment_requests(wallet_address, status);
+
       CREATE TABLE IF NOT EXISTS wallet_proposals (
         id TEXT PRIMARY KEY,
         wallet_address TEXT NOT NULL,
@@ -1367,6 +1404,103 @@ export class CommerceDb {
         .prepare(`SELECT * FROM wallet_entity_keys WHERE wallet_address = ? ORDER BY created_at ASC`)
         .all(walletAddress.toLowerCase()) as WalletEntityKeyRow[]
     ).map(mapWalletEntityKey);
+  }
+
+  createWalletKeyEnrollmentRequest(input: {
+    walletAddress: string;
+    entityId: string;
+    keyType: number;
+    qx?: string | null;
+    qy?: string | null;
+    eoa?: string | null;
+    credentialId?: string | null;
+    label?: string | null;
+    ttlMs?: number;
+  }): WalletKeyEnrollmentRequestRecord {
+    const now = new Date();
+    const id = randomUUID();
+    const expiresAt = new Date(now.getTime() + (input.ttlMs ?? 7 * 24 * 60 * 60 * 1000)).toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_key_enrollment_requests (
+           id, wallet_address, entity_id, key_type, qx, qy, eoa, credential_id, label,
+           status, expires_at, created_at, resolved_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL)`
+      )
+      .run(
+        id,
+        input.walletAddress.toLowerCase(),
+        input.entityId,
+        input.keyType,
+        input.qx ?? null,
+        input.qy ?? null,
+        input.eoa ?? null,
+        input.credentialId ?? null,
+        input.label ?? null,
+        expiresAt,
+        now.toISOString()
+      );
+    return this.getWalletKeyEnrollmentRequest(id)!;
+  }
+
+  getWalletKeyEnrollmentRequest(id: string): WalletKeyEnrollmentRequestRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_key_enrollment_requests WHERE id = ?`)
+      .get(id) as WalletKeyEnrollmentRequestRow | undefined;
+    if (!row) return null;
+    const mapped = mapWalletKeyEnrollmentRequest(row);
+    if (mapped.status === "pending" && Date.parse(mapped.expiresAt) < Date.now()) {
+      this.db
+        .prepare(
+          `UPDATE wallet_key_enrollment_requests SET status = 'expired', resolved_at = ? WHERE id = ?`
+        )
+        .run(new Date().toISOString(), id);
+      return { ...mapped, status: "expired", resolvedAt: new Date().toISOString() };
+    }
+    return mapped;
+  }
+
+  listWalletKeyEnrollmentRequests(
+    walletAddress: string,
+    status?: WalletKeyEnrollmentStatus
+  ): WalletKeyEnrollmentRequestRecord[] {
+    const rows = status
+      ? (this.db
+          .prepare(
+            `SELECT * FROM wallet_key_enrollment_requests WHERE wallet_address = ? AND status = ? ORDER BY created_at ASC`
+          )
+          .all(walletAddress.toLowerCase(), status) as WalletKeyEnrollmentRequestRow[])
+      : (this.db
+          .prepare(
+            `SELECT * FROM wallet_key_enrollment_requests WHERE wallet_address = ? ORDER BY created_at DESC`
+          )
+          .all(walletAddress.toLowerCase()) as WalletKeyEnrollmentRequestRow[]);
+    return rows.map(mapWalletKeyEnrollmentRequest).map((r) => {
+      if (r.status === "pending" && Date.parse(r.expiresAt) < Date.now()) {
+        this.db
+          .prepare(
+            `UPDATE wallet_key_enrollment_requests SET status = 'expired', resolved_at = ? WHERE id = ?`
+          )
+          .run(new Date().toISOString(), r.id);
+        return { ...r, status: "expired" as const, resolvedAt: new Date().toISOString() };
+      }
+      return r;
+    });
+  }
+
+  resolveWalletKeyEnrollmentRequest(
+    id: string,
+    status: "approved" | "rejected"
+  ): WalletKeyEnrollmentRequestRecord | null {
+    const existing = this.getWalletKeyEnrollmentRequest(id);
+    if (!existing || existing.status !== "pending") return null;
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `UPDATE wallet_key_enrollment_requests SET status = ?, resolved_at = ? WHERE id = ?`
+      )
+      .run(status, now, id);
+    return this.getWalletKeyEnrollmentRequest(id);
   }
 
   createWalletProposal(input: {
@@ -2772,6 +2906,24 @@ function mapWalletEntityKey(row: WalletEntityKeyRow): WalletEntityKeyRecord {
     eoa: row.eoa,
     credentialId: row.credential_id,
     createdAt: row.created_at,
+  };
+}
+
+function mapWalletKeyEnrollmentRequest(row: WalletKeyEnrollmentRequestRow): WalletKeyEnrollmentRequestRecord {
+  return {
+    id: row.id,
+    walletAddress: row.wallet_address,
+    entityId: row.entity_id,
+    keyType: row.key_type,
+    qx: row.qx,
+    qy: row.qy,
+    eoa: row.eoa,
+    credentialId: row.credential_id,
+    label: row.label,
+    status: row.status,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at,
   };
 }
 

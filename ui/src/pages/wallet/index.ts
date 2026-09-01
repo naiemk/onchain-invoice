@@ -32,6 +32,11 @@ export async function renderWallet(root: HTMLElement): Promise<void> {
     await renderWalletPair(root);
     return;
   }
+  if (path === "/wallet/join-super") {
+    const { renderWalletJoinSuper } = await import("./join-super.js");
+    await renderWalletJoinSuper(root);
+    return;
+  }
   if (path === "/wallet/send") {
     await renderWalletSend(root);
     return;

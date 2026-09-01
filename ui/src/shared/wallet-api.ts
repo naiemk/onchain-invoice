@@ -197,6 +197,41 @@ export function parsePairingQr(raw: string): {
 export function parsePairingFromUrl(): string | null {
   const encoded = new URLSearchParams(location.search).get("payload");
   if (!encoded) return null;
+  const pad = "=".repeat((4 - (encoded.length % 4)) % 4);
+  const b64 = (encoded + pad).replace(/-/g, "+").replace(/_/g, "/");
+  return atob(b64);
+}
+
+const SUPER_JOIN_PREFIX = "tcsw-join:v1:";
+
+export function superJoinPayload(input: { walletAddress: string; chainId: string }): string {
+  return `${SUPER_JOIN_PREFIX}${input.chainId}:${input.walletAddress}`;
+}
+
+export function superJoinDeepLink(payload: string): string {
+  const encoded = btoa(payload).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${location.origin}/wallet/join-super?payload=${encoded}`;
+}
+
+export function parseSuperJoinPayload(raw: string): { walletAddress: string; chainId: string } {
+  if (!raw.startsWith(SUPER_JOIN_PREFIX)) throw new Error("invalid join payload");
+  const rest = raw.slice(SUPER_JOIN_PREFIX.length);
+  const colon = rest.indexOf(":");
+  if (colon <= 0) throw new Error("invalid join payload");
+  return { chainId: rest.slice(0, colon), walletAddress: rest.slice(colon + 1) };
+}
+
+export function parseSuperJoinFromUrl(): { walletAddress: string; chainId: string } | null {
+  const encoded = new URLSearchParams(location.search).get("payload");
+  if (!encoded) return null;
+  try {
+    const pad = "=".repeat((4 - (encoded.length % 4)) % 4);
+    const b64 = (encoded + pad).replace(/-/g, "+").replace(/_/g, "/");
+    return parseSuperJoinPayload(atob(b64));
+  } catch {
+    return null;
+  }
+}
   const padded = encoded.replace(/-/g, "+").replace(/_/g, "/");
   const pad = padded.length % 4 === 0 ? padded : padded + "=".repeat(4 - (padded.length % 4));
   try {

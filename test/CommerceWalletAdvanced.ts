@@ -238,4 +238,44 @@ describe("commerce wallet advanced API", function () {
     expect(packed.startsWith("0x")).to.equal(true);
     expect(packed.length).to.be.greaterThan(10);
   });
+
+  it("manages key enrollment requests for teammate join", async function () {
+    await withApp(async (baseUrl) => {
+      const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
+      await fetch(`${baseUrl}/api/wallet/${wallet}/entities`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ entityId: ENTITY_B, label: "teammate@example.com" }),
+      });
+      const qx = ethersLib.zeroPadValue("0x0c", 32);
+      const qy = ethersLib.zeroPadValue("0x0d", 32);
+      const createRes = await fetch(`${baseUrl}/api/wallet/${wallet}/key-enrollment-requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          entityId: ENTITY_B,
+          keyType: 0,
+          qx,
+          qy,
+          label: "teammate@example.com",
+        }),
+      });
+      expect(createRes.status).to.equal(201);
+      const created = (await createRes.json()) as { request: { id: string; status: string } };
+      expect(created.request.status).to.equal("pending");
+
+      const listRes = await fetch(`${baseUrl}/api/wallet/${wallet}/key-enrollment-requests?status=pending`);
+      expect(listRes.status).to.equal(200);
+      const list = (await listRes.json()) as { requests: Array<{ id: string }> };
+      expect(list.requests.some((r) => r.id === created.request.id)).to.equal(true);
+
+      const approveRes = await fetch(
+        `${baseUrl}/api/wallet/${wallet}/key-enrollment-requests/${created.request.id}/approve`,
+        { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }
+      );
+      expect(approveRes.status).to.equal(200);
+      const approved = (await approveRes.json()) as { request: { status: string } };
+      expect(approved.request.status).to.equal("approved");
+    });
+  });
 });

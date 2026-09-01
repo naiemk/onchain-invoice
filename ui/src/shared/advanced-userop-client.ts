@@ -73,7 +73,9 @@ export async function buildAdvancedKeySignature(input: {
       sig = await signUserOpHashPersonal(input.userOpHash);
     }
   } else {
-    sig = await signUserOpHash(input.userOpHash, input.credentialId);
+    sig = await signUserOpHash(input.userOpHash, input.credentialId, {
+      requireUv: input.keyType === KEY_YUBIKEY,
+    });
   }
   return encodeAdvancedSignature([{ keyId, sig }]);
 }

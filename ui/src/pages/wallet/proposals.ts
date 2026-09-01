@@ -176,6 +176,7 @@ async function openProposalDetail(
         showStatus(status, t("wallet.sendSigning"));
         const roster = await listWalletEntities(session.address);
         let myKey =
+          (session.keyId ? roster.keys.find((k) => k.keyId === session.keyId) : null) ??
           roster.keys.find((k) => k.qx === session.qx && k.qy === session.qy) ??
           null;
         if (!myKey) {

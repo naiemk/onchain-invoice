@@ -1,9 +1,10 @@
 import { getAddress, zeroPadValue } from "ethers";
 import { t } from "../../i18n/t.js";
-import { createPasskey, loadWalletSession } from "../../shared/webauthn.js";
+import { createPasskey, createSecurityKey, isYubiKeyPinRequiredError, loadWalletSession } from "../../shared/webauthn.js";
 import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import {
   bindWalletAccountBar,
+  renderYubiKeyPinRequiredPanel,
   setButtonLoading,
   showStatus,
   walletFrame,
@@ -14,6 +15,9 @@ import { fetchWalletConfig, waitForUserOp } from "../../shared/wallet-api.js";
 import {
   fetchAdvancedPolicy,
   listWalletEntities,
+  listKeyEnrollmentRequests,
+  approveKeyEnrollmentRequest,
+  rejectKeyEnrollmentRequest,
   registerWalletEntity,
   registerWalletEntityKey,
 } from "../../shared/wallet-advanced-api.js";
@@ -34,7 +38,11 @@ import {
 import { submitSignedUserOp } from "../../shared/userop-client.js";
 import { isAdvancedMode } from "../../shared/wallet-mode.js";
 import { connectEoaWallet, initEoaConnector } from "../../shared/eoa-connector.js";
-import type { WalletEntityKeyRecord, WalletEntityRecord } from "../../../../commerce/shared/wallet.js";
+import type {
+  WalletEntityKeyRecord,
+  WalletEntityRecord,
+  WalletKeyEnrollmentRequestRecord,
+} from "../../../../commerce/shared/wallet.js";
 
 export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> {
   const gen = currentSpaRender();
@@ -70,6 +78,15 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
   if (!isSpaRenderCurrent(gen)) return;
 
   const adminEntity = roster.entities[0] ?? null;
+  let pendingEnrollments: Awaited<ReturnType<typeof listKeyEnrollmentRequests>> = [];
+  if (policy.advanced) {
+    try {
+      pendingEnrollments = await listKeyEnrollmentRequests(session.address, "pending");
+    } catch {
+      pendingEnrollments = [];
+    }
+  }
+  if (!isSpaRenderCurrent(gen)) return;
 
   root.innerHTML = walletFrame({
     current: "superWallet",
@@ -86,6 +103,10 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
               </div>
             </section>
             <section>
+              <h2>${escapeHtml(t("wallet.enrollmentPendingTitle"))}</h2>
+              ${renderPendingEnrollments(pendingEnrollments)}
+            </section>
+            <section>
               <h2>${escapeHtml(t("wallet.superWalletPolicyTitle"))}</h2>
               <div class="field">
                 <label for="policy-threshold">${escapeHtml(t("wallet.superWalletThreshold"))}</label>
@@ -95,7 +116,7 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
             </section>
             <section>
               <h2>${escapeHtml(t("wallet.superWalletEntitiesTitle"))}</h2>
-              ${renderEntityList(roster.entities, roster.keys)}
+              ${renderEntityList(roster.entities, roster.keys, adminEntity?.entityId ?? null)}
               <div class="field">
                 <label for="entity-email">${escapeHtml(t("wallet.superWalletEntityEmail"))}</label>
                 <input id="entity-email" type="email" placeholder="teammate@company.com" />
@@ -112,6 +133,7 @@ export async function renderWalletSuperWallet(root: HTMLElement): Promise<void> 
     bindPolicy(root, session, config, roster, adminEntity);
     bindEntities(root, session, config, roster, adminEntity);
     bindKeyActions(root, session, config, roster, adminEntity);
+    bindEnrollmentApprovals(root, session, config, adminEntity);
   }
 }
 
@@ -152,7 +174,11 @@ function renderUpgradeSection(): string {
     </section>`;
 }
 
-function renderEntityList(entities: WalletEntityRecord[], keys: WalletEntityKeyRecord[]): string {
+function renderEntityList(
+  entities: WalletEntityRecord[],
+  keys: WalletEntityKeyRecord[],
+  adminEntityId: string | null
+): string {
   if (entities.length === 0) {
     return `<p class="field-hint">${escapeHtml(t("wallet.superWalletEntitiesEmpty"))}</p>`;
   }
@@ -170,11 +196,15 @@ function renderEntityList(entities: WalletEntityRecord[], keys: WalletEntityKeyR
                 .join("")}
             </ul>
           </div>
-          <div class="cta-row wallet-entity-actions">
+          ${
+            adminEntityId && e.entityId === adminEntityId
+              ? `<div class="cta-row wallet-entity-actions">
             <button type="button" class="tc-btn secondary small" data-add-passkey="${escapeHtml(e.entityId)}">${escapeHtml(t("wallet.superWalletAddPasskey"))}</button>
             <button type="button" class="tc-btn secondary small" data-add-yubikey="${escapeHtml(e.entityId)}">${escapeHtml(t("wallet.superWalletAddYubiKey"))}</button>
             <button type="button" class="tc-btn secondary small" data-add-eoa="${escapeHtml(e.entityId)}">${escapeHtml(t("wallet.superWalletConnectWallet"))}</button>
-          </div>
+          </div>`
+              : `<p class="field-hint">${escapeHtml(t("wallet.inviteTeammateHint"))}</p>`
+          }
         </li>`;
       })
       .join("")}
@@ -195,6 +225,94 @@ function shortKeyDisplay(k: WalletEntityKeyRecord): string {
 
 function shortEntity(entityId: string): string {
   return `${entityId.slice(0, 10)}…${entityId.slice(-6)}`;
+}
+
+function shortEntity(entityId: string): string {
+  return `${entityId.slice(0, 10)}…${entityId.slice(-6)}`;
+}
+
+function renderPendingEnrollments(requests: WalletKeyEnrollmentRequestRecord[]): string {
+  if (requests.length === 0) {
+    return `<p class="field-hint">${escapeHtml(t("wallet.enrollmentPendingEmpty"))}</p>`;
+  }
+  return `<ul class="wallet-device-list">
+    ${requests
+      .map(
+        (r) => `<li class="wallet-enrollment-row" data-enrollment-id="${escapeHtml(r.id)}">
+          <div>
+            <strong>${escapeHtml(r.label ?? shortEntity(r.entityId))}</strong>
+            <span class="wallet-key-badge">${escapeHtml(keyTypeLabel(r.keyType))}</span>
+            <span class="mono faint">${escapeHtml(shortKeyDisplayFromRequest(r))}</span>
+          </div>
+          <div class="cta-row">
+            <button type="button" class="tc-btn small" data-approve-enrollment="${escapeHtml(r.id)}">${escapeHtml(t("wallet.enrollmentApprove"))}</button>
+            <button type="button" class="tc-btn secondary small" data-reject-enrollment="${escapeHtml(r.id)}">${escapeHtml(t("wallet.enrollmentReject"))}</button>
+          </div>
+        </li>`
+      )
+      .join("")}
+  </ul>`;
+}
+
+function shortKeyDisplayFromRequest(r: WalletKeyEnrollmentRequestRecord): string {
+  if (r.eoa) return `${r.eoa.slice(0, 8)}…${r.eoa.slice(-4)}`;
+  if (r.qx) return `${r.qx.slice(0, 10)}…`;
+  return "key";
+}
+
+function bindEnrollmentApprovals(
+  root: HTMLElement,
+  session: NonNullable<ReturnType<typeof loadWalletSession>>,
+  config: Awaited<ReturnType<typeof fetchWalletConfig>>,
+  adminEntity: WalletEntityRecord | null
+): void {
+  if (!adminEntity) return;
+
+  root.querySelectorAll("[data-approve-enrollment]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const requestId = (btn as HTMLElement).dataset.approveEnrollment!;
+      const status = root.querySelector<HTMLElement>("#super-status");
+      setButtonLoading(btn as HTMLButtonElement, true);
+      try {
+        const requests = await listKeyEnrollmentRequests(session.address, "pending");
+        const req = requests.find((r) => r.id === requestId);
+        if (!req) throw new Error("request_not_found");
+        const qx = req.qx ?? zeroPadValue("0x00", 32);
+        const qy = req.qy ?? zeroPadValue("0x00", 32);
+        const eoa = req.eoa ?? zeroPadValue("0x00", 20);
+        await submitAddKey({
+          session,
+          config,
+          adminEntity,
+          targetEntityId: req.entityId,
+          keyType: req.keyType,
+          qx,
+          qy,
+          eoa,
+          credentialId: req.credentialId ?? undefined,
+        });
+        await approveKeyEnrollmentRequest(session.address, requestId);
+        await renderWalletSuperWallet(root);
+      } catch (error) {
+        showStatus(status, error instanceof Error ? error.message : String(error), "error");
+      } finally {
+        setButtonLoading(btn as HTMLButtonElement, false);
+      }
+    });
+  });
+
+  root.querySelectorAll("[data-reject-enrollment]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const requestId = (btn as HTMLElement).dataset.rejectEnrollment!;
+      const status = root.querySelector<HTMLElement>("#super-status");
+      try {
+        await rejectKeyEnrollmentRequest(session.address, requestId);
+        await renderWalletSuperWallet(root);
+      } catch (error) {
+        showStatus(status, error instanceof Error ? error.message : String(error), "error");
+      }
+    });
+  });
 }
 
 function bindUpgrade(
@@ -385,7 +503,7 @@ function bindKeyActions(
       const status = root.querySelector<HTMLElement>("#super-status");
       try {
         showStatus(status, t("wallet.superWalletEnrollYubiKey"));
-        const passkey = await createPasskey("Security key", { attachment: "cross-platform" });
+        const passkey = await createSecurityKey("Security key");
         const fields = passkeyToKeyFields(passkey);
         await submitAddKey({
           session,
@@ -400,7 +518,11 @@ function bindKeyActions(
         });
         await renderWalletSuperWallet(root);
       } catch (error) {
-        showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        if (isYubiKeyPinRequiredError(error)) {
+          showStatus(status, t("wallet.yubikeyPinRequiredTitle"), "error");
+        } else {
+          showStatus(status, error instanceof Error ? error.message : String(error), "error");
+        }
       }
     });
   });

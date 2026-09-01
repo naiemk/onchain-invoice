@@ -1,3 +1,5 @@
+export type WalletSessionRole = "owner" | "member";
+
 export interface WalletSession {
   address: string;
   chainId: string;
@@ -8,6 +10,14 @@ export interface WalletSession {
   rawId: string;
   label: string;
   lastOpenedAt?: string;
+  /** Super Wallet member session (entity key holder, not simple-mode owner). */
+  role?: WalletSessionRole;
+  entityId?: string;
+  keyId?: string;
+  keyType?: number;
+  eoa?: string;
+  /** Simple-wallet YubiKey backup credential (non-discoverable). */
+  securityKeyCredentialId?: string;
 }
 
 const LEGACY_SESSION_KEY = "tc-wallet-session";
@@ -71,8 +81,37 @@ export function upsertWalletSession(session: WalletSession): void {
   registry.unshift(next);
   writeRegistry(registry);
   localStorage.setItem(ACTIVE_KEY, addr);
-  // Keep legacy key in sync for any old readers during transition.
   localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(next));
+}
+
+export function saveMemberWalletSession(input: {
+  address: string;
+  chainId: string;
+  entityId: string;
+  keyId: string;
+  keyType: number;
+  qx: string;
+  qy: string;
+  credentialId: string;
+  rawId: string;
+  label: string;
+  eoa?: string;
+}): void {
+  upsertWalletSession({
+    address: input.address,
+    chainId: input.chainId,
+    salt: "0x" + "00".repeat(32),
+    qx: input.qx,
+    qy: input.qy,
+    credentialId: input.credentialId,
+    rawId: input.rawId,
+    label: input.label,
+    role: "member",
+    entityId: input.entityId,
+    keyId: input.keyId,
+    keyType: input.keyType,
+    eoa: input.eoa,
+  });
 }
 
 export function setActiveWallet(address: string): boolean {
@@ -119,7 +158,7 @@ export function clearWalletSession(): void {
 
 /** Persist session as active + registry entry (create / unlock). */
 export function saveWalletSession(session: WalletSession): void {
-  upsertWalletSession(session);
+  upsertWalletSession({ ...session, role: session.role ?? "owner" });
 }
 
 export function shortAddress(address: string): string {
