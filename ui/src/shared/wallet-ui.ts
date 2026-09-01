@@ -26,6 +26,47 @@ export type WalletTab =
   | "invoices"
   | "developers";
 
+export interface WalletRenderOptions {
+  /** When true, paint only the page body (React WalletFrame supplies chrome). */
+  frameless?: boolean;
+}
+
+/** Paint wallet page chrome + body, or body-only for React migration. */
+export function paintWalletPage(
+  root: HTMLElement,
+  frame: { current: WalletTab; body: string; title?: string; lede?: string },
+  opts?: WalletRenderOptions,
+  bindBody?: (root: HTMLElement) => void
+): void {
+  if (opts?.frameless) {
+    root.innerHTML = frame.body;
+    bindBody?.(root);
+    return;
+  }
+  root.innerHTML = walletFrame(frame);
+  bindWalletChrome(root);
+  bindBody?.(root);
+}
+
+export function paintWalletLoading(
+  root: HTMLElement,
+  current: WalletTab,
+  title: string,
+  lede?: string,
+  opts?: WalletRenderOptions
+): void {
+  paintWalletPage(
+    root,
+    {
+      current,
+      title,
+      lede,
+      body: `<p class="field-hint wallet-route-loading" aria-busy="true">${escapeHtml(t("wallet.balanceLoading"))}</p>`,
+    },
+    opts
+  );
+}
+
 const ICON_COPY = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="9" y="9" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M5 12.5l4.2 4.2L19 7.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const ICON_LOCK = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="4" y="11" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;

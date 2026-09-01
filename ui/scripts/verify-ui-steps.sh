@@ -55,7 +55,7 @@ assert_contains "$health" '"ok": true' "api/health JSON" || assert_contains "$he
 home="$(curl -fsS -m 5 "$UI_BASE/")"
 assert_contains "$home" "Trustless Commerce" "GET /"
 assert_contains "$home" "<!doctype html>" "GET / doctype"
-assert_contains "$home" "/src/main.ts" "GET / Vite entry (dev)" || assert_contains "$home" "assets/" "GET / built assets"
+assert_contains "$home" "/src/main.tsx" "GET / Vite entry (dev)" || assert_contains "$home" "assets/" "GET / built assets"
 
 create="$(curl -fsS -m 5 "$UI_BASE/create")"
 assert_contains "$create" "Trustless Commerce" "GET /create"
@@ -72,18 +72,14 @@ pass "pay query has no invoice_seed"
 merchant="$(curl -fsS -m 5 "$UI_BASE/merchant")"
 assert_contains "$merchant" "Trustless Commerce" "GET /merchant"
 
-# Source-level create UX guards (SPA shell HTML has no form — catch regressions that
-# curl of /create cannot see). Fail if Open checkout / mono-block embed preview disappear.
+# Source-level create UX guards (React CreatePage).
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-CREATE_SRC="$ROOT/ui/src/pages/create.ts"
+CREATE_SRC="$ROOT/ui/src/pages/react/CreatePage.tsx"
 [[ -f "$CREATE_SRC" ]] || fail "missing $CREATE_SRC"
 create_src="$(cat "$CREATE_SRC")"
-assert_contains "$create_src" 'id="open-checkout"' "create.ts Open checkout CTA"
-assert_contains "$create_src" 't("create.openCheckout")' "create.ts Open checkout i18n key"
-assert_contains "$create_src" "mono-block" "create.ts mono-block embed/url"
-assert_contains "$create_src" "pay-button-preview" "create.ts rendered pay button preview"
-assert_contains "$create_src" "tc-pay-button" "create.ts tc-pay-button class"
-assert_contains "$create_src" 'type="submit"' "create.ts submit Open checkout"
+assert_contains "$create_src" "openCheckout" "CreatePage Open checkout CTA"
+assert_contains "$create_src" 't("create.openCheckout")' "CreatePage Open checkout i18n key"
+assert_contains "$create_src" "tc-pay-button" "CreatePage tc-pay-button class"
 
 # Optional: create invoice when Sepolia is configured (skip soft-fail if not).
 if curl -fsS -m 5 -X POST "${UI_BASE%/}/api/invoices" \

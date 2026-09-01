@@ -54,8 +54,8 @@ test.describe("Super Wallet UI", () => {
   test("creates passkey wallet and opens Super Wallet upgrade UI", async ({ page }) => {
     await addVirtualAuthenticator(page, "platform");
     await page.goto("/wallet/create");
-    await page.fill("#device-name", "E2E Passkey");
-    await page.click("#wallet-create-btn");
+    await page.getByTestId("device-name").fill("E2E Passkey");
+    await page.getByTestId("wallet-create-btn").click();
     await expect(page.locator("#wallet-create-result")).toBeVisible();
     await expect(page.locator("#created-address")).toContainText("0x");
 
@@ -67,7 +67,7 @@ test.describe("Super Wallet UI", () => {
   test("shows entity key enrollment controls after upgrade section", async ({ page }) => {
     await addVirtualAuthenticator(page, "platform");
     await page.goto("/wallet/create");
-    await page.click("#wallet-create-btn");
+    await page.getByTestId("wallet-create-btn").click();
     await expect(page.locator("#wallet-create-result")).toBeVisible();
 
     await page.goto("/wallet/super-wallet");

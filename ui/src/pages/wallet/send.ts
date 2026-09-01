@@ -15,18 +15,18 @@ import {
 } from "../../shared/userop-client.js";
 import { parseUsdcInput } from "../../../../commerce/shared/userop.js";
 import {
-  bindWalletAccountBar,
   chainBalanceRows,
   formatWalletAvailable,
+  paintWalletLoading,
+  paintWalletPage,
   setButtonLoading,
   showStatus,
-  walletFrame,
-  walletLoadingFrame,
+  type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 import { fetchAdvancedPolicy } from "../../shared/wallet-advanced-api.js";
 
-export async function renderWalletSend(root: HTMLElement): Promise<void> {
+export async function renderWalletSend(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
   const session = loadWalletSession();
   if (!session) {
@@ -34,8 +34,7 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
     return;
   }
 
-  root.innerHTML = walletLoadingFrame("send", t("wallet.sendTitle"));
-  bindWalletAccountBar(root);
+  paintWalletLoading(root, "send", t("wallet.sendTitle"), undefined, opts);
 
   const config = await fetchWalletConfig();
   if (!isSpaRenderCurrent(gen)) return;
@@ -66,7 +65,9 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
     deployedOnPrimary = true;
   }
 
-  root.innerHTML = walletFrame({
+  paintWalletPage(
+    root,
+    {
     current: "send",
     title: t("wallet.sendTitle"),
     body: `
@@ -92,15 +93,15 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
       <button type="button" class="tc-btn" id="send-submit" ${!deployedOnPrimary ? "disabled" : ""}>${escapeHtml(t("wallet.sendConfirm"))}</button>
       <p class="field-hint"><a href="/wallet/withdraw" data-route>${escapeHtml(t("wallet.withdrawCta"))}</a></p>
       <p id="send-status" class="status wallet-status" role="status"></p>`,
-  });
-  bindWalletAccountBar(root);
-
+    },
+    opts,
+    (r) => {
   const chain = primaryChain(config);
   const primaryBalance = balance.chains.find((c) => c.chainId === config.chainId);
   const balanceAtoms = BigInt(primaryBalance?.balance ?? "0");
 
-  const amountInput = root.querySelector<HTMLInputElement>("#send-amount");
-  const totalEl = root.querySelector<HTMLElement>("#send-total");
+  const amountInput = r.querySelector<HTMLInputElement>("#send-amount");
+  const totalEl = r.querySelector<HTMLElement>("#send-total");
   const updateTotal = (): void => {
     if (!amountInput || !totalEl) return;
     const parsed = parseUsdcInput(amountInput.value, chain.feeTokenDecimals);
@@ -114,10 +115,12 @@ export async function renderWalletSend(root: HTMLElement): Promise<void> {
   amountInput?.addEventListener("input", updateTotal);
 
   if (deployedOnPrimary) {
-    root.querySelector("#send-submit")?.addEventListener("click", () =>
-      void runSend(root, session, config, feeAtoms, balanceAtoms)
+    r.querySelector("#send-submit")?.addEventListener("click", () =>
+      void runSend(r, session, config, feeAtoms, balanceAtoms)
     );
   }
+    }
+  );
 }
 
 async function runSend(

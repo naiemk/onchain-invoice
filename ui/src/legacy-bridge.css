@@ -1,0 +1,39 @@
+@import "./styles.css";
+
+.legacy-page .topbar,
+.legacy-page .site-footer,
+.legacy-page .global-footer {
+  display: none !important;
+}
+
+body > #app > div > main {
+  padding: 0 !important;
+}
+
+/* Polish legacy checkout/merchant inside React shell */
+.legacy-page .invoice-doc,
+.legacy-page .checkout-panel,
+.legacy-page .merchant-shell .panel {
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 3px color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.legacy-page .invoice-shell {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.legacy-page .invoice-doc {
+  max-width: 32rem;
+  width: 100%;
+}
+
+.legacy-page .merchant-toolbar {
+  gap: 1rem;
+}
+
+.legacy-page .merchant-actions button,
+.legacy-page .merchant-actions .tc-btn {
+  min-height: 2.25rem;
+}

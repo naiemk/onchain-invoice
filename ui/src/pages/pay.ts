@@ -31,6 +31,7 @@ import {
   FIAT_LABELS,
   mountOnramperIframe,
 } from "../shared/onramper-iframe.js";
+import { qrThemeColors } from "../shared/qr-colors.js";
 
 const ACTIVATION_KEY = (invoiceId: string) => `tc.activation.${invoiceId}`;
 const CHECKOUT_KEY = (fingerprint: string) => `tc.checkout.${fingerprint}`;
@@ -324,7 +325,11 @@ async function renderInvoiceStage(
   let qrDataUrl = "";
   if (address) {
     try {
-      qrDataUrl = await QRCode.toDataURL(address, { margin: 1, width: 180, color: { dark: "#0a2540", light: "#ffffff" } });
+      qrDataUrl = await QRCode.toDataURL(address, {
+        margin: 1,
+        width: 180,
+        color: qrThemeColors(),
+      });
     } catch {
       qrDataUrl = "";
     }

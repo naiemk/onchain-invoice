@@ -3,6 +3,7 @@ import { t } from "../../i18n/t.js";
 import { escapeHtml } from "../../shared/dom.js";
 import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import { loadWalletSession } from "../../shared/webauthn.js";
+import { qrThemeColors } from "../../shared/qr-colors.js";
 import {
   addressBox,
   bindCopyButtons,
@@ -41,7 +42,7 @@ export async function renderWalletReceive(root: HTMLElement): Promise<void> {
     qrDataUrl = await QRCode.toDataURL(session.address, {
       margin: 2,
       width: 240,
-      color: { dark: "#0a2540", light: "#ffffff" },
+      color: qrThemeColors(),
     });
   } catch {
     qrDataUrl = "";
