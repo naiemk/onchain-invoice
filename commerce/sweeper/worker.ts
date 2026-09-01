@@ -365,11 +365,21 @@ export class SweeperWorker {
           invoiceAddress: invoice.invoiceAddress ?? undefined,
           payload: { error: message, stage: "prepare" },
         });
-        await this.trackWithRetry({
-          invoiceId: invoice.id,
-          error: message,
-          expectedVersion: invoice.version,
-        });
+        try {
+          await this.trackWithRetry({
+            invoiceId: invoice.id,
+            error: message,
+            expectedVersion: invoice.version,
+          });
+        } catch (trackError) {
+          const trackMessage = trackError instanceof Error ? trackError.message : String(trackError);
+          this.activity?.append("sweep-failed", {
+            invoiceId: invoice.id,
+            chainId: invoice.chainId ? String(invoice.chainId) : undefined,
+            invoiceAddress: invoice.invoiceAddress ?? undefined,
+            payload: { error: trackMessage, stage: "track" },
+          });
+        }
       }
     }
 
