@@ -233,6 +233,76 @@ export function registerWalletAdvancedRoutes(
       }
     }
 
+    const enrollmentMatch = url.pathname.match(
+      /^\/api\/wallet\/(0x[0-9a-fA-F]{40})\/key-enrollment-requests(?:\/([0-9a-f-]{36})(?:\/(approve|reject))?)?$/
+    );
+    if (enrollmentMatch) {
+      const wallet = getAddress(enrollmentMatch[1]);
+      const requestId = enrollmentMatch[2];
+      const action = enrollmentMatch[3];
+
+      if (req.method === "POST" && !requestId) {
+        const body = await handlers.readJson(req);
+        const entityId = String(body.entityId ?? "").trim();
+        const keyType = Number(body.keyType ?? -1);
+        if (!entityId.startsWith("0x") || entityId.length !== 66 || keyType < 0 || keyType > 2) {
+          handlers.sendJson(res, 400, { error: "invalid_enrollment" });
+          return true;
+        }
+        if (!db.getWalletEntity(wallet, entityId)) {
+          handlers.sendJson(res, 404, { error: "entity_not_found" });
+          return true;
+        }
+        const request = db.createWalletKeyEnrollmentRequest({
+          walletAddress: wallet,
+          entityId,
+          keyType,
+          qx: body.qx != null ? String(body.qx) : null,
+          qy: body.qy != null ? String(body.qy) : null,
+          eoa: body.eoa != null ? String(body.eoa) : null,
+          credentialId: body.credentialId != null ? String(body.credentialId) : null,
+          label: body.label != null ? String(body.label) : null,
+        });
+        handlers.sendJson(res, 201, { request });
+        return true;
+      }
+
+      if (req.method === "GET" && !requestId) {
+        const status = url.searchParams.get("status") as import("../shared/wallet.js").WalletKeyEnrollmentStatus | null;
+        const requests = db.listWalletKeyEnrollmentRequests(
+          wallet,
+          status && ["pending", "approved", "rejected", "expired"].includes(status) ? status : undefined
+        );
+        handlers.sendJson(res, 200, { requests });
+        return true;
+      }
+
+      if (requestId) {
+        const request = db.getWalletKeyEnrollmentRequest(requestId);
+        if (!request || request.walletAddress.toLowerCase() !== wallet.toLowerCase()) {
+          handlers.sendJson(res, 404, { error: "request_not_found" });
+          return true;
+        }
+
+        if (req.method === "GET" && !action) {
+          handlers.sendJson(res, 200, { request });
+          return true;
+        }
+
+        if (req.method === "POST" && action === "reject") {
+          const updated = db.resolveWalletKeyEnrollmentRequest(requestId, "rejected");
+          handlers.sendJson(res, 200, { request: updated });
+          return true;
+        }
+
+        if (req.method === "POST" && action === "approve") {
+          const updated = db.resolveWalletKeyEnrollmentRequest(requestId, "approved");
+          handlers.sendJson(res, 200, { request: updated });
+          return true;
+        }
+      }
+    }
+
     return false;
   };
 }

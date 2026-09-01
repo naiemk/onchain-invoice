@@ -347,6 +347,7 @@ function loadWalletConfig(
   const sepoliaFactory = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
   const sepoliaImpl = "0xe024cE8ed1878dBdd3ca8E73B1e586c4E46dC85C";
   const sepoliaRecovery = "0x72739889bcce2B08a23212bae6C7B9F1C29e7873";
+  const sepoliaBundlerBeneficiary = "0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb";
   let factoryAddress = blankToUndefined(expand(env.WALLET_FACTORY_ADDRESS ?? file?.factoryAddress ?? ""));
   let implementationAddress = blankToUndefined(
     expand(env.WALLET_IMPLEMENTATION_ADDRESS ?? file?.implementationAddress ?? "")
@@ -385,7 +386,9 @@ function loadWalletConfig(
     rpcUrl,
     entryPointAddress: entryPoint,
     bundlerFeeUsdc: feeAtoms,
-    bundlerBeneficiary: blankToUndefined(expand(env.WALLET_BUNDLER_BENEFICIARY ?? file?.bundlerBeneficiary ?? "")),
+    bundlerBeneficiary:
+      blankToUndefined(expand(env.WALLET_BUNDLER_BENEFICIARY ?? file?.bundlerBeneficiary ?? "")) ??
+      (chainId === "11155111" ? sepoliaBundlerBeneficiary : undefined),
     feeTokenAddress,
     feeTokenSymbol,
     feeTokenDecimals,

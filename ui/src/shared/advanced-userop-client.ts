@@ -73,7 +73,9 @@ export async function buildAdvancedKeySignature(input: {
       sig = await signUserOpHashPersonal(input.userOpHash);
     }
   } else {
-    sig = await signUserOpHash(input.userOpHash, input.credentialId);
+    sig = await signUserOpHash(input.userOpHash, input.credentialId, {
+      requireUv: input.keyType === KEY_YUBIKEY,
+    });
   }
   return encodeAdvancedSignature([{ keyId, sig }]);
 }
@@ -106,14 +108,7 @@ export async function buildSignedEnableAdvancedUserOp(input: {
     walletAddress: input.walletAddress,
     innerCallData: encodeEnableAdvanced(input.adminEntityId),
     feeAmount: input.feeAmount,
-    sign: (userOpHash) =>
-      buildAdvancedWebAuthnSignature({
-        userOpHash,
-        entityId: input.adminEntityId,
-        qx: input.qx,
-        qy: input.qy,
-        credentialId: input.credentialId,
-      }),
+    sign: (userOpHash) => signUserOpHash(userOpHash, input.credentialId),
   });
 }
 

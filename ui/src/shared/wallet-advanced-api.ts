@@ -1,6 +1,7 @@
 import type {
   WalletEntityKeyRecord,
   WalletEntityRecord,
+  WalletKeyEnrollmentRequestRecord,
   WalletProposalRecord,
   WalletProposalSigRecord,
 } from "../../../commerce/shared/wallet.js";
@@ -66,6 +67,73 @@ export async function registerWalletEntityKey(input: {
   if (!res.ok) throw new Error(`register_key_${res.status}`);
   const data = (await res.json()) as { key: WalletEntityKeyRecord };
   return data.key;
+}
+
+export async function createKeyEnrollmentRequest(input: {
+  walletAddress: string;
+  entityId: string;
+  keyType: number;
+  qx?: string | null;
+  qy?: string | null;
+  eoa?: string | null;
+  credentialId?: string | null;
+  label?: string | null;
+}): Promise<WalletKeyEnrollmentRequestRecord> {
+  const res = await fetch(apiUrl(`/api/wallet/${input.walletAddress}/key-enrollment-requests`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`enrollment_request_${res.status}`);
+  const data = (await res.json()) as { request: WalletKeyEnrollmentRequestRecord };
+  return data.request;
+}
+
+export async function listKeyEnrollmentRequests(
+  walletAddress: string,
+  status?: "pending" | "approved" | "rejected" | "expired"
+): Promise<WalletKeyEnrollmentRequestRecord[]> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  const res = await fetch(apiUrl(`/api/wallet/${walletAddress}/key-enrollment-requests${q}`));
+  if (!res.ok) throw new Error(`enrollment_list_${res.status}`);
+  const data = (await res.json()) as { requests: WalletKeyEnrollmentRequestRecord[] };
+  return data.requests;
+}
+
+export async function getKeyEnrollmentRequest(
+  walletAddress: string,
+  requestId: string
+): Promise<WalletKeyEnrollmentRequestRecord> {
+  const res = await fetch(apiUrl(`/api/wallet/${walletAddress}/key-enrollment-requests/${requestId}`));
+  if (!res.ok) throw new Error(`enrollment_get_${res.status}`);
+  const data = (await res.json()) as { request: WalletKeyEnrollmentRequestRecord };
+  return data.request;
+}
+
+export async function approveKeyEnrollmentRequest(
+  walletAddress: string,
+  requestId: string
+): Promise<WalletKeyEnrollmentRequestRecord> {
+  const res = await fetch(
+    apiUrl(`/api/wallet/${walletAddress}/key-enrollment-requests/${requestId}/approve`),
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
+  );
+  if (!res.ok) throw new Error(`enrollment_approve_${res.status}`);
+  const data = (await res.json()) as { request: WalletKeyEnrollmentRequestRecord };
+  return data.request;
+}
+
+export async function rejectKeyEnrollmentRequest(
+  walletAddress: string,
+  requestId: string
+): Promise<WalletKeyEnrollmentRequestRecord> {
+  const res = await fetch(
+    apiUrl(`/api/wallet/${walletAddress}/key-enrollment-requests/${requestId}/reject`),
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
+  );
+  if (!res.ok) throw new Error(`enrollment_reject_${res.status}`);
+  const data = (await res.json()) as { request: WalletKeyEnrollmentRequestRecord };
+  return data.request;
 }
 
 export async function listProposals(walletAddress: string): Promise<WalletProposalRecord[]> {

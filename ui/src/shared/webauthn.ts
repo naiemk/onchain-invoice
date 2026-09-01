@@ -26,6 +26,29 @@ export interface PasskeyOwner {
   };
 }
 
+/** Thrown when a cross-platform (YubiKey) ceremony completes without user verification (UV). */
+export class YubiKeyPinRequiredError extends Error {
+  constructor() {
+    super("yubikey_pin_required");
+    this.name = "YubiKeyPinRequiredError";
+  }
+}
+
+export function isYubiKeyPinRequiredError(error: unknown): boolean {
+  return error instanceof YubiKeyPinRequiredError || (error instanceof Error && error.message === "yubikey_pin_required");
+}
+
+/** WebAuthn authenticatorData flags byte — bit 2 is user verified (UV). */
+export function authenticatorUvSet(authenticatorData: ArrayBuffer | Uint8Array): boolean {
+  const bytes = authenticatorData instanceof Uint8Array ? authenticatorData : new Uint8Array(authenticatorData);
+  if (bytes.length < 33) return false;
+  return (bytes[32]! & 0x04) !== 0;
+}
+
+export function assertAuthenticatorUvSet(authenticatorData: ArrayBuffer | Uint8Array): void {
+  if (!authenticatorUvSet(authenticatorData)) throw new YubiKeyPinRequiredError();
+}
+
 function rpId(): string {
   return window.location.hostname;
 }
@@ -85,6 +108,9 @@ export async function createPasskey(
   })) as PublicKeyCredential | null;
   if (!cred) throw new Error("Passkey creation cancelled");
   const response = cred.response as AuthenticatorAttestationResponse;
+  if (options?.attachment === "cross-platform") {
+    assertAuthenticatorUvSet(response.getAuthenticatorData());
+  }
   const pk = response.getPublicKey?.();
   if (!pk) throw new Error("Could not read passkey public key");
   const { qx, qy } = spkiToP256Coordinates(pk);
@@ -100,6 +126,11 @@ export async function createPasskey(
       attestationObject: bufferToBase64(attObj),
     },
   };
+}
+
+/** Enroll a cross-platform security key (YubiKey) with UV/PIN required. */
+export async function createSecurityKey(displayName: string): Promise<PasskeyOwner> {
+  return createPasskey(displayName, { attachment: "cross-platform" });
 }
 
 /**
@@ -139,7 +170,11 @@ export async function authenticatePasskey(): Promise<(PasskeyOwner & { fromRegis
 }
 
 /** Sign an ERC-4337 userOpHash with the passkey (OZ WebAuthnAuth encoding). */
-export async function signUserOpHash(userOpHashHex: string, credentialId?: string): Promise<string> {
+export async function signUserOpHash(
+  userOpHashHex: string,
+  credentialId?: string,
+  options?: { requireUv?: boolean }
+): Promise<string> {
   if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
   const hashBytes = hexToBytes(userOpHashHex);
   const allowCredentials = credentialId
@@ -154,7 +189,11 @@ export async function signUserOpHash(userOpHashHex: string, credentialId?: strin
     },
   })) as PublicKeyCredential | null;
   if (!cred) throw new Error("Passkey signing cancelled");
-  return encodeWebAuthnSignature(cred.response as AuthenticatorAssertionResponse);
+  const response = cred.response as AuthenticatorAssertionResponse;
+  if (options?.requireUv) {
+    assertAuthenticatorUvSet(response.authenticatorData);
+  }
+  return encodeWebAuthnSignature(response);
 }
 
 /** Assert over a server challenge (base64url); returns JSON fields for API posts. */

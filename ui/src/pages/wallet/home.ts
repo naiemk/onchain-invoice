@@ -22,6 +22,7 @@ import {
 import { isAdvancedMode } from "../../shared/wallet-mode.js";
 import { listDevices } from "../../shared/wallet-api.js";
 import { fetchWalletRecovery } from "../../shared/wallet-recovery-api.js";
+import { fetchAdvancedPolicy, listWalletEntities } from "../../shared/wallet-advanced-api.js";
 
 export async function renderWalletHome(root: HTMLElement): Promise<void> {
   const session = loadWalletSession();
@@ -143,16 +144,38 @@ function paintDashboard(
     const box = root.querySelector<HTMLElement>("#wallet-advanced-home");
     if (!box) return;
     let deviceCount = 1;
+    let onChainAdvanced = false;
     try {
       deviceCount = (await listDevices(session.address, session.chainId)).length || 1;
     } catch {
       deviceCount = 1;
     }
+    try {
+      const policy = await fetchAdvancedPolicy(session.address);
+      onChainAdvanced = policy.advanced;
+      if (onChainAdvanced) {
+        const roster = await listWalletEntities(session.address);
+        deviceCount = Math.max(roster.keys.length, roster.entities.length, 1);
+      }
+    } catch {
+      onChainAdvanced = false;
+    }
+    const devicesBodyKey = onChainAdvanced ? "wallet.advancedDevicesBodySuper" : "wallet.advancedDevicesBodySimple";
+    const superCard = !onChainAdvanced
+      ? `<a class="wallet-advanced-card wallet-advanced-card-highlight" href="/wallet/super-wallet" data-route>
+          <strong>${escapeHtml(t("wallet.superWalletHomeCta"))}</strong>
+          <span>${escapeHtml(t("wallet.superWalletHomeBanner"))}</span>
+        </a>`
+      : `<a class="wallet-advanced-card" href="/wallet/super-wallet" data-route>
+          <strong>${escapeHtml(t("wallet.superWalletTitle"))}</strong>
+          <span>${escapeHtml(t("wallet.superWalletActiveShort"))}</span>
+        </a>`;
     box.innerHTML = `
       <div class="wallet-advanced-cards">
+        ${superCard}
         <a class="wallet-advanced-card" href="/wallet/security" data-route>
           <strong>${escapeHtml(t("wallet.advancedDevicesTitle"))}</strong>
-          <span>${escapeHtml(t("wallet.advancedDevicesBody", { count: deviceCount }))}</span>
+          <span>${escapeHtml(t(devicesBodyKey, { count: deviceCount }))}</span>
         </a>
         <a class="wallet-advanced-card" href="/wallet/recover" data-route>
           <strong>${escapeHtml(t("wallet.advancedRecoveryTitle"))}</strong>

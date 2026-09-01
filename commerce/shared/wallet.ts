@@ -106,6 +106,24 @@ export interface WalletEntityKeyRecord {
   createdAt: string;
 }
 
+export type WalletKeyEnrollmentStatus = "pending" | "approved" | "rejected" | "expired";
+
+export interface WalletKeyEnrollmentRequestRecord {
+  id: string;
+  walletAddress: string;
+  entityId: string;
+  keyType: number;
+  qx: string | null;
+  qy: string | null;
+  eoa: string | null;
+  credentialId: string | null;
+  label: string | null;
+  status: WalletKeyEnrollmentStatus;
+  expiresAt: string;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
 export type WalletProposalStatus = "draft" | "signing" | "ready" | "executed" | "cancelled";
 
 export interface WalletProposalRecord {

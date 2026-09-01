@@ -15,6 +15,7 @@ import { isAdvancedMode, loadWalletMode, saveWalletMode, type WalletMode } from 
 export type WalletTab =
   | "home"
   | "security"
+  | "superWallet"
   | "send"
   | "receive"
   | "create"
@@ -294,6 +295,7 @@ export function walletSubnav(current: WalletTab): string {
     { href: "/wallet/security", key: "security", label: t("wallet.securityTab") },
   ];
   if (advanced) {
+    links.push({ href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") });
     links.push({ href: "/merchant", key: "invoices", label: t("wallet.invoicesTab") });
     links.push({ href: "/wallet/recover", key: "recover", label: t("wallet.recoverTab") });
     links.push({ href: "/wallet/developers", key: "developers", label: t("wallet.developersTab") });
@@ -417,6 +419,20 @@ export function showStatus(el: HTMLElement | null, message: string, kind: "info"
 
 export function shortKey(hex: string): string {
   return `${hex.slice(0, 8)}…${hex.slice(-6)}`;
+}
+
+export function renderYubiKeyPinRequiredPanel(): string {
+  return `<div class="banner warn wallet-yubikey-pin-panel">
+    <h3>${escapeHtml(t("wallet.yubikeyPinRequiredTitle"))}</h3>
+    <p>${escapeHtml(t("wallet.yubikeyPinRequiredWhy"))}</p>
+    <p class="field-hint">${escapeHtml(t("wallet.yubikeyPinSetupSteps"))}</p>
+    <p class="field-hint">${escapeHtml(t("wallet.yubikeyPinNeverStored"))}</p>
+  </div>`;
+}
+
+export function formatKeyFingerprint(qx: string, qy?: string | null): string {
+  if (!qx) return "—";
+  return qy ? `${shortKey(qx)} / ${shortKey(qy)}` : shortKey(qx);
 }
 
 export { shortAddress };

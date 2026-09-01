@@ -11,32 +11,59 @@ function extractKey(text, key) {
   return m[1].trim();
 }
 
-const newKeys = [
-  "superWalletPolicyTitle",
-  "superWalletThreshold",
-  "superWalletApplyPolicy",
-  "superWalletAddPasskey",
-  "superWalletAddYubiKey",
-  "superWalletConnectWallet",
-  "superWalletConnectWalletHint",
-  "superWalletEnrollPasskey",
-  "superWalletEnrollYubiKey",
-  "superWalletKeyPasskey",
-  "superWalletKeyYubiKey",
-  "superWalletKeyEoa",
-  "superWalletNoSigningKey",
+/** Keys to copy from wallet-en.ts when absent in other locales (English fallback). */
+const keysToSync = [
+  "yubikeyPinRequiredTitle",
+  "yubikeyPinRequiredWhy",
+  "yubikeyPinSetupSteps",
+  "yubikeyPinNeverStored",
+  "inviteTeammate",
+  "inviteTeammateHint",
+  "scanToJoinSuper",
+  "joinSuperTitle",
+  "joinSuperLede",
+  "joinSuperEmail",
+  "joinSuperPasskey",
+  "joinSuperPasskeyLabel",
+  "joinSuperYubiKey",
+  "joinSuperYubiKeyLabel",
+  "joinSuperEoa",
+  "joinSuperWaiting",
+  "joinSuperSubmitting",
+  "joinSuperApproved",
+  "joinSuperRejected",
+  "joinSuperTimeout",
+  "joinSuperEntityMissing",
+  "joinSuperNotAdvanced",
+  "joinSuperNotAdvancedHint",
+  "enrollmentPendingTitle",
+  "enrollmentPendingEmpty",
+  "enrollmentApprove",
+  "enrollmentReject",
+  "addSecurityKey",
+  "addSecurityKeyHint",
+  "signWithSecurityKey",
+  "keyPublicPasskey",
+  "keyPublicEoa",
+  "keyPublicHint",
+  "advancedDevicesBodySuper",
+  "advancedDevicesBodySimple",
 ];
-
-const block = newKeys.map((k) => `  ${k}: ${extractKey(enText, k)},`).join("\n");
 
 for (const file of fs.readdirSync(dir).filter((f) => f.startsWith("wallet-") && f !== "wallet-en.ts")) {
   const p = path.join(dir, file);
   let text = fs.readFileSync(p, "utf8");
-  if (text.includes("superWalletPolicyTitle:")) {
+  const missing = keysToSync.filter((k) => !text.includes(`${k}:`));
+  if (missing.length === 0) {
     console.log("skip", file);
     continue;
   }
-  text = text.replace(/\n\};\s*$/, `\n${block}\n};\n`);
+  const insert = missing.map((k) => `  ${k}: ${extractKey(enText, k)},`).join("\n");
+  if (text.includes("superWalletNoSigningKey:")) {
+    text = text.replace(/(^\s+superWalletNoSigningKey:[\s\S]*?,)(\n)/m, `$1\n${insert}$2`);
+  } else {
+    text = text.replace(/\n\};\s*$/, `\n${insert}\n};\n`);
+  }
   fs.writeFileSync(p, text);
-  console.log("patched", file);
+  console.log("patched", file, missing.join(", "));
 }
