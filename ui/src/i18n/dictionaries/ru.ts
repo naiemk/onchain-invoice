@@ -20,6 +20,7 @@ export const ru = {
     support: "Поддержка",
     getPaid: "Получить оплату",
     security: "Безопасность",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -129,6 +130,7 @@ export const ru = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Читать о безопасности",
     trustBody: "Платформа не может перенаправить выплаты по счетам. Для восстановления нужны подтверждённый email и одобрение опекуна до отменяемого ончейн-timelock.",
     trustTitle: "Расчёт привязан к вашему адресу. Восстановление на виду.",
@@ -256,9 +258,23 @@ export const ru = {
     readyLede: "Откройте кошелёк для повседневных операций или создайте счёт, когда клиенту нужна ссылка на оплату.",
     ctaApiDocs: "Документация API",
     footerCreate: "Создать",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Получить оплату",
     title: "Принимайте оплату как вам удобно",
     lede: "Выставьте счёт клиенту, управляйте открытыми счетами или поделитесь адресом получения кошелька.",
@@ -276,6 +292,7 @@ export const ru = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Безопасность",
     title: "Passkey, расчёт и восстановление, которыми можно управлять",
     lede: "Для бизнеса, которому нельзя потерять компанию вместе с телефоном.",
@@ -296,6 +313,18 @@ export const ru = {
     advPolicies: "Политики расходов",
     advMultisig: "Явный UX политики мультиподписи",
     openWallet: "Открыть кошелёк",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -440,6 +469,22 @@ export const ru = {
     docsAgentsBody:
       "Используйте навык Cursor из проекта, чтобы создавать счета и опрашивать статус без панели продавца. Полная документация:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -654,6 +699,7 @@ export const ru = {
 
   integrations: {
     eyebrow: "Интеграции с платформами",
+    breadcrumb: "INTEGRATIONS",
     title: "Принимайте крипто в своём магазине",
     lede:
       "Trustless Commerce объединяет хостинговый checkout и одношаговый invoice API с лёгкими адаптерами для WooCommerce, Shopify, creator-платформ и других. Установите плагин или направьте ИИ-агента на platform skill — заказы обновляются, когда платёж поступает on-chain.",
@@ -672,6 +718,9 @@ export const ru = {
     aiSkill: "ИИ-навык",
     ctaTitle: "Начните с любой платформы",
     ctaLede: "Создайте тестовый счёт сейчас или откройте документацию по интеграции и ИИ-навык для вашего магазина.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -711,4 +760,7 @@ export const ru = {
     },
   },
   wallet: walletRu,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

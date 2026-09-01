@@ -17,6 +17,7 @@ export const uk = {
     support: "Підтримка",
     getPaid: "Отримати оплату",
     security: "Безпека",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const uk = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Читати про безпеку",
     trustBody: "Платформа не може перенаправити виплати за рахунками. Для відновлення потрібні підтверджений email і схвалення опікуна до скасовного on-chain timelock.",
     trustTitle: "Розрахунок прив’язано до вашої адреси. Відновлення на видноті.",
@@ -253,9 +255,23 @@ export const uk = {
     readyLede: "Відкрийте гаманець для щоденних операцій або створіть рахунок, коли клієнту потрібне посилання на оплату.",
     ctaApiDocs: "Переглянути документацію API",
     footerCreate: "Створити",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Отримати оплату",
     title: "Приймайте оплату так, як вам зручно",
     lede: "Виставте рахунок клієнту, керуйте відкритими рахунками або поділіться адресою отримання гаманця.",
@@ -273,6 +289,7 @@ export const uk = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Безпека",
     title: "Passkey, розрахунок і відновлення, якими можна керувати",
     lede: "Для бізнесу, якому не можна втратити компанію разом із телефоном.",
@@ -293,6 +310,18 @@ export const uk = {
     advPolicies: "Політики витрат",
     advMultisig: "Явний UX політики мультипідпису",
     openWallet: "Відкрити гаманець",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -435,6 +464,22 @@ export const uk = {
     docsAgentsBody:
       "Скористайтеся скілом Cursor із цього проєкту, щоб створювати рахунки й перевіряти статус без панелі продавця. Повна документація:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -649,6 +694,7 @@ export const uk = {
 
   integrations: {
     eyebrow: "Інтеграції з платформами",
+    breadcrumb: "INTEGRATIONS",
     title: "Приймайте крипто у своєму магазині",
     lede:
       "Trustless Commerce поєднує хостинговий checkout і одноразовий invoice API з легкими адаптерами для WooCommerce, Shopify, creator-платформ та інших. Встановіть плагін або направте ШІ-агента на platform skill — замовлення оновлюються, коли платіж надходить on-chain.",
@@ -667,6 +713,9 @@ export const uk = {
     aiSkill: "Скіл для ШІ",
     ctaTitle: "Почніть з будь-якої платформи",
     ctaLede: "Створіть тестовий рахунок зараз або відкрийте документацію з інтеграції та ШІ-скіл для вашого магазину.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -706,4 +755,7 @@ export const uk = {
     },
   },
   wallet: walletUk,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

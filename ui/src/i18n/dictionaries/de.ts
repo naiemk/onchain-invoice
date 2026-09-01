@@ -17,6 +17,7 @@ export const de = {
     support: "Support",
     getPaid: "Bezahlt werden",
     security: "Sicherheit",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const de = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Sicherheit lesen",
     trustBody: "Rechnungsauszahlungen kann die Plattform nicht umleiten. Die Wiederherstellung braucht eine verifizierte E-Mail und Guardian-Freigabe vor einem abbrechbaren On-Chain-Timelock.",
     trustTitle: "Abrechnung an Ihre Adresse gebunden. Wiederherstellung, die Sie sehen.",
@@ -253,9 +255,23 @@ export const de = {
     readyLede: "Öffnen Sie die Wallet für den täglichen Geldverkehr oder erstellen Sie eine Rechnung, wenn ein Kunde einen Zahlungslink braucht.",
     ctaApiDocs: "API-Dokumentation ansehen",
     footerCreate: "Erstellen",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Bezahlt werden",
     title: "Zahlung auf Ihre Weise annehmen",
     lede: "Stellen Sie einem Kunden eine Rechnung, verwalten Sie offene Rechnungen oder teilen Sie Ihre Wallet-Empfangsadresse.",
@@ -273,6 +289,7 @@ export const de = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Sicherheit",
     title: "Passkeys, Abrechnung und Wiederherstellung, die Sie bedienen können",
     lede: "Gebaut für Unternehmen, die ein verlorenes Handy nicht als verlorene Firma behandeln können.",
@@ -293,6 +310,18 @@ export const de = {
     advPolicies: "Ausgaberichtlinien",
     advMultisig: "Explizite Multi-Sig-Richtlinien-UX",
     openWallet: "Wallet öffnen",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -436,6 +465,22 @@ export const de = {
     docsAgentsBody:
       "Mit dem Cursor-Skill des Projekts erstellen Sie Rechnungen und fragen den Status ab – ohne Händler-Dashboard. Vollständige Dokumentation:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -652,6 +697,7 @@ export const de = {
 
   integrations: {
     eyebrow: "Plattform-Integrationen",
+    breadcrumb: "INTEGRATIONS",
     title: "Krypto in Ihrem Shop akzeptieren",
     lede:
       "Trustless Commerce verbindet gehosteten Checkout und eine One-Shot-Rechnungs-API mit schlanken Adaptern für WooCommerce, Shopify, Creator-Plattformen und mehr. Plugin installieren oder KI-Agent auf einen Plattform-Skill zeigen — Bestellungen aktualisieren sich, sobald die Zahlung on-chain eingeht.",
@@ -670,6 +716,9 @@ export const de = {
     aiSkill: "KI-Skill",
     ctaTitle: "Mit jeder Plattform starten",
     ctaLede: "Erstellen Sie jetzt eine Testrechnung oder öffnen Sie die Integrations-Docs und den KI-Skill für Ihren Shop.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -709,4 +758,7 @@ export const de = {
     },
   },
   wallet: walletDe,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

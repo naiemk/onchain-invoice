@@ -20,6 +20,7 @@ export const ko = {
     support: "지원",
     getPaid: "결제 받기",
     security: "보안",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -129,6 +130,7 @@ export const ko = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "보안 읽기",
     trustBody: "플랫폼이 인보이스 지급처를 바꿀 수 없습니다. 복구에는 확인된 이메일과 가디언 승인이 필요하고, 그다음 취소 가능한 온체인 타임락이 시작됩니다.",
     trustTitle: "정산은 내 주소에 묶입니다. 보이는 복구.",
@@ -253,9 +255,23 @@ export const ko = {
     readyLede: "일상 자금은 지갑을 열고, 고객에게 결제 링크가 필요하면 인보이스를 만드세요.",
     ctaApiDocs: "API 문서 보기",
     footerCreate: "만들기",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "결제 받기",
     title: "원하는 방식으로 받기",
     lede: "고객에게 인보이스를 발행하고, 미결제 인보이스를 관리하거나, 지갑 입금 주소를 공유하세요.",
@@ -273,6 +289,7 @@ export const ko = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "보안",
     title: "운영할 수 있는 패스키, 정산, 복구",
     lede: "휴대폰을 잃는 것이 회사를 잃는 일이 되어서는 안 되는 사업을 위해 만들었습니다.",
@@ -293,6 +310,18 @@ export const ko = {
     advPolicies: "지출 정책",
     advMultisig: "명시적 멀티시그 정책 UX",
     openWallet: "지갑 열기",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -433,6 +462,22 @@ export const ko = {
     docsAgentsBody:
       "프로젝트의 Cursor 스킬을 사용하면 판매자 대시보드 없이 인보이스를 만들고 상태를 조회할 수 있습니다. 전체 문서:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -644,6 +689,7 @@ export const ko = {
 
   integrations: {
     eyebrow: "플랫폼 연동",
+    breadcrumb: "INTEGRATIONS",
     title: "스토어프론트에서 암호화폐 받기",
     lede:
       "Trustless Commerce는 호스팅 checkout과 원샷 인보이스 API를 WooCommerce, Shopify, 크리에이터 플랫폼 등을 위한 가벼운 어댑터로 감쌉니다. 플러그인을 설치하거나 AI 에이전트를 플랫폼 스킬에 연결하세요 — on-chain 결제가 들어오면 주문이 업데이트됩니다.",
@@ -662,6 +708,9 @@ export const ko = {
     aiSkill: "AI 스킬",
     ctaTitle: "어떤 플랫폼이든 시작하세요",
     ctaLede: "지금 테스트 인보이스를 만들거나, 스토어프론트용 연동 문서와 AI 스킬을 열어보세요.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -701,4 +750,7 @@ export const ko = {
     },
   },
   wallet: walletKo,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

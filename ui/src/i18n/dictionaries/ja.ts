@@ -20,6 +20,7 @@ export const ja = {
     support: "サポート",
     getPaid: "受け取る",
     security: "セキュリティ",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -129,6 +130,7 @@ export const ja = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "セキュリティを読む",
     trustBody: "請求書の払い出し先をプラットフォームが変更することはできません。リカバリーには確認済みメールとガーディアンの承認が必要で、その後にキャンセル可能なオンチェーンタイムロックが始まります。",
     trustTitle: "着金先はあなたのアドレスに固定。見えるリカバリー。",
@@ -253,9 +255,23 @@ export const ja = {
     readyLede: "日常の資金はウォレットを開き、お客様に支払いリンクが必要なら請求書を作成してください。",
     ctaApiDocs: "API ドキュメントを見る",
     footerCreate: "作成",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "受け取る",
     title: "好きな方法で受け取る",
     lede: "お客様に請求し、未払いの請求書を管理するか、ウォレットの受取アドレスを共有します。",
@@ -273,6 +289,7 @@ export const ja = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "セキュリティ",
     title: "運用できるパスキー、決済、リカバリー",
     lede: "スマホを失うことが会社を失うことであってはならない事業向けです。",
@@ -293,6 +310,18 @@ export const ja = {
     advPolicies: "支出ポリシー",
     advMultisig: "明示的なマルチシグポリシー UX",
     openWallet: "ウォレットを開く",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -433,6 +462,22 @@ export const ja = {
     docsAgentsBody:
       "プロジェクトの Cursor スキルを使えば、販売者ダッシュボードなしで請求書の作成とステータス取得ができます。詳細はこちら:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -644,6 +689,7 @@ export const ja = {
 
   integrations: {
     eyebrow: "プラットフォーム連携",
+    breadcrumb: "INTEGRATIONS",
     title: "ストアフロントで暗号資産を受け付ける",
     lede:
       "Trustless Commerce は、ホスト型 checkout とワンショットの請求書 API を、WooCommerce、Shopify、クリエイター向けプラットフォームなど向けの薄いアダプターで包みます。プラグインを入れるか、AI エージェントをプラットフォームスキルに向けるだけ — on-chain で入金されると注文が更新されます。",
@@ -662,6 +708,9 @@ export const ja = {
     aiSkill: "AI スキル",
     ctaTitle: "どのプラットフォームからでも始められる",
     ctaLede: "今すぐテスト請求書を作成するか、ストアフロント向けの連携ドキュメントと AI スキルを開いてください。",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -701,4 +750,7 @@ export const ja = {
     },
   },
   wallet: walletJa,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

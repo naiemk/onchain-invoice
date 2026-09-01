@@ -17,6 +17,7 @@ export const hi = {
     support: "सहायता",
     getPaid: "भुगतान पाएँ",
     security: "सुरक्षा",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const hi = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "सुरक्षा पढ़ें",
     trustBody: "इनवॉइस भुगतान प्लैटफ़ॉर्म मोड़ नहीं सकता। रिकवरी के लिए सत्यापित ईमेल और गार्जियन स्वीकृति चाहिए, फिर रद्द करने योग्य ऑन-चेन टाइमलॉक।",
     trustTitle: "सेटलमेंट आपके पते से बंधा। रिकवरी जो दिखती है।",
@@ -250,9 +252,23 @@ export const hi = {
     readyLede: "रोज़मर्रा के धन के लिए वॉलेट खोलें, या जब ग्राहक को पे लिंक चाहिए तब इनवॉइस बनाएँ।",
     ctaApiDocs: "API दस्तावेज़ देखें",
     footerCreate: "बनाएँ",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "भुगतान पाएँ",
     title: "अपने तरीके से भुगतान लें",
     lede: "ग्राहक को इनवॉइस भेजें, खुले इनवॉइस प्रबंधित करें, या अपना वॉलेट प्राप्ति पता साझा करें।",
@@ -270,6 +286,7 @@ export const hi = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "सुरक्षा",
     title: "passkey, सेटलमेंट और रिकवरी जिन्हें आप चला सकते हैं",
     lede: "उन व्यवसायों के लिए जो खोए फ़ोन को खोई कंपनी नहीं मान सकते।",
@@ -290,6 +307,18 @@ export const hi = {
     advPolicies: "खर्च नीतियाँ",
     advMultisig: "स्पष्ट मल्टी-सिग नीति UX",
     openWallet: "वॉलेट खोलें",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -430,6 +459,22 @@ export const hi = {
     docsAgentsBody:
       "मर्चेंट डैशबोर्ड के बिना इनवॉइस बनाने और स्टेटस पोल करने के लिए प्रोजेक्ट की Cursor स्किल उपयोग करें। पूरे दस्तावेज़:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -641,6 +686,7 @@ export const hi = {
 
   integrations: {
     eyebrow: "प्लेटफ़ॉर्म इंटीग्रेशन",
+    breadcrumb: "INTEGRATIONS",
     title: "अपने स्टोरफ़्रंट पर क्रिप्टो स्वीकार करें",
     lede:
       "Trustless Commerce होस्टेड checkout और one-shot इनवॉइस API को WooCommerce, Shopify, क्रिएटर प्लेटफ़ॉर्म आदि के लिए हल्के एडाप्टर के साथ जोड़ता है। प्लगइन इंस्टॉल करें या AI एजेंट को प्लेटफ़ॉर्म स्किल पर इंगित करें — on-chain भुगतान आते ही ऑर्डर अपडेट हो जाते हैं।",
@@ -659,6 +705,9 @@ export const hi = {
     aiSkill: "AI स्किल",
     ctaTitle: "किसी भी प्लेटफ़ॉर्म से शुरू करें",
     ctaLede: "अभी एक टेस्ट इनवॉइस बनाएँ, या अपने स्टोरफ़्रंट के लिए इंटीग्रेशन docs और AI स्किल खोलें।",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -698,4 +747,7 @@ export const hi = {
     },
   },
   wallet: walletHi,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

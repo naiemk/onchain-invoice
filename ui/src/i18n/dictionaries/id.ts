@@ -20,6 +20,7 @@ export const id = {
     support: "Bantuan",
     getPaid: "Terima pembayaran",
     security: "Keamanan",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -129,6 +130,7 @@ export const id = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Baca keamanan",
     trustBody: "Pencairan faktur tidak dapat dialihkan oleh platform. Pemulihan membutuhkan email terverifikasi dan persetujuan guardian sebelum timelock on-chain yang dapat dibatalkan.",
     trustTitle: "Penyelesaian terikat ke alamat Anda. Pemulihan yang bisa Anda lihat.",
@@ -257,9 +259,23 @@ export const id = {
     readyLede: "Buka dompet untuk uang sehari-hari, atau buat faktur saat pelanggan membutuhkan tautan pembayaran.",
     ctaApiDocs: "Lihat dokumentasi API",
     footerCreate: "Buat",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Terima pembayaran",
     title: "Terima pembayaran dengan cara Anda",
     lede: "Buat faktur untuk pelanggan, kelola faktur terbuka, atau bagikan alamat penerimaan dompet Anda.",
@@ -277,6 +293,7 @@ export const id = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Keamanan",
     title: "Passkey, penyelesaian, dan pemulihan yang bisa Anda operasikan",
     lede: "Dibangun untuk bisnis yang tidak bisa menganggap ponsel hilang sebagai perusahaan hilang.",
@@ -297,6 +314,18 @@ export const id = {
     advPolicies: "Kebijakan pengeluaran",
     advMultisig: "UX kebijakan multi-sig eksplisit",
     openWallet: "Buka dompet",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -441,6 +470,22 @@ export const id = {
     docsAgentsBody:
       "Gunakan keahlian Cursor dari proyek ini untuk membuat faktur dan memeriksa status tanpa dasbor penjual. Dokumentasi lengkap:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -655,6 +700,7 @@ export const id = {
 
   integrations: {
     eyebrow: "Integrasi platform",
+    breadcrumb: "INTEGRATIONS",
     title: "Terima kripto di toko Anda",
     lede:
       "Trustless Commerce membungkus checkout yang di-host dan API faktur sekali jalan dengan adaptor ringan untuk WooCommerce, Shopify, platform kreator, dan lainnya. Pasang plugin atau arahkan agen AI ke skill platform — pesanan diperbarui saat pembayaran masuk on-chain.",
@@ -673,6 +719,9 @@ export const id = {
     aiSkill: "Keahlian AI",
     ctaTitle: "Mulai dari platform mana pun",
     ctaLede: "Buat faktur uji coba sekarang, atau buka docs integrasi dan keahlian AI untuk toko Anda.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -712,4 +761,7 @@ export const id = {
     },
   },
   wallet: walletId,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

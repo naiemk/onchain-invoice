@@ -17,6 +17,7 @@ export const ur = {
     support: "سپورٹ",
     getPaid: "ادائیگی وصول کریں",
     security: "سیکیورٹی",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -126,6 +127,7 @@ export const ur = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "سیکیورٹی پڑھیں",
     trustBody: "انوائس ادائیگیاں پلیٹ فارم موڑ نہیں سکتا۔ بحالی کے لیے تصدیق شدہ ای میل اور گارڈین منظوری چاہیے، پھر قابلِ منسوخی آن چین ٹائم لاک۔",
     trustTitle: "تصفیہ آپ کے پتے سے بندھا۔ بحالی جو نظر آتی ہے۔",
@@ -250,9 +252,23 @@ export const ur = {
     readyLede: "روزانہ کی رقم کے لیے والیٹ کھولیں، یا جب گاہک کو ادائیگی لنک چاہیے تو انوائس بنائیں۔",
     ctaApiDocs: "API دستاویزات دیکھیں",
     footerCreate: "بنائیں",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "ادائیگی وصول کریں",
     title: "اپنے طریقے سے ادائیگی لیں",
     lede: "گاہک کو انوائس بھیجیں، کھلی انوائسز سنبھالیں، یا اپنا والیٹ وصولی پتہ شیئر کریں۔",
@@ -270,6 +286,7 @@ export const ur = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "سیکیورٹی",
     title: "پاس کی، تصفیہ اور بحالی جو آپ چلا سکتے ہیں",
     lede: "ان کاروباروں کے لیے جو کھوئے فون کو کھوئی کمپنی نہیں سمجھ سکتے۔",
@@ -290,6 +307,18 @@ export const ur = {
     advPolicies: "خرچ کی پالیسیاں",
     advMultisig: "واضح ملٹی سگ پالیسی UX",
     openWallet: "والیٹ کھولیں",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -429,6 +458,22 @@ export const ur = {
     docsAgentsBody:
       "مرچنٹ ڈیش بورڈ کے بغیر انوائسز بنانے اور اسٹیٹس دیکھنے کے لیے پروجیکٹ کی Cursor مہارت استعمال کریں۔ مکمل دستاویزات:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -640,6 +685,7 @@ export const ur = {
 
   integrations: {
     eyebrow: "پلیٹ فارم انٹیگریشنز",
+    breadcrumb: "INTEGRATIONS",
     title: "اپنے اسٹور فرنٹ پر کریپٹو قبول کریں",
     lede:
       "Trustless Commerce ہوسٹڈ checkout اور one-shot انوائس API کو WooCommerce، Shopify، کریئیٹر پلیٹ فارمز اور مزید کے لیے ہلکے ایڈاپٹرز کے ساتھ لپیٹتا ہے۔ پلگ اِن انسٹال کریں یا AI ایجنٹ کو پلیٹ فارم اسکل پر رکھیں — on-chain ادائیگی آتے ہی آرڈرز اپ ڈیٹ ہو جاتے ہیں۔",
@@ -658,6 +704,9 @@ export const ur = {
     aiSkill: "AI مہارت",
     ctaTitle: "کسی بھی پلیٹ فارم سے شروع کریں",
     ctaLede: "ابھی ایک ٹیسٹ انوائس بنائیں، یا اپنے اسٹور فرنٹ کے لیے انٹیگریشن docs اور AI مہارت کھولیں۔",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -697,4 +746,7 @@ export const ur = {
     },
   },
   wallet: walletUr,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;

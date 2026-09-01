@@ -21,6 +21,7 @@ export const es = {
     support: "Soporte",
     getPaid: "Cobrar",
     security: "Seguridad",
+    openWorkspace: "Open workspace",
   },
 
   locale: {
@@ -130,6 +131,7 @@ export const es = {
   },
 
   home: {
+    eyebrow: "A calmer way to run money",
     trustCta: "Ver seguridad",
     trustBody: "La plataforma no puede redirigir los pagos de las facturas. La recuperación pide un email verificado y la aprobación del tutor antes de un timelock on-chain cancelable.",
     trustTitle: "Liquidación atada a tu dirección. Recuperación que puedes ver.",
@@ -257,9 +259,23 @@ export const es = {
     readyLede: "Abre la cartera para el dinero del día a día, o crea una factura cuando un cliente necesita un enlace de pago.",
     ctaApiDocs: "Ver la documentación de la API",
     footerCreate: "Crear",
+    h1Emphasis: "business from.",
+    ctaCreateWallet: "Create a wallet",
+    ctaFieldGuide: "Read the field guide",
+    heroBalanceNetwork: "USDC on Base",
+    heroSettledMonth: "$4,210.00 settled this month",
+    heroWalletPill: "Merchant wallet · {mode}",
+    loopEyebrow: "The operating loop",
+    loopStablecoinsTitle: "Stablecoins in",
+    loopStablecoinsBody: "Receive USDC and USDT to your merchant wallet on the chains you choose.",
+    loopInvoicesTitle: "Invoices out",
+    loopInvoicesBody: "Send pay links that settle straight to your wallet — no intermediary ledger.",
+    loopCashTitle: "Cash to bank",
+    loopCashBody: "Move value between your wallet and the bank account that keeps the business running.",
   },
 
   getPaid: {
+    breadcrumb: "GET PAID",
     eyebrow: "Cobrar",
     title: "Cobra a tu manera",
     lede: "Factura a un cliente, gestiona facturas abiertas o comparte la dirección de recepción de tu cartera.",
@@ -277,6 +293,7 @@ export const es = {
   },
 
   securityPage: {
+    breadcrumb: "SECURITY",
     eyebrow: "Seguridad",
     title: "Passkeys, liquidación y recuperación que puedes operar",
     lede: "Hecho para negocios que no pueden tratar un teléfono perdido como una empresa perdida.",
@@ -297,6 +314,18 @@ export const es = {
     advPolicies: "Políticas de gasto",
     advMultisig: "UX explícita de política multi-sig",
     openWallet: "Abrir cartera",
+    protectedTitle: "Protected by your devices",
+    protectedBody: "Passkeys on this device authorize sends — no seed phrase to print and lose.",
+    addPasskeyCta: "Add a passkey",
+    recoveryMapTitle: "Recovery map",
+    mapPasskeys: "Passkeys",
+    mapEmail: "Email recovery",
+    mapGuardian: "Guardian",
+    active: "Active",
+    verified: "Verified",
+    notAdded: "Not added",
+    reviewRecoveryCta: "Review recovery",
+    transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
   },
 
   create: {
@@ -439,6 +468,22 @@ export const es = {
     docsAgentsBody:
       "Usa el skill de Cursor del proyecto para crear facturas y consultar su estado sin un panel de comercio. Documentación completa:",
     docsGithubPages: "GitHub Pages",
+    breadcrumb: "GET PAID / QUICK INVOICE",
+    essentialsTitle: "The essentials",
+    essentialsHint: "3 fields to send",
+    essentialsMicro: "The essentials first. The details are there when you need them.",
+    whoLabel: "Who are you billing?",
+    whoPlaceholder: "Northstar Hosting",
+    whatLabel: "What's this for?",
+    whatPlaceholder: "March hosting retainer",
+    amountDueLabel: "Amount",
+    dueLabel: "Due",
+    addDetails: "Add details (optional)",
+    usuallyUnder60: "Usually under 60 seconds",
+    createPayLink: "Create pay link",
+    previewAmountDue: "Amount due",
+    previewSettlement: "Settlement bound to your merchant wallet",
+    previewCustomerPays: "The customer pays from any supported wallet",
   },
 
   pay: {
@@ -651,6 +696,7 @@ export const es = {
 
   integrations: {
     eyebrow: "Integraciones de plataforma",
+    breadcrumb: "INTEGRATIONS",
     title: "Acepta cripto en tu tienda",
     lede:
       "Trustless Commerce combina checkout alojado y una API de facturas en un solo paso con adaptadores ligeros para WooCommerce, Shopify, plataformas de creadores y más. Instala un complemento o apunta tu agente de IA a un skill de plataforma — los pedidos se actualizan cuando el pago llega on-chain.",
@@ -669,6 +715,9 @@ export const es = {
     aiSkill: "Skill de IA",
     ctaTitle: "Empieza con cualquier plataforma",
     ctaLede: "Crea una factura de prueba ahora o abre la documentación de integración y el skill de IA para tu tienda.",
+    connect: "Connect",
+    manage: "Manage",
+    statusConnected: "Connected",
     platforms: {
       woocommerce: {
         name: "WooCommerce",
@@ -708,4 +757,7 @@ export const es = {
     },
   },
   wallet: walletEs,
+  footer: {
+    settlementLine: "Settlement bound to your merchant wallet",
+  },
 } satisfies Messages;
