@@ -64,7 +64,9 @@
     "wallet:persist:replay": "node scripts/replay-wallet-persist-log.mjs",
     "test:wallet-advanced": "hardhat test test/WalletAdvanced.ts test/CommerceWalletAdvanced.ts",
     "test:ui-e2e": "npm run commerce:build && playwright test",
-    "test:live-wallet-testnet": "LIVE_WALLET_TESTNET=1 hardhat test test/live/LiveWalletAdvanced.ts"
+    "test:live-wallet-testnet": "LIVE_WALLET_TESTNET=1 hardhat test test/live/LiveWalletAdvanced.ts",
+    "precommit": "bash scripts/pre-commit-ci.sh",
+    "hooks:install": "bash scripts/install-git-hooks.sh"
   },
   "repository": {
     "type": "git",

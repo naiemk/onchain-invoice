@@ -14,12 +14,13 @@ import { fetchWalletConfig, getWalletAccount } from "@/shared/wallet-api.js";
 import {
   buildSupportRequestText,
   fetchRecoverInfo,
+  pickRecoveryOwnerCoords,
   recoverWalletFromChain,
   type WalletRecoverInfo,
 } from "@/shared/wallet-recover-local.js";
 import { unlockRegistryWallet } from "@/shared/wallet-unlock.js";
 import { saveWalletSession, shortAddress, type WalletSession } from "@/shared/wallet-session.js";
-import { ensureSessionCredential } from "@/shared/webauthn.js";
+import { ensureSessionCredential, formatPasskeyError } from "@/shared/webauthn.js";
 
 type Props = {
   open: boolean;
@@ -37,13 +38,11 @@ function isLocalRecoveryError(error: unknown): boolean {
 
 export function isUnlockRecoveryError(error: unknown): boolean {
   if (isLocalRecoveryError(error)) return true;
-  if (!(error instanceof Error)) return false;
-  const msg = error.message;
-  return (
-    msg.includes("No wallet found for this passkey") ||
-    msg.includes("different wallet") ||
-    msg.includes("does not have your wallet passkey")
-  );
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: string }).code;
+    return code === "wrong_wallet" || code === "passkey_missing";
+  }
+  return false;
 }
 
 export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecovered }: Props) {
@@ -104,7 +103,7 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
         setStatus(t("wallet.localRecoveryDbFound"));
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(formatPasskeyError(error));
     } finally {
       setBusy(false);
     }
@@ -124,7 +123,7 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
       onRecovered();
       onOpenChange(false);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(formatPasskeyError(error));
     } finally {
       setBusy(false);
     }
@@ -132,9 +131,12 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
 
   const recoverFromChain = async () => {
     const entry = initialEntry;
-    const ownerQx = info?.account?.ownerQx ?? entry?.qx;
-    const ownerQy = info?.account?.ownerQy ?? entry?.qy;
-    if (!ownerQx || !ownerQy) {
+    const { ownerQx, ownerQy, canRecoverFromChain } = pickRecoveryOwnerCoords({
+      accountOwner: info?.account,
+      registryEntry: entry,
+      ownersOnChain: info?.ownersOnChain,
+    });
+    if (!canRecoverFromChain) {
       setStatus(t("wallet.localRecoveryNeedKeys"));
       return;
     }
@@ -150,20 +152,28 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
         credentialId: prepared?.credentialId,
         label: entry?.label,
       });
-      if (entry) {
+      if (entry || result.credentialId) {
         saveWalletSession({
-          ...entry,
+          ...(entry ?? {
+            address: result.account.address,
+            chainId,
+            salt: result.account.salt,
+            qx: result.account.ownerQx,
+            qy: result.account.ownerQy,
+            rawId: "",
+            label: t("wallet.defaultDevice"),
+          }),
           address: result.account.address,
           salt: result.account.salt,
           qx: result.account.ownerQx,
           qy: result.account.ownerQy,
-          credentialId: prepared?.credentialId ?? entry.credentialId,
+          credentialId: result.credentialId || prepared?.credentialId || entry?.credentialId || "",
         });
       }
       onRecovered();
       onOpenChange(false);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(formatPasskeyError(error));
     } finally {
       setBusy(false);
     }

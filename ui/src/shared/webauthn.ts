@@ -44,6 +44,60 @@ export function isYubiKeyPinRequiredError(error: unknown): boolean {
   return error instanceof YubiKeyPinRequiredError || (error instanceof Error && error.message === "yubikey_pin_required");
 }
 
+export type WebAuthnErrorCode =
+  | "cancelled"
+  | "busy"
+  | "not_supported"
+  | "security_blocked"
+  | "timeout"
+  | "unknown";
+
+/** Structured WebAuthn failure with a stable machine-readable code. */
+export class WebAuthnError extends Error {
+  readonly code: WebAuthnErrorCode;
+
+  constructor(code: WebAuthnErrorCode, cause?: unknown) {
+    super(messageForWebAuthnCode(code));
+    this.name = "WebAuthnError";
+    this.code = code;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+export function isWebAuthnError(error: unknown, code?: WebAuthnErrorCode): boolean {
+  if (!(error instanceof WebAuthnError)) return false;
+  return code ? error.code === code : true;
+}
+
+export function isWebAuthnCancelled(error: unknown): boolean {
+  return isWebAuthnError(error, "cancelled");
+}
+
+function messageForWebAuthnCode(code: WebAuthnErrorCode): string {
+  switch (code) {
+    case "cancelled":
+      return t("wallet.passkeyCancelled");
+    case "busy":
+      return t("wallet.passkeyAuthenticatorBusy");
+    case "not_supported":
+      return t("wallet.passkeyNotSupported");
+    case "security_blocked":
+      return t("wallet.passkeySecurityBlocked");
+    case "timeout":
+      return t("wallet.passkeyTimeout");
+    default:
+      return t("wallet.signInFailed");
+  }
+}
+
+/** Map unknown errors to user-facing passkey copy (preserves local_recovery and API errors). */
+export function formatPasskeyError(error: unknown): string {
+  if (error instanceof WebAuthnError) return error.message;
+  if (error instanceof YubiKeyPinRequiredError) return t("wallet.yubikeyPinRequiredTitle");
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 /** WebAuthn authenticatorData flags byte — bit 2 is user verified (UV). */
 export function authenticatorUvSet(authenticatorData: ArrayBuffer | Uint8Array): boolean {
   const bytes = authenticatorData instanceof Uint8Array ? authenticatorData : new Uint8Array(authenticatorData);
@@ -102,37 +156,75 @@ function platformRequestOptions(
   };
 }
 
-let webAuthnInFlight: Promise<PublicKeyCredential | null> | null = null;
+/** Serialize every WebAuthn ceremony so the platform never sees overlapping get/create calls. */
+let webAuthnTail: Promise<void> = Promise.resolve();
+
+async function withWebAuthnLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = webAuthnTail;
+  let release!: () => void;
+  webAuthnTail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
+export function mapWebAuthnDomException(error: unknown): WebAuthnError {
+  if (error instanceof WebAuthnError) return error;
+  if (error instanceof DOMException) {
+    switch (error.name) {
+      case "NotAllowedError":
+        return new WebAuthnError("cancelled", error);
+      case "InvalidStateError":
+        return new WebAuthnError("busy", error);
+      case "AbortError":
+        return new WebAuthnError("cancelled", error);
+      case "SecurityError":
+        return new WebAuthnError("security_blocked", error);
+      case "TimeoutError":
+        return new WebAuthnError("timeout", error);
+      default:
+        return new WebAuthnError("unknown", error);
+    }
+  }
+  return new WebAuthnError("unknown", error);
+}
+
+function assertWebAuthnSupported(): void {
+  if (!webAuthnSupported()) throw new WebAuthnError("not_supported");
+}
 
 async function webAuthnGet(
   options: PublicKeyCredentialRequestOptions
 ): Promise<PublicKeyCredential | null> {
-  if (webAuthnInFlight) {
-    await webAuthnInFlight.catch(() => undefined);
-  }
-  const op = (async () => {
+  return withWebAuthnLock(async () => {
     try {
       return (await navigator.credentials.get({ publicKey: options })) as PublicKeyCredential | null;
     } catch (error) {
-      if (error instanceof DOMException && error.name === "NotAllowedError") {
-        throw new Error(t("wallet.passkeyPromptPending"));
-      }
-      throw error;
+      throw mapWebAuthnDomException(error);
     }
-  })();
-  webAuthnInFlight = op;
-  try {
-    return await op;
-  } finally {
-    if (webAuthnInFlight === op) webAuthnInFlight = null;
-  }
+  });
+}
+
+async function webAuthnCreate(options: CredentialCreationOptions): Promise<PublicKeyCredential | null> {
+  return withWebAuthnLock(async () => {
+    try {
+      return (await navigator.credentials.create(options)) as PublicKeyCredential | null;
+    } catch (error) {
+      throw mapWebAuthnDomException(error);
+    }
+  });
 }
 
 export async function createPasskey(
   displayName: string,
   options?: { attachment?: "platform" | "cross-platform" }
 ): Promise<PasskeyOwner> {
-  if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
+  assertWebAuthnSupported();
   const challenge = randomChallenge();
   const authenticatorSelection: AuthenticatorSelectionCriteria = {
     residentKey: options?.attachment === "cross-platform" ? "discouraged" : "required",
@@ -141,20 +233,28 @@ export async function createPasskey(
   if (options?.attachment) {
     authenticatorSelection.authenticatorAttachment = options.attachment;
   }
-  const cred = (await navigator.credentials.create({
-    publicKey: {
-      challenge,
-      rp: { name: "Trustless Commerce Wallet", id: rpId() },
-      user: {
-        id: crypto.getRandomValues(new Uint8Array(16)),
-        name: displayName,
-        displayName,
+  let cred: PublicKeyCredential | null;
+  try {
+    cred = await webAuthnCreate({
+      publicKey: {
+        challenge,
+        rp: { name: "Trustless Commerce Wallet", id: rpId() },
+        user: {
+          id: crypto.getRandomValues(new Uint8Array(16)),
+          name: displayName,
+          displayName,
+        },
+        pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+        authenticatorSelection,
       },
-      pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-      authenticatorSelection,
-    },
-  })) as PublicKeyCredential | null;
-  if (!cred) throw new Error("Passkey creation cancelled");
+    });
+  } catch (error) {
+    if (isWebAuthnCancelled(error)) {
+      throw new Error(t("wallet.passkeyCreationCancelled"));
+    }
+    throw error;
+  }
+  if (!cred) throw new Error(t("wallet.passkeyCreationCancelled"));
   const response = cred.response as AuthenticatorAttestationResponse;
   if (options?.attachment === "cross-platform") {
     assertAuthenticatorUvSet(response.getAuthenticatorData());
@@ -181,6 +281,29 @@ export async function createSecurityKey(displayName: string): Promise<PasskeyOwn
   return createPasskey(displayName, { attachment: "cross-platform" });
 }
 
+async function getPasskeyAssertion(
+  options: PublicKeyCredentialRequestOptions,
+  input?: { allowDiscoverableFallback?: boolean }
+): Promise<PublicKeyCredential | null> {
+  const allowCredentials = options.allowCredentials;
+  try {
+    return await webAuthnGet(options);
+  } catch (error) {
+    if (input?.allowDiscoverableFallback && allowCredentials?.length) {
+      if (error instanceof WebAuthnError && error.code === "busy") throw error;
+      try {
+        const { allowCredentials: _drop, ...rest } = options;
+        return await webAuthnGet({ ...rest, hints: ["client-device"] });
+      } catch (fallbackError) {
+        if (isWebAuthnCancelled(fallbackError)) return null;
+        throw fallbackError;
+      }
+    }
+    if (isWebAuthnCancelled(error)) return null;
+    throw error;
+  }
+}
+
 /**
  * Discoverable WebAuthn get — returns credentialId from the assertion.
  * When credentialId is provided, pins allowCredentials to that passkey.
@@ -188,20 +311,13 @@ export async function createSecurityKey(displayName: string): Promise<PasskeyOwn
 export async function authenticatePasskey(input?: {
   credentialId?: string;
 }): Promise<(PasskeyOwner & { fromRegistry: boolean }) | null> {
-  if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
+  assertWebAuthnSupported();
   const allowCredentials = input?.credentialId?.trim()
     ? [{ id: credentialIdToBytesLocal(input.credentialId), type: "public-key" as const }]
     : undefined;
-  let cred: PublicKeyCredential | null = null;
-  try {
-    cred = await webAuthnGet(platformRequestOptions(randomChallenge(), allowCredentials));
-  } catch (error) {
-    if (allowCredentials && error instanceof DOMException && error.name === "NotAllowedError") {
-      cred = await webAuthnGet(platformRequestOptions(randomChallenge()));
-    } else {
-      throw error;
-    }
-  }
+  const cred = await getPasskeyAssertion(platformRequestOptions(randomChallenge(), allowCredentials), {
+    allowDiscoverableFallback: !!allowCredentials,
+  });
   if (!cred) return null;
   const credentialId = credentialIdFromRawId(cred.rawId);
   const rawId = bufferToHex(cred.rawId);
@@ -269,7 +385,7 @@ export async function signUserOpHash(
   credentialId?: string,
   options?: { requireUv?: boolean; session?: WalletSession }
 ): Promise<string> {
-  if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
+  assertWebAuthnSupported();
   const hashBytes = hexToBytes(userOpHashHex);
   const pinCredential = options?.requireUv && credentialId?.trim();
   const publicKey = pinCredential
@@ -278,8 +394,16 @@ export async function signUserOpHash(
       ])
     : platformRequestOptions(hashBytes);
 
-  const cred = await webAuthnGet(publicKey);
-  if (!cred) throw new Error("Passkey signing cancelled");
+  let cred: PublicKeyCredential | null;
+  try {
+    cred = await webAuthnGet(publicKey);
+  } catch (error) {
+    if (isWebAuthnCancelled(error)) {
+      throw new Error(t("wallet.passkeySigningCancelled"));
+    }
+    throw error;
+  }
+  if (!cred) throw new Error(t("wallet.passkeySigningCancelled"));
   const response = cred.response as AuthenticatorAssertionResponse;
   if (options?.requireUv) {
     assertAuthenticatorUvSet(response.authenticatorData);
@@ -302,13 +426,21 @@ export async function assertPasskeyChallenge(input: {
   };
   credentialId: string;
 }> {
-  if (!webAuthnSupported()) throw new Error("WebAuthn not supported");
+  assertWebAuthnSupported();
   const challenge = base64UrlToBytes(input.challengeBase64Url);
   const allowCredentials = input.credentialId?.trim()
     ? [{ id: credentialIdToBytesLocal(input.credentialId), type: "public-key" as const }]
     : undefined;
-  const cred = await webAuthnGet(platformRequestOptions(challenge, allowCredentials));
-  if (!cred) throw new Error("Passkey assertion cancelled");
+  let cred: PublicKeyCredential | null;
+  try {
+    cred = await webAuthnGet(platformRequestOptions(challenge, allowCredentials));
+  } catch (error) {
+    if (isWebAuthnCancelled(error)) {
+      throw new Error(t("wallet.passkeySigningCancelled"));
+    }
+    throw error;
+  }
+  if (!cred) throw new Error(t("wallet.passkeySigningCancelled"));
   const response = cred.response as AuthenticatorAssertionResponse;
   return {
     credentialId: credentialIdFromRawId(cred.rawId),
