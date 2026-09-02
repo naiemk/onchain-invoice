@@ -1,0 +1,1487 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://naiemk.github.io/onchain-invoice/platform-integration/">
+      
+      
+        <link rel="prev" href="../wallet-client-api/">
+      
+      
+        <link rel="next" href="../agents/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Platform integrations - Trustless Commerce</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#platform-integration-contract" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Trustless Commerce" class="md-header__button md-logo" aria-label="Trustless Commerce" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Trustless Commerce
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Platform integrations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/naiemk/onchain-invoice" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Trustless Commerce" class="md-nav__button md-logo" aria-label="Trustless Commerce" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Trustless Commerce
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/naiemk/onchain-invoice" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../create/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create invoice
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../invoice-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quote/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quote API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wallet-client-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wallet client API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform integrations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create invoice
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Create invoice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#request-fields-stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request fields (stable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#idempotency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idempotency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#response-stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Response (stable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hosted-checkout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hosted checkout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status polling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Status polling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invoice-status-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice status lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#callback-webhook-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Callback / webhook contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Callback / webhook contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handler-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handler requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#suggested-order-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested order mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#client-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client libraries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform adapters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ai-agent-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI agent skills
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sweepers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sweepers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ops / Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vercel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vercel UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create invoice
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Create invoice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#request-fields-stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request fields (stable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#idempotency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idempotency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#response-stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Response (stable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hosted-checkout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hosted checkout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status polling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Status polling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invoice-status-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice status lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#callback-webhook-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Callback / webhook contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Callback / webhook contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handler-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handler requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#suggested-order-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested order mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#client-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client libraries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform adapters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ai-agent-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI agent skills
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="platform-integration-contract">Platform integration contract</h1>
+<p>Stable contract for ecommerce platforms, creator tools, and custom storefronts integrating Trustless Commerce.</p>
+<p><strong>Base primitive:</strong> one <code>POST /api/invoices</code> call plus hosted <code>/pay</code> checkout. Platform adapters are thin wrappers around this contract.</p>
+<h2 id="endpoints">Endpoints</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/invoices</code></td>
+<td>None (rate limited)</td>
+<td>Create invoice + payment address</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/invoices/:id</code></td>
+<td>None (rate limited)</td>
+<td>Poll status + events</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/invoices?to=…</code></td>
+<td>Optional wallet headers</td>
+<td>Merchant invoice list</td>
+</tr>
+</tbody>
+</table>
+<p>See also <a href="../create/">Create invoice</a> and <a href="../api/">HTTP API</a>.</p>
+<h2 id="create-invoice">Create invoice</h2>
+<div class="highlight"><pre><span></span><code><span class="err">POST /api/invoices</span>
+<span class="err">Content-Type: application/json</span>
+<span class="err">Idempotency-Key: order-1042</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"price"</span><span class="p">:</span><span class="w"> </span><span class="s2">"49.00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"to"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"0xMerchant..."</span><span class="p">,</span><span class="w"> </span><span class="s2">"TMerchant..."</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"chains"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"11155111"</span><span class="p">,</span><span class="w"> </span><span class="s2">"3448148188"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"tokens"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"USDC"</span><span class="p">,</span><span class="w"> </span><span class="s2">"USDT"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"clientInvoiceId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"order-1042"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"chainId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"11155111"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"token"</span><span class="p">:</span><span class="w"> </span><span class="s2">"USDC"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"selectedTo"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0xMerchant..."</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Pro template pack"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Optional line-item summary"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"callback"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://shop.example/webhooks/trustless-commerce"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"allowPartial"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="request-fields-stable">Request fields (stable)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>price</code></td>
+<td>yes</td>
+<td>USD decimal string, e.g. <code>"49.00"</code></td>
+</tr>
+<tr>
+<td><code>to</code></td>
+<td>yes</td>
+<td>Merchant payout address(es); EVM <code>0x…</code>, Tron <code>T…</code>, or Solana base58</td>
+</tr>
+<tr>
+<td><code>chains</code></td>
+<td>yes</td>
+<td>Allowed chain IDs (comma-separated in pay links)</td>
+</tr>
+<tr>
+<td><code>tokens</code></td>
+<td>yes</td>
+<td>Allowed token symbols, e.g. <code>USDC</code>, <code>USDT</code></td>
+</tr>
+<tr>
+<td><code>chainId</code></td>
+<td>yes*</td>
+<td>Selected chain for this checkout (*defaults to first <code>chains</code> entry)</td>
+</tr>
+<tr>
+<td><code>token</code></td>
+<td>yes*</td>
+<td>Selected token (*defaults to first <code>tokens</code> entry)</td>
+</tr>
+<tr>
+<td><code>selectedTo</code></td>
+<td>yes*</td>
+<td>Payout address for selected chain (*defaults to first matching <code>to</code>)</td>
+</tr>
+<tr>
+<td><code>clientInvoiceId</code></td>
+<td>recommended</td>
+<td>Your order / cart id — stored and returned on invoice</td>
+</tr>
+<tr>
+<td><code>callback</code></td>
+<td>recommended</td>
+<td>HTTPS URL for payment webhooks</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>optional</td>
+<td>Shown on hosted checkout</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>optional</td>
+<td>Shown on hosted checkout</td>
+</tr>
+<tr>
+<td><code>allowPartial</code></td>
+<td>optional</td>
+<td>Default <code>false</code>; when <code>true</code>, underpayment may reach <code>paid_partial</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Do not send</strong> <code>invoiceSeed</code> — it is server-assigned.</p>
+<h3 id="idempotency">Idempotency</h3>
+<p>Send <code>Idempotency-Key</code> (your stable order id). Retries with the same key return <strong>200</strong> with the original invoice (<code>created: false</code>). Without a key, duplicate creates for the same deterministic invoice id return <strong>409</strong>.</p>
+<h3 id="response-stable">Response (stable)</h3>
+<p>HTTP <strong>201</strong> when newly created, <strong>200</strong> when idempotent replay.</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"invoice"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"inv_…"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"clientInvoiceId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"order-1042"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"priceUsd"</span><span class="p">:</span><span class="w"> </span><span class="s2">"49.00"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"toAddresses"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"0xMerchant..."</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">"selectedTo"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0xMerchant..."</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"chainId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"11155111"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"token"</span><span class="p">:</span><span class="w"> </span><span class="s2">"USDC"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"invoiceAddress"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0xPayTo…"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"callbackUrl"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://shop.example/webhooks/trustless-commerce"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"allowPartial"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"awaiting_payment"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"amountPaid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"amountSwept"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"createdAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-08-19T12:00:00.000Z"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"updatedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-08-19T12:00:00.000Z"</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"created"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"payLink"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/pay?id=inv_…"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"checkoutLink"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/pay?price=49.00&amp;to=0xMerchant…"</span>
+<span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Use in integrations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>invoice.id</code></td>
+<td>Store on your order; poll <code>GET /api/invoices/:id</code></td>
+</tr>
+<tr>
+<td><code>invoice.invoiceAddress</code></td>
+<td>Display / QR on custom checkout (hosted <code>/pay</code> preferred)</td>
+</tr>
+<tr>
+<td><code>payLink</code></td>
+<td><strong>Redirect buyer here</strong> after create — resumes this invoice</td>
+</tr>
+<tr>
+<td><code>checkoutLink</code></td>
+<td>Pre-invoice pay-link template (buyer picks chain on <code>/pay</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Prefix relative paths with your Trustless Commerce base URL (e.g. <code>https://pay.example.com</code>).</p>
+<h2 id="hosted-checkout">Hosted checkout</h2>
+<p>Treat <strong><code>/pay</code></strong> as the canonical buyer experience.</p>
+<ol>
+<li>Platform creates invoice via API.</li>
+<li>Redirect buyer to <code>{baseUrl}{payLink}</code> (or render a button to that URL).</li>
+<li>Buyer completes payment on hosted checkout; sweeper settles on-chain.</li>
+</ol>
+<p>Optional UI chrome on <code>/pay</code> links: <code>header=full</code> (default top-level), <code>minimal</code>, or <code>none</code> (iframe). Embedded <code>/pay</code> defaults to no chrome and may be iframed cross-origin. See <a href="../create/#checkout-chrome-header">Create an invoice</a>.</p>
+<p>Platform adapters should <strong>not</strong> reimplement wallet UI unless required by the host platform.</p>
+<h2 id="status-polling">Status polling</h2>
+<div class="highlight"><pre><span></span><code><span class="err">GET /api/invoices/:id</span>
+</code></pre></div>
+<p>Response includes <code>invoice</code> fields plus <code>events[]</code> (audit trail).</p>
+<h3 id="invoice-status-lifecycle">Invoice status lifecycle</h3>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+<th>Platform action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>awaiting_payment</code></td>
+<td>Invoice active, no payment yet</td>
+<td>Keep order pending</td>
+</tr>
+<tr>
+<td><code>paid</code></td>
+<td>Full payment detected on-chain</td>
+<td>Mark order paid / fulfill</td>
+</tr>
+<tr>
+<td><code>paid_partial</code></td>
+<td>Partial payment (<code>allowPartial: true</code>)</td>
+<td>Partial fulfillment or hold</td>
+</tr>
+<tr>
+<td><code>swept</code></td>
+<td>Funds swept to merchant</td>
+<td>Optional: mark settled (already paid)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recommended:</strong> mark platform orders <strong>paid</strong> on <code>paid</code>, <code>paid_partial</code> (if allowed), or <code>swept</code>.</p>
+<p>Poll every 5–15 s while the buyer is on-site, or rely on callbacks (below).</p>
+<h2 id="callback-webhook-contract">Callback / webhook contract</h2>
+<p>When an invoice first transitions into a paid-like status (<code>paid</code>, <code>paid_partial</code>, or <code>swept</code>), the API POSTs to <code>callback</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST {callback}</span>
+<span class="err">Content-Type: application/json</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invoice.updated"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"invoice"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"...full invoice record..."</span><span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="handler-requirements">Handler requirements</h3>
+<ol>
+<li>Respond <strong>2xx</strong> quickly; do heavy work asynchronously.</li>
+<li>Match <code>invoice.clientInvoiceId</code> or stored <code>invoice.id</code> to your order.</li>
+<li>Idempotent: ignore duplicate notifications for the same status.</li>
+<li>Verify <code>invoice.status</code> before fulfilling.</li>
+</ol>
+<p>Callbacks are <strong>best-effort</strong> (no automatic retries today). Combine with polling for reliability.</p>
+<h3 id="suggested-order-mapping">Suggested order mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Trustless status</th>
+<th>WooCommerce / Shopify / creator</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>awaiting_payment</code></td>
+<td>Pending payment</td>
+</tr>
+<tr>
+<td><code>paid</code></td>
+<td>Processing / paid</td>
+</tr>
+<tr>
+<td><code>paid_partial</code></td>
+<td>On hold or partial (merchant policy)</td>
+</tr>
+<tr>
+<td><code>swept</code></td>
+<td>Completed (optional distinction)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="authentication-model">Authentication model</h2>
+<table>
+<thead>
+<tr>
+<th>Actor</th>
+<th>Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Invoice create / public read</td>
+<td>Unauthenticated (IP rate limits)</td>
+</tr>
+<tr>
+<td>Merchant list / force sweep</td>
+<td>Wallet signature headers (<code>x-merchant-address</code>, <code>x-merchant-message</code>, <code>x-merchant-signature</code>)</td>
+</tr>
+<tr>
+<td>Admin / sweeper registration</td>
+<td><code>x-api-key</code></td>
+</tr>
+<tr>
+<td>Embedded passkey wallets</td>
+<td>HMAC wallet client API (<code>x-client-*</code>) — see <a href="../wallet-client-api/">Wallet client API</a></td>
+</tr>
+</tbody>
+</table>
+<p>Platform plugins store the <strong>hosted API base URL</strong> and merchant wallet addresses in settings. They do not need merchant wallet signing for create + callback flows.</p>
+<p>Invoice create stays public. Platforms that embed <strong>user passkey wallets</strong> on their own domain use the HMAC <a href="../wallet-client-api/">Wallet client API</a>, not the hosted <code>/wallet</code> UI.</p>
+<h2 id="client-libraries">Client libraries</h2>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Path</th>
+<th>Package</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Node / TypeScript</td>
+<td><a href="../platforms/sdk/node/"><code>platforms/sdk/node/</code></a></td>
+<td><code>@trustless-commerce/platform-sdk</code></td>
+</tr>
+<tr>
+<td>PHP (WooCommerce)</td>
+<td><a href="../platforms/sdk/php/"><code>platforms/sdk/php/</code></a></td>
+<td><code>trustless-commerce/platform-sdk</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="platform-adapters">Platform adapters</h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Path</th>
+<th>Model</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WooCommerce</td>
+<td><a href="../platforms/woocommerce/"><code>platforms/woocommerce/</code></a></td>
+<td>Native payment gateway + callback</td>
+</tr>
+<tr>
+<td>Shopify</td>
+<td><a href="../platforms/shopify/"><code>platforms/shopify/</code></a></td>
+<td>Offsite checkout app + order sync</td>
+</tr>
+<tr>
+<td>Kajabi / Teachable</td>
+<td><a href="../platforms/creator/"><code>platforms/creator/</code></a></td>
+<td>External checkout + enrollment webhook</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../platforms/README.md"><code>platforms/README.md</code></a> for the full integration roadmap.</p>
+<h2 id="ai-agent-skills">AI agent skills</h2>
+<p>Each platform has a Cursor skill for fast integration:</p>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Skill path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WooCommerce</td>
+<td><code>.cursor/skills/trustless-commerce-woocommerce/SKILL.md</code></td>
+</tr>
+<tr>
+<td>Shopify</td>
+<td><code>.cursor/skills/trustless-commerce-shopify/SKILL.md</code></td>
+</tr>
+<tr>
+<td>Kajabi</td>
+<td><code>.cursor/skills/trustless-commerce-kajabi/SKILL.md</code></td>
+</tr>
+<tr>
+<td>Teachable</td>
+<td><code>.cursor/skills/trustless-commerce-teachable/SKILL.md</code></td>
+</tr>
+<tr>
+<td>BigCommerce</td>
+<td><code>.cursor/skills/trustless-commerce-bigcommerce/SKILL.md</code></td>
+</tr>
+<tr>
+<td>Lemon Squeezy</td>
+<td><code>.cursor/skills/trustless-commerce-lemonsqueezy/SKILL.md</code></td>
+</tr>
+<tr>
+<td>Gumroad</td>
+<td><code>.cursor/skills/trustless-commerce-gumroad/SKILL.md</code></td>
+</tr>
+<tr>
+<td>Wallet client (HMAC)</td>
+<td><code>.cursor/skills/trustless-commerce-wallet/SKILL.md</code></td>
+</tr>
+</tbody>
+</table>
+<p>Product UI: <code>/integrations</code> on the hosted site lists all platforms with docs and skill links.</p>
+<h2 id="versioning">Versioning</h2>
+<p>This document describes the <strong>v1</strong> integration contract aligned with <code>POST /api/invoices</code>. Breaking changes will bump a documented version and preserve backward-compatible fields where possible.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

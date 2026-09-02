@@ -1,0 +1,1186 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://naiemk.github.io/onchain-invoice/invoice-types/">
+      
+      
+        <link rel="prev" href="../create/">
+      
+      
+        <link rel="next" href="../quote/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Invoice types - Trustless Commerce</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#invoice-types" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Trustless Commerce" class="md-header__button md-logo" aria-label="Trustless Commerce" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Trustless Commerce
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Invoice types
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/naiemk/onchain-invoice" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Trustless Commerce" class="md-nav__button md-logo" aria-label="Trustless Commerce" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Trustless Commerce
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/naiemk/onchain-invoice" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../create/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create invoice
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice types
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#per-type-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-type fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Per-type fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crypto-paymentmode-crypto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crypto (paymentMode: "crypto")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-paymentmode-crypto_or_fiat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined (paymentMode: "crypto_or_fiat")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fiat-paymentmode-fiat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fiat (paymentMode: "fiat")
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fiat-field-cascade-create-ui-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fiat field cascade (create UI + agents)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-response-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request / response examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Request / response examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crypto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crypto
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-crypto-or-fiat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined (crypto or fiat)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fiat-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fiat only
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quote/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quote API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wallet-client-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wallet client API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sweepers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sweepers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ops / Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vercel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vercel UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#per-type-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-type fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Per-type fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crypto-paymentmode-crypto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crypto (paymentMode: "crypto")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-paymentmode-crypto_or_fiat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined (paymentMode: "crypto_or_fiat")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fiat-paymentmode-fiat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fiat (paymentMode: "fiat")
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fiat-field-cascade-create-ui-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fiat field cascade (create UI + agents)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-response-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request / response examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Request / response examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crypto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crypto
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-crypto-or-fiat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined (crypto or fiat)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fiat-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fiat only
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="invoice-types">Invoice types</h1>
+<p>Trustless Commerce invoices use <code>paymentMode</code> (not a separate <code>invoiceType</code> field):</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>UI label</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>crypto</code></td>
+<td>Crypto</td>
+<td>On-chain payment only (default)</td>
+</tr>
+<tr>
+<td><code>crypto_or_fiat</code></td>
+<td>Combined</td>
+<td>Payer may pay with crypto <strong>or</strong> card/bank (Onramper)</td>
+</tr>
+<tr>
+<td><code>fiat</code></td>
+<td>Fiat</td>
+<td>Card/bank only; settlement still lands on-chain as USDC/USDT</td>
+</tr>
+</tbody>
+</table>
+<p>Fiat modes require Onramper enabled on the instance (<code>ONRAMPER_ENABLED</code> + keys, or demo mode).</p>
+<h2 id="per-type-fields">Per-type fields</h2>
+<h3 id="crypto-paymentmode-crypto">Crypto (<code>paymentMode: "crypto"</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>price</code></td>
+<td>yes</td>
+<td>Settlement amount in USD (USDC/USDT face value)</td>
+</tr>
+<tr>
+<td><code>to</code></td>
+<td>yes</td>
+<td>Merchant address(es) matching selected chains</td>
+</tr>
+<tr>
+<td><code>chains</code> / <code>tokens</code></td>
+<td>yes</td>
+<td>At least one compatible pair</td>
+</tr>
+<tr>
+<td><code>allowPartial</code></td>
+<td>no</td>
+<td>Default <code>false</code></td>
+</tr>
+<tr>
+<td><code>clientInvoiceId</code>, <code>title</code>, <code>description</code>, <code>callback</code>, <code>lang</code></td>
+<td>no</td>
+<td>Metadata</td>
+</tr>
+</tbody>
+</table>
+<h3 id="combined-paymentmode-crypto_or_fiat">Combined (<code>paymentMode: "crypto_or_fiat"</code>)</h3>
+<p>Same as crypto, plus optional quote hints used when the payer chooses card/bank:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>displayFiat</code></td>
+<td>no</td>
+<td>Preferred customer currency (e.g. <code>EUR</code>)</td>
+</tr>
+<tr>
+<td><code>quoteCountry</code></td>
+<td>no</td>
+<td>ISO-3166 alpha-2 (default <code>us</code>)</td>
+</tr>
+<tr>
+<td><code>quotePaymentMethod</code></td>
+<td>no</td>
+<td>Onramper method id; omit for Auto</td>
+</tr>
+<tr>
+<td><code>quoteProvider</code></td>
+<td>no</td>
+<td>Onramper ramp id; omit for Auto</td>
+</tr>
+<tr>
+<td><code>quoteSlippageBps</code></td>
+<td>no</td>
+<td>Max settlement drift at pay time (default <code>100</code> = 1%)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="fiat-paymentmode-fiat">Fiat (<code>paymentMode: "fiat"</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>displayFiat</code></td>
+<td>yes</td>
+<td>Customer pays in this currency</td>
+</tr>
+<tr>
+<td><code>displayAmount</code></td>
+<td>yes*</td>
+<td>Customer fiat amount (<code>direction=pay</code> quote)</td>
+</tr>
+<tr>
+<td><code>price</code></td>
+<td>derived</td>
+<td>Settlement crypto from quote (server fills if omitted)</td>
+</tr>
+<tr>
+<td><code>quoteCountry</code></td>
+<td>no</td>
+<td>Default <code>us</code></td>
+</tr>
+<tr>
+<td><code>quotePaymentMethod</code> / <code>quoteProvider</code></td>
+<td>no</td>
+<td>Auto if omitted</td>
+</tr>
+<tr>
+<td><code>quoteSlippageBps</code></td>
+<td>no</td>
+<td>Default <code>100</code></td>
+</tr>
+<tr>
+<td><code>allowPartial</code></td>
+<td>n/a</td>
+<td>Not meaningful for fiat-only</td>
+</tr>
+</tbody>
+</table>
+<p>*Or provide <code>price</code> and let the server quote <code>direction=receive</code>.</p>
+<p>Fiat invoices lock to Onramper-supported settlement rails (mainnet: Ethereum/Base/Tron; testnet: Sepolia/Nile).</p>
+<h2 id="fiat-field-cascade-create-ui-agents">Fiat field cascade (create UI + agents)</h2>
+<p>When building a quote for fiat / combined invoices, treat fields as a dependency graph. <code>pairs</code> = selected <code>chainId:token</code> set.</p>
+<table>
+<thead>
+<tr>
+<th>Changed field</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>currency (<code>displayFiat</code>)</td>
+<td>Refetch payment methods, then providers. Reset method/provider to remembered-if-still-offered, else Auto.</td>
+</tr>
+<tr>
+<td>country</td>
+<td>Same as currency.</td>
+</tr>
+<tr>
+<td>networks / tokens (<code>pairs</code>)</td>
+<td>Same as currency.</td>
+</tr>
+<tr>
+<td>payment method</td>
+<td>Refetch providers only.</td>
+</tr>
+<tr>
+<td>provider</td>
+<td><strong>No refetch</strong> — pick the matching row from the last <code>quotes[]</code> and update settlement preview.</td>
+</tr>
+<tr>
+<td>amount</td>
+<td>Refetch providers (debounce ~400ms). Keep provider preference if still quoted.</td>
+</tr>
+<tr>
+<td>max drift (<code>quoteSlippageBps</code>)</td>
+<td>Invalidates nothing. Stored on the invoice; enforced at pay time (<code>POST /api/invoices/:id/onramp-session</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Auto</strong> means omit the field and take the API's <code>recommended</code> value. A remembered preference overrides Auto only when it still appears in the freshly fetched option list.</p>
+<p>See also <a href="../quote/">Quote API</a>.</p>
+<h2 id="request-response-examples">Request / response examples</h2>
+<h3 id="crypto">Crypto</h3>
+<div class="highlight"><pre><span></span><code><span class="err">POST /api/invoices</span>
+<span class="err">Content-Type: application/json</span>
+<span class="err">Idempotency-Key: order-crypto-1</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"price"</span><span class="p">:</span><span class="w"> </span><span class="s2">"49.00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"to"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"0xMerchantEvm..."</span><span class="p">,</span><span class="w"> </span><span class="s2">"TMerchantTron..."</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"chains"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"11155111"</span><span class="p">,</span><span class="w"> </span><span class="s2">"nile"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"tokens"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"USDC"</span><span class="p">,</span><span class="w"> </span><span class="s2">"USDT"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"clientInvoiceId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"order-crypto-1"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"chainId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"11155111"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"token"</span><span class="p">:</span><span class="w"> </span><span class="s2">"USDC"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"selectedTo"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0xMerchantEvm..."</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Pro template pack"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"callback"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://shop.example/webhooks/trustless-commerce"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"allowPartial"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"paymentMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"crypto"</span>
+<span class="p">}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"invoice"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"inv_…"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"clientInvoiceId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"order-crypto-1"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"priceUsd"</span><span class="p">:</span><span class="w"> </span><span class="s2">"49.00"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"paymentMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"crypto"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"awaiting_payment"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"invoiceAddress"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0x…"</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"created"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"payLink"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/pay?id=inv_…"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"checkoutLink"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/pay?price=49.00&amp;to=0xMerchantEvm…"</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="combined-crypto-or-fiat">Combined (crypto or fiat)</h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"price"</span><span class="p">:</span><span class="w"> </span><span class="s2">"49.00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"to"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"0xMerchantEvm..."</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"chains"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"8453"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"tokens"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"USDC"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"clientInvoiceId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"order-both-1"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"chainId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"8453"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"token"</span><span class="p">:</span><span class="w"> </span><span class="s2">"USDC"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"selectedTo"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0xMerchantEvm..."</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"paymentMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"crypto_or_fiat"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"displayFiat"</span><span class="p">:</span><span class="w"> </span><span class="s2">"EUR"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quoteCountry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"de"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quotePaymentMethod"</span><span class="p">:</span><span class="w"> </span><span class="s2">"creditcard"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quoteSlippageBps"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The payer chooses crypto or card on <code>/pay</code>. Card checkout uses <code>POST /api/invoices/:id/onramp-session</code>.</p>
+<h3 id="fiat-only">Fiat only</h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"to"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"0xMerchantEvm..."</span><span class="p">,</span><span class="w"> </span><span class="s2">"TMerchantTron..."</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"chains"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"1"</span><span class="p">,</span><span class="w"> </span><span class="s2">"8453"</span><span class="p">,</span><span class="w"> </span><span class="s2">"tron"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"tokens"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"USDC"</span><span class="p">,</span><span class="w"> </span><span class="s2">"USDT"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"clientInvoiceId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"order-fiat-1"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"paymentMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fiat"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"displayFiat"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SEK"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"displayAmount"</span><span class="p">:</span><span class="w"> </span><span class="s2">"500.00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quoteCountry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"se"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quotePaymentMethod"</span><span class="p">:</span><span class="w"> </span><span class="s2">"swish"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quoteProvider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"revolut"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quoteSlippageBps"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The server quotes Onramper (<code>direction=pay</code>), sets <code>price</code> to the settlement crypto amount, and returns <code>awaiting_payment</code>. If settlement USDC drifts beyond <code>quoteSlippageBps</code> at pay time, the session returns <strong>410</strong> <code>quote_expired</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
