@@ -150,6 +150,11 @@ export const walletZhHans = {
   openWallet: "打开",
   createAnother: "创建另一个钱包",
   unlockAnother: "解锁另一个",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "本设备上的钱包",
   chooseWalletLede: "选择要打开的钱包。每个都是用此浏览器上的通行密钥创建的。",
   balanceLoading: "…",

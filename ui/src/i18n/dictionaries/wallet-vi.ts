@@ -155,6 +155,11 @@ export const walletVi = {
   openWallet: "Mở",
   createAnother: "Tạo ví khác",
   unlockAnother: "Mở khóa ví khác",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "Ví của bạn trên thiết bị này",
   chooseWalletLede: "Chọn ví để mở. Mỗi ví được tạo bằng passkey trên trình duyệt này.",
   balanceLoading: "…",

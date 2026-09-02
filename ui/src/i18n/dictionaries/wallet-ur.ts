@@ -156,6 +156,11 @@ export const walletUr = {
   openWallet: "کھولیں",
   createAnother: "دوسری والیٹ بنائیں",
   unlockAnother: "دوسری ان لاک کریں",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "اس ڈیوائس پر آپ کی والیٹس",
   chooseWalletLede: "کھولنے کے لیے والیٹ منتخب کریں۔ ہر ایک اسی براؤزر میں پاس کی سے بنائی گئی۔",
   balanceLoading: "…",

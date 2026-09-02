@@ -132,6 +132,11 @@ export const walletEn = {
   openWallet: "Open",
   createAnother: "Create another wallet",
   unlockAnother: "Unlock wallet from device",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   localRecoveryTitle: "Local recovery",
   localRecoveryLede: "Your funds stay on-chain. We'll try to restore the server record for this passkey.",
   localRecoveryChain: "Chain",

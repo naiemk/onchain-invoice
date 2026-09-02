@@ -150,6 +150,11 @@ export const walletJa = {
   openWallet: "開く",
   createAnother: "別のウォレットを作成",
   unlockAnother: "別のウォレットをロック解除",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "このデバイスのウォレット",
   chooseWalletLede: "開くウォレットを選択してください。それぞれこのブラウザのパスキーで作成されています。",
   balanceLoading: "…",

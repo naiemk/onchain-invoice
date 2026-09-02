@@ -155,6 +155,11 @@ export const walletAr = {
   openWallet: "فتح",
   createAnother: "إنشاء محفظة أخرى",
   unlockAnother: "فتح أخرى",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "محافظك على هذا الجهاز",
   chooseWalletLede: "اختر محفظة لفتحها. كل منها أُنشئت بمفتاح مرور في هذا المتصفح.",
   balanceLoading: "…",

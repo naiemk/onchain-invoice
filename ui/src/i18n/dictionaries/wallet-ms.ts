@@ -157,6 +157,11 @@ export const walletMs = {
   openWallet: "Buka",
   createAnother: "Cipta dompet lain",
   unlockAnother: "Buka kunci yang lain",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "Dompet anda pada peranti ini",
   chooseWalletLede:
     "Pilih dompet untuk dibuka. Setiap satu dicipta dengan passkey pada pelayar ini.",
