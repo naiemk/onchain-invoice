@@ -1,4 +1,14 @@
+import "dotenv/config";
+import { Wallet } from "ethers";
 import { loadBundlerConfig, BundlerWorker } from "./worker.js";
+
+// Local .env commonly uses generic names; bundler example config expects specific names.
+process.env.EVM_RPC_URL ??= process.env.SEPOLIA_RPC_URL;
+process.env.BUNDLER_WALLET_KEY ??= process.env.EVM_PRIVATE_KEY;
+process.env.BUNDLER_PRIVATE_KEY ??= process.env.EVM_PRIVATE_KEY;
+if (!process.env.BUNDLER_ADDRESS && process.env.BUNDLER_WALLET_KEY) {
+  process.env.BUNDLER_ADDRESS = new Wallet(process.env.BUNDLER_WALLET_KEY).address;
+}
 
 const configPath = process.env.BUNDLER_CONFIG ?? process.argv[2] ?? "commerce/config/bundler.example.yaml";
 const config = await loadBundlerConfig(configPath);

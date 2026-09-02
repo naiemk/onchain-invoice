@@ -79,7 +79,13 @@ export function registerWalletRoutes(
         return true;
       }
       try {
-        const balance = await fetchWalletBalance(getAddress(wallet), walletConfig, db);
+        const address = getAddress(wallet);
+        const balance = await fetchWalletBalance(address, walletConfig, db);
+        const funded = balance.chains.some((c) => BigInt(c.balance) > 0n);
+        db.touchWalletActivation(address, funded);
+        for (const chain of balance.chains) {
+          if (chain.deployed) db.markWalletDeployed(address, chain.chainId);
+        }
         handlers.sendJson(res, 200, balance);
       } catch (error) {
         handlers.sendJson(res, 400, {
@@ -194,8 +200,32 @@ export function registerWalletRoutes(
         return true;
       }
       const chainId = url.searchParams.get("chainId")?.trim() ?? walletConfig.chainId;
-      const accounts = db.listUndeployedWalletAccounts(chainId);
+      const limit = Number(url.searchParams.get("limit") ?? "100");
+      const accounts = db.listUndeployedWalletAccounts(chainId, Number.isFinite(limit) ? limit : 100);
       handlers.sendJson(res, 200, { accounts, chainId });
+      return true;
+    }
+
+    const activationMatch = url.pathname.match(/^\/api\/wallet\/accounts\/(0x[0-9a-fA-F]{40})\/activation$/);
+    if (req.method === "PATCH" && activationMatch) {
+      try {
+        handlers.requireApiKey(req, handlers.sweeperApiKey, "SWEEPER_API_KEY");
+      } catch {
+        handlers.sendJson(res, 401, { error: "unauthorized" });
+        return true;
+      }
+      const body = await handlers.readJson(req);
+      const account = db.recordWalletActivationCheck({
+        address: activationMatch[1],
+        funded: Boolean(body.funded),
+        deployed: Boolean(body.deployed),
+        error: str(body.error),
+      });
+      if (!account) {
+        handlers.sendJson(res, 404, { error: "account_not_found" });
+        return true;
+      }
+      handlers.sendJson(res, 200, { account });
       return true;
     }
 

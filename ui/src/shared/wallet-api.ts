@@ -18,8 +18,8 @@ export async function fetchWalletConfig(): Promise<WalletPublicConfig> {
 }
 
 export async function fetchWalletBalance(wallet: string): Promise<WalletBalanceResponse> {
-  const q = new URLSearchParams({ wallet });
-  const res = await fetch(apiUrl(`/api/wallet/balance?${q}`));
+  const q = new URLSearchParams({ wallet, _: String(Date.now()) });
+  const res = await fetch(apiUrl(`/api/wallet/balance?${q}`), { cache: "no-store" });
   if (!res.ok) throw new Error("failed to load balance");
   return res.json() as Promise<WalletBalanceResponse>;
 }

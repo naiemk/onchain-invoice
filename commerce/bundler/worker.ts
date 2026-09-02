@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { Contract, JsonRpcProvider, Wallet, getAddress } from "ethers";
+import { AbiCoder, Contract, JsonRpcProvider, Wallet, getAddress } from "ethers";
 import type { WalletUserOpRecord } from "../shared/userop.js";
 import {
   ENTRYPOINT_ABI,
@@ -153,7 +153,7 @@ export class BundlerWorker {
     }
 
     const submitter = new Wallet(chain.privateKey, provider);
-    const beneficiary = getAddress(chain.beneficiary ?? chain.bundlerAddress);
+    const beneficiary = getAddress(chain.beneficiary || chain.bundlerAddress);
     const ep = entryPoint.connect(submitter) as Contract;
     try {
       await this.ensureAccountPrefund(ep, record.walletAddress, record.userOp, record.chainId);
@@ -176,7 +176,7 @@ export class BundlerWorker {
       await this.trackWithRetry({
         userOpHash: record.userOpHash,
         status: "rejected",
-        rejectReason: "simulation_revert",
+        rejectReason: userOpSimulationRejectReason(error),
         expectedVersion: record.version,
       });
       this.activity?.append("userop-simulation-failed", {
@@ -222,7 +222,7 @@ export class BundlerWorker {
       feeTokenAddress: chain.feeTokenAddress ?? "",
       feeTokenSymbol: chain.feeTokenSymbol ?? "USDC",
       feeTokenDecimals: chain.feeTokenDecimals ?? 6,
-      bundlerBeneficiary: chain.beneficiary ?? chain.bundlerAddress,
+      bundlerBeneficiary: chain.beneficiary || chain.bundlerAddress,
       minFeeUsdc: BigInt(chain.feeUsdc ?? "100000"),
     };
   }
@@ -338,14 +338,37 @@ export async function loadBundlerConfig(path: string): Promise<BundlerConfig> {
     : await loadYaml(path);
   const chains = Array.isArray(doc.chains) ? (doc.chains as BundlerChainConfig[]) : [];
   return {
-    serverUrl: String(doc.serverUrl ?? process.env.SERVER_URL ?? "http://localhost:8080"),
+    serverUrl: String(doc.serverUrl || process.env.SERVER_URL || "http://localhost:8080"),
     intervalMs: Number(doc.intervalMs ?? 15_000),
-    bundlerWalletKey: String(doc.bundlerWalletKey ?? process.env.BUNDLER_WALLET_KEY ?? ""),
+    bundlerWalletKey: String(doc.bundlerWalletKey || process.env.BUNDLER_WALLET_KEY || ""),
     maxRetries: Number(doc.maxRetries ?? 5),
     activityLogPath: doc.activityLogPath ? String(doc.activityLogPath) : undefined,
     claimLeaseMs: Number(doc.claimLeaseMs ?? 180_000),
     chains,
   };
+}
+
+function userOpSimulationRejectReason(error: unknown): string {
+  const data = extractRevertData(error);
+  if (data?.startsWith("0x220266b6")) {
+    try {
+      const [, reason] = AbiCoder.defaultAbiCoder().decode(["uint256", "string"], `0x${data.slice(10)}`) as unknown as [bigint, string];
+      if (reason.includes("AA24")) return "signature_invalid";
+      if (reason.includes("AA21")) return "prefund_failed";
+      if (reason.includes("AA20")) return "account_not_deployed";
+      return `simulation_revert:${reason}`;
+    } catch {
+      return "simulation_revert";
+    }
+  }
+  return "simulation_revert";
+}
+
+function extractRevertData(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const obj = error as { data?: unknown; error?: unknown; info?: unknown };
+  if (typeof obj.data === "string") return obj.data;
+  return extractRevertData(obj.error) ?? extractRevertData(obj.info);
 }
 
 function sleep(ms: number): Promise<void> {

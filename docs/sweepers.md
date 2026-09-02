@@ -1,12 +1,14 @@
-# Nodes (sweepers, bundler, wallet-deployer)
+# Nodes (sweepers, bundler, wallet activator)
 
 Testnet nodes install runs several workers from **one** Docker image: `ghcr.io/<org>/trustless-commerce-sweeper` (built on every `main` push). Compose overrides `command` for non-sweeper roles.
+
+`wallet-deployer-evm` is the historical process/command name. Product docs call this role **wallet activator** because it activates funded passkey wallets whether or not the funds came from an invoice.
 
 | Service | Role |
 | --- | --- |
 | `sweeper-evm` / `sweeper-tron` (+ optional `sweeper-solana`) | Detect → claim → track paid → sweep → track swept |
 | `bundler-evm` | Poll pending UserOps → EntryPoint `depositTo` (gas) → `handleOps` |
-| `wallet-deployer-evm` | When undeployed wallet has USDC → `WalletFactory.createAccount` |
+| `wallet-deployer-evm` / wallet activator | When undeployed wallet has USDC → `WalletFactory.createAccount` |
 
 ## Sweeper
 
@@ -26,10 +28,12 @@ Config: `onchain-invoice-nodes.yaml` (from `commerce/config/sweeper.example.yaml
 
 Config: `onchain-invoice-bundler.yaml`.
 
-## Wallet deployer
+## Wallet activator (`wallet-deployer-evm`)
 
+- Activates funded passkey wallets, including direct token transfers with no invoice.
 - Uses sweeper API key against `GET /api/wallet/deployer/accounts` and `PATCH …/deployed`
 - Needs `WALLET_FACTORY_ADDRESS` + funded `WALLET_DEPLOYER_PRIVATE_KEY` (often same as sweeper key)
+- The current implementation polls undeployed wallet accounts and checks configured token balances before deploying. Production scaling should bound this candidate set with rate limits, backoff, and/or token `Transfer` event indexing so old unfunded wallets are not checked forever.
 - Also polls `GET /api/internal/wallet-recovery/jobs` and runs guardian recovery:
   - `initiate` → `AdminGuardianRecovery.initiateOwnerRecovery`
   - `cancel` → `Wallet.cancelPendingOwnerWithSignature`

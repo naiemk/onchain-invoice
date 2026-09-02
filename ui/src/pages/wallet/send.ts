@@ -123,6 +123,23 @@ export async function renderWalletSend(root: HTMLElement, opts?: WalletRenderOpt
   );
 }
 
+function formatSendRejectReason(reason: string | null | undefined): string {
+  switch (reason) {
+    case "signature_invalid":
+      return t("wallet.userOpSignatureInvalid");
+    case "insufficient_balance":
+      return t("wallet.userOpInsufficientBalance");
+    case "simulation_revert":
+      return t("wallet.userOpSimulationRevert");
+    case "execution_reverted":
+      return t("wallet.userOpExecutionReverted");
+    case "prefund_failed":
+      return t("wallet.userOpPrefundFailed");
+    default:
+      return reason?.startsWith("simulation_revert:") ? t("wallet.userOpSimulationRevert") : reason ?? t("wallet.sendFailed");
+  }
+}
+
 async function runSend(
   root: HTMLElement,
   session: NonNullable<ReturnType<typeof loadWalletSession>>,
@@ -175,7 +192,7 @@ async function runSend(
       showStatus(status, t("wallet.sendSuccess", { hash: result.txHash ?? userOpHash }), "success");
       return;
     }
-    showStatus(status, result.rejectReason ?? t("wallet.sendFailed"), "error");
+    showStatus(status, formatSendRejectReason(result.rejectReason), "error");
   } catch (error) {
     showStatus(status, formatPasskeyError(error), "error");
   } finally {

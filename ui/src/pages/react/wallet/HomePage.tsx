@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronDown, Mail } from "lucide-react";
+import { ChevronDown, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -108,8 +108,24 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
     };
   }, [initialSession, t]);
 
+  const loadBalance = useCallback(async () => {
+    setLoading(true);
+    try {
+      const balance = await fetchWalletBalance(session.address);
+      setTotalUsd(balance.totalUsd);
+      setChains(balance.chains);
+      setBalanceError(false);
+    } catch {
+      setTotalUsd(t("wallet.balanceZero"));
+      setBalanceError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [session.address, t]);
+
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     void (async () => {
       try {
         const balance = await fetchWalletBalance(session.address);
@@ -238,7 +254,20 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
     <WalletFrame current="home">
       <div className="space-y-6">
         <div className="rounded-2xl bg-brand-panel p-6 text-brand-panel-foreground">
-          <p className="text-xs text-brand-panel-foreground/70">{t("wallet.totalBalance")}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-brand-panel-foreground/70">{t("wallet.totalBalance")}</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={loading}
+              onClick={() => void loadBalance()}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              {t("wallet.refresh")}
+            </Button>
+          </div>
           {loading ? (
             <Skeleton className="mt-2 h-12 w-48 bg-brand-panel-foreground/10" />
           ) : (

@@ -205,9 +205,10 @@ export async function addWalletFromPasskey(): Promise<WalletSession> {
 /** Open a saved wallet after verifying the passkey on this device. */
 export async function unlockRegistryWallet(entry: WalletSession): Promise<WalletSession> {
   const prepared = await ensureSessionCredential(entry);
-  const auth = await authenticatePasskey(
-    prepared.credentialId?.trim() ? { credentialId: prepared.credentialId } : undefined
-  );
+  if (!prepared.credentialId?.trim()) {
+    throw Object.assign(new Error(t("wallet.passkeyMissingOnDevice")), { code: "missing_credential_id" });
+  }
+  const auth = await authenticatePasskey({ credentialId: prepared.credentialId });
   if (!auth) throw new Error(t("wallet.passkeyCancelled"));
   return finalizeSession(await buildSessionFromAuth(auth, prepared));
 }

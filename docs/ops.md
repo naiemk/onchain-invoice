@@ -27,11 +27,11 @@ wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/i
 wget -qO- https://raw.githubusercontent.com/naiemk/onchain-invoice/main/deploy/install/install-nodes.sh | bash
 ```
 
-Creates `onchain-invoice-api.yaml` / `onchain-invoice-nodes.yaml` (if missing), bundler/wallet-deployer YAMLs, and `./start-onchain-invoice-*.sh`. Nodes compose runs sweepers **plus** bundler + wallet-deployer from the **sweeper** image (command override). Details: [`deploy/install/README.md`](https://github.com/naiemk/onchain-invoice/blob/main/deploy/install/README.md).
+Creates `onchain-invoice-api.yaml` / `onchain-invoice-nodes.yaml` (if missing), bundler and wallet-activator (`wallet-deployer-evm`) YAMLs, and `./start-onchain-invoice-*.sh`. Nodes compose runs sweepers **plus** bundler + wallet activator from the **sweeper** image (command override). Details: [`deploy/install/README.md`](https://github.com/naiemk/onchain-invoice/blob/main/deploy/install/README.md).
 
 ## CI
 
-`.github/workflows/docker.yml` builds and pushes API, sweeper, UI, and nginx images on every `main` commit. Bundler and wallet-deployer are **not** separate GHCR packages — they reuse the sweeper image.
+`.github/workflows/docker.yml` builds and pushes API, sweeper, UI, and nginx images on every `main` commit. Bundler and wallet activator (`wallet-deployer-evm`) are **not** separate GHCR packages — they reuse the sweeper image.
 
 ## System tests (published images)
 

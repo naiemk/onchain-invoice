@@ -47,12 +47,17 @@ export function formatUserOpRejectReason(reason: string | null | undefined): str
   switch (reason) {
     case "insufficient_balance":
       return t("wallet.userOpInsufficientBalance");
+    case "signature_invalid":
+      return t("wallet.userOpSignatureInvalid");
     case "simulation_revert":
       return t("wallet.userOpSimulationRevert");
     case "execution_reverted":
       return t("wallet.userOpExecutionReverted");
     case "prefund_failed":
-      return t("wallet.userOpSimulationRevert");
+      return t("wallet.userOpPrefundFailed");
+    case "account_not_deployed":
+    case "simulation_revert:AA20 account not deployed":
+      return t("wallet.userOpAccountNotDeployed");
     default:
       return reason ?? t("wallet.sendFailed");
   }
@@ -67,6 +72,9 @@ export async function assertUpgradePreflight(session: WalletSession, config: Wal
   const balanceAtoms = BigInt(primary?.balance ?? "0");
   if (balanceAtoms < feeAtoms) {
     throw new Error(t("wallet.superWalletUpgradeNeedFunds"));
+  }
+  if (primary && !primary.deployed) {
+    throw new Error(t("wallet.userOpAccountNotDeployed"));
   }
 }
 

@@ -57,9 +57,18 @@ export function CreateDisclaimerWizard({
         </DialogHeader>
         <p className="text-sm leading-relaxed text-muted-foreground">{bodies[step - 1]}</p>
         <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
-          <Button type="button" variant="ghost" data-testid="wallet-create-disclaimer-skip" onClick={finish}>
-            {t("wallet.createDisclaimerSkip")}
-          </Button>
+          {step < TOTAL_STEPS ? (
+            <Button
+              type="button"
+              variant="ghost"
+              data-testid="wallet-create-disclaimer-skip"
+              onClick={() => setStep(TOTAL_STEPS)}
+            >
+              {t("wallet.createDisclaimerSkip")}
+            </Button>
+          ) : (
+            <span />
+          )}
           <div className="flex gap-2">
             {step > 1 && (
               <Button type="button" variant="secondary" onClick={() => setStep((s) => s - 1)}>
