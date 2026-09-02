@@ -1,5 +1,6 @@
 import { apiUrl } from "./site.js";
 import { t } from "../i18n/t.js";
+import { getWalletAccount, listDevices } from "./wallet-api.js";
 import { assertPasskeyChallenge } from "./webauthn.js";
 import type { WalletAccountRecord } from "../../../commerce/shared/wallet.js";
 
@@ -53,6 +54,40 @@ export async function createRecordChallenge(
   return res.json() as Promise<{ challengeId: string; challenge: string; expiresAt: string }>;
 }
 
+/** Pin WebAuthn to the passkey registered for this wallet when the server knows it. */
+export async function resolveRecoveryCredentialId(input: {
+  walletAddress: string;
+  chainId: string;
+  ownerQx?: string;
+  ownerQy?: string;
+  registryCredentialId?: string;
+}): Promise<string | undefined> {
+  if (input.registryCredentialId?.trim()) return input.registryCredentialId.trim();
+
+  const account = await getWalletAccount(input.walletAddress);
+  if (account?.credentialId?.trim()) {
+    const ownerKnown = Boolean(input.ownerQx?.trim() && input.ownerQy?.trim());
+    const ownerMatch =
+      !ownerKnown ||
+      (account.ownerQx === input.ownerQx && account.ownerQy === input.ownerQy);
+    if (ownerMatch) return account.credentialId.trim();
+  }
+
+  try {
+    const devices = await listDevices(input.walletAddress, input.chainId);
+    const match = devices.find((d) => {
+      if (!d.credentialId?.trim()) return false;
+      if (!input.ownerQx?.trim() || !input.ownerQy?.trim()) return true;
+      return d.ownerQx === input.ownerQx && d.ownerQy === input.ownerQy;
+    });
+    if (match?.credentialId) return match.credentialId.trim();
+  } catch {
+    /* ignore */
+  }
+
+  return undefined;
+}
+
 export async function recoverWalletFromChain(input: {
   walletAddress: string;
   chainId: string;
@@ -62,9 +97,17 @@ export async function recoverWalletFromChain(input: {
   label?: string;
 }): Promise<{ account: WalletAccountRecord; recovered: boolean; credentialId: string }> {
   const { challengeId, challenge } = await createRecordChallenge(input.walletAddress);
+  const credentialIdPin =
+    input.credentialId?.trim() ||
+    (await resolveRecoveryCredentialId({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      ownerQx: input.ownerQx,
+      ownerQy: input.ownerQy,
+    }));
   const { credentialId, assertion } = await assertPasskeyChallenge({
     challengeBase64Url: challenge,
-    credentialId: input.credentialId,
+    credentialId: credentialIdPin,
   });
   const body: Record<string, unknown> = {
     walletAddress: input.walletAddress,

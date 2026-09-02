@@ -247,7 +247,7 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
               )}
               {canOfferPasskeyRelink(info, initialEntry) && (
                 <Button type="button" disabled={busy} onClick={() => void recoverFromChain()}>
-                  {t(initialEntry ? "wallet.localRecoveryRelink" : "wallet.localRecoveryFromChain")}
+                  {t("wallet.localRecoveryRelink")}
                 </Button>
               )}
             </div>
