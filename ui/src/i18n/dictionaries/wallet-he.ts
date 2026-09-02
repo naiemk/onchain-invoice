@@ -151,6 +151,11 @@ export const walletHe = {
   openWallet: "פתיחה",
   createAnother: "יצירת ארנק נוסף",
   unlockAnother: "פתיחת ארנק נוסף",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "הארנקים במכשיר זה",
   chooseWalletLede: "בחרו ארנק לפתיחה. כל אחד נוצר עם מפתח גישה בדפדפן זה.",
   balanceLoading: "…",

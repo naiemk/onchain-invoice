@@ -157,6 +157,11 @@ export const walletTr = {
   openWallet: "Aç",
   createAnother: "Başka cüzdan oluştur",
   unlockAnother: "Başkasının kilidini aç",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "Bu cihazdaki cüzdanlarınız",
   chooseWalletLede: "Açılacak cüzdanı seçin. Her biri bu tarayıcıda bir passkey ile oluşturuldu.",
   balanceLoading: "…",

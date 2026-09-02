@@ -156,6 +156,11 @@ export const walletBn = {
   openWallet: "খুলুন",
   createAnother: "আরেকটি ওয়ালেট তৈরি করুন",
   unlockAnother: "আরেকটি আনলক করুন",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "এই ডিভাইসে আপনার ওয়ালেট",
   chooseWalletLede:
     "খোলার জন্য একটি ওয়ালেট নির্বাচন করুন। প্রতিটি এই ব্রাউজারের পাসকি দিয়ে তৈরি।",

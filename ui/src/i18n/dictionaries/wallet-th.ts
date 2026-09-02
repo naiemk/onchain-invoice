@@ -155,6 +155,11 @@ export const walletTh = {
   openWallet: "เปิด",
   createAnother: "สร้างวอลเล็ตอีกอัน",
   unlockAnother: "ปลดล็อกอันอื่น",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "วอลเล็ตของคุณบนอุปกรณ์นี้",
   chooseWalletLede: "เลือกวอลเล็ตที่จะเปิด แต่ละอันสร้างด้วยพาสคีย์บนเบราว์เซอร์นี้",
   balanceLoading: "…",

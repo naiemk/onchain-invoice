@@ -158,6 +158,11 @@ export const walletRu = {
   openWallet: "Открыть",
   createAnother: "Создать ещё кошелёк",
   unlockAnother: "Разблокировать другой",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "Ваши кошельки на этом устройстве",
   chooseWalletLede: "Выберите кошелёк для открытия. Каждый создан с passkey в этом браузере.",
   balanceLoading: "…",

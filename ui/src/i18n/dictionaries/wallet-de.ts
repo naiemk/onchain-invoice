@@ -158,6 +158,11 @@ export const walletDe = {
   openWallet: "Öffnen",
   createAnother: "Weitere Wallet erstellen",
   unlockAnother: "Weitere entsperren",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "Ihre Wallets auf diesem Gerät",
   chooseWalletLede:
     "Wählen Sie eine Wallet zum Öffnen. Jede wurde mit einem Passkey in diesem Browser erstellt.",

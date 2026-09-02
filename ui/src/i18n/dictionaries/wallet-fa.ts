@@ -140,6 +140,11 @@ export const walletFa = {
   openWallet: "باز کردن",
   createAnother: "ایجاد کیف پول دیگر",
   unlockAnother: "باز کردن دیگری",
+  otherWalletOptions: "گزینه‌های دیگر",
+  otherWalletOptionsLede:
+    "با اسکن QR روی دستگاه دیگر این مرورگر را جفت کنید، یا کیف پولی را که از قبل دارید بازیابی کنید.",
+  pairWithAnotherDevice: "جفت کردن با دستگاه دیگر",
+  recoverExistingOnDevice: "بازیابی کیف پول‌های موجود روی این دستگاه",
   localRecoveryTitle: "بازیابی محلی",
   localRecoveryLede:
     "وجوه شما روی زنجیره می‌مانند. سعی می‌کنیم رکورد سرور این کلید عبور را بازگردانیم.",

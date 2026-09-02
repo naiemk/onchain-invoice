@@ -158,6 +158,11 @@ export const walletUk = {
   openWallet: "Відкрити",
   createAnother: "Створити ще гаманець",
   unlockAnother: "Розблокувати інший",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "Ваші гаманці на цьому пристрої",
   chooseWalletLede: "Виберіть гаманець для відкриття. Кожен створено з passkey у цьому браузері.",
   balanceLoading: "…",

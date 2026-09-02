@@ -150,6 +150,11 @@ export const walletKo = {
   openWallet: "열기",
   createAnother: "다른 지갑 만들기",
   unlockAnother: "다른 지갑 잠금 해제",
+  otherWalletOptions: "Other options",
+  otherWalletOptionsLede:
+    "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
+  pairWithAnotherDevice: "Pair with another device",
+  recoverExistingOnDevice: "Recover existing wallets on this device",
   chooseWallet: "이 기기의 지갑",
   chooseWalletLede: "열 지갑을 선택하세요. 각각 이 브라우저의 패스키로 만들어졌습니다.",
   balanceLoading: "…",
