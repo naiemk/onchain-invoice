@@ -105,6 +105,9 @@ export const walletMs = {
   localRecoveryRetryPasskey: "Retry passkey unlock",
   localRecoveryDeployed: "Wallet is deployed on-chain. Recover the server record with your passkey.",
   localRecoveryFromChain: "Recover from chain",
+  localRecoveryRelink: "Re-link this device with passkey",
+  localRecoveryPasskeyMismatch:
+    "This passkey does not match the on-chain owner for this wallet. Use the passkey that created it.",
   localRecoveryUndeployed: "Wallet is not deployed on-chain yet. Operator recovery from persist log is required.",
   localRecoveryUndeployedFunds: "If you sent USDC already, contact support — do not send more until recovery completes.",
   localRecoverySupportCta: "Get support request text",

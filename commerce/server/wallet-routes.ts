@@ -11,6 +11,7 @@ import {
 } from "../shared/userop.js";
 import { validateUserOpFee } from "../shared/userop-fee.js";
 import { deriveWalletSalt, predictWalletAddress } from "../shared/wallet-address.js";
+import { matchRecoveredWalletOwner } from "../shared/wallet-recover-match.js";
 import {
   buildOnramperWidgetSession,
   listOnramperEvmWalletAssets,
@@ -161,7 +162,8 @@ export function registerWalletRoutes(
         derivedSalt
       );
       const address = str(body.address)?.toLowerCase() ?? predicted.toLowerCase();
-      if (address !== predicted.toLowerCase()) {
+      const existing = isAddress(address) ? db.getWalletAccount(address) : null;
+      if (!existing && address !== predicted.toLowerCase()) {
         handlers.sendJson(res, 400, { error: "address_mismatch", expected: predicted });
         return true;
       }
@@ -924,9 +926,11 @@ async function recoverWalletAccount(
 
   const chain = walletConfig.chains.find((c) => c.chainId === chainId) ?? walletConfig.chains[0];
   const onChainOwners = await readWalletOwnersOnChain(walletAddress, chain);
+  const stored = db.getWalletAccount(walletAddress);
   const candidates: { qx: string; qy: string }[] = [];
   const seen = new Set<string>();
   pushOwnerCandidate(candidates, seen, ownerQx ?? undefined, ownerQy ?? undefined);
+  if (stored) pushOwnerCandidate(candidates, seen, stored.ownerQx, stored.ownerQy);
   for (const owner of onChainOwners) pushOwnerCandidate(candidates, seen, owner.qx, owner.qy);
 
   if (candidates.length === 0) {
@@ -945,38 +949,28 @@ async function recoverWalletAccount(
     origins: appConfig.corsOrigins.includes("*") ? null : appConfig.corsOrigins,
   };
 
-  let matched: { qx: string; qy: string } | null = null;
-  for (const candidate of candidates) {
-    try {
-      verifyWebAuthnAssertion(assertion, {
-        ...verifyOpts,
-        ownerQx: candidate.qx,
-        ownerQy: candidate.qy,
-      });
-    } catch {
-      continue;
-    }
-    const derivedSalt = deriveWalletSalt(candidate.qx, candidate.qy);
-    const predicted = predictWalletAddress(
-      walletConfig.factoryAddress,
-      walletConfig.implementationAddress,
-      derivedSalt
-    );
-    if (predicted.toLowerCase() !== walletAddress) continue;
-    if (onChainOwners.length > 0) {
-      const onChain = onChainOwners.some(
-        (owner) =>
-          owner.qx.toLowerCase() === candidate.qx.toLowerCase() &&
-          owner.qy.toLowerCase() === candidate.qy.toLowerCase()
-      );
-      if (!onChain) continue;
-    }
-    matched = candidate;
-    break;
-  }
+  const matched = matchRecoveredWalletOwner({
+    walletAddress,
+    factoryAddress: walletConfig.factoryAddress,
+    implementationAddress: walletConfig.implementationAddress,
+    candidates,
+    onChainOwners,
+    verify: (owner) => {
+      try {
+        verifyWebAuthnAssertion(assertion, {
+          ...verifyOpts,
+          ownerQx: owner.qx,
+          ownerQy: owner.qy,
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  });
 
-  if (!matched) {
-    handlers.sendJson(res, 400, { error: "passkey_owner_mismatch" });
+  if (!matched.ok) {
+    handlers.sendJson(res, 400, { error: matched.error, reason: matched.reason });
     return;
   }
 
@@ -988,12 +982,15 @@ async function recoverWalletAccount(
 
   const account = db.upsertWalletAccount({
     address: walletAddress,
-    salt: deriveWalletSalt(matched.qx, matched.qy),
+    salt: stored?.salt || matched.salt,
     ownerQx: matched.qx,
     ownerQy: matched.qy,
     credentialId,
     webauthnAttestation: null,
   });
+  if (onChainOwners.length > 0) {
+    db.markWalletDeployed(walletAddress, chainId);
+  }
   const device = db.upsertWalletDevice({
     walletAddress,
     chainId,
@@ -1002,5 +999,9 @@ async function recoverWalletAccount(
     label: str(body.label) || "Recovered passkey",
     credentialId,
   });
-  handlers.sendJson(res, 200, { account, device, recovered: true });
+  handlers.sendJson(res, 200, {
+    account: db.getWalletAccount(walletAddress) ?? account,
+    device,
+    recovered: true,
+  });
 }

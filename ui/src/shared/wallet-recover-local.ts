@@ -1,4 +1,5 @@
 import { apiUrl } from "./site.js";
+import { t } from "../i18n/t.js";
 import { assertPasskeyChallenge } from "./webauthn.js";
 import type { WalletAccountRecord } from "../../../commerce/shared/wallet.js";
 
@@ -19,7 +20,14 @@ export type WalletRecoverInfo = {
 };
 
 async function readError(res: Response): Promise<string> {
-  const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+  const body = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    message?: string;
+    reason?: string;
+  };
+  if (body.error === "passkey_owner_mismatch") {
+    return t("wallet.localRecoveryPasskeyMismatch");
+  }
   return body.message ?? body.error ?? `request failed (${res.status})`;
 }
 
@@ -101,6 +109,19 @@ export function pickRecoveryOwnerCoords(input: {
     ownerQy: ownerQy || undefined,
     canRecoverFromChain,
   };
+}
+
+export function canOfferPasskeyRelink(
+  info: WalletRecoverInfo | null,
+  registryEntry?: { qx?: string; qy?: string } | null
+): boolean {
+  if (!info) return false;
+  const { canRecoverFromChain } = pickRecoveryOwnerCoords({
+    accountOwner: info.account,
+    registryEntry,
+    ownersOnChain: info.ownersOnChain,
+  });
+  return canRecoverFromChain || info.deployed || info.inDb;
 }
 
 export function buildSupportRequestText(input: {

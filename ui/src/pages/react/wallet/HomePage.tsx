@@ -436,6 +436,7 @@ function WalletEmpty({ onOpened }: { onOpened: () => void }) {
   const supported = webAuthnSupported();
   const [status, setStatus] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
 
   const unlock = async () => {
     setUnlocking(true);
@@ -444,13 +445,19 @@ function WalletEmpty({ onOpened }: { onOpened: () => void }) {
       await unlockWalletWithPasskey();
       onOpened();
     } catch (error) {
-      setStatus(formatPasskeyError(error));
+      if (isUnlockRecoveryError(error)) {
+        setRecoveryOpen(true);
+        setStatus(null);
+      } else {
+        setStatus(formatPasskeyError(error));
+      }
     } finally {
       setUnlocking(false);
     }
   };
 
   return (
+    <>
     <WalletFrame current="home" showChrome={false} title={t("wallet.homeTitle")} lede={t("wallet.homeLede")}>
       <div className="grid gap-3 md:grid-cols-2">
         <Card>
@@ -480,6 +487,8 @@ function WalletEmpty({ onOpened }: { onOpened: () => void }) {
       </div>
       {status && <p className="mt-4 text-sm text-destructive">{status}</p>}
     </WalletFrame>
+    <LocalRecoverySheet open={recoveryOpen} onOpenChange={setRecoveryOpen} onRecovered={onOpened} />
+    </>
   );
 }
 
