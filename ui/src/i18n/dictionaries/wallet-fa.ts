@@ -127,6 +127,9 @@ export const walletFa = {
     "آدرس کیف پول شما در همه زنجیره‌های EVM قطعی است. با رسیدن USDC خودکار فعال می‌شود — بدون تراکنش استقرار.",
   defaultDevice: "دستگاه من",
   signInFailed: "باز کردن ناموفق یا لغو شد.",
+  addWalletFromPasskey: "Add wallet from passkey",
+  addWalletFromPasskeyHint: "Sync a wallet from the server using a passkey on this device. Repeat for each passkey you use.",
+  addWalletFromPasskeyDone: "Wallet added to your list.",
   passkeyMissingOnDevice:
     "این دستگاه کلید عبور کیف پول شما را ندارد. از صفحهٔ اصلی کیف پول را باز کنید یا ابتدا این دستگاه را جفت کنید.",
   passkeyPromptPending: "یک درخواست کلید عبور هنوز در حال انجام است. صبر کنید و دوباره تلاش کنید.",

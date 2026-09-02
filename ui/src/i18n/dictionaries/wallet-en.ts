@@ -90,6 +90,10 @@ export const walletEn = {
   unlockHint: "Use a passkey already stored on this device — not for moving to a new phone.",
   unlockNotFound: "No wallet found for this passkey. Create a wallet or pair from another device.",
   unlockSectionTitle: "Already have a passkey here?",
+  addWalletFromPasskey: "Add wallet from passkey",
+  addWalletFromPasskeyHint:
+    "Sync a wallet from the server using a passkey on this device. Repeat for each passkey you use.",
+  addWalletFromPasskeyDone: "Wallet added to your list.",
   pairDevice: "Pair this device",
   pairFromOtherHint:
     "Wallet on another device? Open it there → Devices → Pair another device.",
