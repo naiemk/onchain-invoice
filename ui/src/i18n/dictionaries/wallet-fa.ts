@@ -152,6 +152,9 @@ export const walletFa = {
   localRecoveryDeployed:
     "کیف پول روی زنجیره مستقر شده است. رکورد سرور را با کلید عبور بازیابی کنید.",
   localRecoveryFromChain: "بازیابی از زنجیره",
+  localRecoveryRelink: "این دستگاه را دوباره با کلید عبور پیوند دهید",
+  localRecoveryPasskeyMismatch:
+    "این کلید عبور با مالک روی زنجیره این کیف پول مطابقت ندارد. از کلید عبوری استفاده کنید که آن را ساخته است.",
   localRecoveryUndeployed:
     "کیف پول هنوز روی زنجیره مستقر نشده است. بازیابی اپراتور از لاگ persist لازم است.",
   localRecoveryUndeployedFunds:

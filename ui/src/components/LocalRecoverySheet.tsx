@@ -13,6 +13,7 @@ import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletConfig, getWalletAccount } from "@/shared/wallet-api.js";
 import {
   buildSupportRequestText,
+  canOfferPasskeyRelink,
   fetchRecoverInfo,
   pickRecoveryOwnerCoords,
   recoverWalletFromChain,
@@ -77,9 +78,12 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
     setStatus(null);
     setSupportText(null);
     try {
-      const row = await getWalletAccount(address.trim());
-      if (row && initialEntry) {
-        setStatus(t("wallet.localRecoveryDbFound"));
+      try {
+        const recovered = await fetchRecoverInfo(address.trim(), chainId);
+        setInfo(recovered);
+      } catch (error) {
+        const row = await getWalletAccount(address.trim());
+        if (!row) throw error;
         setInfo({
           wallet: address.toLowerCase(),
           chainId,
@@ -95,19 +99,13 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
             deployedChains: row.deployedChains,
           },
         });
-        return;
-      }
-      const recovered = await fetchRecoverInfo(address.trim(), chainId);
-      setInfo(recovered);
-      if (recovered.inDb) {
-        setStatus(t("wallet.localRecoveryDbFound"));
       }
     } catch (error) {
       setStatus(formatPasskeyError(error));
     } finally {
       setBusy(false);
     }
-  }, [address, chainId, initialEntry, t]);
+  }, [address, chainId, t]);
 
   useEffect(() => {
     if (open && initialEntry?.address) void lookup();
@@ -123,7 +121,15 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
       onRecovered();
       onOpenChange(false);
     } catch (error) {
-      setStatus(formatPasskeyError(error));
+      if (!canOfferPasskeyRelink(info, initialEntry)) {
+        setStatus(formatPasskeyError(error));
+        return;
+      }
+      try {
+        await recoverFromChain();
+      } catch {
+        setStatus(formatPasskeyError(error));
+      }
     } finally {
       setBusy(false);
     }
@@ -136,7 +142,7 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
       registryEntry: entry,
       ownersOnChain: info?.ownersOnChain,
     });
-    if (!canRecoverFromChain) {
+    if (!canRecoverFromChain && !info?.deployed && !info?.inDb) {
       setStatus(t("wallet.localRecoveryNeedKeys"));
       return;
     }
@@ -231,12 +237,19 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
             {t("wallet.localRecoveryLookup")}
           </Button>
 
-          {info?.inDb && initialEntry && (
+          {info?.inDb && (
             <div className="rounded-lg border p-4 space-y-2">
               <p className="text-sm">{t("wallet.localRecoveryDbFound")}</p>
-              <Button type="button" disabled={busy} onClick={() => void retryDbUnlock()}>
-                {t("wallet.localRecoveryRetryPasskey")}
-              </Button>
+              {initialEntry && (
+                <Button type="button" disabled={busy} onClick={() => void retryDbUnlock()}>
+                  {t("wallet.localRecoveryRetryPasskey")}
+                </Button>
+              )}
+              {canOfferPasskeyRelink(info, initialEntry) && (
+                <Button type="button" disabled={busy} onClick={() => void recoverFromChain()}>
+                  {t(initialEntry ? "wallet.localRecoveryRelink" : "wallet.localRecoveryFromChain")}
+                </Button>
+              )}
             </div>
           )}
 
@@ -250,7 +263,7 @@ export function LocalRecoverySheet({ open, onOpenChange, initialEntry, onRecover
             </div>
           )}
 
-          {info && !info.deployed && (
+          {info && !info.deployed && !info.inDb && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 space-y-2">
               <p className="text-sm">{t("wallet.localRecoveryUndeployed")}</p>
               {info.hasFunds && (
