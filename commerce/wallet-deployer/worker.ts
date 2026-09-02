@@ -117,23 +117,33 @@ export class WalletDeployerWorker {
       if (this.stopped) return;
       try {
         const predicted = await factory.predictAddress(account.salt);
-        if (predicted.toLowerCase() !== account.address.toLowerCase()) continue;
+        if (predicted.toLowerCase() !== account.address.toLowerCase()) {
+          await this.trackActivation(account.address, { error: "predicted_address_mismatch" });
+          continue;
+        }
         const code = await provider.getCode(account.address);
         if (code !== "0x") {
           await this.markDeployed(account.address, String(chain.chainId));
+          await this.trackActivation(account.address, { deployed: true });
           // If a recovery initiate is pending for this wallet, process after deploy.
           continue;
         }
         const balance = BigInt(await token.balanceOf(account.address));
-        if (balance < minBalance) continue;
+        if (balance < minBalance) {
+          await this.trackActivation(account.address, { funded: false });
+          continue;
+        }
+        await this.trackActivation(account.address, { funded: true });
         const tx = await factory.createAccount(account.ownerQx, account.ownerQy, account.salt);
         const receipt = await tx.wait();
         await this.markDeployed(account.address, String(chain.chainId));
+        await this.trackActivation(account.address, { deployed: true });
         this.activity?.append("wallet-deployed", {
           chainId: String(chain.chainId),
           payload: { address: account.address, txHash: receipt?.hash },
         });
       } catch (error) {
+        await this.trackActivation(account.address, { error: String(error) }).catch(() => undefined);
         this.activity?.append("deploy-error", {
           chainId: String(chain.chainId),
           payload: { address: account.address, error: String(error) },
@@ -369,9 +379,10 @@ export class WalletDeployerWorker {
     }
   }
 
-  private async fetchUndeployedAccounts(chainId: string): Promise<WalletAccountRecord[]> {
+  private async fetchUndeployedAccounts(chainId: string, limit = 100): Promise<WalletAccountRecord[]> {
     const base = this.config.serverUrl.replace(/\/$/, "");
-    const response = await fetch(`${base}/api/wallet/deployer/accounts?chainId=${encodeURIComponent(chainId)}`, {
+    const q = new URLSearchParams({ chainId, limit: String(limit) });
+    const response = await fetch(`${base}/api/wallet/deployer/accounts?${q}`, {
       headers: { "x-api-key": this.config.sweeperApiKey },
     });
     if (!response.ok) {
@@ -379,6 +390,24 @@ export class WalletDeployerWorker {
     }
     const body = (await response.json()) as { accounts?: WalletAccountRecord[] };
     return body.accounts ?? [];
+  }
+
+  private async trackActivation(
+    address: string,
+    input: { funded?: boolean; deployed?: boolean; error?: string }
+  ): Promise<void> {
+    const base = this.config.serverUrl.replace(/\/$/, "");
+    const response = await fetch(`${base}/api/wallet/accounts/${address}/activation`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": this.config.sweeperApiKey,
+      },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new Error(`Track activation failed: ${response.status} ${await response.text()}`);
+    }
   }
 
   private async markDeployed(address: string, chainId: string): Promise<void> {
@@ -463,9 +492,11 @@ export async function loadWalletDeployerConfig(path: string): Promise<WalletDepl
     ? (JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>)
     : await loadYaml(path);
   const chains = Array.isArray(doc.chains) ? (doc.chains as WalletDeployerChainConfig[]) : [];
+  const serverUrl = String(doc.serverUrl || process.env.SERVER_URL || "http://localhost:8080");
+  const sweeperApiKey = String(doc.sweeperApiKey || process.env.SWEEPER_API_KEY || "");
   return {
-    serverUrl: String(doc.serverUrl ?? process.env.SERVER_URL ?? "http://localhost:8080"),
-    sweeperApiKey: String(doc.sweeperApiKey ?? process.env.SWEEPER_API_KEY ?? ""),
+    serverUrl,
+    sweeperApiKey,
     intervalMs: Number(doc.intervalMs ?? 30_000),
     activityLogPath: doc.activityLogPath ? String(doc.activityLogPath) : undefined,
     chains,

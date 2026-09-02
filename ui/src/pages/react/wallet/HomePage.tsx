@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronDown, Mail } from "lucide-react";
+import { ChevronDown, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -27,7 +27,7 @@ import {
   type WalletSession,
 } from "@/shared/wallet-session.js";
 import { formatPasskeyError, webAuthnSupported } from "@/shared/webauthn.js";
-import { unlockRegistryWallet } from "@/shared/wallet-unlock.js";
+import { addWalletFromPasskey, unlockRegistryWallet, unlockWalletWithPasskey } from "@/shared/wallet-unlock.js";
 import { LocalRecoverySheet, isUnlockRecoveryError } from "@/components/LocalRecoverySheet";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { isAdvancedMode } from "@/shared/wallet-mode.js";
@@ -108,8 +108,24 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
     };
   }, [initialSession, t]);
 
+  const loadBalance = useCallback(async () => {
+    setLoading(true);
+    try {
+      const balance = await fetchWalletBalance(session.address);
+      setTotalUsd(balance.totalUsd);
+      setChains(balance.chains);
+      setBalanceError(false);
+    } catch {
+      setTotalUsd(t("wallet.balanceZero"));
+      setBalanceError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [session.address, t]);
+
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     void (async () => {
       try {
         const balance = await fetchWalletBalance(session.address);
@@ -238,7 +254,20 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
     <WalletFrame current="home">
       <div className="space-y-6">
         <div className="rounded-2xl bg-brand-panel p-6 text-brand-panel-foreground">
-          <p className="text-xs text-brand-panel-foreground/70">{t("wallet.totalBalance")}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-brand-panel-foreground/70">{t("wallet.totalBalance")}</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={loading}
+              onClick={() => void loadBalance()}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              {t("wallet.refresh")}
+            </Button>
+          </div>
           {loading ? (
             <Skeleton className="mt-2 h-12 w-48 bg-brand-panel-foreground/10" />
           ) : (
@@ -339,10 +368,12 @@ function WalletPicker({
   const { t } = useLocale();
   const [balances, setBalances] = useState<Record<string, string | null>>({});
   const [status, setStatus] = useState<string | null>(null);
+  const [statusOk, setStatusOk] = useState(false);
   const [recoveryEntry, setRecoveryEntry] = useState<WalletSession | null>(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
 
   const [openingAddress, setOpeningAddress] = useState<string | null>(null);
+  const [addingPasskey, setAddingPasskey] = useState(false);
 
   useEffect(() => {
     void Promise.all(
@@ -366,6 +397,7 @@ function WalletPicker({
 
   const openWallet = async (entry: WalletSession) => {
     setOpeningAddress(entry.address);
+    setStatusOk(false);
     setStatus(t("wallet.sendSigning"));
     try {
       await unlockRegistryWallet(entry);
@@ -382,6 +414,27 @@ function WalletPicker({
     }
   };
 
+  const addFromPasskey = async () => {
+    setAddingPasskey(true);
+    setStatusOk(false);
+    setStatus(t("wallet.sendSigning"));
+    try {
+      await addWalletFromPasskey();
+      setStatusOk(true);
+      setStatus(t("wallet.addWalletFromPasskeyDone"));
+      onOpened();
+    } catch (error) {
+      if (isUnlockRecoveryError(error)) {
+        openRecovery();
+        setStatus(null);
+      } else {
+        setStatus(formatPasskeyError(error));
+      }
+    } finally {
+      setAddingPasskey(false);
+    }
+  };
+
   return (
     <>
     <WalletFrame
@@ -395,7 +448,7 @@ function WalletPicker({
           <button
             key={w.address}
             type="button"
-            disabled={Boolean(openingAddress)}
+            disabled={Boolean(openingAddress) || addingPasskey}
             onClick={() => void openWallet(w)}
             className="flex w-full items-center justify-between gap-4 rounded-lg border p-4 text-left transition-colors hover:border-primary/40 disabled:opacity-60"
           >
@@ -425,13 +478,23 @@ function WalletPicker({
         ))}
       </div>
       <div className="mt-6 flex flex-wrap gap-3">
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={Boolean(openingAddress) || addingPasskey}
+          onClick={() => void addFromPasskey()}
+        >
+          {addingPasskey ? t("wallet.sendSigning") : t("wallet.addWalletFromPasskey")}
+        </Button>
         <Button asChild variant="outline">
           <Link to="/wallet/create">{t("wallet.createAnother")}</Link>
         </Button>
-        <AnotherWalletMenu disabled={Boolean(openingAddress)} onRecover={() => openRecovery()} />
+        <AnotherWalletMenu disabled={Boolean(openingAddress) || addingPasskey} onRecover={() => openRecovery()} />
       </div>
-      <p className="mt-4 text-sm text-muted-foreground">{t("wallet.syncHint")}</p>
-      {status && <p className="mt-2 text-sm text-destructive">{status}</p>}
+      <p className="mt-4 text-sm text-muted-foreground">{t("wallet.addWalletFromPasskeyHint")}</p>
+      {status && (
+        <p className={`mt-2 text-sm ${statusOk ? "text-muted-foreground" : "text-destructive"}`}>{status}</p>
+      )}
     </WalletFrame>
     <LocalRecoverySheet
       open={recoveryOpen}
@@ -447,6 +510,26 @@ function WalletEmpty({ onOpened }: { onOpened: () => void }) {
   const { t } = useLocale();
   const supported = webAuthnSupported();
   const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const unlock = async () => {
+    setBusy(true);
+    setStatus(t("wallet.sendSigning"));
+    try {
+      await unlockWalletWithPasskey();
+      onOpened();
+    } catch (error) {
+      if (isUnlockRecoveryError(error)) {
+        setRecoveryOpen(true);
+        setStatus(null);
+      } else {
+        setStatus(formatPasskeyError(error));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <>
@@ -466,14 +549,19 @@ function WalletEmpty({ onOpened }: { onOpened: () => void }) {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t("wallet.otherWalletOptions")}</CardTitle>
-            <CardDescription>{t("wallet.otherWalletOptionsLede")}</CardDescription>
+            <CardTitle className="text-base">{t("wallet.unlockSectionTitle")}</CardTitle>
+            <CardDescription>{t("wallet.unlockHint")}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <AnotherWalletMenu onRecover={() => setRecoveryOpen(true)} />
+          <CardContent className="space-y-3">
+            <Button type="button" disabled={!supported || busy} onClick={() => void unlock()}>
+              {busy ? t("wallet.sendSigning") : t("wallet.unlock")}
+            </Button>
+            <p className="text-xs text-muted-foreground">{t("wallet.pairFromOtherHint")}</p>
+            <AnotherWalletMenu disabled={busy} onRecover={() => setRecoveryOpen(true)} />
           </CardContent>
         </Card>
       </div>
+      {status && <p className="mt-4 text-sm text-destructive">{status}</p>}
     </WalletFrame>
     <LocalRecoverySheet open={recoveryOpen} onOpenChange={setRecoveryOpen} onRecovered={onOpened} />
     </>

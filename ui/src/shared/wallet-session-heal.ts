@@ -17,7 +17,10 @@ export type HealWalletSessionResult = {
 };
 
 /** Merge server + roster data so signing works after a partial Super Wallet upgrade. */
-export async function healWalletSession(session: WalletSession): Promise<HealWalletSessionResult> {
+export async function healWalletSession(
+  session: WalletSession,
+  options?: { persist?: boolean }
+): Promise<HealWalletSessionResult> {
   let next = await ensureSessionCredential(session);
 
   try {
@@ -89,7 +92,7 @@ export async function healWalletSession(session: WalletSession): Promise<HealWal
     next.qx !== session.qx ||
     next.qy !== session.qy;
 
-  if (changed) saveWalletSession(next);
+  if (changed && options?.persist !== false) saveWalletSession(next);
 
   return { session: next, needsSuperWalletEmail };
 }

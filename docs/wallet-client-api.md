@@ -11,14 +11,14 @@ This is separate from the hosted product UI (`/wallet` + public `/api/wallet/*`)
 | Partner frontend | WebAuthn `create` / `get` with `rp.id` = partner domain |
 | Partner backend | Holds HMAC secret; verifies email/identity; forwards assertions |
 | Trustless Commerce API | Verifies HMAC + WebAuthn; derives CREATE2 address; queues UserOps / recovery |
-| Wallet-deployer | Deploys funded wallets; runs guardian recovery txs |
+| Wallet activator (`wallet-deployer`) | Deploys funded wallets; runs guardian recovery txs |
 
 ```mermaid
 sequenceDiagram
   participant Browser as Browser_on_client_domain
   participant Backend as Client_backend
   participant API as Commerce_API
-  participant Worker as Wallet_deployer
+  participant Worker as Wallet_activator
   participant Chain as EVM
 
   Backend->>API: HMAC POST challenge
@@ -209,7 +209,7 @@ POST /api/client/wallets/:address/recovery
 }
 ```
 
-Queues `initiate` for the wallet-deployer (guardian `initiateOwnerRecovery`). CREATE2 salt stays the **original** passkey; undeployed wallets deploy with original owners then start recovery.
+Queues `initiate` for the wallet activator / `wallet-deployer` worker (guardian `initiateOwnerRecovery`). CREATE2 salt stays the **original** passkey; undeployed wallets deploy with original owners then start recovery.
 
 ```http
 POST /api/client/wallets/:address/recovery/cancel
@@ -240,5 +240,5 @@ After the timelock, the deployer auto-calls `executeOwnerRecovery`.
 ## Related
 
 - Hosted wallet UI: `/wallet` (public `/api/wallet/*`)
-- Nodes: [Sweepers](sweepers.md) (wallet-deployer also runs recovery jobs)
+- Nodes: [Sweepers](sweepers.md) (wallet activator / `wallet-deployer` also runs recovery jobs)
 - Agents: skill `.cursor/skills/trustless-commerce-wallet/SKILL.md`

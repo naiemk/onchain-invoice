@@ -42,6 +42,9 @@ export function encodeWebAuthnSignatureFromJson(input: {
   });
 }
 
+const P256_N = BigInt("0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551");
+const P256_HALF_N = BigInt("0x7fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a8");
+
 function encodeWebAuthnParts(parts: WebAuthnAssertionParts): string {
   const coder = AbiCoder.defaultAbiCoder();
   return coder.encode(
@@ -65,10 +68,7 @@ export function parseWebAuthnAssertion(response: AuthenticatorAssertionResponse)
 function parseEs256Signature(signature: ArrayBuffer): { r: string; s: string } {
   const bytes = new Uint8Array(signature);
   if (bytes.length === 64) {
-    return {
-      r: hex(bytes.slice(0, 32)),
-      s: hex(bytes.slice(32, 64)),
-    };
+    return normalizeP256Signature(hex(bytes.slice(0, 32)), hex(bytes.slice(32, 64)));
   }
   // DER fallback
   let offset = 0;
@@ -81,10 +81,23 @@ function parseEs256Signature(signature: ArrayBuffer): { r: string; s: string } {
   if (bytes[offset++] !== 0x02) throw new Error("Invalid DER s");
   const sLen = bytes[offset++];
   const sBytes = bytes.slice(offset, offset + sLen);
-  return {
-    r: hex32(pad32(rBytes)),
-    s: hex32(pad32(sBytes)),
-  };
+  return normalizeP256Signature(hex32(pad32(rBytes)), hex32(pad32(sBytes)));
+}
+
+function normalizeP256Signature(r: string, s: string): { r: string; s: string } {
+  const sValue = BigInt(s);
+  if (sValue <= P256_HALF_N) return { r, s };
+  return { r, s: hex32(bigIntToBytes32(P256_N - sValue)) };
+}
+
+function bigIntToBytes32(value: bigint): Uint8Array {
+  const out = new Uint8Array(32);
+  let n = value;
+  for (let i = 31; i >= 0; i--) {
+    out[i] = Number(n & 0xffn);
+    n >>= 8n;
+  }
+  return out;
 }
 
 function pad32(bytes: Uint8Array): Uint8Array {

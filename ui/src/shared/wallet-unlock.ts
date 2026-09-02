@@ -14,6 +14,7 @@ import {
   saveWalletSession,
   type WalletSession,
 } from "./webauthn.js";
+import { addWalletToRegistry } from "./wallet-session.js";
 import { healWalletSession, findRegistryEntry } from "./wallet-session-heal.js";
 import { t } from "../i18n/t.js";
 
@@ -78,7 +79,7 @@ async function finalizeSession(session: WalletSession): Promise<WalletSession> {
   return healed.session;
 }
 
-async function sessionFromAuth(
+async function buildSessionFromAuth(
   auth: NonNullable<Awaited<ReturnType<typeof authenticatePasskey>>>,
   preferred?: WalletSession
 ): Promise<WalletSession> {
@@ -135,18 +136,17 @@ async function sessionFromAuth(
       });
     }
 
-    return finalizeSession(session);
+    return session;
   }
 
   if (registryMatch) {
-    const merged: WalletSession = {
+    return {
       ...registryMatch,
       credentialId: auth.credentialId,
       rawId: auth.rawId || registryMatch.rawId,
       qx: auth.qx || registryMatch.qx,
       qy: auth.qy || registryMatch.qy,
     };
-    return finalizeSession(merged);
   }
 
   const found = await fetchWalletAccountByCredentialId(auth.credentialId);
@@ -167,7 +167,7 @@ async function sessionFromAuth(
     /* ignore */
   }
 
-  const session: WalletSession = {
+  return {
     address: account.address,
     chainId: config.chainId,
     salt: account.salt,
@@ -177,7 +177,6 @@ async function sessionFromAuth(
     rawId: auth.rawId,
     label,
   };
-  return finalizeSession(session);
 }
 
 /**
@@ -187,15 +186,29 @@ async function sessionFromAuth(
 export async function unlockWalletWithPasskey(): Promise<WalletSession> {
   const auth = await authenticatePasskey();
   if (!auth) throw new Error(t("wallet.passkeyCancelled"));
-  return sessionFromAuth(auth);
+  return finalizeSession(await buildSessionFromAuth(auth));
+}
+
+/**
+ * Sync a wallet from the server into the local list using a passkey on this device.
+ * Does not open the wallet — repeat for each passkey to add multiple wallets.
+ */
+export async function addWalletFromPasskey(): Promise<WalletSession> {
+  const auth = await authenticatePasskey();
+  if (!auth) throw new Error(t("wallet.passkeyCancelled"));
+  const session = await buildSessionFromAuth(auth);
+  const healed = await healWalletSession(session, { persist: false });
+  addWalletToRegistry(healed.session);
+  return healed.session;
 }
 
 /** Open a saved wallet after verifying the passkey on this device. */
 export async function unlockRegistryWallet(entry: WalletSession): Promise<WalletSession> {
   const prepared = await ensureSessionCredential(entry);
-  const auth = await authenticatePasskey(
-    prepared.credentialId?.trim() ? { credentialId: prepared.credentialId } : undefined
-  );
+  if (!prepared.credentialId?.trim()) {
+    throw Object.assign(new Error(t("wallet.passkeyMissingOnDevice")), { code: "missing_credential_id" });
+  }
+  const auth = await authenticatePasskey({ credentialId: prepared.credentialId });
   if (!auth) throw new Error(t("wallet.passkeyCancelled"));
-  return sessionFromAuth(auth, prepared);
+  return finalizeSession(await buildSessionFromAuth(auth, prepared));
 }

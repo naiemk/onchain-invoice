@@ -88,6 +88,17 @@ export function listWalletRegistryForDeployment(
   return listWalletRegistry().filter((w) => isTestnetChain(w.chainId) === deploymentIsTestnet);
 }
 
+/** Add or refresh a wallet in the local list without making it the active session. */
+export function addWalletToRegistry(session: WalletSession): void {
+  migrateWalletSessionStorage();
+  const addr = normalizeAddress(session.address);
+  const next: WalletSession = { ...session, address: addr, lastOpenedAt: new Date().toISOString() };
+  const registry = readRegistryRaw().filter((w) => normalizeAddress(w.address) !== addr);
+  registry.unshift(next);
+  writeRegistry(registry);
+  notifyWalletSessionChange();
+}
+
 export function upsertWalletSession(session: WalletSession): void {
   migrateWalletSessionStorage();
   const addr = normalizeAddress(session.address);

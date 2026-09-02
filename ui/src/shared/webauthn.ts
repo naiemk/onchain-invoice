@@ -282,26 +282,30 @@ export async function createSecurityKey(displayName: string): Promise<PasskeyOwn
 }
 
 async function getPasskeyAssertion(
-  options: PublicKeyCredentialRequestOptions,
-  input?: { allowDiscoverableFallback?: boolean }
+  options: PublicKeyCredentialRequestOptions
 ): Promise<PublicKeyCredential | null> {
-  const allowCredentials = options.allowCredentials;
   try {
     return await webAuthnGet(options);
   } catch (error) {
-    if (input?.allowDiscoverableFallback && allowCredentials?.length) {
-      if (error instanceof WebAuthnError && error.code === "busy") throw error;
-      try {
-        const { allowCredentials: _drop, ...rest } = options;
-        return await webAuthnGet({ ...rest, hints: ["client-device"] });
-      } catch (fallbackError) {
-        if (isWebAuthnCancelled(fallbackError)) return null;
-        throw fallbackError;
-      }
-    }
     if (isWebAuthnCancelled(error)) return null;
     throw error;
   }
+}
+
+function assertCredentialMatchesRequest(expectedCredentialId: string | undefined, rawId: ArrayBuffer): void {
+  if (!expectedCredentialId?.trim()) return;
+  const actualCredentialId = credentialIdFromRawId(rawId);
+  if (!credentialIdsMatch(expectedCredentialId, actualCredentialId)) {
+    throw Object.assign(new Error(t("wallet.unlockWrongWallet")), { code: "wrong_wallet" });
+  }
+}
+
+function requireWalletBoundCredentialId(credentialId: string | undefined): string {
+  const trimmed = credentialId?.trim();
+  if (!trimmed) {
+    throw Object.assign(new Error(t("wallet.passkeyMissingOnDevice")), { code: "missing_credential_id" });
+  }
+  return trimmed;
 }
 
 /**
@@ -315,10 +319,9 @@ export async function authenticatePasskey(input?: {
   const allowCredentials = input?.credentialId?.trim()
     ? [{ id: credentialIdToBytesLocal(input.credentialId), type: "public-key" as const }]
     : undefined;
-  const cred = await getPasskeyAssertion(platformRequestOptions(randomChallenge(), allowCredentials), {
-    allowDiscoverableFallback: !!allowCredentials,
-  });
+  const cred = await getPasskeyAssertion(platformRequestOptions(randomChallenge(), allowCredentials));
   if (!cred) return null;
+  assertCredentialMatchesRequest(input?.credentialId, cred.rawId);
   const credentialId = credentialIdFromRawId(cred.rawId);
   const rawId = bufferToHex(cred.rawId);
   const match = listWalletRegistry().find((w) => credentialIdsMatch(w.credentialId, credentialId));
@@ -387,12 +390,10 @@ export async function signUserOpHash(
 ): Promise<string> {
   assertWebAuthnSupported();
   const hashBytes = hexToBytes(userOpHashHex);
-  const pinCredential = options?.requireUv && credentialId?.trim();
-  const publicKey = pinCredential
-    ? platformRequestOptions(hashBytes, [
-        { id: credentialIdToBytesLocal(credentialId!), type: "public-key" },
-      ])
-    : platformRequestOptions(hashBytes);
+  const boundCredentialId = requireWalletBoundCredentialId(credentialId);
+  const publicKey = platformRequestOptions(hashBytes, [
+    { id: credentialIdToBytesLocal(boundCredentialId), type: "public-key" },
+  ]);
 
   let cred: PublicKeyCredential | null;
   try {
@@ -404,6 +405,7 @@ export async function signUserOpHash(
     throw error;
   }
   if (!cred) throw new Error(t("wallet.passkeySigningCancelled"));
+  assertCredentialMatchesRequest(boundCredentialId, cred.rawId);
   const response = cred.response as AuthenticatorAssertionResponse;
   if (options?.requireUv) {
     assertAuthenticatorUvSet(response.authenticatorData);
@@ -441,6 +443,7 @@ export async function assertPasskeyChallenge(input: {
     throw error;
   }
   if (!cred) throw new Error(t("wallet.passkeySigningCancelled"));
+  assertCredentialMatchesRequest(input.credentialId, cred.rawId);
   const response = cred.response as AuthenticatorAssertionResponse;
   return {
     credentialId: credentialIdFromRawId(cred.rawId),

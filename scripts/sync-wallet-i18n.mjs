@@ -113,6 +113,9 @@ const keysToSync = [
   "localRecoverySupportCopy",
   "localRecoveryCopy",
   "localRecoveryNeedKeys",
+  "addWalletFromPasskey",
+  "addWalletFromPasskeyHint",
+  "addWalletFromPasskeyDone",
 ];
 
 function hasKey(text, key) {

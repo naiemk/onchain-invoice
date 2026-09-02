@@ -1,4 +1,9 @@
+import "dotenv/config";
 import { loadWalletDeployerConfig, WalletDeployerWorker } from "./worker.js";
+
+// Local .env commonly uses generic names; wallet-deployer example config expects specific names.
+process.env.EVM_RPC_URL ??= process.env.SEPOLIA_RPC_URL;
+process.env.WALLET_DEPLOYER_PRIVATE_KEY ??= process.env.EVM_PRIVATE_KEY;
 
 const configPath =
   process.env.WALLET_DEPLOYER_CONFIG ?? process.argv[2] ?? "commerce/config/wallet-deployer.example.yaml";

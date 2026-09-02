@@ -364,7 +364,14 @@ function loadWalletConfig(
     recoveryAddress ??= sepoliaRecovery;
   }
   const rpcUrl = blankToUndefined(
-    expand(env.WALLET_RPC_URL ?? file?.rpcUrl ?? env.EVM_RPC_URL ?? fallbackRpc ?? "")
+    expand(
+      env.WALLET_RPC_URL ??
+        file?.rpcUrl ??
+        env.EVM_RPC_URL ??
+        (chainId === "11155111" ? env.SEPOLIA_RPC_URL : undefined) ??
+        fallbackRpc ??
+        ""
+    )
   );
   const feeTokenAddress = blankToUndefined(
     expand(env.WALLET_BUNDLER_FEE_TOKEN ?? env.WALLET_FEE_TOKEN ?? file?.feeTokenAddress ?? sepoliaUsdc)

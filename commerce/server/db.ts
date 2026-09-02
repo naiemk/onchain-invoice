@@ -116,6 +116,12 @@ interface WalletAccountRow {
   credential_id: string | null;
   webauthn_attestation: string | null;
   deployed_chains: string;
+  activation_priority_at: string | null;
+  activation_next_check_at: string | null;
+  activation_last_check_at: string | null;
+  activation_check_count: number;
+  activation_status: string;
+  activation_error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -819,6 +825,12 @@ export class CommerceDb {
         credential_id TEXT,
         webauthn_attestation TEXT,
         deployed_chains TEXT NOT NULL DEFAULT '[]',
+        activation_priority_at TEXT,
+        activation_next_check_at TEXT,
+        activation_last_check_at TEXT,
+        activation_check_count INTEGER NOT NULL DEFAULT 0,
+        activation_status TEXT NOT NULL DEFAULT 'pending',
+        activation_error TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -1089,6 +1101,16 @@ export class CommerceDb {
     this.ensureColumn("invoices", "quote_provider", "TEXT");
     this.ensureColumn("invoices", "quote_slippage_bps", "INTEGER");
     this.ensureColumn("invoices", "lang", "TEXT");
+    this.ensureColumn("wallet_accounts", "activation_priority_at", "TEXT");
+    this.ensureColumn("wallet_accounts", "activation_next_check_at", "TEXT");
+    this.ensureColumn("wallet_accounts", "activation_last_check_at", "TEXT");
+    this.ensureColumn("wallet_accounts", "activation_check_count", "INTEGER NOT NULL DEFAULT 0");
+    this.ensureColumn("wallet_accounts", "activation_status", "TEXT NOT NULL DEFAULT 'pending'");
+    this.ensureColumn("wallet_accounts", "activation_error", "TEXT");
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_wallet_accounts_activation
+        ON wallet_accounts(activation_priority_at, activation_status, activation_next_check_at);
+    `);
     this.migrateHostedChallengesRecordPurpose();
   }
 
@@ -1228,13 +1250,79 @@ export class CommerceDb {
     return row ? mapWalletDevice(row) : null;
   }
 
-  listUndeployedWalletAccounts(chainId: string): WalletAccountRecord[] {
+  listUndeployedWalletAccounts(chainId: string, limit = 100): WalletAccountRecord[] {
+    const now = new Date().toISOString();
     const rows = this.db
-      .prepare(`SELECT * FROM wallet_accounts ORDER BY created_at ASC LIMIT 500`)
-      .all() as WalletAccountRow[];
+      .prepare(
+        `SELECT * FROM wallet_accounts
+         WHERE activation_priority_at IS NOT NULL
+           AND activation_status != 'deployed'
+           AND (activation_next_check_at IS NULL OR activation_next_check_at <= ?)
+         ORDER BY
+           CASE WHEN activation_status = 'funded' THEN 0 ELSE 1 END ASC,
+           activation_next_check_at ASC,
+           activation_priority_at DESC
+         LIMIT ?`
+      )
+      .all(now, Math.max(1, Math.min(limit, 500))) as WalletAccountRow[];
     return rows
       .map(mapWalletAccount)
       .filter((a) => !a.deployedChains.includes(chainId));
+  }
+
+  touchWalletActivation(address: string, funded: boolean): WalletAccountRecord | null {
+    const account = this.getWalletAccount(address);
+    if (!account) return null;
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `UPDATE wallet_accounts
+         SET activation_priority_at = ?,
+             activation_next_check_at = ?,
+             activation_status = CASE WHEN ? THEN 'funded' ELSE activation_status END,
+             activation_error = NULL,
+             updated_at = ?
+         WHERE address = ?`
+      )
+      .run(now, now, funded ? 1 : 0, now, address.toLowerCase());
+    return this.getWalletAccount(address);
+  }
+
+  recordWalletActivationCheck(input: {
+    address: string;
+    funded: boolean;
+    deployed?: boolean;
+    error?: string;
+  }): WalletAccountRecord | null {
+    const account = this.getWalletAccount(input.address);
+    if (!account) return null;
+    const now = new Date();
+    const checks = this.walletActivationCheckCount(input.address) + 1;
+    const delayMs = input.deployed || input.funded
+      ? 0
+      : Math.min(24 * 60 * 60_000, Math.max(60_000, 60_000 * 2 ** Math.min(checks - 1, 10)));
+    const next = new Date(now.getTime() + delayMs).toISOString();
+    const status = input.deployed ? "deployed" : input.funded ? "funded" : input.error ? "error" : "pending";
+    this.db
+      .prepare(
+        `UPDATE wallet_accounts
+         SET activation_last_check_at = ?,
+             activation_next_check_at = ?,
+             activation_check_count = ?,
+             activation_status = ?,
+             activation_error = ?,
+             updated_at = ?
+         WHERE address = ?`
+      )
+      .run(now.toISOString(), next, checks, status, input.error ?? null, now.toISOString(), input.address.toLowerCase());
+    return this.getWalletAccount(input.address);
+  }
+
+  private walletActivationCheckCount(address: string): number {
+    const row = this.db
+      .prepare(`SELECT activation_check_count FROM wallet_accounts WHERE address = ?`)
+      .get(address.toLowerCase()) as { activation_check_count: number } | undefined;
+    return Number(row?.activation_check_count ?? 0);
   }
 
   markWalletDeployed(address: string, chainId: string): WalletAccountRecord | null {
@@ -1244,7 +1332,14 @@ export class CommerceDb {
     const deployed = [...account.deployedChains, chainId];
     const now = new Date().toISOString();
     this.db
-      .prepare(`UPDATE wallet_accounts SET deployed_chains = ?, updated_at = ? WHERE address = ?`)
+      .prepare(
+        `UPDATE wallet_accounts
+         SET deployed_chains = ?,
+             activation_status = 'deployed',
+             activation_error = NULL,
+             updated_at = ?
+         WHERE address = ?`
+      )
       .run(JSON.stringify(deployed), now, address.toLowerCase());
     this.walletPersist("account.deployed", {
       address: address.toLowerCase(),
