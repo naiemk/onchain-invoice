@@ -135,6 +135,8 @@ export interface WalletProposalRecord {
   data: string;
   nonce: string | null;
   status: WalletProposalStatus;
+  txHash: string | null;
+  signatureCount?: number;
   createdAt: string;
   updatedAt: string;
 }

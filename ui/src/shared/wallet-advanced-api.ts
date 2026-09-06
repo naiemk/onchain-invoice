@@ -111,6 +111,22 @@ export async function registerWalletEntityKey(input: {
   return data.key;
 }
 
+export async function deleteWalletEntity(walletAddress: string, entityId: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/wallet/${walletAddress}/entities/${entityId}`), { method: "DELETE" });
+  if (!res.ok) throw new Error(`delete_entity_${res.status}`);
+}
+
+export async function deleteWalletEntityKey(
+  walletAddress: string,
+  entityId: string,
+  keyId: string
+): Promise<void> {
+  const res = await fetch(apiUrl(`/api/wallet/${walletAddress}/entities/${entityId}/keys/${keyId}`), {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`delete_key_${res.status}`);
+}
+
 export async function createKeyEnrollmentRequest(input: {
   walletAddress: string;
   entityId: string;
@@ -261,4 +277,19 @@ export async function executeProposal(
   if (!res.ok) throw new Error(`execute_proposal_${res.status}`);
   const data = (await res.json()) as { userOpHash: string };
   return data;
+}
+
+export async function attachProposalTx(
+  walletAddress: string,
+  proposalId: string,
+  txHash: string
+): Promise<WalletProposalRecord> {
+  const res = await fetch(apiUrl(`/api/wallet/${walletAddress}/proposals/${proposalId}`), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ txHash }),
+  });
+  if (!res.ok) throw new Error(`proposal_tx_${res.status}`);
+  const data = (await res.json()) as { proposal: WalletProposalRecord };
+  return data.proposal;
 }

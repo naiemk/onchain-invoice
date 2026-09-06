@@ -199,6 +199,8 @@ interface WalletProposalRow {
   data: string;
   nonce: string | null;
   status: WalletProposalStatus;
+  tx_hash: string | null;
+  signature_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -1199,6 +1201,7 @@ export class CommerceDb {
         data TEXT NOT NULL,
         nonce TEXT,
         status TEXT NOT NULL CHECK (status IN ('draft','signing','ready','executed','cancelled')),
+        tx_hash TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -1251,6 +1254,7 @@ export class CommerceDb {
     this.ensureColumn("wallet_accounts", "activation_check_count", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("wallet_accounts", "activation_status", "TEXT NOT NULL DEFAULT 'pending'");
     this.ensureColumn("wallet_accounts", "activation_error", "TEXT");
+    this.ensureColumn("wallet_proposals", "tx_hash", "TEXT");
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_wallet_accounts_activation
         ON wallet_accounts(activation_priority_at, activation_status, activation_next_check_at);
@@ -1394,6 +1398,7 @@ export class CommerceDb {
     return row ? mapWalletDevice(row) : null;
   }
 
+  /** Funded wallets first; GET /api/wallet/balance calls touchWalletActivation to make them due now. */
   listUndeployedWalletAccounts(chainId: string, limit = 100): WalletAccountRecord[] {
     const now = new Date().toISOString();
     const rows = this.db
@@ -1446,6 +1451,7 @@ export class CommerceDb {
       ? 0
       : Math.min(24 * 60 * 60_000, Math.max(60_000, 60_000 * 2 ** Math.min(checks - 1, 10)));
     const next = new Date(now.getTime() + delayMs).toISOString();
+    // Keep funded status on deploy errors so the queue still prioritizes them.
     const status = input.deployed ? "deployed" : input.funded ? "funded" : input.error ? "error" : "pending";
     this.db
       .prepare(
@@ -1760,6 +1766,22 @@ export class CommerceDb {
     ).map(mapWalletEntityKey);
   }
 
+  deleteWalletEntity(walletAddress: string, entityId: string): boolean {
+    const addr = walletAddress.toLowerCase();
+    this.db.prepare(`DELETE FROM wallet_entity_keys WHERE wallet_address = ? AND entity_id = ?`).run(addr, entityId);
+    const result = this.db
+      .prepare(`DELETE FROM wallet_entities WHERE wallet_address = ? AND entity_id = ?`)
+      .run(addr, entityId);
+    return result.changes > 0;
+  }
+
+  deleteWalletEntityKey(walletAddress: string, keyId: string): boolean {
+    const result = this.db
+      .prepare(`DELETE FROM wallet_entity_keys WHERE wallet_address = ? AND key_id = ?`)
+      .run(walletAddress.toLowerCase(), keyId);
+    return result.changes > 0;
+  }
+
   createWalletKeyEnrollmentRequest(input: {
     walletAddress: string;
     entityId: string;
@@ -1905,18 +1927,21 @@ export class CommerceDb {
   }
 
   listWalletProposals(walletAddress: string, status?: WalletProposalStatus): WalletProposalRecord[] {
+    const select = `SELECT p.*,
+         (SELECT COUNT(*) FROM wallet_proposal_sigs s WHERE s.proposal_id = p.id) AS signature_count
+         FROM wallet_proposals p`;
     if (status) {
       return (
         this.db
           .prepare(
-            `SELECT * FROM wallet_proposals WHERE wallet_address = ? AND status = ? ORDER BY created_at DESC`
+            `${select} WHERE p.wallet_address = ? AND p.status = ? ORDER BY p.created_at DESC`
           )
           .all(walletAddress.toLowerCase(), status) as WalletProposalRow[]
       ).map(mapWalletProposal);
     }
     return (
       this.db
-        .prepare(`SELECT * FROM wallet_proposals WHERE wallet_address = ? ORDER BY created_at DESC`)
+        .prepare(`${select} WHERE p.wallet_address = ? ORDER BY p.created_at DESC`)
         .all(walletAddress.toLowerCase()) as WalletProposalRow[]
     ).map(mapWalletProposal);
   }
@@ -1926,6 +1951,15 @@ export class CommerceDb {
     const result = this.db
       .prepare(`UPDATE wallet_proposals SET status = ?, updated_at = ? WHERE id = ?`)
       .run(status, now, id);
+    if (result.changes === 0) return null;
+    return this.getWalletProposal(id);
+  }
+
+  updateWalletProposalTxHash(id: string, txHash: string): WalletProposalRecord | null {
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(`UPDATE wallet_proposals SET tx_hash = ?, updated_at = ? WHERE id = ?`)
+      .run(txHash, now, id);
     if (result.changes === 0) return null;
     return this.getWalletProposal(id);
   }
@@ -3356,6 +3390,8 @@ function mapWalletProposal(row: WalletProposalRow): WalletProposalRecord {
     data: row.data,
     nonce: row.nonce,
     status: row.status,
+    txHash: row.tx_hash ?? null,
+    signatureCount: row.signature_count != null ? Number(row.signature_count) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

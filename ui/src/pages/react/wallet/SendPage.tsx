@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Contract, JsonRpcProvider, formatUnits, getAddress, isAddress } from "ethers";
-import { ArrowUpRight, CheckCircle2, Copy, Shield } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Copy, RefreshCw, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,8 +25,10 @@ import {
   getWalletAccount,
   primaryChain,
   waitForUserOp,
+  walletChainIsFunded,
   type WalletPublicConfig,
 } from "@/shared/wallet-api.js";
+import { subscribePageVisible } from "@/shared/page-visibility.js";
 import { fetchAdvancedPolicy } from "@/shared/wallet-advanced-api.js";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
@@ -34,6 +36,8 @@ import { buildSignedAdvancedSendUserOp } from "@/shared/advanced-userop-client.j
 import { buildSignedSendUserOp, submitSignedUserOp } from "@/shared/userop-client.js";
 import { ERC20_ABI, parseUsdcInput } from "../../../../../commerce/shared/userop.js";
 import { WalletFrame } from "./WalletFrame";
+import { SuperPayPage } from "./SuperPayPage";
+import { useWalletPolicy } from "./wallet-policy";
 
 function formatSendRejectReason(reason: string | null | undefined, t: (key: string, vars?: Record<string, string | number>) => string): string {
   switch (reason) {
@@ -53,6 +57,12 @@ function formatSendRejectReason(reason: string | null | undefined, t: (key: stri
 }
 
 export function SendPage() {
+  const { isSuperWallet } = useWalletPolicy();
+  if (isSuperWallet) return <SuperPayPage />;
+  return <SimpleSendPage />;
+}
+
+function SimpleSendPage() {
   const { t } = useLocale();
   const navigate = useNavigate();
   const [session, setSession] = useState<WalletSession | null>(() => loadWalletSession());
@@ -60,6 +70,8 @@ export function SendPage() {
   const [balanceUsd, setBalanceUsd] = useState("0.00");
   const [tokenBalances, setTokenBalances] = useState<Record<string, bigint>>({});
   const [deployed, setDeployed] = useState(false);
+  const [funded, setFunded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [selectedTokenSymbol, setSelectedTokenSymbol] = useState("USDC");
@@ -71,44 +83,71 @@ export function SendPage() {
   const [busy, setBusy] = useState(false);
   const [advancedEntityId, setAdvancedEntityId] = useState<string | null>(null);
 
+  const loadActivation = useCallback(async (active: WalletSession, cfg: WalletPublicConfig) => {
+    const balance = await fetchWalletBalance(active.address);
+    const chain = primaryChain(cfg);
+    const primary = balance.chains.find((c) => c.chainId === chain.chainId);
+    setBalanceUsd(balance.totalUsd);
+    setTokenBalances((prev) => ({ ...prev, [chain.feeTokenSymbol]: BigInt(primary?.balance ?? "0") }));
+    let isDeployed = primary?.deployed ?? false;
+    const account = await getWalletAccount(active.address).catch(() => null);
+    if (account?.deployedChains.includes(cfg.chainId)) isDeployed = true;
+    setDeployed(isDeployed);
+    setFunded(walletChainIsFunded(primary?.balance));
+  }, []);
+
   useEffect(() => {
     if (!session) {
       navigate("/wallet", { replace: true });
       return;
     }
+    let cancelled = false;
     void (async () => {
       const healed = await healWalletSession(session);
+      if (cancelled) return;
       if (healed.session !== session) setSession(healed.session);
       const active = healed.session;
       const cfg = await fetchWalletConfig();
-      const policy = await fetchAdvancedPolicy(active.address).catch(() => null);
-      if (policy?.advanced && policy.threshold > 1) {
-        navigate("/wallet/proposals?create=1", { replace: true });
-        return;
-      }
-      if (policy?.advanced) {
-        if (healed.needsSuperWalletEmail) {
-          navigate("/wallet/super-wallet", { replace: true });
-          return;
-        }
-        if (active.entityId) setAdvancedEntityId(active.entityId);
-      }
+      if (cancelled) return;
+      if (active.entityId) setAdvancedEntityId(active.entityId);
       setConfig(cfg);
       try {
-        const balance = await fetchWalletBalance(active.address);
-        setBalanceUsd(balance.totalUsd);
-        const chain = primaryChain(cfg);
-        const primary = balance.chains.find((c) => c.chainId === chain.chainId);
-        setTokenBalances((prev) => ({ ...prev, [chain.feeTokenSymbol]: BigInt(primary?.balance ?? "0") }));
-        let isDeployed = primary?.deployed ?? false;
-        const account = await getWalletAccount(active.address).catch(() => null);
-        if (account?.deployedChains.includes(cfg.chainId)) isDeployed = true;
-        setDeployed(isDeployed);
+        await loadActivation(active, cfg);
       } catch {
-        /* ignore */
+        /* keep last known status */
       }
     })();
-  }, [session, navigate]);
+    return () => {
+      cancelled = true;
+    };
+  }, [session, navigate, loadActivation]);
+
+  useEffect(() => {
+    if (!session || !config) return;
+    return subscribePageVisible(() => {
+      void loadActivation(session, config).catch(() => undefined);
+    });
+  }, [session, config, loadActivation]);
+
+  useEffect(() => {
+    if (!session || !config || deployed || !funded) return;
+    const id = window.setInterval(() => {
+      void loadActivation(session, config).catch(() => undefined);
+    }, 3_000);
+    return () => window.clearInterval(id);
+  }, [session, config, deployed, funded, loadActivation]);
+
+  const handleRefresh = async () => {
+    if (!session || !config) return;
+    setRefreshing(true);
+    try {
+      await loadActivation(session, config);
+    } catch {
+      /* keep last known status */
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const chain = useMemo(() => (config ? primaryChain(config) : null), [config]);
   const tokenOptions = useMemo(
@@ -285,7 +324,20 @@ export function SendPage() {
         <PageCard>
           {!deployed && (
             <Alert variant="warn" className="mb-4">
-              <AlertDescription>{t("wallet.sendNotDeployed")}</AlertDescription>
+              <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>{funded ? t("wallet.userOpAccountNotDeployed") : t("wallet.sendNotDeployed")}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={refreshing}
+                  onClick={() => void handleRefresh()}
+                  className="gap-2 self-start"
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                  {t("wallet.refresh")}
+                </Button>
+              </AlertDescription>
             </Alert>
           )}
           <div className="space-y-4">

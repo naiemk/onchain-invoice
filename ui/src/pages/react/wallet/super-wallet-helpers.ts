@@ -10,10 +10,12 @@ import type {
   WalletEntityRecord,
   WalletKeyEnrollmentRequestRecord,
 } from "../../../../../commerce/shared/wallet.js";
-import { buildSignedAddKeyUserOp } from "@/shared/advanced-userop-client.js";
+import { buildSignedAddKeyUserOp, buildSignedRemoveEntityUserOp, buildSignedRemoveKeyUserOp } from "@/shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
 import { fetchWalletBalance, primaryChain, waitForUserOp, type WalletPublicConfig } from "@/shared/wallet-api.js";
 import {
+  deleteWalletEntity,
+  deleteWalletEntityKey,
   registerWalletEntityKey,
   waitForAdvancedPolicy,
   type AdvancedPolicy,
@@ -150,6 +152,63 @@ export async function submitAddKey(input: {
     eoa: input.keyType === KEY_EOA ? getAddress(input.eoa) : null,
     credentialId: input.credentialId ?? null,
   });
+}
+
+export async function submitRemoveEntity(input: {
+  session: WalletSession;
+  config: WalletPublicConfig;
+  adminEntity: WalletEntityRecord;
+  entityId: string;
+}): Promise<void> {
+  const fee = BigInt(input.config.bundlerFeeUsdc || "0");
+  const { userOp, userOpHash } = await buildSignedRemoveEntityUserOp({
+    config: input.config,
+    walletAddress: input.session.address,
+    adminEntityId: input.adminEntity.entityId,
+    entityId: input.entityId,
+    qx: input.session.qx,
+    qy: input.session.qy,
+    feeAmount: fee,
+    credentialId: input.session.credentialId,
+  });
+  await submitSignedUserOp({
+    config: input.config,
+    userOp,
+    userOpHash,
+    walletAddress: input.session.address,
+  });
+  const result = await waitForUserOp(userOpHash);
+  if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
+  await deleteWalletEntity(input.session.address, input.entityId);
+}
+
+export async function submitRemoveKey(input: {
+  session: WalletSession;
+  config: WalletPublicConfig;
+  adminEntity: WalletEntityRecord;
+  entityId: string;
+  keyId: string;
+}): Promise<void> {
+  const fee = BigInt(input.config.bundlerFeeUsdc || "0");
+  const { userOp, userOpHash } = await buildSignedRemoveKeyUserOp({
+    config: input.config,
+    walletAddress: input.session.address,
+    adminEntityId: input.adminEntity.entityId,
+    adminQx: input.session.qx,
+    adminQy: input.session.qy,
+    adminCredentialId: input.session.credentialId,
+    keyId: input.keyId,
+    feeAmount: fee,
+  });
+  await submitSignedUserOp({
+    config: input.config,
+    userOp,
+    userOpHash,
+    walletAddress: input.session.address,
+  });
+  const result = await waitForUserOp(userOpHash);
+  if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
+  await deleteWalletEntityKey(input.session.address, input.entityId, input.keyId);
 }
 
 export { KEY_EOA, KEY_WEBAUTHN, KEY_YUBIKEY, zeroPadValue };

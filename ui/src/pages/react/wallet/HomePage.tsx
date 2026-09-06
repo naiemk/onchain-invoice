@@ -14,9 +14,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NoticeCarousel, type NoticeItem } from "@/components/NoticeCarousel";
 import { ExplorerLink } from "@/components/ExplorerLink";
 import { useLocale } from "@/providers/LocaleProvider";
-import { fetchWalletBalance, listDevices } from "@/shared/wallet-api.js";
+import { fetchWalletBalance, listDevices, walletChainIsFunded } from "@/shared/wallet-api.js";
+import { subscribePageVisible } from "@/shared/page-visibility.js";
 import { fetchWalletEmail, fetchWalletRecovery } from "@/shared/wallet-recovery-api.js";
-import { resolveAdvancedPolicy, listWalletEntities } from "@/shared/wallet-advanced-api.js";
+import { resolveAdvancedPolicy, listWalletEntities, listProposals } from "@/shared/wallet-advanced-api.js";
 import { deploymentMode, isTestnet } from "@/shared/networks.js";
 import {
   listWalletRegistry,
@@ -31,8 +32,11 @@ import { addWalletFromPasskey, unlockRegistryWallet, unlockWalletWithPasskey } f
 import { LocalRecoverySheet, isUnlockRecoveryError } from "@/components/LocalRecoverySheet";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { isAdvancedMode } from "@/shared/wallet-mode.js";
-import type { WalletBalanceChain } from "../../../../../commerce/shared/wallet.js";
+import type { WalletBalanceChain, WalletProposalRecord } from "../../../../../commerce/shared/wallet.js";
 import { WalletFrame } from "./WalletFrame";
+import { useWalletPolicy } from "./wallet-policy";
+import { isClosedProposal, isFullySigned, proposalSummary } from "./proposal-display";
+import { StatusBadge } from "@/components/StatusBadge";
 
 function ChainBalanceList({ chains, t }: { chains: WalletBalanceChain[]; t: (k: string, v?: Record<string, string | number>) => string }) {
   if (!chains.length) {
@@ -74,6 +78,7 @@ function EmailAttachCard() {
 
 function WalletDashboard({ session: initialSession }: { session: WalletSession }) {
   const { t } = useLocale();
+  const { isSuperWallet, policy } = useWalletPolicy();
   const advanced = isAdvancedMode();
   const [session, setSession] = useState(initialSession);
   const [healNotice, setHealNotice] = useState<string | null>(null);
@@ -84,6 +89,8 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
   const [pendingRecovery, setPendingRecovery] = useState(false);
   const [showEmailCard, setShowEmailCard] = useState(false);
   const [notices, setNotices] = useState<NoticeItem[]>([]);
+  const [entityLabel, setEntityLabel] = useState<string | null>(null);
+  const [openProposals, setOpenProposals] = useState<WalletProposalRecord[]>([]);
 
   useEffect(() => {
     setSession(initialSession);
@@ -108,8 +115,8 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
     };
   }, [initialSession, t]);
 
-  const loadBalance = useCallback(async () => {
-    setLoading(true);
+  const loadBalance = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const balance = await fetchWalletBalance(session.address);
       setTotalUsd(balance.totalUsd);
@@ -119,32 +126,22 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
       setTotalUsd(t("wallet.balanceZero"));
       setBalanceError(true);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [session.address, t]);
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    void (async () => {
-      try {
-        const balance = await fetchWalletBalance(session.address);
-        if (cancelled) return;
-        setTotalUsd(balance.totalUsd);
-        setChains(balance.chains);
-        setBalanceError(false);
-      } catch {
-        if (cancelled) return;
-        setTotalUsd(t("wallet.balanceZero"));
-        setBalanceError(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [session.address, t]);
+    void loadBalance();
+  }, [loadBalance]);
+
+  useEffect(() => subscribePageVisible(() => void loadBalance({ silent: true })), [loadBalance]);
+
+  const activating = chains.some((c) => !c.deployed && walletChainIsFunded(c.balance));
+  useEffect(() => {
+    if (!activating) return;
+    const id = window.setInterval(() => void loadBalance({ silent: true }), 3_000);
+    return () => window.clearInterval(id);
+  }, [activating, loadBalance]);
 
   useEffect(() => {
     void (async () => {
@@ -215,14 +212,6 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
           cta: t("wallet.superWalletConvertCta"),
           className: "border-primary/30 bg-primary/5",
         });
-      } else {
-        items.push({
-          id: "super-manage",
-          title: t("wallet.superWalletTitle"),
-          description: t("wallet.superWalletActiveShort"),
-          href: "/wallet/super-wallet",
-          cta: t("wallet.superWalletManage"),
-        });
       }
 
       items.push(
@@ -249,6 +238,28 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
       setNotices(items);
     })();
   }, [advanced, session.address, session.chainId, t]);
+
+  useEffect(() => {
+    if (!isSuperWallet) {
+      setEntityLabel(null);
+      setOpenProposals([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const roster = await listWalletEntities(session.address).catch(() => ({ entities: [], keys: [] }));
+      if (cancelled) return;
+      const mine =
+        roster.entities.find((e) => e.entityId === session.entityId) ?? roster.entities[0] ?? null;
+      setEntityLabel(mine?.label ?? session.label);
+      const list = await listProposals(session.address).catch(() => []);
+      if (cancelled) return;
+      setOpenProposals(list.filter((p) => !isClosedProposal(p)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSuperWallet, session.address, session.entityId, session.label]);
 
   return (
     <WalletFrame current="home">
@@ -292,7 +303,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
           <Alert variant="warn">
             <AlertDescription>
               {healNotice}{" "}
-              <Link to="/wallet/super-wallet" className="font-medium underline">
+              <Link to={isSuperWallet ? "/wallet/access" : "/wallet/super-wallet"} className="font-medium underline">
                 {t("wallet.superWalletRestoreEmailCta")}
               </Link>
             </AlertDescription>
@@ -307,6 +318,65 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
               </Link>
             </AlertDescription>
           </Alert>
+        )}
+        {isSuperWallet && policy && (
+          <section
+            data-testid="super-wallet-home-summary"
+            className="rounded-xl border border-border bg-card p-5 space-y-4"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">{t("wallet.superWalletHomeEntity")}</p>
+                <p className="text-sm font-medium">{entityLabel ?? session.label}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("wallet.superWalletActive", {
+                    threshold: String(policy.threshold),
+                    entities: String(policy.entityCount),
+                  })}
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/wallet/access">{t("wallet.superWalletHomeOpenAccess")}</Link>
+              </Button>
+            </div>
+            <div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">{t("wallet.superWalletHomeProposalsTitle")}</h2>
+                <Button asChild size="sm" variant="ghost">
+                  <Link to="/wallet/send?status=closed">{t("wallet.proposalsClosedCta")}</Link>
+                </Button>
+              </div>
+              {openProposals.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("wallet.proposalsEmpty")}</p>
+              ) : (
+                <ul className="divide-y rounded-lg border">
+                  {openProposals.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                      <div className="min-w-0 space-y-1">
+                        <p className="truncate text-sm">{proposalSummary(p, t)}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <StatusBadge tone="pending">{p.status}</StatusBadge>
+                          {isFullySigned(p, policy.threshold) ? (
+                            <StatusBadge tone="verified">{t("wallet.proposalsFullySigned")}</StatusBadge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              {t("wallet.proposalsSigCount", {
+                                count: String(p.signatureCount ?? 0),
+                                threshold: String(policy.threshold),
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/wallet/send?id=${p.id}`}>{t("wallet.proposalsOpenOne")}</Link>
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
         )}
         {advanced && notices.length > 0 && <NoticeCarousel items={notices} />}
         <p className="text-sm text-muted-foreground">

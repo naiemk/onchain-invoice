@@ -95,6 +95,22 @@ describe("commerce wallet advanced API", function () {
       expect(body.entities[0]?.label).to.equal("Admin");
       expect(body.keys[0]?.keyId.toLowerCase()).to.equal(keyId.toLowerCase());
       expect(body.keys[0]?.eoa?.toLowerCase()).to.equal(eoa.toLowerCase());
+
+      const keyDel = await fetch(`${baseUrl}/api/wallet/${wallet}/entities/${ADMIN_ENTITY}/keys/${keyId}`, {
+        method: "DELETE",
+      });
+      expect(keyDel.status).to.equal(200);
+      const afterKey = await fetch(`${baseUrl}/api/wallet/${wallet}/entities`);
+      const afterKeyBody = (await afterKey.json()) as { keys: unknown[] };
+      expect(afterKeyBody.keys).to.have.length(0);
+
+      const entDel = await fetch(`${baseUrl}/api/wallet/${wallet}/entities/${ADMIN_ENTITY}`, {
+        method: "DELETE",
+      });
+      expect(entDel.status).to.equal(200);
+      const afterEnt = await fetch(`${baseUrl}/api/wallet/${wallet}/entities`);
+      const afterEntBody = (await afterEnt.json()) as { entities: unknown[] };
+      expect(afterEntBody.entities).to.have.length(0);
     });
   });
 
@@ -152,8 +168,27 @@ describe("commerce wallet advanced API", function () {
 
       const got = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}`);
       expect(got.status).to.equal(200);
-      const detail = (await got.json()) as { signatures: Array<{ keyId: string }> };
+      const detail = (await got.json()) as { signatures: Array<{ keyId: string }>; proposal: { txHash: string | null } };
       expect(detail.signatures).to.have.length(1);
+      expect(detail.proposal.txHash).to.equal(null);
+
+      const tx = `0x${"ab".repeat(32)}`;
+      const patch = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ txHash: tx }),
+      });
+      expect(patch.status).to.equal(200);
+      const patched = (await patch.json()) as { proposal: { txHash: string | null } };
+      expect(patched.proposal.txHash).to.equal(tx);
+
+      const list = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals`);
+      const listed = (await list.json()) as {
+        proposals: Array<{ id: string; txHash: string | null; signatureCount?: number }>;
+      };
+      const row = listed.proposals.find((p) => p.id === proposal.id);
+      expect(row?.txHash).to.equal(tx);
+      expect(row?.signatureCount).to.equal(1);
 
       const execute = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}/execute`, {
         method: "POST",

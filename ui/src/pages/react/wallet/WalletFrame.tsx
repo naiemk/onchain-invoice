@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, ChevronDown, Copy, Lock, Plus } from "lucide-react";
+import { Check, ChevronDown, Copy, Lock, Plus, Vault } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHero } from "@/components/PageHero";
@@ -30,6 +30,8 @@ import {
 } from "@/shared/wallet-session.js";
 import { isAdvancedMode, loadWalletMode, saveWalletMode, type WalletMode } from "@/shared/wallet-mode.js";
 import type { WalletTab } from "@/shared/wallet-ui.js";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useWalletPolicy } from "./wallet-policy";
 
 const IDENT_PALETTE = [
   { h: 168, s: 56, l: 32 },
@@ -71,10 +73,12 @@ function WalletAccountChip({
   session,
   registry,
   onSessionChange,
+  isSuperWallet,
 }: {
   session: WalletSession;
   registry: WalletSession[];
   onSessionChange: () => void;
+  isSuperWallet: boolean;
 }) {
   const { t } = useLocale();
   const navigate = useNavigate();
@@ -141,6 +145,21 @@ function WalletAccountChip({
         </Button>
         <WalletAddressQrDialog address={session.address} />
         <ExplorerLink chainId={session.chainId} value={session.address} className="h-8 w-8 rounded-md border border-border" />
+        {isSuperWallet && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                data-testid="super-wallet-shield"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-primary"
+                tabIndex={0}
+              >
+                <Vault className="h-4 w-4" />
+                <span className="sr-only">{t("wallet.superWalletShieldTooltip")}</span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{t("wallet.superWalletShieldTooltip")}</TooltipContent>
+          </Tooltip>
+        )}
       </div>
       <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t("wallet.lock")} onClick={lock}>
         <Lock className="h-3.5 w-3.5" />
@@ -180,6 +199,7 @@ function WalletModeToggle() {
 
 function WalletSubnav({ current }: { current: WalletTab }) {
   const { t } = useLocale();
+  const { isSuperWallet } = useWalletPolicy();
   const advanced = isAdvancedMode();
 
   const links = useMemo(() => {
@@ -190,14 +210,19 @@ function WalletSubnav({ current }: { current: WalletTab }) {
       { href: "/wallet/cash", key: "cash", label: t("wallet.cashTab") },
       { href: "/wallet/security", key: "security", label: t("wallet.securityTab") },
     ];
-    if (advanced) {
+    if (isSuperWallet) {
+      items.push(
+        { href: "/wallet/access", key: "access", label: t("wallet.accessTab") },
+        { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
+      );
+    } else if (advanced) {
       items.push(
         { href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") },
         { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
       );
     }
     return items;
-  }, [t, advanced]);
+  }, [t, advanced, isSuperWallet]);
 
   return (
     <ScrollSubnav
@@ -222,6 +247,7 @@ const TAB_BREADCRUMBS: Partial<Record<WalletTab, string>> = {
   getPaid: "WALLET / GET PAID",
   developers: "WALLET / DEVELOPERS",
   invoices: "WALLET / INVOICES",
+  access: "WALLET / ACCESS",
 };
 
 export function WalletFrame({
@@ -240,6 +266,7 @@ export function WalletFrame({
   breadcrumb?: string;
 }) {
   const { t } = useLocale();
+  const { isSuperWallet } = useWalletPolicy();
   const [session, setSession] = useState<WalletSession | null>(() => loadWalletSession());
   const mode = deploymentMode();
   const registry = useMemo(
@@ -281,8 +308,13 @@ export function WalletFrame({
         </Alert>
       )}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <WalletAccountChip session={session} registry={registry} onSessionChange={refreshSession} />
-        <WalletModeToggle />
+        <WalletAccountChip
+          session={session}
+          registry={registry}
+          onSessionChange={refreshSession}
+          isSuperWallet={isSuperWallet}
+        />
+        {!isSuperWallet && <WalletModeToggle />}
       </div>
       {title && <PageHero breadcrumb={crumb} title={title} lede={lede} className="mb-4" />}
       <WalletSubnav current={current} />

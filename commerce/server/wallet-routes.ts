@@ -82,6 +82,7 @@ export function registerWalletRoutes(
         const address = getAddress(wallet);
         const balance = await fetchWalletBalance(address, walletConfig, db);
         const funded = balance.chains.some((c) => BigInt(c.balance) > 0n);
+        // Refresh / balance poll: bump funded wallets to the front of the deployer queue.
         db.touchWalletActivation(address, funded);
         for (const chain of balance.chains) {
           if (chain.deployed) db.markWalletDeployed(address, chain.chainId);

@@ -142,6 +142,14 @@ export function encodeAddEntity(entityId: string): string {
   return walletIface.encodeFunctionData("addEntity", [entityId]);
 }
 
+export function encodeRemoveEntity(entityId: string): string {
+  return walletIface.encodeFunctionData("removeEntity", [entityId]);
+}
+
+export function encodeRemoveKey(keyId: string): string {
+  return walletIface.encodeFunctionData("removeKey", [keyId]);
+}
+
 export function encodeAddKey(
   entityId: string,
   keyType: number,

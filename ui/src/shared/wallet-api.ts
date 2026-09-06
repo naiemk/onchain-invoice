@@ -24,6 +24,14 @@ export async function fetchWalletBalance(wallet: string): Promise<WalletBalanceR
   return res.json() as Promise<WalletBalanceResponse>;
 }
 
+export function walletChainIsFunded(balance: string | undefined): boolean {
+  try {
+    return BigInt(balance ?? "0") > 0n;
+  } catch {
+    return false;
+  }
+}
+
 export async function registerWalletAccount(input: {
   address: string;
   salt: string;
