@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-time export of existing wallet SQLite rows into the persist-log WAL.
+ * One-time export of existing wallet + invoice SQLite rows into the persist-log WAL.
  * Usage: PERSIST_LOG_DIR=./persist-logs DB_PATH=./data/trustless-commerce.db node scripts/backfill-wallet-persist-log.mjs
  */
 import { mkdir } from "node:fs/promises";
@@ -92,8 +92,83 @@ async function main() {
     );
   }
 
+  try {
+    for (const row of raw.prepare("SELECT * FROM invoices ORDER BY created_at ASC").all()) {
+      await log.appendSync(
+        "invoice",
+        "invoice.created",
+        {
+          invoiceId: row.id,
+          invoiceSeed: row.invoice_seed,
+          clientInvoiceId: row.client_invoice_id,
+          priceUsd: row.price_usd,
+          toAddresses: JSON.parse(row.to_addresses || "[]"),
+          selectedTo: row.selected_to,
+          chainId: row.chain_id,
+          token: row.token,
+          invoiceAddress: row.invoice_address,
+          title: row.title,
+          description: row.description,
+          callbackUrl: row.callback_url,
+          allowPartial: row.allow_partial === 1,
+          paymentMode: row.payment_mode,
+          displayFiat: row.display_fiat,
+          displayAmount: row.display_amount,
+          quoteCountry: row.quote_country,
+          quotePaymentMethod: row.quote_payment_method,
+          quoteProvider: row.quote_provider,
+          quoteSlippageBps: row.quote_slippage_bps,
+          lang: row.lang,
+          createdAt: row.created_at,
+        },
+        row.id
+      );
+      count++;
+      const status = row.status;
+      if (status === "paid" || status === "paid_partial" || status === "swept") {
+        await log.appendSync(
+          "invoice",
+          "invoice.paid",
+          {
+            invoiceId: row.id,
+            status: status === "swept" ? "paid" : status,
+            amountPaid: row.amount_paid,
+            amountSwept: row.amount_swept,
+            feeCollected: row.fee_collected,
+            gasSpentWei: row.gas_spent_wei,
+            paidAt: row.paid_at,
+          },
+          `${row.id}:paid`
+        );
+        count++;
+      }
+      if (status === "swept") {
+        await log.appendSync(
+          "invoice",
+          "invoice.swept",
+          {
+            invoiceId: row.id,
+            status: "swept",
+            amountPaid: row.amount_paid,
+            amountSwept: row.amount_swept,
+            feeCollected: row.fee_collected,
+            gasSpentWei: row.gas_spent_wei,
+            sweepTx: row.sweep_tx,
+            paidAt: row.paid_at,
+            sweptAt: row.swept_at,
+          },
+          `${row.id}:swept`
+        );
+        count++;
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/no such table: invoices/i.test(message)) throw error;
+  }
+
   raw.close();
-  console.log(`Backfilled ${count} wallet persist-log events to ${logDir}`);
+  console.log(`Backfilled ${count} persist-log events (wallet + invoice) to ${logDir}`);
 }
 
 main().catch((err) => {

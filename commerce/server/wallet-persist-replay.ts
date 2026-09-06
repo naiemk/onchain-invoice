@@ -194,6 +194,7 @@ export function applyWalletPersistStateToDb(db: CommerceDb, state: WalletPersist
       for (const chainId of account.deployedChains) {
         db.markWalletDeployed(account.address, chainId);
       }
+      db.touchWalletActivation(account.address, false);
     }
     for (const device of state.devices.values()) {
       db.upsertWalletDevice({
