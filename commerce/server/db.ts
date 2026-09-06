@@ -39,7 +39,7 @@ import type {
 } from "../shared/wallet.js";
 import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
 import { parsePaymentMode } from "../shared/onramper.js";
-import { PersistLog, WALLET_PERSIST_STREAM } from "./persist-log.js";
+import { INVOICE_PERSIST_STREAM, PersistLog, WALLET_PERSIST_STREAM } from "./persist-log.js";
 
 interface InvoiceRow {
   id: string;
@@ -252,6 +252,11 @@ export class CommerceDb {
     this.persistLog.append(WALLET_PERSIST_STREAM, type, payload, eventId);
   }
 
+  private invoicePersist(type: string, payload: Record<string, unknown>, eventId?: string): void {
+    if (this.skipPersistLog || !this.persistLog) return;
+    this.persistLog.append(INVOICE_PERSIST_STREAM, type, payload, eventId);
+  }
+
   close(): void {
     this.db.close();
   }
@@ -390,7 +395,11 @@ export class CommerceDb {
       if (!invoice) throw new Error("Failed to create invoice");
       return { invoice, created: true };
     });
-    return tx();
+    const result = tx();
+    if (result.created) {
+      this.invoicePersist("invoice.created", invoiceCreatedPersistPayload(result.invoice), result.invoice.id);
+    }
+    return result;
   }
 
   /** @deprecated Prefer createInvoice */
@@ -623,7 +632,142 @@ export class CommerceDb {
     );
     const updated = this.getInvoice(input.invoiceId);
     if (!updated) throw new Error("Failed to update invoice");
+    if (!input.error && (status === "paid" || status === "paid_partial")) {
+      this.invoicePersist("invoice.paid", invoiceStatusPersistPayload(updated), `${updated.id}:paid`);
+    } else if (!input.error && status === "swept") {
+      this.invoicePersist("invoice.swept", invoiceStatusPersistPayload(updated), `${updated.id}:swept`);
+    }
     return updated;
+  }
+
+  /**
+   * Rebuild an invoice row from persist-log (disaster recovery). Does not append persist events.
+   * Leaves claim leases empty so a restarted sweeper can claim.
+   */
+  restorePersistedInvoice(input: {
+    invoiceId: string;
+    invoiceSeed: string;
+    clientInvoiceId?: string;
+    priceUsd: string;
+    toAddresses: string[];
+    selectedTo: string | null;
+    chainId: string | null;
+    token: string | null;
+    invoiceAddress: string | null;
+    title?: string | null;
+    description?: string | null;
+    callbackUrl?: string | null;
+    allowPartial?: boolean;
+    paymentMode?: PaymentMode;
+    displayFiat?: string | null;
+    displayAmount?: string | null;
+    quoteCountry?: string | null;
+    quotePaymentMethod?: string | null;
+    quoteProvider?: string | null;
+    quoteSlippageBps?: number | null;
+    lang?: string | null;
+    status: InvoiceStatus;
+    amountPaid?: string;
+    amountSwept?: string;
+    feeCollected?: string;
+    gasSpentWei?: string;
+    sweepTx?: string | null;
+    createdAt?: string;
+    paidAt?: string | null;
+    sweptAt?: string | null;
+  }): InvoiceRecord {
+    const now = new Date().toISOString();
+    const createdAt = input.createdAt ?? now;
+    this.db
+      .prepare(
+        `INSERT INTO invoices (
+          id, invoice_seed, client_invoice_id, price_usd, to_addresses, selected_to, chain_id, token,
+          invoice_address, title, description, callback_url, allow_partial, payment_mode, payer_fiat,
+          display_fiat, display_amount, quote_country, quote_payment_method, quote_provider, quote_slippage_bps, lang, status,
+          amount_paid, amount_swept, fee_collected, gas_spent_wei, sweep_tx,
+          pay_session_id, version, claimed_by, claimed_until,
+          created_at, updated_at, paid_at, swept_at
+        ) VALUES (
+          @id, @invoiceSeed, @clientInvoiceId, @priceUsd, @toAddresses, @selectedTo, @chainId, @token,
+          @invoiceAddress, @title, @description, @callbackUrl, @allowPartial, @paymentMode, NULL,
+          @displayFiat, @displayAmount, @quoteCountry, @quotePaymentMethod, @quoteProvider, @quoteSlippageBps, @lang, @status,
+          @amountPaid, @amountSwept, @feeCollected, @gasSpentWei, @sweepTx,
+          NULL, 1, NULL, NULL,
+          @createdAt, @now, @paidAt, @sweptAt
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          invoice_seed = excluded.invoice_seed,
+          client_invoice_id = excluded.client_invoice_id,
+          price_usd = excluded.price_usd,
+          to_addresses = excluded.to_addresses,
+          selected_to = excluded.selected_to,
+          chain_id = excluded.chain_id,
+          token = excluded.token,
+          invoice_address = excluded.invoice_address,
+          title = excluded.title,
+          description = excluded.description,
+          callback_url = excluded.callback_url,
+          allow_partial = excluded.allow_partial,
+          payment_mode = excluded.payment_mode,
+          display_fiat = excluded.display_fiat,
+          display_amount = excluded.display_amount,
+          quote_country = excluded.quote_country,
+          quote_payment_method = excluded.quote_payment_method,
+          quote_provider = excluded.quote_provider,
+          quote_slippage_bps = excluded.quote_slippage_bps,
+          lang = excluded.lang,
+          status = excluded.status,
+          amount_paid = excluded.amount_paid,
+          amount_swept = excluded.amount_swept,
+          fee_collected = excluded.fee_collected,
+          gas_spent_wei = excluded.gas_spent_wei,
+          sweep_tx = excluded.sweep_tx,
+          claimed_by = NULL,
+          claimed_until = NULL,
+          version = invoices.version + 1,
+          updated_at = excluded.updated_at,
+          paid_at = excluded.paid_at,
+          swept_at = excluded.swept_at`
+      )
+      .run({
+        id: input.invoiceId,
+        invoiceSeed: input.invoiceSeed,
+        clientInvoiceId: input.clientInvoiceId ?? "",
+        priceUsd: input.priceUsd,
+        toAddresses: JSON.stringify(input.toAddresses),
+        selectedTo: input.selectedTo,
+        chainId: input.chainId,
+        token: input.token,
+        invoiceAddress: input.invoiceAddress,
+        title: input.title ?? null,
+        description: input.description ?? null,
+        callbackUrl: input.callbackUrl ?? null,
+        allowPartial: input.allowPartial ? 1 : 0,
+        paymentMode: input.paymentMode ?? "crypto",
+        displayFiat: input.displayFiat ?? null,
+        displayAmount: input.displayAmount ?? null,
+        quoteCountry: input.quoteCountry ?? null,
+        quotePaymentMethod: input.quotePaymentMethod ?? null,
+        quoteProvider: input.quoteProvider ?? null,
+        quoteSlippageBps:
+          typeof input.quoteSlippageBps === "number" && Number.isFinite(input.quoteSlippageBps)
+            ? Math.round(input.quoteSlippageBps)
+            : null,
+        lang: input.lang ?? null,
+        status: input.status,
+        amountPaid: input.amountPaid ?? "0",
+        amountSwept: input.amountSwept ?? "0",
+        feeCollected: input.feeCollected ?? "0",
+        gasSpentWei: input.gasSpentWei ?? "0",
+        sweepTx: input.sweepTx ?? null,
+        createdAt,
+        now,
+        paidAt: input.paidAt ?? null,
+        sweptAt: input.sweptAt ?? null,
+      });
+    const invoice = this.getInvoice(input.invoiceId);
+    if (!invoice) throw new Error("Failed to restore invoice");
+    return invoice;
   }
 
   addEvent(invoiceId: string, kind: InvoiceEventKind, payload: unknown, createdAt = new Date().toISOString()): void {
@@ -3002,6 +3146,47 @@ function mapWalletRecoveryRequest(row: WalletRecoveryRequestRow): WalletRecovery
     chainId: row.chain_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function invoiceCreatedPersistPayload(invoice: InvoiceRecord): Record<string, unknown> {
+  return {
+    invoiceId: invoice.id,
+    invoiceSeed: invoice.invoiceSeed,
+    clientInvoiceId: invoice.clientInvoiceId,
+    priceUsd: invoice.priceUsd,
+    toAddresses: invoice.toAddresses,
+    selectedTo: invoice.selectedTo,
+    chainId: invoice.chainId,
+    token: invoice.token,
+    invoiceAddress: invoice.invoiceAddress,
+    title: invoice.title,
+    description: invoice.description,
+    callbackUrl: invoice.callbackUrl,
+    allowPartial: invoice.allowPartial,
+    paymentMode: invoice.paymentMode,
+    displayFiat: invoice.displayFiat,
+    displayAmount: invoice.displayAmount,
+    quoteCountry: invoice.quoteCountry,
+    quotePaymentMethod: invoice.quotePaymentMethod,
+    quoteProvider: invoice.quoteProvider,
+    quoteSlippageBps: invoice.quoteSlippageBps,
+    lang: invoice.lang,
+    createdAt: invoice.createdAt,
+  };
+}
+
+function invoiceStatusPersistPayload(invoice: InvoiceRecord): Record<string, unknown> {
+  return {
+    invoiceId: invoice.id,
+    status: invoice.status,
+    amountPaid: invoice.amountPaid,
+    amountSwept: invoice.amountSwept,
+    feeCollected: invoice.feeCollected,
+    gasSpentWei: invoice.gasSpentWei,
+    sweepTx: invoice.sweepTx,
+    paidAt: invoice.paidAt,
+    sweptAt: invoice.sweptAt,
   };
 }
 

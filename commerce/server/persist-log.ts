@@ -26,6 +26,7 @@ export type PersistLogEvent = {
 };
 
 export const WALLET_PERSIST_STREAM = "wallet";
+export const INVOICE_PERSIST_STREAM = "invoice";
 
 const DEFAULT_ROTATE_BYTES = 8 * 1024 * 1024;
 const DEFAULT_ROTATE_SEC = 60;
