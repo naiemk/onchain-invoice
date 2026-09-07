@@ -18,7 +18,6 @@ export const he = {
     getPaid: "קבלו תשלום",
     security: "אבטחה",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

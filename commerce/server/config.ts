@@ -90,6 +90,11 @@ export interface AppConfig {
   walletAdminGuardian?: string;
   /** HMAC secret for guardian session tokens (defaults to adminApiKey). */
   guardianSessionSecret?: string;
+  /** Etherscan API v2 key for inbound wallet transfer history. */
+  etherscanApiKey?: string;
+  etherscanApiUrl: string;
+  /** Per wallet+chain cooldown before another explorer fetch (default 45s). */
+  walletTransferSyncMinMs: number;
 }
 
 export interface EmailConfig {
@@ -302,6 +307,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     guardianSessionSecret: blankToUndefined(
       expand(env.GUARDIAN_SESSION_SECRET ?? env.ADMIN_API_KEY ?? file.adminApiKey ?? "")
     ),
+    etherscanApiKey: blankToUndefined(expand(env.ETHERSCAN_API_KEY ?? "")),
+    etherscanApiUrl: expand(env.ETHERSCAN_API_URL ?? "https://api.etherscan.io/v2/api"),
+    walletTransferSyncMinMs: Number(env.WALLET_TRANSFER_SYNC_MIN_MS ?? 45_000),
   };
 }
 

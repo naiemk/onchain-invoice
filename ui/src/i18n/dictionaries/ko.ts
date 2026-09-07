@@ -21,7 +21,6 @@ export const ko = {
     getPaid: "결제 받기",
     security: "보안",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

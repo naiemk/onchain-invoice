@@ -21,7 +21,6 @@ export const zhHans = {
     getPaid: "收款",
     security: "安全",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

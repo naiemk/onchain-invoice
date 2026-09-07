@@ -11,6 +11,8 @@ import {
   encodeConfigureMultisig,
   encodeEnableAdvanced,
   encodeExecuteCallData,
+  encodeRemoveEntity,
+  encodeRemoveKey,
   userOpToTuple,
 } from "../../../commerce/shared/userop.js";
 import {
@@ -181,6 +183,59 @@ export async function buildSignedAddEntityUserOp(input: {
         qx: input.qx,
         qy: input.qy,
         credentialId: input.credentialId,
+      }),
+  });
+}
+
+export async function buildSignedRemoveEntityUserOp(input: {
+  config: WalletPublicConfig;
+  walletAddress: string;
+  adminEntityId: string;
+  entityId: string;
+  qx: string;
+  qy: string;
+  feeAmount: bigint;
+  credentialId?: string;
+}): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
+  return buildPolicyUserOp({
+    config: input.config,
+    walletAddress: input.walletAddress,
+    innerCallData: encodeRemoveEntity(input.entityId),
+    feeAmount: input.feeAmount,
+    sign: (userOpHash) =>
+      buildAdvancedWebAuthnSignature({
+        userOpHash,
+        entityId: input.adminEntityId,
+        qx: input.qx,
+        qy: input.qy,
+        credentialId: input.credentialId,
+      }),
+  });
+}
+
+export async function buildSignedRemoveKeyUserOp(input: {
+  config: WalletPublicConfig;
+  walletAddress: string;
+  adminEntityId: string;
+  adminQx: string;
+  adminQy: string;
+  adminCredentialId?: string;
+  keyId: string;
+  feeAmount: bigint;
+}): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
+  return buildPolicyUserOp({
+    config: input.config,
+    walletAddress: input.walletAddress,
+    innerCallData: encodeRemoveKey(input.keyId),
+    feeAmount: input.feeAmount,
+    sign: (userOpHash) =>
+      buildAdvancedKeySignature({
+        userOpHash,
+        entityId: input.adminEntityId,
+        keyType: KEY_WEBAUTHN,
+        qx: input.adminQx,
+        qy: input.adminQy,
+        credentialId: input.adminCredentialId,
       }),
   });
 }

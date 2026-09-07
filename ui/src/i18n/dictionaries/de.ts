@@ -18,7 +18,6 @@ export const de = {
     getPaid: "Bezahlt werden",
     security: "Sicherheit",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

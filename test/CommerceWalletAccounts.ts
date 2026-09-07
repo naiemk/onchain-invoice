@@ -241,7 +241,55 @@ describe("commerce wallet accounts API", function () {
       const body = (await res.json()) as { wallet: string; totalUsdc: string; chains: unknown[] };
       expect(body.wallet.toLowerCase()).to.equal(address.toLowerCase());
       expect(body.chains).to.be.an("array");
+
+      const queued = await fetch(`${baseUrl}/api/wallet/deployer/accounts?chainId=11155111`, {
+        headers: { "x-api-key": BASE_ENV.SWEEPER_API_KEY },
+      });
+      expect(queued.status).to.equal(200);
+      const queueBody = (await queued.json()) as { accounts: { address: string }[] };
+      expect(queueBody.accounts.some((a) => a.address === address.toLowerCase())).to.equal(true);
     });
+  });
+});
+
+describe("commerce wallet activation queue", function () {
+  it("lists funded wallets first and Refresh (touch) makes a backed-off wallet due now", async function () {
+    const dir = await mkdtemp(join(tmpdir(), "commerce-wallet-act-"));
+    const db = new CommerceDb(join(dir, "test.db"));
+    try {
+      const salt = deriveWalletSalt(QX, QY);
+      const unfunded = "0x0000000000000000000000000000000000000001";
+      const funded = "0x0000000000000000000000000000000000000002";
+      for (const address of [unfunded, funded]) {
+        db.upsertWalletAccount({
+          address,
+          salt,
+          ownerQx: QX,
+          ownerQy: QY,
+          credentialId: `cred-${address}`,
+          webauthnAttestation: null,
+        });
+      }
+
+      db.touchWalletActivation(unfunded, false);
+      db.touchWalletActivation(funded, true);
+      expect(db.listUndeployedWalletAccounts("11155111").map((a) => a.address)).to.deep.equal([
+        funded,
+        unfunded,
+      ]);
+
+      db.recordWalletActivationCheck({ address: funded, funded: false });
+      expect(db.listUndeployedWalletAccounts("11155111").map((a) => a.address)).to.deep.equal([unfunded]);
+
+      db.touchWalletActivation(funded, true);
+      expect(db.listUndeployedWalletAccounts("11155111")[0]?.address).to.equal(funded);
+
+      db.recordWalletActivationCheck({ address: funded, funded: true, error: "rpc timeout" });
+      expect(db.listUndeployedWalletAccounts("11155111")[0]?.address).to.equal(funded);
+    } finally {
+      db.close();
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

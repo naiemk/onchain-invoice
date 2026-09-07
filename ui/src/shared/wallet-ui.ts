@@ -24,6 +24,7 @@ export type WalletTab =
   | "cash"
   | "getPaid"
   | "invoices"
+  | "access"
   | "developers";
 
 export interface WalletRenderOptions {
@@ -327,20 +328,26 @@ export function bindWalletModeToggle(root: HTMLElement, onChange?: (mode: Wallet
 
 export function walletSubnav(current: WalletTab): string {
   const advanced = isAdvancedMode();
+  const isSuperWallet = Boolean(loadWalletSession()?.entityId);
   const links: Array<{ href: string; key: WalletTab; label: string }> = [
     { href: "/wallet", key: "home", label: t("wallet.homeTab") },
     { href: "/wallet/get-paid", key: "getPaid", label: t("wallet.getPaidTab") },
     { href: "/wallet/send", key: "send", label: t("wallet.payTab") },
     { href: "/wallet/cash", key: "cash", label: t("wallet.cashTab") },
-    { href: "/wallet/security", key: "security", label: t("wallet.securityTab") },
   ];
-  if (advanced) {
-    links.push({ href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") });
+  if (isSuperWallet) {
+    links.push({ href: "/wallet/access", key: "access", label: t("wallet.accessTab") });
     links.push({ href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") });
+  } else {
+    links.push({ href: "/wallet/security", key: "security", label: t("wallet.securityTab") });
+    if (advanced) {
+      links.push({ href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") });
+      links.push({ href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") });
+    }
   }
   return `
     <div class="wallet-subnav-row">
-      ${walletModeToggleHtml()}
+      ${isSuperWallet ? "" : walletModeToggleHtml()}
       <nav class="wallet-subnav" aria-label="${escapeHtml(t("wallet.navLabel"))}">
         ${links
           .map((l) =>

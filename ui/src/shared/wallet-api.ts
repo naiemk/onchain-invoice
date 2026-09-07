@@ -24,6 +24,14 @@ export async function fetchWalletBalance(wallet: string): Promise<WalletBalanceR
   return res.json() as Promise<WalletBalanceResponse>;
 }
 
+export function walletChainIsFunded(balance: string | undefined): boolean {
+  try {
+    return BigInt(balance ?? "0") > 0n;
+  } catch {
+    return false;
+  }
+}
+
 export async function registerWalletAccount(input: {
   address: string;
   salt: string;
@@ -270,6 +278,20 @@ export async function waitForUserOp(userOpHash: string, timeoutMs = 120_000): Pr
     await new Promise((r) => setTimeout(r, 2000));
   }
   throw new Error("Timed out waiting for userOp");
+}
+
+export async function fetchWalletTransfers(
+  wallet: string,
+  chainId?: string
+): Promise<{ transfers: import("../../../commerce/shared/wallet.js").WalletTransferRecord[]; syncedAt: string | null }> {
+  const q = new URLSearchParams({ wallet });
+  if (chainId) q.set("chainId", chainId);
+  const res = await fetch(apiUrl(`/api/wallet/transfers?${q}`), { cache: "no-store" });
+  if (!res.ok) throw new Error("failed to load transfers");
+  return res.json() as Promise<{
+    transfers: import("../../../commerce/shared/wallet.js").WalletTransferRecord[];
+    syncedAt: string | null;
+  }>;
 }
 
 /** Resolve primary chain RPC from multi-chain config. */

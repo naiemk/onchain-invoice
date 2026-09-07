@@ -64,8 +64,40 @@ export class WalletDeployerWorker {
       await this.inFlight;
       this.inFlight = null;
       if (this.stopped) break;
-      await sleep(this.config.intervalMs ?? 30_000);
+      await this.waitForNextWork();
     }
+  }
+
+  /**
+   * Sleep up to intervalMs, but wake early when GET /balance (Refresh) pokes a
+   * funded wallet into the undeployed queue.
+   */
+  private async waitForNextWork(): Promise<void> {
+    const idleMs = this.config.intervalMs ?? 30_000;
+    const peekMs = Math.min(3_000, idleMs);
+    const deadline = Date.now() + idleMs;
+    while (!this.stopped) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return;
+      await sleep(Math.min(peekMs, remaining));
+      if (this.stopped) return;
+      try {
+        if (await this.hasDueUndeployedAccounts()) return;
+      } catch {
+        /* keep waiting */
+      }
+    }
+  }
+
+  private async hasDueUndeployedAccounts(): Promise<boolean> {
+    for (const chain of this.config.chains) {
+      if (!chain.rpcUrl?.trim() || isUnsetSecret(chain.privateKey) || !chain.factoryAddress?.trim()) {
+        continue;
+      }
+      const accounts = await this.fetchUndeployedAccounts(String(chain.chainId), 1);
+      if (accounts.length > 0) return true;
+    }
+    return false;
   }
 
   async stopAndWait(): Promise<void> {
@@ -134,14 +166,22 @@ export class WalletDeployerWorker {
           continue;
         }
         await this.trackActivation(account.address, { funded: true });
-        const tx = await factory.createAccount(account.ownerQx, account.ownerQy, account.salt);
-        const receipt = await tx.wait();
-        await this.markDeployed(account.address, String(chain.chainId));
-        await this.trackActivation(account.address, { deployed: true });
-        this.activity?.append("wallet-deployed", {
-          chainId: String(chain.chainId),
-          payload: { address: account.address, txHash: receipt?.hash },
-        });
+        try {
+          const tx = await factory.createAccount(account.ownerQx, account.ownerQy, account.salt);
+          const receipt = await tx.wait();
+          await this.markDeployed(account.address, String(chain.chainId));
+          await this.trackActivation(account.address, { deployed: true });
+          this.activity?.append("wallet-deployed", {
+            chainId: String(chain.chainId),
+            payload: { address: account.address, txHash: receipt?.hash },
+          });
+        } catch (error) {
+          await this.trackActivation(account.address, { funded: true, error: String(error) }).catch(() => undefined);
+          this.activity?.append("deploy-error", {
+            chainId: String(chain.chainId),
+            payload: { address: account.address, error: String(error) },
+          });
+        }
       } catch (error) {
         await this.trackActivation(account.address, { error: String(error) }).catch(() => undefined);
         this.activity?.append("deploy-error", {

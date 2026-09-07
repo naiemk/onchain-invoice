@@ -9,6 +9,7 @@ import {
   userOpToTuple,
 } from "../shared/userop.js";
 import { encodeAdvancedSignature } from "../shared/advanced-wallet.js";
+import { recordProposalTransfers } from "./wallet-transfer-sync.js";
 
 const WALLET_POLICY_ABI = [
   "function advanced() view returns (bool)",
@@ -66,6 +67,21 @@ export function registerWalletAdvancedRoutes(
       }
     }
 
+    const entityDeleteMatch = url.pathname.match(
+      /^\/api\/wallet\/(0x[0-9a-fA-F]{40})\/entities\/(0x[0-9a-fA-F]{64})$/
+    );
+    if (entityDeleteMatch && req.method === "DELETE") {
+      const wallet = getAddress(entityDeleteMatch[1]);
+      const entityId = entityDeleteMatch[2];
+      const ok = db.deleteWalletEntity(wallet, entityId);
+      if (!ok) {
+        handlers.sendJson(res, 404, { error: "entity_not_found" });
+        return true;
+      }
+      handlers.sendJson(res, 200, { ok: true });
+      return true;
+    }
+
     const entityKeysMatch = url.pathname.match(
       /^\/api\/wallet\/(0x[0-9a-fA-F]{40})\/entities\/(0x[0-9a-fA-F]{64})\/keys$/
     );
@@ -90,6 +106,21 @@ export function registerWalletAdvancedRoutes(
         credentialId: body.credentialId != null ? String(body.credentialId) : null,
       });
       handlers.sendJson(res, 200, { key });
+      return true;
+    }
+
+    const entityKeyDeleteMatch = url.pathname.match(
+      /^\/api\/wallet\/(0x[0-9a-fA-F]{40})\/entities\/(0x[0-9a-fA-F]{64})\/keys\/(0x[0-9a-fA-F]{64})$/
+    );
+    if (entityKeyDeleteMatch && req.method === "DELETE") {
+      const wallet = getAddress(entityKeyDeleteMatch[1]);
+      const keyId = entityKeyDeleteMatch[3];
+      const ok = db.deleteWalletEntityKey(wallet, keyId);
+      if (!ok) {
+        handlers.sendJson(res, 404, { error: "key_not_found" });
+        return true;
+      }
+      handlers.sendJson(res, 200, { ok: true });
       return true;
     }
 
@@ -143,6 +174,19 @@ export function registerWalletAdvancedRoutes(
           proposal,
           signatures: db.listWalletProposalSigs(proposalId),
         });
+        return true;
+      }
+
+      if (req.method === "PATCH" && !action) {
+        const body = await handlers.readJson(req);
+        const txHash = String(body.txHash ?? "").trim();
+        if (!txHash) {
+          handlers.sendJson(res, 400, { error: "tx_hash_required" });
+          return true;
+        }
+        const updated = db.updateWalletProposalTxHash(proposalId, txHash);
+        if (updated) recordProposalTransfers(db, appConfig, updated);
+        handlers.sendJson(res, 200, { proposal: updated });
         return true;
       }
 

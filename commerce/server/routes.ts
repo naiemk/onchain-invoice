@@ -59,6 +59,7 @@ import { requireBundler } from "./bundler-auth.js";
 import { registerWalletRoutes } from "./wallet-routes.js";
 import { registerWalletClientRoutes } from "./wallet-client-routes.js";
 import { registerHostedRecoveryRoutes } from "./wallet-hosted-recovery.js";
+import { recordIncludedUserOpTransfers } from "./wallet-transfer-sync.js";
 import { formatUsdFromUsdc } from "../shared/userop.js";
 import type { UserOpStatus } from "../shared/userop.js";
 import { WALLET_ADVANCED_ABI } from "../shared/advanced-wallet.js";
@@ -1160,7 +1161,7 @@ async function claimUserOp(req: IncomingMessage, res: ServerResponse, { config, 
   sendJson(res, 200, { userOp });
 }
 
-async function trackUserOp(req: IncomingMessage, res: ServerResponse, { db }: RouteContext): Promise<void> {
+async function trackUserOp(req: IncomingMessage, res: ServerResponse, { db, config }: RouteContext): Promise<void> {
   const auth = requireBundler(req, db);
   const body = await readJson(req);
   if (typeof body.userOpHash !== "string") {
@@ -1176,6 +1177,7 @@ async function trackUserOp(req: IncomingMessage, res: ServerResponse, { db }: Ro
     expectedVersion: body.expectedVersion !== undefined ? Number(body.expectedVersion) : undefined,
     bundlerAddress: auth.address,
   });
+  recordIncludedUserOpTransfers(db, config, userOp);
   sendJson(res, 200, { userOp });
 }
 

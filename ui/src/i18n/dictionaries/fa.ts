@@ -18,7 +18,6 @@ export const fa = {
     getPaid: "دریافت وجه",
     security: "امنیت",
     developers: "توسعه‌دهندگان",
-    openWorkspace: "باز کردن فضای کار",
   },
 
   locale: {

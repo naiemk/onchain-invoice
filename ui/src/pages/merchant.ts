@@ -13,6 +13,7 @@ import {
 } from "../shared/networks.js";
 import { apiUrl } from "../shared/site.js";
 import type { InvoiceRecord, InvoiceStatus, InvoiceWithEvents } from "../shared/types.js";
+import { loadWalletSession } from "../shared/wallet-session.js";
 
 const STORAGE_KEY = "tc.merchantAddress";
 
@@ -47,7 +48,13 @@ export function renderMerchant(root: HTMLElement): void {
     return;
   }
 
-  const initialAddress = params.get("to") ?? localStorage.getItem(STORAGE_KEY) ?? "";
+  const session = loadWalletSession();
+  const fromWallet = location.pathname.startsWith("/wallet/invoices");
+  const initialAddress =
+    params.get("to") ??
+    (fromWallet ? session?.address : null) ??
+    localStorage.getItem(STORAGE_KEY) ??
+    "";
   const state: MerchantState = {
     address: initialAddress,
     invoices: [],
@@ -312,7 +319,7 @@ export function renderMerchant(root: HTMLElement): void {
   }
 
   function updateListUrl(): void {
-    const url = new URL(location.origin + "/merchant");
+    const url = new URL(location.origin + (fromWallet ? "/wallet/invoices" : "/merchant"));
     if (state.address) url.searchParams.set("to", state.address);
     if (state.status) url.searchParams.set("status", state.status);
     if (state.time !== "all") url.searchParams.set("time", state.time);

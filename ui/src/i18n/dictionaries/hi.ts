@@ -18,7 +18,6 @@ export const hi = {
     getPaid: "भुगतान पाएँ",
     security: "सुरक्षा",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

@@ -21,7 +21,6 @@ export const ru = {
     getPaid: "Получить оплату",
     security: "Безопасность",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

@@ -336,7 +336,13 @@ function bindUpgrade(
       showStatus(status, t("wallet.superWalletEmailRequired"), "error");
       return;
     }
-    if (!window.confirm(t("wallet.superWalletUpgradeConfirm"))) return;
+    const confirmText = [
+      email,
+      t("wallet.superWalletUpgradeConfirmNoVerify"),
+      t("wallet.superWalletUpgradeConfirmSpelling"),
+      t("wallet.superWalletUpgradeConfirm"),
+    ].join("\n\n");
+    if (!window.confirm(confirmText)) return;
     const btn = root.querySelector<HTMLButtonElement>("#enable-advanced");
     setButtonLoading(btn, true);
     try {

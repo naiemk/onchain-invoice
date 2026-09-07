@@ -36,8 +36,13 @@ import type {
   WalletProposalRecord,
   WalletProposalSigRecord,
   WalletProposalStatus,
+  WalletTransferRecord,
+  WalletTransferSyncCursor,
+  WalletTransferDirection,
+  WalletTransferSource,
 } from "../shared/wallet.js";
 import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
+import type { TransferDraft } from "../shared/wallet-transfers.js";
 import { parsePaymentMode } from "../shared/onramper.js";
 import { INVOICE_PERSIST_STREAM, PersistLog, WALLET_PERSIST_STREAM } from "./persist-log.js";
 
@@ -199,6 +204,8 @@ interface WalletProposalRow {
   data: string;
   nonce: string | null;
   status: WalletProposalStatus;
+  tx_hash: string | null;
+  signature_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -210,6 +217,33 @@ interface WalletProposalSigRow {
   key_type: number;
   signature: string;
   created_at: string;
+}
+
+interface WalletTransferRow {
+  id: string;
+  wallet_address: string;
+  chain_id: string;
+  direction: WalletTransferDirection;
+  token_address: string;
+  token_symbol: string;
+  token_decimals: number;
+  amount: string;
+  counterparty: string;
+  tx_hash: string;
+  log_index: number;
+  block_number: number;
+  source: WalletTransferSource;
+  user_op_hash: string | null;
+  proposal_id: string | null;
+  created_at: string;
+}
+
+interface WalletTransferSyncRow {
+  wallet_address: string;
+  chain_id: string;
+  last_block: number;
+  last_log_index: number;
+  last_fetched_at: string;
 }
 
 interface BundlerRow {
@@ -1199,6 +1233,7 @@ export class CommerceDb {
         data TEXT NOT NULL,
         nonce TEXT,
         status TEXT NOT NULL CHECK (status IN ('draft','signing','ready','executed','cancelled')),
+        tx_hash TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -1230,6 +1265,38 @@ export class CommerceDb {
         expires_at TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS wallet_transfers (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        chain_id TEXT NOT NULL,
+        direction TEXT NOT NULL CHECK (direction IN ('in','out')),
+        token_address TEXT NOT NULL,
+        token_symbol TEXT NOT NULL,
+        token_decimals INTEGER NOT NULL,
+        amount TEXT NOT NULL,
+        counterparty TEXT NOT NULL,
+        tx_hash TEXT NOT NULL,
+        log_index INTEGER NOT NULL,
+        block_number INTEGER NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('userop','proposal','explorer')),
+        user_op_hash TEXT,
+        proposal_id TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_transfers_log
+        ON wallet_transfers(chain_id, tx_hash, log_index);
+      CREATE INDEX IF NOT EXISTS idx_wallet_transfers_wallet
+        ON wallet_transfers(wallet_address, chain_id, block_number DESC, log_index DESC);
+
+      CREATE TABLE IF NOT EXISTS wallet_transfer_sync (
+        wallet_address TEXT NOT NULL,
+        chain_id TEXT NOT NULL,
+        last_block INTEGER NOT NULL DEFAULT 0,
+        last_log_index INTEGER NOT NULL DEFAULT 0,
+        last_fetched_at TEXT NOT NULL,
+        PRIMARY KEY (wallet_address, chain_id)
+      );
     `);
 
     this.ensureColumn("invoices", "version", "INTEGER NOT NULL DEFAULT 1");
@@ -1251,6 +1318,7 @@ export class CommerceDb {
     this.ensureColumn("wallet_accounts", "activation_check_count", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("wallet_accounts", "activation_status", "TEXT NOT NULL DEFAULT 'pending'");
     this.ensureColumn("wallet_accounts", "activation_error", "TEXT");
+    this.ensureColumn("wallet_proposals", "tx_hash", "TEXT");
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_wallet_accounts_activation
         ON wallet_accounts(activation_priority_at, activation_status, activation_next_check_at);
@@ -1394,6 +1462,7 @@ export class CommerceDb {
     return row ? mapWalletDevice(row) : null;
   }
 
+  /** Funded wallets first; GET /api/wallet/balance calls touchWalletActivation to make them due now. */
   listUndeployedWalletAccounts(chainId: string, limit = 100): WalletAccountRecord[] {
     const now = new Date().toISOString();
     const rows = this.db
@@ -1446,6 +1515,7 @@ export class CommerceDb {
       ? 0
       : Math.min(24 * 60 * 60_000, Math.max(60_000, 60_000 * 2 ** Math.min(checks - 1, 10)));
     const next = new Date(now.getTime() + delayMs).toISOString();
+    // Keep funded status on deploy errors so the queue still prioritizes them.
     const status = input.deployed ? "deployed" : input.funded ? "funded" : input.error ? "error" : "pending";
     this.db
       .prepare(
@@ -1760,6 +1830,22 @@ export class CommerceDb {
     ).map(mapWalletEntityKey);
   }
 
+  deleteWalletEntity(walletAddress: string, entityId: string): boolean {
+    const addr = walletAddress.toLowerCase();
+    this.db.prepare(`DELETE FROM wallet_entity_keys WHERE wallet_address = ? AND entity_id = ?`).run(addr, entityId);
+    const result = this.db
+      .prepare(`DELETE FROM wallet_entities WHERE wallet_address = ? AND entity_id = ?`)
+      .run(addr, entityId);
+    return result.changes > 0;
+  }
+
+  deleteWalletEntityKey(walletAddress: string, keyId: string): boolean {
+    const result = this.db
+      .prepare(`DELETE FROM wallet_entity_keys WHERE wallet_address = ? AND key_id = ?`)
+      .run(walletAddress.toLowerCase(), keyId);
+    return result.changes > 0;
+  }
+
   createWalletKeyEnrollmentRequest(input: {
     walletAddress: string;
     entityId: string;
@@ -1905,18 +1991,21 @@ export class CommerceDb {
   }
 
   listWalletProposals(walletAddress: string, status?: WalletProposalStatus): WalletProposalRecord[] {
+    const select = `SELECT p.*,
+         (SELECT COUNT(*) FROM wallet_proposal_sigs s WHERE s.proposal_id = p.id) AS signature_count
+         FROM wallet_proposals p`;
     if (status) {
       return (
         this.db
           .prepare(
-            `SELECT * FROM wallet_proposals WHERE wallet_address = ? AND status = ? ORDER BY created_at DESC`
+            `${select} WHERE p.wallet_address = ? AND p.status = ? ORDER BY p.created_at DESC`
           )
           .all(walletAddress.toLowerCase(), status) as WalletProposalRow[]
       ).map(mapWalletProposal);
     }
     return (
       this.db
-        .prepare(`SELECT * FROM wallet_proposals WHERE wallet_address = ? ORDER BY created_at DESC`)
+        .prepare(`${select} WHERE p.wallet_address = ? ORDER BY p.created_at DESC`)
         .all(walletAddress.toLowerCase()) as WalletProposalRow[]
     ).map(mapWalletProposal);
   }
@@ -1928,6 +2017,156 @@ export class CommerceDb {
       .run(status, now, id);
     if (result.changes === 0) return null;
     return this.getWalletProposal(id);
+  }
+
+  updateWalletProposalTxHash(id: string, txHash: string): WalletProposalRecord | null {
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(`UPDATE wallet_proposals SET tx_hash = ?, updated_at = ? WHERE id = ?`)
+      .run(txHash, now, id);
+    if (result.changes === 0) return null;
+    return this.getWalletProposal(id);
+  }
+
+  upsertWalletTransfer(input: TransferDraft & { createdAt?: string }): WalletTransferRecord {
+    const now = input.createdAt ?? new Date().toISOString();
+    const wallet = input.walletAddress.toLowerCase();
+    const chainId = input.chainId;
+    const txHash = input.txHash.toLowerCase();
+    const token = input.tokenAddress.toLowerCase();
+    const counterparty = input.counterparty.toLowerCase();
+    const amount = input.amount;
+    const direction = input.direction;
+
+    const semantic = this.db
+      .prepare(
+        `SELECT * FROM wallet_transfers
+         WHERE chain_id = ? AND tx_hash = ? AND token_address = ? AND amount = ?
+           AND direction = ? AND counterparty = ?`
+      )
+      .get(chainId, txHash, token, amount, direction, counterparty) as WalletTransferRow | undefined;
+    const byLog =
+      semantic ??
+      (this.db
+        .prepare(`SELECT * FROM wallet_transfers WHERE chain_id = ? AND tx_hash = ? AND log_index = ?`)
+        .get(chainId, txHash, input.logIndex) as WalletTransferRow | undefined);
+
+    if (byLog) {
+      const keepManaged = byLog.source === "userop" || byLog.source === "proposal";
+      const source = keepManaged ? byLog.source : input.source;
+      this.db
+        .prepare(
+          `UPDATE wallet_transfers SET
+             log_index = CASE WHEN @incomingLog > log_index THEN @incomingLog ELSE log_index END,
+             block_number = CASE WHEN @incomingBlock > block_number THEN @incomingBlock ELSE block_number END,
+             source = @source,
+             user_op_hash = COALESCE(user_op_hash, @userOpHash),
+             proposal_id = COALESCE(proposal_id, @proposalId)
+           WHERE id = @id`
+        )
+        .run({
+          incomingLog: input.logIndex,
+          incomingBlock: input.blockNumber,
+          source,
+          userOpHash: input.userOpHash,
+          proposalId: input.proposalId,
+          id: byLog.id,
+        });
+      return this.getWalletTransfer(byLog.id)!;
+    }
+
+    const id = randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO wallet_transfers (
+           id, wallet_address, chain_id, direction, token_address, token_symbol, token_decimals,
+           amount, counterparty, tx_hash, log_index, block_number, source, user_op_hash, proposal_id, created_at
+         ) VALUES (
+           @id, @wallet, @chainId, @direction, @token, @symbol, @decimals,
+           @amount, @counterparty, @txHash, @logIndex, @blockNumber, @source, @userOpHash, @proposalId, @now
+         )`
+      )
+      .run({
+        id,
+        wallet,
+        chainId,
+        direction,
+        token,
+        symbol: input.tokenSymbol,
+        decimals: input.tokenDecimals,
+        amount,
+        counterparty,
+        txHash,
+        logIndex: input.logIndex,
+        blockNumber: input.blockNumber,
+        source: input.source,
+        userOpHash: input.userOpHash,
+        proposalId: input.proposalId,
+        now,
+      });
+    return this.getWalletTransfer(id)!;
+  }
+
+  getWalletTransfer(id: string): WalletTransferRecord | null {
+    const row = this.db.prepare(`SELECT * FROM wallet_transfers WHERE id = ?`).get(id) as
+      | WalletTransferRow
+      | undefined;
+    return row ? mapWalletTransfer(row) : null;
+  }
+
+  listWalletTransfers(walletAddress: string, chainId?: string, limit = 50): WalletTransferRecord[] {
+    const wallet = walletAddress.toLowerCase();
+    const rows = chainId
+      ? (this.db
+          .prepare(
+            `SELECT * FROM wallet_transfers
+             WHERE wallet_address = ? AND chain_id = ?
+             ORDER BY block_number DESC, log_index DESC, created_at DESC
+             LIMIT ?`
+          )
+          .all(wallet, chainId, limit) as WalletTransferRow[])
+      : (this.db
+          .prepare(
+            `SELECT * FROM wallet_transfers
+             WHERE wallet_address = ?
+             ORDER BY block_number DESC, log_index DESC, created_at DESC
+             LIMIT ?`
+          )
+          .all(wallet, limit) as WalletTransferRow[]);
+    return rows.map(mapWalletTransfer);
+  }
+
+  getWalletTransferSync(walletAddress: string, chainId: string): WalletTransferSyncCursor | null {
+    const row = this.db
+      .prepare(`SELECT * FROM wallet_transfer_sync WHERE wallet_address = ? AND chain_id = ?`)
+      .get(walletAddress.toLowerCase(), chainId) as WalletTransferSyncRow | undefined;
+    return row ? mapWalletTransferSync(row) : null;
+  }
+
+  upsertWalletTransferSync(input: {
+    walletAddress: string;
+    chainId: string;
+    lastBlock: number;
+    lastLogIndex: number;
+    lastFetchedAt: string;
+  }): WalletTransferSyncCursor {
+    this.db
+      .prepare(
+        `INSERT INTO wallet_transfer_sync (wallet_address, chain_id, last_block, last_log_index, last_fetched_at)
+         VALUES (@wallet, @chainId, @lastBlock, @lastLogIndex, @fetchedAt)
+         ON CONFLICT(wallet_address, chain_id) DO UPDATE SET
+           last_block = excluded.last_block,
+           last_log_index = excluded.last_log_index,
+           last_fetched_at = excluded.last_fetched_at`
+      )
+      .run({
+        wallet: input.walletAddress.toLowerCase(),
+        chainId: input.chainId,
+        lastBlock: input.lastBlock,
+        lastLogIndex: input.lastLogIndex,
+        fetchedAt: input.lastFetchedAt,
+      });
+    return this.getWalletTransferSync(input.walletAddress, input.chainId)!;
   }
 
   addWalletProposalSig(input: {
@@ -3356,6 +3595,8 @@ function mapWalletProposal(row: WalletProposalRow): WalletProposalRecord {
     data: row.data,
     nonce: row.nonce,
     status: row.status,
+    txHash: row.tx_hash ?? null,
+    signatureCount: row.signature_count != null ? Number(row.signature_count) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -3369,6 +3610,37 @@ function mapWalletProposalSig(row: WalletProposalSigRow): WalletProposalSigRecor
     keyType: row.key_type,
     signature: row.signature,
     createdAt: row.created_at,
+  };
+}
+
+function mapWalletTransfer(row: WalletTransferRow): WalletTransferRecord {
+  return {
+    id: row.id,
+    walletAddress: row.wallet_address,
+    chainId: row.chain_id,
+    direction: row.direction,
+    tokenAddress: row.token_address,
+    tokenSymbol: row.token_symbol,
+    tokenDecimals: row.token_decimals,
+    amount: row.amount,
+    counterparty: row.counterparty,
+    txHash: row.tx_hash,
+    logIndex: row.log_index,
+    blockNumber: row.block_number,
+    source: row.source,
+    userOpHash: row.user_op_hash,
+    proposalId: row.proposal_id,
+    createdAt: row.created_at,
+  };
+}
+
+function mapWalletTransferSync(row: WalletTransferSyncRow): WalletTransferSyncCursor {
+  return {
+    walletAddress: row.wallet_address,
+    chainId: row.chain_id,
+    lastBlock: row.last_block,
+    lastLogIndex: row.last_log_index,
+    lastFetchedAt: row.last_fetched_at,
   };
 }
 

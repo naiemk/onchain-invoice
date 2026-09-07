@@ -18,7 +18,6 @@ export const nl = {
     getPaid: "Betaald worden",
     security: "Beveiliging",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

@@ -22,7 +22,6 @@ export const it = {
     getPaid: "Incassa",
     security: "Sicurezza",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {
