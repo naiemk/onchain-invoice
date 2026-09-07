@@ -22,6 +22,7 @@ import { confirmOnramperOfframpTransaction } from "../shared/onramper-confirm.js
 import type { CommerceDb } from "./db.js";
 import { verifyCaptcha } from "./captcha.js";
 import { registerWalletAdvancedRoutes } from "./wallet-advanced-routes.js";
+import { enqueueWalletTransferSync } from "./wallet-transfer-sync.js";
 import {
   verifyWebAuthnAssertion,
   type WebAuthnAssertionJson,
@@ -369,6 +370,29 @@ export function registerWalletRoutes(
         return true;
       }
       handlers.sendJson(res, 400, { error: "unknown action" });
+      return true;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/wallet/transfers") {
+      const wallet = url.searchParams.get("wallet")?.trim();
+      const chainId = url.searchParams.get("chainId")?.trim() || undefined;
+      if (!wallet || !isAddress(wallet)) {
+        handlers.sendJson(res, 400, { error: "wallet required" });
+        return true;
+      }
+      const transfers = db.listWalletTransfers(wallet, chainId);
+      const chains = chainId
+        ? [chainId]
+        : walletConfig.chains.length
+          ? walletConfig.chains.map((c) => c.chainId)
+          : [walletConfig.chainId];
+      let syncedAt: string | null = null;
+      for (const id of chains) {
+        enqueueWalletTransferSync(db, appConfig, wallet, id);
+        const cursor = db.getWalletTransferSync(wallet, id);
+        if (cursor && (!syncedAt || cursor.lastFetchedAt > syncedAt)) syncedAt = cursor.lastFetchedAt;
+      }
+      handlers.sendJson(res, 200, { transfers, syncedAt });
       return true;
     }
 

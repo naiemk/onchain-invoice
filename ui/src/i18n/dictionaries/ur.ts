@@ -18,7 +18,6 @@ export const ur = {
     getPaid: "ادائیگی وصول کریں",
     security: "سیکیورٹی",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

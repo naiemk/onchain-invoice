@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getAddress, isAddress, isHexString } from "ethers";
+import { Contract, JsonRpcProvider, formatUnits, getAddress, isAddress, isHexString } from "ethers";
+import { ArrowUpRight, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,12 +13,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageCard, PageSplit } from "@/components/PageSplit";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ExplorerLink } from "@/components/ExplorerLink";
+import { SendScanButton } from "@/components/SendScanDialog";
 import { useLocale } from "@/providers/LocaleProvider";
-import { fetchWalletConfig, waitForUserOp } from "@/shared/wallet-api.js";
+import { fetchWalletConfig, primaryChain, waitForUserOp } from "@/shared/wallet-api.js";
 import {
   attachProposalTx,
   createProposal,
@@ -31,7 +33,7 @@ import {
   type AdvancedPolicy,
 } from "@/shared/wallet-advanced-api.js";
 import { signProposalUserOp } from "@/shared/advanced-userop-client.js";
-import { encodeErc20Transfer, parseUsdcInput } from "../../../../../commerce/shared/userop.js";
+import { ERC20_ABI, encodeErc20Transfer, parseUsdcInput } from "../../../../../commerce/shared/userop.js";
 import { KEY_EOA } from "../../../../../commerce/shared/advanced-wallet.js";
 import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 import { connectEoaWallet, getConnectedEoaAddress, initEoaConnector } from "@/shared/eoa-connector.js";
@@ -41,7 +43,8 @@ import type {
   WalletPublicConfig,
 } from "../../../../../commerce/shared/wallet.js";
 import { WalletFrame } from "./WalletFrame";
-import { isClosedProposal, isFullySigned, proposalSummary, shortAddr } from "./proposal-display";
+import { isClosedProposal, isFullySigned, ProposalSummaryLine } from "./proposal-display";
+import { TxHistory } from "./TxHistory";
 
 type StatusKind = "info" | "error" | "success";
 type CreateKind = "transfer" | "call";
@@ -61,6 +64,11 @@ export function SuperPayPage() {
   const [createKind, setCreateKind] = useState<CreateKind>("transfer");
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [selectedTokenSymbol, setSelectedTokenSymbol] = useState("USDC");
+  const [tokenBalances, setTokenBalances] = useState<Record<string, bigint>>({});
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);
   const [callTarget, setCallTarget] = useState("");
   const [callValue, setCallValue] = useState("0");
   const [callData, setCallData] = useState("0x");
@@ -134,28 +142,116 @@ export function SuperPayPage() {
     [proposals, closedView]
   );
 
+  const chain = useMemo(() => (config ? primaryChain(config) : null), [config]);
+  const tokenOptions = useMemo(
+    () =>
+      chain
+        ? [
+            {
+              symbol: chain.feeTokenSymbol,
+              address: chain.feeTokenAddress,
+              decimals: chain.feeTokenDecimals,
+            },
+            ...(chain.stableTokens ?? []),
+          ].filter((token, index, arr) => token.address && arr.findIndex((tok) => tok.symbol === token.symbol) === index)
+        : [],
+    [chain]
+  );
+  const selectedToken = tokenOptions.find((token) => token.symbol === selectedTokenSymbol) ?? tokenOptions[0];
+  const tokenDecimals = selectedToken?.decimals ?? chain?.feeTokenDecimals ?? 6;
+  const selectedTokenBalance = selectedToken ? tokenBalances[selectedToken.symbol] ?? 0n : 0n;
+  const selectedPaysFee = Boolean(
+    selectedToken?.address && chain?.feeTokenAddress && selectedToken.address.toLowerCase() === chain.feeTokenAddress.toLowerCase()
+  );
+  const maxSendAtoms = selectedPaysFee
+    ? selectedTokenBalance > BigInt(config?.bundlerFeeUsdc || "0")
+      ? selectedTokenBalance - BigInt(config?.bundlerFeeUsdc || "0")
+      : 0n
+    : selectedTokenBalance;
+  const selectedAvailable = formatUnits(selectedTokenBalance, tokenDecimals);
+  const feeUsd = config?.bundlerFeeUsd ?? "—";
+
+  useEffect(() => {
+    if (!session || !config || !chain || !tokenOptions.length) return;
+    if (!tokenOptions.some((token) => token.symbol === selectedTokenSymbol)) {
+      setSelectedTokenSymbol(tokenOptions[0]?.symbol ?? "USDC");
+    }
+    let cancelled = false;
+    void Promise.all(
+      tokenOptions.map(async (token) => {
+        if (!token.address || !chain.rpcUrl) return [token.symbol, 0n] as const;
+        try {
+          const provider = new JsonRpcProvider(chain.rpcUrl);
+          const contract = new Contract(token.address, ERC20_ABI, provider);
+          return [token.symbol, BigInt(await contract.balanceOf(session.address))] as const;
+        } catch {
+          return [token.symbol, 0n] as const;
+        }
+      })
+    ).then((rows) => {
+      if (!cancelled) setTokenBalances(Object.fromEntries(rows));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chain, config, selectedTokenSymbol, session, tokenOptions]);
+
+  const handleScan = useCallback((result: { recipient: string; amount?: string }) => {
+    setRecipient(result.recipient);
+    if (result.amount) setAmount(result.amount);
+    setStatus(null);
+  }, []);
+
+  const openReview = () => {
+    if (!config || !session || !selectedToken?.address) return;
+    if (!isAddress(recipient)) {
+      setStatus({ kind: "error", message: t("wallet.sendInvalidRecipient") });
+      return;
+    }
+    const parsed = parseUsdcInput(amount, selectedToken.decimals);
+    if (parsed === null || parsed <= 0n) {
+      setStatus({ kind: "error", message: t("wallet.sendInvalidAmount") });
+      return;
+    }
+    const feeAtoms = BigInt(config.bundlerFeeUsdc || "0");
+    if (parsed > selectedTokenBalance || (selectedPaysFee && parsed + feeAtoms > selectedTokenBalance)) {
+      setStatus({ kind: "error", message: t("wallet.sendInsufficientBalance") });
+      return;
+    }
+    setStatus(null);
+    setReviewOpen(true);
+  };
+
   const createTransfer = async () => {
     if (!session || !config) return;
     if (!isAddress(recipient)) {
       setStatus({ kind: "error", message: t("wallet.sendInvalidRecipient") });
       return;
     }
-    const chain = config.chains.find((c) => c.chainId === config.chainId);
-    if (!chain?.feeTokenAddress) {
+    const token = selectedToken;
+    if (!token?.address) {
       setStatus({ kind: "error", message: t("wallet.sendNotDeployed") });
       return;
     }
+    const sendAmount = parseUsdcInput(amount, token.decimals);
+    if (sendAmount === null || sendAmount <= 0n) {
+      setStatus({ kind: "error", message: t("wallet.sendInvalidAmount") });
+      return;
+    }
     setBusy("create");
+    setReviewOpen(false);
     try {
-      const sendAmount = parseUsdcInput(amount, config.feeTokenDecimals);
       const data = encodeErc20Transfer(getAddress(recipient), sendAmount);
       const proposal = await createProposal({
         walletAddress: session.address,
         chainId: config.chainId,
-        target: chain.feeTokenAddress,
+        target: token.address,
         value: "0",
         data,
       });
+      setRecipient("");
+      setAmount("");
+      setNote("");
       setSearchParams({ id: proposal.id }, { replace: true });
       await reloadList(session);
       await loadDetail(proposal.id, session);
@@ -286,6 +382,7 @@ export function SuperPayPage() {
         await attachProposalTx(session.address, detail.proposal.id, result.txHash);
       }
       setStatus({ kind: "success", message: t("wallet.proposalsExecuted") });
+      setHistoryKey((n) => n + 1);
       await reloadList(session);
       await loadDetail(detail.proposal.id, session);
     } catch (error) {
@@ -316,8 +413,8 @@ export function SuperPayPage() {
             <Skeleton className="h-24 w-full" />
           </div>
         ) : (
+          <>
           <PageSplit>
-            <div className="space-y-6">
               <PageCard>
                 <div className="mb-4 flex flex-wrap gap-2">
                   <Button
@@ -341,32 +438,85 @@ export function SuperPayPage() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="prop-recipient">{t("wallet.sendRecipient")}</Label>
-                      <Input
-                        id="prop-recipient"
-                        type="text"
-                        className="font-mono"
-                        placeholder="0x…"
-                        value={recipient}
-                        onChange={(e) => setRecipient(e.target.value)}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          id="prop-recipient"
+                          type="text"
+                          className="font-mono"
+                          placeholder="0x…"
+                          value={recipient}
+                          disabled={busy !== null}
+                          onChange={(e) => setRecipient(e.target.value)}
+                        />
+                        <SendScanButton onScan={handleScan} tokenDecimals={tokenDecimals} disabled={busy !== null} />
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="prop-amount">{t("wallet.sendAmount")}</Label>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="prop-amount">{t("wallet.sendAmount")}</Label>
+                        <Select
+                          value={selectedToken?.symbol ?? selectedTokenSymbol}
+                          onValueChange={setSelectedTokenSymbol}
+                          disabled={busy !== null || tokenOptions.length <= 1}
+                        >
+                          <SelectTrigger id="send-token" className="h-9 w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tokenOptions.map((token) => (
+                              <SelectItem key={token.symbol} value={token.symbol}>
+                                {token.symbol}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <Input
                         id="prop-amount"
                         type="text"
                         inputMode="decimal"
+                        placeholder="0.00"
                         value={amount}
+                        disabled={busy !== null}
                         onChange={(e) => setAmount(e.target.value)}
+                      />
+                      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                        <span>
+                          {t("wallet.sendAvailable", {
+                            amount: selectedAvailable,
+                            symbol: selectedToken?.symbol ?? "",
+                          })}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={busy !== null || maxSendAtoms <= 0n}
+                          onClick={() => setAmount(formatUnits(maxSendAtoms, tokenDecimals))}
+                        >
+                          {t("wallet.max")}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="prop-note">{t("wallet.sendNoteOptional")}</Label>
+                      <Input
+                        id="prop-note"
+                        placeholder={t("wallet.sendNotePlaceholder")}
+                        value={note}
+                        disabled={busy !== null}
+                        onChange={(e) => setNote(e.target.value)}
                       />
                     </div>
                     <Button
-                      id="create-proposal"
+                      id="review-proposal"
                       type="button"
                       disabled={busy === "create"}
-                      onClick={() => void createTransfer()}
+                      onClick={openReview}
                     >
-                      {t("wallet.proposalsCreateCta")}
+                      {t("wallet.sendReview")}
+                      <ArrowUpRight className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ) : (
@@ -414,8 +564,24 @@ export function SuperPayPage() {
                   </div>
                 )}
               </PageCard>
-
-              <PageCard>
+              {createKind === "transfer" && (
+                <PageCard>
+                  <Shield className="mb-3 h-5 w-5 text-emphasis" aria-hidden />
+                  <h2 className="text-base font-semibold">{t("wallet.sendPauseTitle")}</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">{t("wallet.sendPauseBody")}</p>
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    {t("wallet.sendNetworkFeeLine", { fee: feeUsd })}
+                  </p>
+                  <p className="mt-2 text-sm">
+                    {t("wallet.sendAvailable", {
+                      amount: selectedAvailable,
+                      symbol: selectedToken?.symbol ?? "",
+                    })}
+                  </p>
+                </PageCard>
+              )}
+          </PageSplit>
+            <PageCard>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-base font-semibold">
                     {closedView ? t("wallet.proposalsClosed") : t("wallet.proposalsOpen")}
@@ -450,11 +616,10 @@ export function SuperPayPage() {
                               {fully && p.status !== "executed" && p.status !== "cancelled" && (
                                 <StatusBadge tone="verified">{t("wallet.proposalsFullySigned")}</StatusBadge>
                               )}
-                              {p.status === "executed" && p.txHash && (
-                                <ExplorerLink chainId={p.chainId} value={p.txHash} kind="tx" />
-                              )}
                             </div>
-                            <p className="truncate text-sm">{proposalSummary(p, t, decimals)}</p>
+                            <p className="truncate text-sm">
+                              <ProposalSummaryLine proposal={p} t={t} decimals={decimals} tokens={tokenOptions} />
+                            </p>
                             <p className="font-mono text-xs text-muted-foreground">
                               {t("wallet.proposalsSigCount", {
                                 count: String(p.signatureCount ?? 0),
@@ -498,10 +663,51 @@ export function SuperPayPage() {
                   {status.message}
                 </p>
               )}
+            <div className="mt-6">
+              <TxHistory wallet={session.address} chainId={config?.chainId} refreshKey={historyKey} />
             </div>
-          </PageSplit>
+          </>
         )}
       </div>
+
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("wallet.sendReviewTitle")}</DialogTitle>
+            <DialogDescription>{t("wallet.sendPauseBody")}</DialogDescription>
+          </DialogHeader>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">{t("wallet.sendRecipient")}</dt>
+              <dd className="font-mono text-end">{recipient.slice(0, 10)}…</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">{t("wallet.sendAmount")}</dt>
+              <dd>
+                {amount} {selectedToken?.symbol ?? ""}
+              </dd>
+            </div>
+            {note.trim() ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">{t("wallet.sendNoteOptional")}</dt>
+                <dd className="text-end">{note}</dd>
+              </div>
+            ) : null}
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">{t("wallet.networkFee")}</dt>
+              <dd>{feeUsd}</dd>
+            </div>
+          </dl>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setReviewOpen(false)}>
+              {t("wallet.cancel")}
+            </Button>
+            <Button id="create-proposal" type="button" disabled={busy === "create"} onClick={() => void createTransfer()}>
+              {t("wallet.proposalsCreateCta")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(detail && policy)}
@@ -516,11 +722,11 @@ export function SuperPayPage() {
           <DialogContent id="proposal-detail">
             <DialogHeader>
               <DialogTitle>{t("wallet.proposalsDetail")}</DialogTitle>
-              <DialogDescription className="font-mono text-xs">
-                {shortAddr(detail.proposal.target)} · {detail.proposal.status}
-              </DialogDescription>
+              <DialogDescription>{detail.proposal.status}</DialogDescription>
             </DialogHeader>
-            <p className="text-sm">{proposalSummary(detail.proposal, t, decimals)}</p>
+            <p className="text-sm">
+              <ProposalSummaryLine proposal={detail.proposal} t={t} decimals={decimals} tokens={tokenOptions} />
+            </p>
             <p className="text-sm">
               {t("wallet.proposalsSigCount", {
                 count: String(detail.signatures.length),
@@ -533,12 +739,6 @@ export function SuperPayPage() {
                 ? ` · ${t("wallet.proposalsFullySigned")}`
                 : ` · ${t("wallet.proposalsAwaitingSignatures")}`}
             </p>
-            {detail.proposal.txHash && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-mono text-xs">{shortAddr(detail.proposal.txHash)}</span>
-                <ExplorerLink chainId={detail.proposal.chainId} value={detail.proposal.txHash} kind="tx" />
-              </div>
-            )}
             <DialogFooter className="flex-col gap-2 sm:flex-row">
               <Button
                 id="sign-proposal"

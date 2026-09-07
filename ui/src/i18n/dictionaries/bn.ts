@@ -18,7 +18,6 @@ export const bn = {
     getPaid: "পেমেন্ট নিন",
     security: "নিরাপত্তা",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

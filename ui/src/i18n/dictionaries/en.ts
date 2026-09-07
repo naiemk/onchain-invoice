@@ -27,7 +27,6 @@ export const en = {
     getPaid: "Get paid",
     security: "Security",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   footer: {

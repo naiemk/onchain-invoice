@@ -239,12 +239,22 @@ test.describe("Super Wallet UI", () => {
     await expect(page.getByTestId("super-wallet-home-summary")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Wallet navigation" })).toContainText("Access");
     await expect(page.getByRole("navigation", { name: "Wallet navigation" })).not.toContainText("Super Wallet");
+    await expect(page.getByRole("navigation", { name: "Wallet navigation" })).not.toContainText("Security");
     await expect(page.getByRole("group", { name: "Wallet mode" })).toHaveCount(0);
+
+    await page.goto("/wallet/security");
+    await expect(page).toHaveURL(/\/wallet\/access/);
+    await page.goto("/wallet/recover");
+    await expect(page).toHaveURL(/\/wallet\/access/);
 
     await page.goto("/wallet/send");
     await expect(page.getByTestId("super-wallet-pay")).toBeVisible();
     await expect(page.getByRole("button", { name: "Send tokens" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Contract call" })).toBeVisible();
+    await expect(page.locator("#send-token")).toBeVisible();
+    await expect(page.locator("#prop-amount")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Review payment" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Max" })).toBeVisible();
 
     await page.goto("/wallet/super-wallet");
     await expect(page).toHaveURL(/\/wallet\/?$/);

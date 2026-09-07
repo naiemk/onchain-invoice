@@ -38,6 +38,7 @@ import { ERC20_ABI, parseUsdcInput } from "../../../../../commerce/shared/userop
 import { WalletFrame } from "./WalletFrame";
 import { SuperPayPage } from "./SuperPayPage";
 import { useWalletPolicy } from "./wallet-policy";
+import { TxHistory } from "./TxHistory";
 
 function formatSendRejectReason(reason: string | null | undefined, t: (key: string, vars?: Record<string, string | number>) => string): string {
   switch (reason) {
@@ -81,6 +82,7 @@ function SimpleSendPage() {
   const [successTxHash, setSuccessTxHash] = useState<string | null>(null);
   const [txCopied, setTxCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);
   const [advancedEntityId, setAdvancedEntityId] = useState<string | null>(null);
 
   const loadActivation = useCallback(async (active: WalletSession, cfg: WalletPublicConfig) => {
@@ -291,6 +293,7 @@ function SimpleSendPage() {
         setRecipient("");
         setAmount("");
         setNote("");
+        setHistoryKey((n) => n + 1);
         return;
       }
       setStatus({ kind: "error", message: formatSendRejectReason(result.rejectReason, t) });
@@ -505,6 +508,10 @@ function SimpleSendPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <div className="mt-6">
+        <TxHistory wallet={session.address} chainId={config?.chainId} refreshKey={historyKey} />
+      </div>
 
       <p className="mt-4 text-sm text-muted-foreground">
         <Link to="/wallet/withdraw" className="text-primary hover:underline">

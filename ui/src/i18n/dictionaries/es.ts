@@ -22,7 +22,6 @@ export const es = {
     getPaid: "Cobrar",
     security: "Seguridad",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

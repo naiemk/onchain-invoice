@@ -18,7 +18,6 @@ export const vi = {
     getPaid: "Nhận thanh toán",
     security: "Bảo mật",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

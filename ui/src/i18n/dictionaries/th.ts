@@ -18,7 +18,6 @@ export const th = {
     getPaid: "รับชำระเงิน",
     security: "ความปลอดภัย",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

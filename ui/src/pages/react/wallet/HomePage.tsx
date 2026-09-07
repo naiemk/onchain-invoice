@@ -35,7 +35,7 @@ import { isAdvancedMode } from "@/shared/wallet-mode.js";
 import type { WalletBalanceChain, WalletProposalRecord } from "../../../../../commerce/shared/wallet.js";
 import { WalletFrame } from "./WalletFrame";
 import { useWalletPolicy } from "./wallet-policy";
-import { isClosedProposal, isFullySigned, proposalSummary } from "./proposal-display";
+import { isClosedProposal, isFullySigned, ProposalSummaryLine } from "./proposal-display";
 import { StatusBadge } from "@/components/StatusBadge";
 
 function ChainBalanceList({ chains, t }: { chains: WalletBalanceChain[]; t: (k: string, v?: Record<string, string | number>) => string }) {
@@ -144,6 +144,10 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
   }, [activating, loadBalance]);
 
   useEffect(() => {
+    if (isSuperWallet) {
+      setPendingRecovery(false);
+      return;
+    }
     void (async () => {
       try {
         const recovery = await fetchWalletRecovery(session.address);
@@ -152,7 +156,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
         /* ignore */
       }
     })();
-  }, [session.address]);
+  }, [isSuperWallet, session.address]);
 
   useEffect(() => {
     if (advanced) return;
@@ -214,26 +218,28 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
         });
       }
 
-      items.push(
-        {
-          id: "devices",
-          title: t("wallet.advancedDevicesTitle"),
-          description: t(devicesBodyKey, { count: deviceCount }),
-          href: "/wallet/security",
-        },
-        {
-          id: "recovery",
-          title: t("wallet.advancedRecoveryTitle"),
-          description: t("wallet.advancedRecoveryBody"),
-          href: "/wallet/security#recovery",
-        },
-        {
-          id: "invoices",
-          title: t("wallet.advancedInvoicesTitle"),
-          description: t("wallet.advancedInvoicesBody"),
-          href: "/wallet/invoices",
-        }
-      );
+      if (!onChainAdvanced) {
+        items.push(
+          {
+            id: "devices",
+            title: t("wallet.advancedDevicesTitle"),
+            description: t(devicesBodyKey, { count: deviceCount }),
+            href: "/wallet/security",
+          },
+          {
+            id: "recovery",
+            title: t("wallet.advancedRecoveryTitle"),
+            description: t("wallet.advancedRecoveryBody"),
+            href: "/wallet/security#recovery",
+          }
+        );
+      }
+      items.push({
+        id: "invoices",
+        title: t("wallet.advancedInvoicesTitle"),
+        description: t("wallet.advancedInvoicesBody"),
+        href: "/wallet/invoices",
+      });
 
       setNotices(items);
     })();
@@ -309,7 +315,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
             </AlertDescription>
           </Alert>
         )}
-        {pendingRecovery && (
+        {pendingRecovery && !isSuperWallet && (
           <Alert variant="warn">
             <AlertDescription>
               {t("wallet.pendingRecovery")}{" "}
@@ -353,7 +359,9 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
                   {openProposals.map((p) => (
                     <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2">
                       <div className="min-w-0 space-y-1">
-                        <p className="truncate text-sm">{proposalSummary(p, t)}</p>
+                        <p className="truncate text-sm">
+                          <ProposalSummaryLine proposal={p} t={t} />
+                        </p>
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusBadge tone="pending">{p.status}</StatusBadge>
                           {isFullySigned(p, policy.threshold) ? (
@@ -379,13 +387,15 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
           </section>
         )}
         {advanced && notices.length > 0 && <NoticeCarousel items={notices} />}
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium">{t("wallet.thisDeviceChip")}</span>{" "}
-          <Link to="/wallet/security" className="text-primary hover:underline">
-            {t("wallet.manageDevices")}
-          </Link>{" "}
-          · {t("wallet.pairOtherDevices")}
-        </p>
+        {!isSuperWallet && (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium">{t("wallet.thisDeviceChip")}</span>{" "}
+            <Link to="/wallet/security" className="text-primary hover:underline">
+              {t("wallet.manageDevices")}
+            </Link>{" "}
+            · {t("wallet.pairOtherDevices")}
+          </p>
+        )}
         {chains.length > 0 && (
           <section className="rounded-xl border border-border bg-card p-5">
             <h2 className="mb-3 text-sm font-semibold">{t("wallet.byChain")}</h2>

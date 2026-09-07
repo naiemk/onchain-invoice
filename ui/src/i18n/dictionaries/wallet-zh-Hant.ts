@@ -502,4 +502,9 @@ export const walletZhHant = {
   userOpInsufficientBalance: "Not enough USDC in this wallet to cover the network fee.",
   userOpSimulationRevert: "The transaction would fail on-chain. Check your balance and try again.",
   userOpExecutionReverted: "The transaction was mined but did not succeed. Your wallet was not changed.",
+  txHistoryTitle: "Activity",
+  txHistoryEmpty: "No transfers yet.",
+  txHistoryIn: "Received",
+  txHistoryOut: "Sent",
+  txHistoryLoading: "Loading activity…",
 };

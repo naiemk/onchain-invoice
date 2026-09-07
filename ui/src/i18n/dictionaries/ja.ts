@@ -21,7 +21,6 @@ export const ja = {
     getPaid: "受け取る",
     security: "セキュリティ",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

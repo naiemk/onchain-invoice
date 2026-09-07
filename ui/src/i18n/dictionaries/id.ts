@@ -21,7 +21,6 @@ export const id = {
     getPaid: "Terima pembayaran",
     security: "Keamanan",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

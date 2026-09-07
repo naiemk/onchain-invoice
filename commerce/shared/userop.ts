@@ -198,6 +198,34 @@ export function encodeExecuteCallData(calls: BatchCall[]): string {
   return walletIface.encodeFunctionData("execute", [ERC7821_BATCH_MODE, encodeBatch(calls)]);
 }
 
+export function decodeErc20TransferCall(data: string): { to: string; amount: bigint } | null {
+  try {
+    const parsed = erc20Iface.parseTransaction({ data });
+    if (parsed?.name !== "transfer") return null;
+    return { to: getAddress(String(parsed.args[0])), amount: BigInt(parsed.args[1]) };
+  } catch {
+    return null;
+  }
+}
+
+/** Decode `execute(mode, executionData)` into the inner ERC-7821 batch calls. */
+export function decodeExecuteCalls(callData: string): BatchCall[] {
+  try {
+    const parsed = walletIface.parseTransaction({ data: callData });
+    if (parsed?.name !== "execute") return [];
+    const executionData = String(parsed.args[1] ?? "0x");
+    const decoded = coder.decode(["tuple(address target, uint256 value, bytes data)[]"], executionData);
+    const calls = decoded[0] as Array<[string, bigint, string]>;
+    return calls.map(([target, value, data]) => ({
+      target: getAddress(target),
+      value: BigInt(value),
+      data,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export function buildFeeTransferCall(feeToken: string, beneficiary: string, feeAmount: bigint): BatchCall {
   return {
     target: getAddress(feeToken),

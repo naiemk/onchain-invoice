@@ -527,4 +527,9 @@ export const walletEn = {
   keyPublicHint: "YubiKey uses the same public key format as a passkey (P-256 coordinates).",
   advancedDevicesBodySuper: "{count} key(s) — invite teammates",
   advancedDevicesBodySimple: "{count} device(s) — pair or remove",
+  txHistoryTitle: "Activity",
+  txHistoryEmpty: "No transfers yet.",
+  txHistoryIn: "Received",
+  txHistoryOut: "Sent",
+  txHistoryLoading: "Loading activity…",
 };

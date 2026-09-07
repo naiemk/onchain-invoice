@@ -280,6 +280,20 @@ export async function waitForUserOp(userOpHash: string, timeoutMs = 120_000): Pr
   throw new Error("Timed out waiting for userOp");
 }
 
+export async function fetchWalletTransfers(
+  wallet: string,
+  chainId?: string
+): Promise<{ transfers: import("../../../commerce/shared/wallet.js").WalletTransferRecord[]; syncedAt: string | null }> {
+  const q = new URLSearchParams({ wallet });
+  if (chainId) q.set("chainId", chainId);
+  const res = await fetch(apiUrl(`/api/wallet/transfers?${q}`), { cache: "no-store" });
+  if (!res.ok) throw new Error("failed to load transfers");
+  return res.json() as Promise<{
+    transfers: import("../../../commerce/shared/wallet.js").WalletTransferRecord[];
+    syncedAt: string | null;
+  }>;
+}
+
 /** Resolve primary chain RPC from multi-chain config. */
 export function primaryChain(config: WalletPublicConfig) {
   const chain = config.chains?.find((c) => c.chainId === config.chainId) ?? config.chains?.[0];

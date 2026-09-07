@@ -208,18 +208,20 @@ function WalletSubnav({ current }: { current: WalletTab }) {
       { href: "/wallet/get-paid", key: "getPaid", label: t("wallet.getPaidTab") },
       { href: "/wallet/send", key: "send", label: t("wallet.payTab") },
       { href: "/wallet/cash", key: "cash", label: t("wallet.cashTab") },
-      { href: "/wallet/security", key: "security", label: t("wallet.securityTab") },
     ];
     if (isSuperWallet) {
       items.push(
         { href: "/wallet/access", key: "access", label: t("wallet.accessTab") },
         { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
       );
-    } else if (advanced) {
-      items.push(
-        { href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") },
-        { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
-      );
+    } else {
+      items.push({ href: "/wallet/security", key: "security", label: t("wallet.securityTab") });
+      if (advanced) {
+        items.push(
+          { href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") },
+          { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
+        );
+      }
     }
     return items;
   }, [t, advanced, isSuperWallet]);

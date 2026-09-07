@@ -108,11 +108,15 @@ function paintDashboard(
               </div>`
             : ""
         }
-        <p class="wallet-device-status">
+        ${
+          session.entityId
+            ? ""
+            : `<p class="wallet-device-status">
           <span class="wallet-device-status-label">${escapeHtml(t("wallet.thisDeviceChip"))}</span>
           <a href="/wallet/security" data-route>${escapeHtml(t("wallet.manageDevices"))}</a>
           <span class="wallet-device-status-hint">${escapeHtml(t("wallet.pairOtherDevices"))}</span>
-        </p>
+        </p>`
+        }
         ${opts.chainHtml}
       </div>
       <p id="wallet-home-status" class="status wallet-status" role="status" hidden></p>
@@ -125,15 +129,17 @@ function paintDashboard(
   void (async () => {
     const attention = root.querySelector<HTMLElement>("#wallet-needs-attention");
     try {
-      const recovery = await fetchWalletRecovery(session.address);
-      if (recovery.request || recovery.pendingOwner?.active) {
-        if (attention) {
-          attention.hidden = false;
-          attention.classList.remove("hidden");
-          attention.innerHTML = `
+      if (!session.entityId) {
+        const recovery = await fetchWalletRecovery(session.address);
+        if (recovery.request || recovery.pendingOwner?.active) {
+          if (attention) {
+            attention.hidden = false;
+            attention.classList.remove("hidden");
+            attention.innerHTML = `
             <p class="banner warn">${escapeHtml(t("wallet.pendingRecovery"))}
               <a href="/wallet/security#recovery" data-route>${escapeHtml(t("wallet.recoverOpen"))}</a>
             </p>`;
+          }
         }
       }
     } catch {
@@ -166,21 +172,21 @@ function paintDashboard(
           <strong>${escapeHtml(t("wallet.superWalletHomeCta"))}</strong>
           <span>${escapeHtml(t("wallet.superWalletHomeBanner"))}</span>
         </a>`
-      : `<a class="wallet-advanced-card" href="/wallet/super-wallet" data-route>
-          <strong>${escapeHtml(t("wallet.superWalletTitle"))}</strong>
-          <span>${escapeHtml(t("wallet.superWalletActiveShort"))}</span>
-        </a>`;
-    box.innerHTML = `
-      <div class="wallet-advanced-cards">
-        ${superCard}
-        <a class="wallet-advanced-card" href="/wallet/security" data-route>
+      : "";
+    const deviceCards = onChainAdvanced
+      ? ""
+      : `<a class="wallet-advanced-card" href="/wallet/security" data-route>
           <strong>${escapeHtml(t("wallet.advancedDevicesTitle"))}</strong>
           <span>${escapeHtml(t(devicesBodyKey, { count: deviceCount }))}</span>
         </a>
         <a class="wallet-advanced-card" href="/wallet/security#recovery" data-route>
           <strong>${escapeHtml(t("wallet.advancedRecoveryTitle"))}</strong>
           <span>${escapeHtml(t("wallet.advancedRecoveryBody"))}</span>
-        </a>
+        </a>`;
+    box.innerHTML = `
+      <div class="wallet-advanced-cards">
+        ${superCard}
+        ${deviceCards}
         <a class="wallet-advanced-card" href="/wallet/invoices" data-route>
           <strong>${escapeHtml(t("wallet.advancedInvoicesTitle"))}</strong>
           <span>${escapeHtml(t("wallet.advancedInvoicesBody"))}</span>

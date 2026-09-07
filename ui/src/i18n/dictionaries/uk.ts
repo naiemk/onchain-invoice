@@ -18,7 +18,6 @@ export const uk = {
     getPaid: "Отримати оплату",
     security: "Безпека",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

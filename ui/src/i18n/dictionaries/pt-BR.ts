@@ -22,7 +22,6 @@ export const ptBR = {
     getPaid: "Receber",
     security: "Segurança",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

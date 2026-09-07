@@ -21,7 +21,6 @@ export const ms = {
     getPaid: "Terima bayaran",
     security: "Keselamatan",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

@@ -40,8 +40,8 @@ for (const file of locales) {
   let text = fs.readFileSync(p, "utf8");
   if (!text.includes("developers:")) {
     text = text.replace(
-      /(    security: [^\n]+,\n)(    openWorkspace:)/,
-      `$1    developers: "Developers",\n$2`
+      /(    security: [^\n]+,\n)/,
+      `$1    developers: "Developers",\n`
     );
     fs.writeFileSync(p, text);
     console.log("patched nav.developers", file);

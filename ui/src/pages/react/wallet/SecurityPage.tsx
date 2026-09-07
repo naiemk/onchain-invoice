@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { Mail, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,6 +13,7 @@ import { fetchAdvancedPolicy } from "@/shared/wallet-advanced-api.js";
 import { loadWalletSession } from "@/shared/wallet-session.js";
 import { WalletFrame } from "./WalletFrame";
 import { WalletBodyMount } from "./WalletBodyMount";
+import { useWalletPolicy } from "./wallet-policy";
 
 function EmailStatusCard() {
   const { t } = useLocale();
@@ -96,6 +97,8 @@ function OtherDevicesCard() {
 
 export function SecurityPage() {
   const { t } = useLocale();
+  const { isSuperWallet } = useWalletPolicy();
+  if (isSuperWallet) return <Navigate to="/wallet/access" replace />;
   return (
     <WalletFrame
       current="security"

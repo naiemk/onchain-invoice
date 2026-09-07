@@ -124,6 +124,37 @@ export interface WalletKeyEnrollmentRequestRecord {
   resolvedAt: string | null;
 }
 
+export type WalletTransferDirection = "in" | "out";
+export type WalletTransferSource = "userop" | "proposal" | "explorer";
+
+/** View-only in/out ledger, separate from UserOp / proposal lifecycle. */
+export interface WalletTransferRecord {
+  id: string;
+  walletAddress: string;
+  chainId: string;
+  direction: WalletTransferDirection;
+  tokenAddress: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  amount: string;
+  counterparty: string;
+  txHash: string;
+  logIndex: number;
+  blockNumber: number;
+  source: WalletTransferSource;
+  userOpHash: string | null;
+  proposalId: string | null;
+  createdAt: string;
+}
+
+export interface WalletTransferSyncCursor {
+  walletAddress: string;
+  chainId: string;
+  lastBlock: number;
+  lastLogIndex: number;
+  lastFetchedAt: string;
+}
+
 export type WalletProposalStatus = "draft" | "signing" | "ready" | "executed" | "cancelled";
 
 export interface WalletProposalRecord {

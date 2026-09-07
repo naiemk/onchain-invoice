@@ -1,5 +1,5 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowUpRight, Menu, Moon, Sun } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Menu, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -113,36 +113,6 @@ function FooterEnvLine() {
   );
 }
 
-function OpenWorkspaceButton({
-  className,
-  onAfterNavigate,
-}: {
-  className?: string;
-  onAfterNavigate?: () => void;
-}) {
-  const { t } = useLocale();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const openWorkspace = () => {
-    onAfterNavigate?.();
-    const onWalletHome = location.pathname === "/wallet";
-    if (onWalletHome) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      document.getElementById("main-content")?.focus();
-      return;
-    }
-    navigate("/wallet");
-  };
-
-  return (
-    <Button type="button" size="sm" className={className} onClick={openWorkspace}>
-      {t("nav.openWorkspace")}
-      <ArrowUpRight className="h-3.5 w-3.5" />
-    </Button>
-  );
-}
-
 function FooterLinkSep() {
   return <span aria-hidden="true">·</span>;
 }
@@ -247,7 +217,6 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
               <div data-app-nav className="flex items-center gap-2 max-md:!hidden">
                 <LocaleSelect />
                 <ThemeToggle />
-                <OpenWorkspaceButton className="ms-1" />
               </div>
               <div data-app-nav-mobile className="ml-auto flex items-center gap-2 md:!hidden">
                 <ThemeToggle />
@@ -266,7 +235,6 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
                     </div>
                     <div className="mt-6 space-y-4">
                       <LocaleSelect />
-                      <OpenWorkspaceButton className="w-full" onAfterNavigate={() => setMobileOpen(false)} />
                     </div>
                   </SheetContent>
                 </Sheet>

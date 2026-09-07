@@ -563,5 +563,9 @@ export const walletFa = {
   keyPublicHint: "YubiKey همان قالب کلید عمومی کلید عبور (مختصات P-256) را استفاده می‌کند.",
   advancedDevicesBodySuper: "{count} کلید — دعوت هم‌تیمی‌ها",
   advancedDevicesBodySimple: "{count} دستگاه — جفت یا حذف",
+  txHistoryTitle: "Activity",
+  txHistoryEmpty: "No transfers yet.",
+  txHistoryIn: "Received",
+  txHistoryOut: "Sent",
+  txHistoryLoading: "Loading activity…",
 };
-

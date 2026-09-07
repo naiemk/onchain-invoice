@@ -9,6 +9,7 @@ import {
   userOpToTuple,
 } from "../shared/userop.js";
 import { encodeAdvancedSignature } from "../shared/advanced-wallet.js";
+import { recordProposalTransfers } from "./wallet-transfer-sync.js";
 
 const WALLET_POLICY_ABI = [
   "function advanced() view returns (bool)",
@@ -184,6 +185,7 @@ export function registerWalletAdvancedRoutes(
           return true;
         }
         const updated = db.updateWalletProposalTxHash(proposalId, txHash);
+        if (updated) recordProposalTransfers(db, appConfig, updated);
         handlers.sendJson(res, 200, { proposal: updated });
         return true;
       }

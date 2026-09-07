@@ -14,6 +14,7 @@ import { deploymentMode } from "@/shared/networks.js";
 import { loadWalletSession } from "@/shared/wallet-session.js";
 import { shortAddress } from "@/shared/wallet-session.js";
 import { WalletFrame } from "./WalletFrame";
+import { TxHistory } from "./TxHistory";
 
 export function ReceivePage() {
   const { t } = useLocale();
@@ -105,6 +106,9 @@ export function ReceivePage() {
           </Button>
         </PageCard>
       </PageSplit>
+      <div className="mt-6">
+        <TxHistory wallet={session.address} chainId={session.chainId} />
+      </div>
     </WalletFrame>
   );
 }

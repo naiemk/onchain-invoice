@@ -18,7 +18,6 @@ export const ar = {
     getPaid: "استلم المدفوعات",
     security: "الأمان",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {

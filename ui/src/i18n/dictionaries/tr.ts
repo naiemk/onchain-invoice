@@ -21,7 +21,6 @@ export const tr = {
     getPaid: "Ödeme al",
     security: "Güvenlik",
     developers: "Developers",
-    openWorkspace: "Open workspace",
   },
 
   locale: {
