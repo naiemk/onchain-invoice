@@ -113,7 +113,7 @@ async function mockSuperWalletActiveApis(page: Page): Promise<void> {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          pairing: { status: "pending", newOwnerQx: null, newOwnerQy: null, deviceLabel: null },
+          pairing: { status: "pending", newOwnerQx: null, newOwnerQy: null, newOwnerCredentialId: null, deviceLabel: null },
         }),
       });
       return;
@@ -315,13 +315,16 @@ test.describe("Super Wallet UI", () => {
     await expect(page.getByTestId("access-page")).toBeVisible();
 
     const admin = page.locator(`[data-entity-id="${adminEntityId}"]`);
-    await expect(admin.getByTestId("remove-key")).toBeDisabled();
-    await expect(admin.getByTestId("last-key-blocked")).toBeVisible();
+    await expect(admin.getByTestId("remove-key")).toBeEnabled();
+    await expect(admin.getByTestId("last-key-blocked")).toHaveCount(0);
+    await expect(admin.getByRole("button", { name: "Add passkey" })).toHaveCount(0);
     await expect(admin.getByTestId("remove-entity")).toHaveCount(0);
+    await admin.getByTestId("remove-key").click();
+    await expect(page.locator("#super-status")).toContainText("at least one key");
 
     const teammate = page.locator(`[data-entity-id="${teammateEntityId}"]`);
-    await expect(teammate.getByTestId("remove-key")).toBeDisabled();
-    await expect(teammate.getByTestId("last-key-blocked")).toBeVisible();
+    await expect(teammate.getByTestId("remove-key")).toBeEnabled();
+    await expect(teammate.getByTestId("last-key-blocked")).toHaveCount(0);
     await expect(teammate.getByTestId("remove-entity")).toBeDisabled();
     await expect(teammate.getByTestId("remove-entity-blocked")).toContainText("at least 2 of 2");
   });
@@ -344,6 +347,8 @@ test.describe("Super Wallet UI", () => {
     await expect(page.getByRole("link", { name: "Details" }).first()).toHaveAttribute("href", "/wallet/access");
     await expect(page.getByRole("button", { name: "Pair another device" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add security key (YubiKey)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
+    await expect(page.getByTestId("identity-email-card")).toBeVisible();
     await page.getByRole("button", { name: "Pair another device" }).click();
     await expect(page.getByTestId("pair-device-dialog")).toBeVisible();
     await expect(page.getByTestId("pair-copy-link")).toBeVisible();

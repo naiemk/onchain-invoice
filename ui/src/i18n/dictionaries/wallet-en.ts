@@ -33,7 +33,7 @@ export const walletEn = {
   invoicesTab: "Invoices",
   accessTab: "Access",
   accessPageTitle: "Wallet access",
-  accessPageLede: "Entities, signing keys, and the approval threshold for this Super Wallet.",
+  accessPageLede: "Other identities and the M-of-N policy. Add keys for this identity on Security.",
   superWalletShieldTooltip: "Super Wallet. Conversion is permanent — there is no convert back.",
   developersTab: "Developers",
   actionGetPaid: "Get paid",
@@ -442,7 +442,8 @@ export const walletEn = {
   superWalletUpgradeNeedFunds:
     "Add USDC to this wallet first — the network fee is paid from your balance when you convert.",
   userOpInsufficientBalance: "Not enough funds in this wallet to cover the send amount and network fee.",
-  userOpSignatureInvalid: "Passkey signature did not match this wallet. Lock the wallet, reopen it with the correct passkey, and try again.",
+  userOpSignatureInvalid:
+    "The wallet rejected this signature. Face ID / Touch ID succeeding only proves the browser unlocked a passkey — not that the Super Wallet contract accepted it.",
   userOpPrefundFailed: "Could not fund the EntryPoint gas deposit. Try again in a moment.",
   userOpAccountNotDeployed: "Your wallet is funded but still activating on-chain. Wait a moment, refresh, and try again.",
   userOpSimulationRevert: "The transaction would fail on-chain. Check your balance and try again.",
@@ -551,4 +552,14 @@ export const walletEn = {
   txHistoryIn: "Received",
   txHistoryOut: "Sent",
   txHistoryLoading: "Loading activity…",
+  passkeyNotOnChain:
+    "This passkey is not registered on the wallet. Lock and reopen with the passkey you used to create or pair this device.",
+  userOpAlreadySubmitted: "This transaction is already in progress.",
+  identityEmailTitle: "This identity",
+  identityChangeEmail: "Change email",
+  identityEmailNone: "No email attached yet.",
+  identityBackupHint:
+    "This identity has only one key. Add another passkey, security key, or wallet — if you lose this device you may lose access.",
+  connectWalletNeedsEmail:
+    "Verify an email on this wallet before connecting an external wallet. That email becomes your Super Wallet identity.",
 };

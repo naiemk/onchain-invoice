@@ -6,6 +6,7 @@ import { PageCard, PageSplit } from "@/components/PageSplit";
 import { TrustNotice } from "@/components/TrustNotice";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useLocale } from "@/providers/LocaleProvider";
+import { WalletContractsCard } from "./WalletContractsCard";
 
 export function SecurityPage() {
   const { t } = useLocale();
@@ -57,6 +58,7 @@ export function SecurityPage() {
       </PageSplit>
 
       <TrustNotice className="mt-8">{t("securityPage.transparencyNotice")}</TrustNotice>
+      <WalletContractsCard />
     </div>
   );
 }

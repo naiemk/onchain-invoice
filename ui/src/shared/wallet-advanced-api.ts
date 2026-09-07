@@ -279,7 +279,24 @@ export async function executeProposal(
       body: JSON.stringify(signature ? { signature } : {}),
     }
   );
-  if (!res.ok) throw new Error(await readError(res, `execute_proposal_${res.status}`));
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+      userOpHash?: string;
+    };
+    const err = body.message || body.error || `execute_proposal_${res.status}`;
+    if (
+      (err === "duplicate_user_op_hash" || /UNIQUE constraint failed: wallet_user_ops/i.test(err)) &&
+      body.userOpHash
+    ) {
+      return { userOpHash: body.userOpHash };
+    }
+    if (err === "duplicate_user_op_hash" || /UNIQUE constraint failed: wallet_user_ops/i.test(err)) {
+      throw new Error("duplicate_user_op_hash");
+    }
+    throw new Error(err);
+  }
   const data = (await res.json()) as { userOpHash: string };
   return data;
 }

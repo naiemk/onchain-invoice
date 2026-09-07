@@ -1,8 +1,8 @@
 import { hashEntityEmail, computeKeyId, KEY_WEBAUTHN } from "../../../commerce/shared/advanced-wallet.js";
 import { zeroPadValue } from "ethers";
-import { fetchWalletBalance, fetchWalletConfig, getWalletAccount, listDevices } from "./wallet-api.js";
-import { listWalletEntities, resolveAdvancedPolicy } from "./wallet-advanced-api.js";
-import { credentialIdsMatch } from "./credential-id.js";
+import { getWalletAccount } from "./wallet-api.js";
+import { fetchAdvancedPolicy } from "./wallet-advanced-api.js";
+import { resolveCurrentWalletPasskey } from "./current-wallet-passkey.js";
 import { ensureSessionCredential } from "./webauthn.js";
 import {
   listWalletRegistry,
@@ -16,7 +16,7 @@ export type HealWalletSessionResult = {
   needsSuperWalletEmail?: boolean;
 };
 
-/** Merge server + roster data so signing works after a partial Super Wallet upgrade. */
+/** Refresh salt/label; identity (qx/credentialId) only via CurrentWalletPasskey. */
 export async function healWalletSession(
   session: WalletSession,
   options?: { persist?: boolean }
@@ -29,60 +29,28 @@ export async function healWalletSession(
       next = {
         ...next,
         salt: account.salt || next.salt,
-        qx: account.ownerQx || next.qx,
-        qy: account.ownerQy || next.qy,
-        ...(account.credentialId && !next.credentialId?.trim()
-          ? { credentialId: account.credentialId }
-          : {}),
       };
     }
   } catch {
     /* offline */
   }
 
-  try {
-    const config = await fetchWalletConfig();
-    const devices = await listDevices(next.address, config.chainId);
-    const device = devices.find(
-      (d) =>
-        Boolean(d.credentialId) &&
-        ((d.ownerQx === next.qx && d.ownerQy === next.qy) ||
-          (d.credentialId === next.credentialId && Boolean(next.credentialId?.trim())) ||
-          credentialIdsMatch(d.credentialId, next.credentialId))
-    );
-    if (device?.credentialId && device.credentialId !== next.credentialId) {
-      next = { ...next, credentialId: device.credentialId };
-    }
-  } catch {
-    /* ignore */
-  }
-
   let needsSuperWalletEmail = false;
   try {
-    const balance = await fetchWalletBalance(next.address).catch(() => null);
-    const deployed = balance?.chains.some((c) => c.deployed) ?? false;
-    const policy = await resolveAdvancedPolicy(next.address, deployed);
-
-    if (policy.advanced) {
-      const roster = await listWalletEntities(next.address).catch(() => ({ entities: [], keys: [] }));
-      const mine =
-        roster.keys.find((k) => k.credentialId && credentialIdsMatch(k.credentialId, next.credentialId)) ??
-        roster.keys.find((k) => k.qx === next.qx && k.qy === next.qy);
-
-      if (mine) {
-        next = {
-          ...next,
-          entityId: mine.entityId,
-          keyId: mine.keyId,
-          keyType: mine.keyType,
-          ...(mine.credentialId ? { credentialId: mine.credentialId } : {}),
-        };
-      } else if (!next.entityId) {
-        needsSuperWalletEmail = true;
-      }
-    }
+    const passkey = await resolveCurrentWalletPasskey(next, "heal", { persist: options?.persist !== false });
+    next = {
+      ...next,
+      qx: passkey.qx,
+      qy: passkey.qy,
+      credentialId: passkey.credentialId,
+      entityId: passkey.entityId ?? next.entityId,
+      keyId: passkey.keyId ?? next.keyId,
+      keyType: passkey.keyType ?? next.keyType,
+      eoa: passkey.eoa ?? next.eoa,
+    };
   } catch {
-    /* ignore */
+    const policy = await fetchAdvancedPolicy(next.address).catch(() => null);
+    needsSuperWalletEmail = Boolean(policy?.advanced && !next.entityId);
   }
 
   const changed =
@@ -94,7 +62,7 @@ export async function healWalletSession(
 
   if (changed && options?.persist !== false) saveWalletSession(next);
 
-  return { session: next, needsSuperWalletEmail };
+  return { session: next, needsSuperWalletEmail: Boolean(needsSuperWalletEmail && !next.entityId) };
 }
 
 /** Restore Super Wallet signing after upgrade when API roster is missing entityId. */

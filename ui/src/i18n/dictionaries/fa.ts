@@ -332,6 +332,16 @@ export const fa = {
     reviewRecoveryCta: "بازبینی بازیابی",
     transparencyNotice:
       "نشان می‌دهیم چه چیزی دسترسی را محافظت می‌کند، چه کسی می‌تواند بازیابی کند و کدام دستگاه آخرین تراکنش را امضا کرد.",
+    contractsTitle: "Contracts",
+    contractsLede: "Factory and implementations this network uses to create passkey wallets.",
+    contractsFactory: "Factory",
+    contractsImplementation: "Implementation",
+    contractsRecovery: "Recovery",
+    contractsEntryPoint: "EntryPoint",
+    contractsOnChain: "On-chain from factory",
+    contractsMatch: "Matches config",
+    contractsMismatch: "Differs from config",
+    contractsUnavailable: "Wallet contracts are not configured for this API.",
   },
 
   create: {

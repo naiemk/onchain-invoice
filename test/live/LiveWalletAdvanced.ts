@@ -13,7 +13,7 @@ const API_BASE = (process.env.LIVE_WALLET_TESTNET_API_URL ?? "https://testnet.tr
   ""
 );
 const EXPECTED_FACTORY = (
-  process.env.WALLET_FACTORY_ADDRESS ?? "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537"
+  process.env.WALLET_FACTORY_ADDRESS ?? "0x805131afe47723819B7b81dA25256429d77aa12E"
 ).toLowerCase();
 const QX = "0x" + "aa".repeat(32);
 const QY = "0x" + "bb".repeat(32);

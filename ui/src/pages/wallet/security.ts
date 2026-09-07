@@ -24,6 +24,7 @@ import {
   buildSignedRemoveOwnerUserOp,
   submitSignedUserOp,
 } from "../../shared/userop-client.js";
+import { resolveCurrentWalletPasskey } from "../../shared/current-wallet-passkey.js";
 import {
   bindCopyButtons,
   formatKeyFingerprint,
@@ -237,7 +238,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
     setButtonLoading(btn, true);
     try {
       showStatus(status, t("wallet.superWalletEnrollYubiKey"));
-      const key = await createSecurityKey(t("wallet.addSecurityKey"));
+      const key = await createSecurityKey(session.label, { walletLabel: session.label });
       showStatus(status, t("wallet.sendSigning"));
       await addPasskeySigner({
         session,
@@ -279,6 +280,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
         chainId: session.chainId,
         nonce: pairing.pairing.nonce,
         rpId: window.location.hostname,
+        walletLabel: session.label,
       });
       const deepLink = pairingDeepLink(payload);
       let qrDataUrl = "";
@@ -393,7 +395,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
                   advanced: onChainAdvanced,
                   qx: p.newOwnerQx!,
                   qy: p.newOwnerQy!,
-                  credentialId: null,
+                  credentialId: p.newOwnerCredentialId ?? null,
                   label: p.deviceLabel ?? "Device",
                   keyType: KEY_WEBAUTHN,
                 });
@@ -425,13 +427,13 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
         showStatus(status, t("wallet.sendSigning"));
         const cfg = await fetchWalletConfig();
         const fee = BigInt(cfg.bundlerFeeUsdc || "0");
+        const passkey = await resolveCurrentWalletPasskey(session, "remove-key");
         const { userOp, userOpHash } = await buildSignedRemoveOwnerUserOp({
           config: cfg,
-          walletAddress: session.address,
+          passkey,
           qx,
           qy,
           feeAmount: fee,
-          credentialId: session.credentialId,
         });
         await submitSignedUserOp({ config: cfg, userOp, userOpHash, walletAddress: session.address });
         const result = await waitForUserOp(userOpHash);

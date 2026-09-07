@@ -11,7 +11,8 @@ import type {
   WalletKeyEnrollmentRequestRecord,
 } from "../../../../../commerce/shared/wallet.js";
 import { buildSignedAddKeyUserOp, buildSignedRemoveEntityUserOp, buildSignedRemoveKeyUserOp } from "@/shared/advanced-userop-client.js";
-import { asAdvancedKeyType, resolveSessionSigningKey } from "@/shared/advanced-signing-key.js";
+import { asAdvancedKeyType } from "@/shared/advanced-signing-key.js";
+import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
 import { fetchWalletBalance, primaryChain, waitForUserOp, type WalletPublicConfig } from "@/shared/wallet-api.js";
 import {
@@ -129,17 +130,11 @@ export async function submitAddKey(input: {
 }): Promise<void> {
   const fee = BigInt(input.config.bundlerFeeUsdc || "0");
   const keyId = computeKeyId(input.targetEntityId, input.keyType, input.qx, input.qy, input.eoa);
-  const resolved = await resolveSessionSigningKey(input.session);
-  if (!resolved) throw new Error(t("wallet.superWalletNoSigningKey"));
+  const passkey = await resolveCurrentWalletPasskey(input.session, "add-key");
+  if (!passkey.entityId) throw new Error(t("wallet.superWalletNoSigningKey"));
   const { userOp, userOpHash } = await buildSignedAddKeyUserOp({
     config: input.config,
-    walletAddress: resolved.session.address,
-    adminEntityId: resolved.key.entityId,
-    adminKeyType: asAdvancedKeyType(resolved.key.keyType),
-    adminQx: resolved.key.qx || resolved.session.qx,
-    adminQy: resolved.key.qy || resolved.session.qy,
-    adminEoa: resolved.key.eoa ?? undefined,
-    adminCredentialId: resolved.key.credentialId ?? resolved.session.credentialId,
+    passkey,
     targetEntityId: input.targetEntityId,
     keyType: asAdvancedKeyType(input.keyType),
     qx: input.qx,
@@ -175,16 +170,13 @@ export async function submitRemoveEntity(input: {
   keyIds: string[];
 }): Promise<void> {
   const fee = BigInt(input.config.bundlerFeeUsdc || "0");
+  const passkey = await resolveCurrentWalletPasskey(input.session, "remove-entity");
   const { userOp, userOpHash } = await buildSignedRemoveEntityUserOp({
     config: input.config,
-    walletAddress: input.session.address,
-    adminEntityId: input.adminEntity.entityId,
+    passkey,
     entityId: input.entityId,
     keyIds: input.keyIds,
-    qx: input.session.qx,
-    qy: input.session.qy,
     feeAmount: fee,
-    credentialId: input.session.credentialId,
   });
   await submitSignedUserOp({
     config: input.config,
@@ -205,13 +197,10 @@ export async function submitRemoveKey(input: {
   keyId: string;
 }): Promise<void> {
   const fee = BigInt(input.config.bundlerFeeUsdc || "0");
+  const passkey = await resolveCurrentWalletPasskey(input.session, "remove-key");
   const { userOp, userOpHash } = await buildSignedRemoveKeyUserOp({
     config: input.config,
-    walletAddress: input.session.address,
-    adminEntityId: input.adminEntity.entityId,
-    adminQx: input.session.qx,
-    adminQy: input.session.qy,
-    adminCredentialId: input.session.credentialId,
+    passkey,
     keyId: input.keyId,
     feeAmount: fee,
   });

@@ -331,6 +331,16 @@ export const th = {
     notAdded: "Not added",
     reviewRecoveryCta: "Review recovery",
     transparencyNotice: "We show you what protects access, who can recover it, and which device last signed a transaction.",
+    contractsTitle: "Contracts",
+    contractsLede: "Factory and implementations this network uses to create passkey wallets.",
+    contractsFactory: "Factory",
+    contractsImplementation: "Implementation",
+    contractsRecovery: "Recovery",
+    contractsEntryPoint: "EntryPoint",
+    contractsOnChain: "On-chain from factory",
+    contractsMatch: "Matches config",
+    contractsMismatch: "Differs from config",
+    contractsUnavailable: "Wallet contracts are not configured for this API.",
   },
 
   create: {

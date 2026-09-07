@@ -34,6 +34,7 @@ import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 import { buildSignedAdvancedSendUserOp } from "@/shared/advanced-userop-client.js";
 import { buildSignedSendUserOp, submitSignedUserOp } from "@/shared/userop-client.js";
+import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
 import { ERC20_ABI, parseUsdcInput } from "../../../../../commerce/shared/userop.js";
 import { formatSendRejectReason } from "@/shared/userop-errors.js";
 import { WalletFrame } from "./WalletFrame";
@@ -243,31 +244,26 @@ function SimpleSendPage() {
         setStatus({ kind: "error", message: t("wallet.sendInsufficientBalance") });
         return;
       }
-      const { userOp, userOpHash } =
-        advancedEntityId != null
-          ? await buildSignedAdvancedSendUserOp({
-              config,
-              walletAddress: session.address,
-              entityId: advancedEntityId,
-              qx: session.qx,
-              qy: session.qy,
-              recipient: getAddress(recipient),
-              sendAmount,
-              feeAmount: feeAtoms,
-              credentialId: session.credentialId,
-              chainId: chain.chainId,
-              sendTokenAddress: token.address,
-            })
-          : await buildSignedSendUserOp({
-              config,
-              walletAddress: session.address,
-              recipient: getAddress(recipient),
-              sendAmount,
-              feeAmount: feeAtoms,
-              credentialId: session.credentialId,
-              chainId: chain.chainId,
-              sendTokenAddress: token.address,
-            });
+      const passkey = await resolveCurrentWalletPasskey(session, "send");
+      const { userOp, userOpHash } = passkey.advanced
+        ? await buildSignedAdvancedSendUserOp({
+            config,
+            passkey,
+            recipient: getAddress(recipient),
+            sendAmount,
+            feeAmount: feeAtoms,
+            chainId: chain.chainId,
+            sendTokenAddress: token.address,
+          })
+        : await buildSignedSendUserOp({
+            config,
+            passkey,
+            recipient: getAddress(recipient),
+            sendAmount,
+            feeAmount: feeAtoms,
+            chainId: chain.chainId,
+            sendTokenAddress: token.address,
+          });
       setStatus({ kind: "info", message: t("wallet.sendSubmitting") });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);

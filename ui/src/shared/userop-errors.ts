@@ -18,10 +18,15 @@ export function formatSendRejectReason(
       return t("wallet.proposalsAwaitingSignatures");
     case "already_executed":
       return t("wallet.proposalsExecuted");
+    case "duplicate_user_op_hash":
+      return t("wallet.userOpAlreadySubmitted");
     case "rpc_unavailable":
       return t("wallet.bundlerNotConfigured");
     default:
       if (reason?.startsWith("simulation_revert:")) return t("wallet.userOpSimulationRevert");
+      if (reason && /UNIQUE constraint failed: wallet_user_ops/i.test(reason)) {
+        return t("wallet.userOpAlreadySubmitted");
+      }
       return reason && reason !== "failed" && reason !== "rejected"
         ? reason
         : t("wallet.sendFailed");

@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
 import { network } from "hardhat";
 import { zeroPadValue } from "ethers";
 import {
@@ -9,6 +10,7 @@ import {
   KEY_WEBAUTHN,
   signEoaPersonalDigest,
 } from "../commerce/shared/advanced-wallet.js";
+import { encodeWebAuthnSignatureFromJson } from "../commerce/shared/webauthn-signature.js";
 import {
   ERC7821_BATCH_MODE,
   encodeBatch,
@@ -16,6 +18,7 @@ import {
   buildFeeTransferCall,
   encodeErc20Transfer,
 } from "../commerce/shared/userop.js";
+import { userOpHashToWebAuthnChallenge } from "../ui/src/shared/webauthn-p256.js";
 
 describe("Wallet advanced entity M-of-N", function () {
   const ENTRYPOINT = "0x433709009B8330FDa32311DF1C2AFA402eD8D009";
@@ -284,6 +287,38 @@ describe("Wallet advanced entity M-of-N", function () {
     expect(await wallet.exposedValidateAdvanced(digest, packed)).to.equal(true);
   });
 
+  it("accepts a migrated passkey after wrapping AWD1", async function () {
+    const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
+    const [owner] = await ethers.getSigners();
+    const passkey = p256Passkey();
+    const Helper = await ethers.getContractFactory("WalletAdvancedTestHelper");
+    const walletImpl = await Helper.deploy();
+    const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
+    const recovery = await Recovery.deploy(owner.address, owner.address);
+    const Factory = await ethers.getContractFactory("WalletFactory");
+    const factory = await Factory.deploy(
+      await walletImpl.getAddress(),
+      await recovery.getAddress(),
+      3600n,
+      owner.address
+    );
+    const salt = ethers.id("wallet-advanced-webauthn");
+    await factory.createAccount(passkey.qx, passkey.qy, salt);
+    const wallet = await ethers.getContractAt("WalletAdvancedTestHelper", await factory.predictAddress(salt));
+
+    const digest = ethers.id("advanced-webauthn-userop");
+    const inner = signWebAuthn(passkey.pem, digest);
+    expect(await wallet.exposedValidateRaw(digest, inner)).to.equal(true);
+
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await expectRevert(wallet.exposedValidateRaw(digest, inner), "InvalidEntitySig");
+
+    const keyId = computeKeyId(ADMIN_ENTITY, KEY_WEBAUTHN, passkey.qx, passkey.qy, "0x0000000000000000000000000000000000000000");
+    const packed = encodeAdvancedSignature([{ keyId, sig: inner }]);
+    expect(await wallet.exposedValidateAdvanced(digest, packed)).to.equal(true);
+    expect(await wallet.exposedValidateRaw(digest, packed)).to.equal(true);
+  });
+
   it("rejects removing the last key of an identity", async function () {
     const { wallet, eoaA } = await deployHelper();
     await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
@@ -355,4 +390,44 @@ async function expectRevert(promise: Promise<unknown>, fragment: string): Promis
 
 function errorSel(name: string): string {
   return name;
+}
+
+function p256Passkey(): { qx: string; qy: string; pem: string } {
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const spki = publicKey.export({ type: "spki", format: "der" }) as Buffer;
+  const point = spki.subarray(spki.length - 65);
+  expect(point[0]).to.equal(0x04);
+  return {
+    qx: zeroPadValue("0x" + point.subarray(1, 33).toString("hex"), 32),
+    qy: zeroPadValue("0x" + point.subarray(33, 65).toString("hex"), 32),
+    pem: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
+  };
+}
+
+function signWebAuthn(pem: string, userOpHash: string): string {
+  const challenge = userOpHashToWebAuthnChallenge(userOpHash);
+  const clientDataJSON = JSON.stringify({
+    type: "webauthn.get",
+    challenge,
+    origin: "http://localhost",
+    crossOrigin: false,
+  });
+  const authenticatorData = Buffer.concat([
+    createHash("sha256").update("localhost").digest(),
+    Buffer.from([0x05]),
+    Buffer.alloc(4),
+  ]);
+  const signed = Buffer.concat([
+    authenticatorData,
+    createHash("sha256").update(clientDataJSON, "utf8").digest(),
+  ]);
+  const signature = sign("sha256", signed, {
+    key: createPrivateKey(pem),
+    dsaEncoding: "ieee-p1363",
+  });
+  return encodeWebAuthnSignatureFromJson({
+    authenticatorData: "0x" + authenticatorData.toString("hex"),
+    clientDataJSON,
+    signature: "0x" + signature.toString("hex"),
+  });
 }

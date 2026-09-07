@@ -9,8 +9,8 @@ import { CommerceDb } from "../commerce/server/db.js";
 import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
 import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
 
-const FACTORY = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
-const IMPL = "0xe024cE8ed1878dBdd3ca8E73B1e586c4E46dC85C";
+const FACTORY = "0x805131afe47723819B7b81dA25256429d77aa12E";
+const IMPL = "0x4D19ce70D3D4a63cBa685665B39C133141B5dDC2";
 const QX = ethersLib.zeroPadValue("0x0a", 32);
 const QY = ethersLib.zeroPadValue("0x0b", 32);
 
@@ -20,7 +20,7 @@ const BASE_ENV = {
   SWEEPER_API_KEY: "sweeper-wallet-test",
   WALLET_FACTORY_ADDRESS: FACTORY,
   WALLET_IMPLEMENTATION_ADDRESS: IMPL,
-  WALLET_RECOVERY_ADDRESS: "0x72739889bcce2B08a23212bae6C7B9F1C29e7873",
+  WALLET_RECOVERY_ADDRESS: "0xC68914FF4EE1d9A7f263ea550DAf6d89EB801D91",
   WALLET_RPC_URL: "",
   EVM_RPC_URL: "",
   TURNSTILE_SECRET: "",
@@ -428,6 +428,93 @@ describe("commerce wallet pairing API", function () {
       db.setWalletPairingExpiresAt(pairing.nonce, new Date(Date.now() - 1_000).toISOString());
       const got = db.getWalletPairing(pairing.nonce);
       expect(got?.status).to.equal("expired");
+      db.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("submit stores the new device credentialId for confirm", async function () {
+    await withApp(async (baseUrl) => {
+      const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
+      const create = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "create", walletAddress: wallet, chainId: "11155111" }),
+      });
+      const { pairing } = (await create.json()) as { pairing: { nonce: string } };
+
+      const submit = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "submit",
+          nonce: pairing.nonce,
+          newOwnerQx: ethersLib.zeroPadValue("0x11", 32),
+          newOwnerQy: ethersLib.zeroPadValue("0x12", 32),
+          deviceLabel: "Brave",
+          newOwnerCredentialId: "cred-brave",
+        }),
+      });
+      expect(submit.status).to.equal(200);
+
+      const poll = await fetch(`${baseUrl}/api/wallet/pairing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "poll", nonce: pairing.nonce }),
+      });
+      const polled = (await poll.json()) as {
+        pairing: { status: string; newOwnerCredentialId: string | null; deviceLabel: string | null };
+      };
+      expect(polled.pairing.status).to.equal("approved");
+      expect(polled.pairing.newOwnerCredentialId).to.equal("cred-brave");
+      expect(polled.pairing.deviceLabel).to.equal("Brave");
+    });
+  });
+
+  it("does not move the first-owner device credentialId onto another passkey", async function () {
+    resetRateLimitBuckets();
+    const dir = await mkdtemp(join(tmpdir(), "commerce-wallet-devsteal-"));
+    try {
+      const db = new CommerceDb(join(dir, "test.db"));
+      const wallet = predictWalletAddress(FACTORY, IMPL, deriveWalletSalt(QX, QY));
+      db.upsertWalletAccount({
+        address: wallet,
+        salt: deriveWalletSalt(QX, QY),
+        ownerQx: QX,
+        ownerQy: QY,
+        credentialId: "cred-original",
+        webauthnAttestation: null,
+      });
+      db.upsertWalletDevice({
+        walletAddress: wallet,
+        chainId: "11155111",
+        ownerQx: QX,
+        ownerQy: QY,
+        label: "Original",
+        credentialId: "cred-original",
+      });
+      db.upsertWalletDevice({
+        walletAddress: wallet,
+        chainId: "11155111",
+        ownerQx: QX,
+        ownerQy: QY,
+        label: "Brave",
+        credentialId: "cred-brave",
+      });
+      const devices = db.listWalletDevices(wallet, "11155111");
+      expect(devices).to.have.length(1);
+      expect(devices[0]?.credentialId).to.equal("cred-original");
+
+      db.upsertWalletAccount({
+        address: wallet,
+        salt: deriveWalletSalt(QX, QY),
+        ownerQx: QX,
+        ownerQy: QY,
+        credentialId: "cred-brave",
+        webauthnAttestation: null,
+      });
+      expect(db.getWalletAccount(wallet)?.credentialId).to.equal("cred-original");
       db.close();
     } finally {
       await rm(dir, { recursive: true, force: true });

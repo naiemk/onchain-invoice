@@ -26,6 +26,8 @@ import {
   type WalletRenderOptions,
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
+import { shortAddress } from "../../shared/wallet-session.js";
+import { inferDeviceLabel } from "../../shared/passkey-name.js";
 
 type TurnstileCtl = Awaited<ReturnType<typeof mountTurnstile>>;
 
@@ -301,7 +303,7 @@ async function bindRecoverBody(
         root.querySelector<HTMLInputElement>("#recover-lost-email")?.value.trim() || undefined;
       const label =
         root.querySelector<HTMLInputElement>("#recover-device-name")?.value.trim() ||
-        t("wallet.defaultDevice");
+        inferDeviceLabel();
       if (!walletAddress && !email) {
         showStatus(status, t("wallet.recoverNeedWalletOrEmail"), "error");
         return;
@@ -313,7 +315,10 @@ async function bindRecoverBody(
           showStatus(status, t("wallet.recoverCaptchaRequired"), "error");
           return;
         }
-        const passkey = await createPasskey(label);
+        const passkey = await createPasskey(label, {
+          walletLabel: session?.label || (walletAddress ? shortAddress(walletAddress) : undefined),
+          deviceLabel: label,
+        });
         const ch = await createRecoveryChallenge("recover", walletAddress);
         const { assertion } = await assertPasskeyChallenge({
           challengeBase64Url: ch.challenge,

@@ -44,7 +44,7 @@ import type {
   WalletPublicConfig,
 } from "../../../../../commerce/shared/wallet.js";
 import { WalletFrame } from "./WalletFrame";
-import { isClosedProposal, isFullySigned, ProposalSummaryLine } from "./proposal-display";
+import { isClosedProposal, isFullySigned, proposalSignatureCount, ProposalSummaryLine } from "./proposal-display";
 import { TxHistory } from "./TxHistory";
 
 type StatusKind = "info" | "error" | "success";
@@ -306,21 +306,18 @@ export function SuperPayPage() {
     }
   };
 
-  const resolveSigningKey = async (sess: WalletSession) => {
-    const resolved = await resolveSessionSigningKey(sess);
-    return resolved?.key ?? null;
-  };
-
   const signCurrent = async () => {
     if (!session || !config || !detail || !policy || busy) return;
     setBusy("sign");
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
-      const myKey = await resolveSigningKey(session);
-      if (!myKey) throw new Error(t("wallet.superWalletNoSigningKey"));
+      const resolved = await resolveSessionSigningKey(session);
+      if (!resolved) throw new Error(t("wallet.superWalletNoSigningKey"));
+      const myKey = resolved.key;
       const prepared = await prepareProposal(session.address, detail.proposal.id);
       const signature = await signProposalUserOp({
         userOpHash: prepared.userOpHash,
+        passkey: resolved.passkey,
         entityId: myKey.entityId,
         keyType: asAdvancedKeyType(myKey.keyType),
         qx: myKey.qx ?? undefined,
@@ -337,10 +334,17 @@ export function SuperPayPage() {
         signature,
       });
       const data = await getProposal(session.address, detail.proposal.id);
-      setDetail(data);
+      const signed = {
+        ...data,
+        proposal: {
+          ...data.proposal,
+          signatureCount: proposalSignatureCount(data.proposal, data.signatures),
+        },
+      };
+      setDetail(signed);
       await reloadList(session);
-      if (data.signatures.length >= policy.threshold) {
-        await runExecute(session, data.proposal.id);
+      if (proposalSignatureCount(signed.proposal, signed.signatures) >= policy.threshold) {
+        await runExecute(session, signed.proposal.id);
       } else {
         setStatus({ kind: "info", message: t("wallet.proposalsSigned") });
       }
@@ -746,13 +750,10 @@ export function SuperPayPage() {
             </p>
             <p className="text-sm">
               {t("wallet.proposalsSigCount", {
-                count: String(detail.signatures.length),
+                count: String(proposalSignatureCount(detail.proposal, detail.signatures)),
                 threshold: String(policy.threshold),
               })}
-              {isFullySigned(
-                { ...detail.proposal, signatureCount: detail.signatures.length },
-                policy.threshold
-              )
+              {isFullySigned(detail.proposal, policy.threshold, detail.signatures)
                 ? ` · ${t("wallet.proposalsFullySigned")}`
                 : ` · ${t("wallet.proposalsAwaitingSignatures")}`}
             </p>
@@ -796,10 +797,7 @@ export function SuperPayPage() {
                 disabled={
                   busy !== null ||
                   detail.proposal.status === "executed" ||
-                  !isFullySigned(
-                    { ...detail.proposal, signatureCount: detail.signatures.length },
-                    policy.threshold
-                  )
+                  !isFullySigned(detail.proposal, policy.threshold, detail.signatures)
                 }
                 onClick={() => void executeCurrent()}
               >

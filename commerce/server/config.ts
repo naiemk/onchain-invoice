@@ -357,9 +357,9 @@ function loadWalletConfig(
     "0x433709009B8330FDa32311DF1C2AFA402eD8D009";
   const sepoliaUsdc = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
   // Published Sepolia passkey wallet (data/wallet-deploy-sepolia.json).
-  const sepoliaFactory = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
-  const sepoliaImpl = "0xe024cE8ed1878dBdd3ca8E73B1e586c4E46dC85C";
-  const sepoliaRecovery = "0x72739889bcce2B08a23212bae6C7B9F1C29e7873";
+  const sepoliaFactory = "0x805131afe47723819B7b81dA25256429d77aa12E";
+  const sepoliaImpl = "0x4D19ce70D3D4a63cBa685665B39C133141B5dDC2";
+  const sepoliaRecovery = "0xC68914FF4EE1d9A7f263ea550DAf6d89EB801D91";
   const sepoliaBundlerBeneficiary = "0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb";
   let factoryAddress = blankToUndefined(expand(env.WALLET_FACTORY_ADDRESS ?? file?.factoryAddress ?? ""));
   let implementationAddress = blankToUndefined(

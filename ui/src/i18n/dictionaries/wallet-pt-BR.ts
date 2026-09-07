@@ -553,4 +553,14 @@ export const walletPtBR = {
   txHistoryLoading: "Loading activity…",
   superWalletRemoveLastKeyBlocked: "This identity must keep at least one key. Removing it would leave the identity unable to sign.",
   superWalletRemoveEntityBelowThreshold: "Cannot remove this identity: the wallet needs at least {threshold} of {count}. Lower the threshold first.",
+  passkeyNotOnChain:
+    "This passkey is not registered on the wallet. Lock and reopen with the passkey you used to create or pair this device.",
+  userOpAlreadySubmitted: "This transaction is already in progress.",
+  identityEmailTitle: "This identity",
+  identityChangeEmail: "Change email",
+  identityEmailNone: "No email attached yet.",
+  identityBackupHint:
+    "This identity has only one key. Add another passkey, security key, or wallet — if you lose this device you may lose access.",
+  connectWalletNeedsEmail:
+    "Verify an email on this wallet before connecting an external wallet. That email becomes your Super Wallet identity.",
 };

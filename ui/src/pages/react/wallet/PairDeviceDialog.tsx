@@ -23,13 +23,14 @@ import {
   rejectPairing,
 } from "@/shared/wallet-api.js";
 import { KEY_WEBAUTHN } from "../../../../../commerce/shared/advanced-wallet.js";
-import type { WalletSession } from "@/shared/wallet-session.js";
+import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 
 type Phase = "loading" | "share" | "approve" | "error";
 
 type ApprovedPairing = {
   newOwnerQx: string;
   newOwnerQy: string;
+  newOwnerCredentialId: string | null;
   deviceLabel: string;
 };
 
@@ -120,6 +121,7 @@ export function PairDeviceDialog({
           chainId: session.chainId,
           nonce: created.pairing.nonce,
           rpId: window.location.hostname,
+          walletLabel: session.label,
         });
         const link = pairingDeepLink(payload);
         let qr = "";
@@ -195,6 +197,7 @@ export function PairDeviceDialog({
           setApproved({
             newOwnerQx: p.newOwnerQx,
             newOwnerQy: p.newOwnerQy,
+            newOwnerCredentialId: p.newOwnerCredentialId ?? null,
             deviceLabel: p.deviceLabel ?? t("wallet.defaultDevice"),
           });
           setPhase("approve");
@@ -234,11 +237,11 @@ export function PairDeviceDialog({
     setError(null);
     try {
       await addPasskeySigner({
-        session,
+        session: loadWalletSession() ?? session,
         advanced,
         qx: approved.newOwnerQx,
         qy: approved.newOwnerQy,
-        credentialId: null,
+        credentialId: approved.newOwnerCredentialId,
         label: approved.deviceLabel,
         keyType: KEY_WEBAUTHN,
       });

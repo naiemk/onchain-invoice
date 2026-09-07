@@ -286,25 +286,40 @@ export function registerWalletAdvancedRoutes(
           handlers.sendJson(res, 200, { userOpHash, userOp: existing });
           return true;
         }
-        const record =
-          existing != null
-            ? db.requeueWalletUserOp({
-                userOpHash,
-                userOp,
-                walletAddress: wallet,
-                chainId: proposal.chainId,
-              })
-            : db.createWalletUserOp({
-                walletAddress: wallet,
-                chainId: proposal.chainId,
-                userOpHash,
-                userOp,
-              });
-        if (!record) {
-          handlers.sendJson(res, 409, { error: "duplicate_user_op_hash" });
-          return true;
+        try {
+          const record =
+            existing != null
+              ? db.requeueWalletUserOp({
+                  userOpHash,
+                  userOp,
+                  walletAddress: wallet,
+                  chainId: proposal.chainId,
+                })
+              : db.createWalletUserOp({
+                  walletAddress: wallet,
+                  chainId: proposal.chainId,
+                  userOpHash,
+                  userOp,
+                });
+          if (!record) {
+            const raced = db.getWalletUserOpByHash(userOpHash);
+            if (raced) {
+              handlers.sendJson(res, 200, { userOpHash, userOp: raced });
+              return true;
+            }
+            handlers.sendJson(res, 409, { error: "duplicate_user_op_hash", userOpHash });
+            return true;
+          }
+          handlers.sendJson(res, 200, { userOpHash, userOp: record });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const raced = db.getWalletUserOpByHash(userOpHash);
+          if (raced && (/UNIQUE constraint failed/i.test(message) || message.includes("duplicate"))) {
+            handlers.sendJson(res, 200, { userOpHash, userOp: raced });
+            return true;
+          }
+          handlers.sendJson(res, 409, { error: "duplicate_user_op_hash", message, userOpHash });
         }
-        handlers.sendJson(res, 200, { userOpHash, userOp: record });
         return true;
       }
     }

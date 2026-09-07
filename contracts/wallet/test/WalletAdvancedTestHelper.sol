@@ -42,6 +42,10 @@ contract WalletAdvancedTestHelper is Wallet {
         return _validateAdvancedSignatures(digest, signature);
     }
 
+    function exposedValidateRaw(bytes32 digest, bytes calldata signature) external view returns (bool) {
+        return _rawSignatureValidation(digest, signature);
+    }
+
     function exposedKeyId(
         bytes32 entityId,
         uint8 keyType,

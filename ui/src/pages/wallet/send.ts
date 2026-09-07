@@ -9,6 +9,7 @@ import {
 } from "../../shared/wallet-api.js";
 import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import { formatPasskeyError, loadWalletSession } from "../../shared/webauthn.js";
+import { resolveCurrentWalletPasskey } from "../../shared/current-wallet-passkey.js";
 import {
   buildSignedSendUserOp,
   submitSignedUserOp,
@@ -176,13 +177,13 @@ async function runSend(
   try {
     setButtonLoading(btn, true, t("wallet.sendSigning"));
     showStatus(status, t("wallet.sendSigning"));
+    const passkey = await resolveCurrentWalletPasskey(session, "send");
     const { userOp, userOpHash } = await buildSignedSendUserOp({
       config,
-      walletAddress: session.address,
+      passkey,
       recipient: getAddress(recipientRaw),
       sendAmount,
       feeAmount: feeAtoms,
-      credentialId: session.credentialId,
     });
     showStatus(status, t("wallet.sendSubmitting"));
     await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });

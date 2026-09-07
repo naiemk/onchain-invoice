@@ -235,7 +235,10 @@ export function JoinSuperPage() {
                 onClick={async () => {
                   setBusy("passkey");
                   try {
-                    const passkey = await createPasskey(t("wallet.joinSuperPasskeyLabel"), { attachment: "platform" });
+                    const passkey = await createPasskey(email.trim() || t("wallet.joinSuperPasskeyLabel"), {
+                      attachment: "platform",
+                      walletLabel: email.trim() || undefined,
+                    });
                     const fields = passkeyToKeyFields(passkey);
                     await enroll(KEY_WEBAUTHN, {
                       qx: fields.qx,
@@ -264,7 +267,9 @@ export function JoinSuperPage() {
                 onClick={async () => {
                   setBusy("yubikey");
                   try {
-                    const passkey = await createSecurityKey(t("wallet.joinSuperYubiKeyLabel"));
+                    const passkey = await createSecurityKey(email.trim() || t("wallet.joinSuperYubiKeyLabel"), {
+                      walletLabel: email.trim() || undefined,
+                    });
                     const fields = passkeyToKeyFields(passkey);
                     await enroll(KEY_YUBIKEY, {
                       qx: fields.qx,

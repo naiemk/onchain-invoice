@@ -7,6 +7,7 @@ import { t } from "../../i18n/t.js";
 import { escapeHtml } from "../../shared/dom.js";
 import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import { loadWalletSession } from "../../shared/webauthn.js";
+import { resolveCurrentWalletPasskey } from "../../shared/current-wallet-passkey.js";
 import {
   buildSignedSendUserOp,
   submitSignedUserOp,
@@ -189,13 +190,13 @@ async function runCashout(
   try {
     setButtonLoading(btn, true, t("wallet.sendSigning"));
     showStatus(status, t("wallet.sendSigning"));
+    const passkey = await resolveCurrentWalletPasskey(input.session, "send");
     const { userOp, userOpHash } = await buildSignedSendUserOp({
       config: input.config,
-      walletAddress: input.session.address,
+      passkey,
       recipient: input.recipient,
       sendAmount: input.sendAmount,
       feeAmount: input.feeAtoms,
-      credentialId: input.session.credentialId,
       chainId: input.chainId,
       sendTokenAddress: input.sendTokenAddress,
     });

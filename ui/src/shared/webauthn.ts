@@ -1,5 +1,6 @@
 import { encodeWebAuthnSignature } from "../../../commerce/shared/webauthn-signature.js";
 import { credentialIdToBytes, credentialIdsMatch } from "./credential-id.js";
+import { formatPasskeyName, inferDeviceLabel } from "./passkey-name.js";
 import {
   listWalletRegistry,
   upsertWalletSession,
@@ -222,7 +223,7 @@ async function webAuthnCreate(options: CredentialCreationOptions): Promise<Publi
 
 export async function createPasskey(
   displayName: string,
-  options?: { attachment?: "platform" | "cross-platform" }
+  options?: { attachment?: "platform" | "cross-platform"; walletLabel?: string; deviceLabel?: string }
 ): Promise<PasskeyOwner> {
   assertWebAuthnSupported();
   const challenge = randomChallenge();
@@ -233,6 +234,14 @@ export async function createPasskey(
   if (options?.attachment) {
     authenticatorSelection.authenticatorAttachment = options.attachment;
   }
+  const passkeyName = formatPasskeyName({
+    walletLabel: options?.walletLabel ?? displayName,
+    deviceLabel:
+      options?.deviceLabel ??
+      (options?.walletLabel && options.walletLabel.trim() !== displayName.trim()
+        ? displayName
+        : inferDeviceLabel()),
+  });
   let cred: PublicKeyCredential | null;
   try {
     cred = await webAuthnCreate({
@@ -241,8 +250,8 @@ export async function createPasskey(
         rp: { name: "Trustless Commerce Wallet", id: rpId() },
         user: {
           id: crypto.getRandomValues(new Uint8Array(16)),
-          name: displayName,
-          displayName,
+          name: passkeyName,
+          displayName: passkeyName,
         },
         pubKeyCredParams: [{ alg: -7, type: "public-key" }],
         authenticatorSelection,
@@ -277,8 +286,15 @@ export async function createPasskey(
 }
 
 /** Enroll a cross-platform security key (YubiKey) with UV/PIN required. */
-export async function createSecurityKey(displayName: string): Promise<PasskeyOwner> {
-  return createPasskey(displayName, { attachment: "cross-platform" });
+export async function createSecurityKey(
+  displayName: string,
+  options?: { walletLabel?: string }
+): Promise<PasskeyOwner> {
+  return createPasskey(displayName, {
+    attachment: "cross-platform",
+    walletLabel: options?.walletLabel ?? displayName,
+    deviceLabel: "YubiKey",
+  });
 }
 
 async function getPasskeyAssertion(
@@ -352,17 +368,6 @@ export async function ensureSessionCredential(session: WalletSession): Promise<W
   );
   if (reg?.credentialId) {
     const next = { ...session, credentialId: reg.credentialId, rawId: reg.rawId || session.rawId };
-    upsertWalletSession(next);
-    return next;
-  }
-
-  const { listDevices } = await import("./wallet-api.js");
-  const devices = await listDevices(session.address, session.chainId);
-  const match = devices.find(
-    (d) => d.credentialId && d.ownerQx === session.qx && d.ownerQy === session.qy
-  );
-  if (match?.credentialId) {
-    const next = { ...session, credentialId: match.credentialId };
     upsertWalletSession(next);
     return next;
   }

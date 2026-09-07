@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { KeyRound, Loader2, Smartphone } from "lucide-react";
+import { KeyRound, Loader2, Smartphone, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageCard } from "@/components/PageSplit";
 import { useLocale } from "@/providers/LocaleProvider";
-import { addPasskeySigner } from "@/shared/wallet-add-signer.js";
+import { addConnectedEoaSigner, addPasskeySigner } from "@/shared/wallet-add-signer.js";
 import {
   deleteDevice,
   fetchWalletConfig,
@@ -17,6 +17,7 @@ import { formatKeyFingerprint, shortKey } from "@/shared/wallet-ui.js";
 import { createSecurityKey, isYubiKeyPinRequiredError } from "@/shared/webauthn.js";
 import { loadWalletSession, upsertWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 import { buildSignedRemoveOwnerUserOp, submitSignedUserOp } from "@/shared/userop-client.js";
+import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
 import { KEY_YUBIKEY } from "../../../../../commerce/shared/advanced-wallet.js";
 import type { WalletDeviceRecord } from "../../../../../commerce/shared/wallet.js";
 import { PairDeviceDialog } from "./PairDeviceDialog";
@@ -32,6 +33,7 @@ export function DevicesCard({
   const [devices, setDevices] = useState<WalletDeviceRecord[] | null>(null);
   const [pairOpen, setPairOpen] = useState(false);
   const [yubiBusy, setYubiBusy] = useState(false);
+  const [eoaBusy, setEoaBusy] = useState(false);
   const [yubiHelp, setYubiHelp] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: "error" | "info"; message: string } | null>(null);
@@ -69,7 +71,7 @@ export function DevicesCard({
     setYubiHelp(false);
     setStatus({ kind: "info", message: t("wallet.superWalletEnrollYubiKey") });
     try {
-      const key = await createSecurityKey(t("wallet.addSecurityKey"));
+      const key = await createSecurityKey(session.label, { walletLabel: session.label });
       setStatus({ kind: "info", message: t("wallet.sendSigning") });
       await addPasskeySigner({
         session,
@@ -95,6 +97,20 @@ export function DevicesCard({
     }
   };
 
+  const addEoa = async () => {
+    setEoaBusy(true);
+    setStatus({ kind: "info", message: t("wallet.superWalletConnectWalletHint") });
+    try {
+      await addConnectedEoaSigner(session);
+      setStatus(null);
+      await refresh();
+    } catch (error) {
+      setStatus({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setEoaBusy(false);
+    }
+  };
+
   const removeDevice = async (device: WalletDeviceRecord) => {
     if (!window.confirm(t("wallet.removeConfirm"))) return;
     const id = `${device.ownerQx}|${device.ownerQy}`;
@@ -104,13 +120,13 @@ export function DevicesCard({
       const cfg = await fetchWalletConfig();
       const fee = BigInt(cfg.bundlerFeeUsdc || "0");
       const live = loadWalletSession() ?? session;
+      const passkey = await resolveCurrentWalletPasskey(live, "remove-key");
       const { userOp, userOpHash } = await buildSignedRemoveOwnerUserOp({
         config: cfg,
-        walletAddress: live.address,
+        passkey,
         qx: device.ownerQx,
         qy: device.ownerQy,
         feeAmount: fee,
-        credentialId: live.credentialId,
       });
       await submitSignedUserOp({ config: cfg, userOp, userOpHash, walletAddress: live.address });
       const result = await waitForUserOp(userOpHash);
@@ -194,6 +210,11 @@ export function DevicesCard({
       </div>
 
       <div className="space-y-2">
+        {(devices?.length ?? 1) <= 1 ? (
+          <p className="text-sm text-muted-foreground" data-testid="identity-backup-hint">
+            {t("wallet.identityBackupHint")}
+          </p>
+        ) : null}
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button type="button" onClick={() => setPairOpen(true)}>
             <Smartphone className="h-4 w-4" />
@@ -202,6 +223,10 @@ export function DevicesCard({
           <Button type="button" variant="outline" disabled={yubiBusy} onClick={() => void addYubiKey()}>
             {yubiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
             {t("wallet.addSecurityKey")}
+          </Button>
+          <Button type="button" variant="outline" disabled={eoaBusy} onClick={() => void addEoa()}>
+            {eoaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+            {t("wallet.superWalletConnectWallet")}
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">{t("wallet.addSecurityKeyHint")}</p>

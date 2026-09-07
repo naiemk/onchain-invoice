@@ -137,6 +137,7 @@ interface WalletPairingRow {
   chain_id: string;
   new_owner_qx: string | null;
   new_owner_qy: string | null;
+  new_owner_credential_id: string | null;
   device_label: string | null;
   status: WalletPairingRecord["status"];
   expires_at: string;
@@ -987,6 +988,7 @@ export class CommerceDb {
         chain_id TEXT NOT NULL,
         new_owner_qx TEXT,
         new_owner_qy TEXT,
+        new_owner_credential_id TEXT,
         device_label TEXT,
         status TEXT NOT NULL CHECK (status IN ('pending','approved','consumed','expired')),
         expires_at TEXT NOT NULL,
@@ -1319,6 +1321,7 @@ export class CommerceDb {
     this.ensureColumn("wallet_accounts", "activation_status", "TEXT NOT NULL DEFAULT 'pending'");
     this.ensureColumn("wallet_accounts", "activation_error", "TEXT");
     this.ensureColumn("wallet_proposals", "tx_hash", "TEXT");
+    this.ensureColumn("wallet_pairings", "new_owner_credential_id", "TEXT");
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_wallet_accounts_activation
         ON wallet_accounts(activation_priority_at, activation_status, activation_next_check_at);
@@ -1371,7 +1374,12 @@ export class CommerceDb {
            deployed_chains, created_at, updated_at
          ) VALUES (@address, @salt, @ownerQx, @ownerQy, @credentialId, @webauthnAttestation, '[]', @now, @now)
          ON CONFLICT(address) DO UPDATE SET
-           credential_id = COALESCE(excluded.credential_id, credential_id),
+           credential_id = CASE
+             WHEN excluded.credential_id IS NULL OR excluded.credential_id = '' THEN credential_id
+             WHEN credential_id IS NULL OR credential_id = '' THEN excluded.credential_id
+             WHEN credential_id = excluded.credential_id THEN excluded.credential_id
+             ELSE credential_id
+           END,
            webauthn_attestation = COALESCE(excluded.webauthn_attestation, webauthn_attestation),
            updated_at = @now`
       )
@@ -1586,7 +1594,12 @@ export class CommerceDb {
          VALUES (@walletAddress, @chainId, @ownerQx, @ownerQy, @label, @credentialId, @now, @now)
          ON CONFLICT(wallet_address, chain_id, owner_qx, owner_qy) DO UPDATE SET
            label = excluded.label,
-           credential_id = COALESCE(excluded.credential_id, credential_id),
+           credential_id = CASE
+             WHEN excluded.credential_id IS NULL OR excluded.credential_id = '' THEN credential_id
+             WHEN credential_id IS NULL OR credential_id = '' THEN excluded.credential_id
+             WHEN credential_id = excluded.credential_id THEN excluded.credential_id
+             ELSE credential_id
+           END,
            last_used_at = @now`
       )
       .run({
@@ -1642,7 +1655,8 @@ export class CommerceDb {
     nonce: string,
     newOwnerQx: string,
     newOwnerQy: string,
-    deviceLabel: string | null
+    deviceLabel: string | null,
+    newOwnerCredentialId: string | null = null
   ): WalletPairingRecord | null {
     const row = this.getWalletPairing(nonce);
     if (!row || row.status !== "pending") return null;
@@ -1652,9 +1666,9 @@ export class CommerceDb {
     }
     this.db
       .prepare(
-        `UPDATE wallet_pairings SET new_owner_qx = ?, new_owner_qy = ?, device_label = ?, status = 'approved' WHERE nonce = ?`
+        `UPDATE wallet_pairings SET new_owner_qx = ?, new_owner_qy = ?, device_label = ?, new_owner_credential_id = ?, status = 'approved' WHERE nonce = ?`
       )
-      .run(newOwnerQx, newOwnerQy, deviceLabel, nonce);
+      .run(newOwnerQx, newOwnerQy, deviceLabel, newOwnerCredentialId, nonce);
     return this.getWalletPairing(nonce);
   }
 
@@ -1703,22 +1717,32 @@ export class CommerceDb {
   }): WalletUserOpRecord {
     const now = new Date().toISOString();
     const id = randomUUID();
-    this.db
-      .prepare(
-        `INSERT INTO wallet_user_ops (
-           id, wallet_address, chain_id, user_op_hash, user_op_json, status,
-           version, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, 'pending', 1, ?, ?)`
-      )
-      .run(
-        id,
-        input.walletAddress.toLowerCase(),
-        input.chainId,
-        input.userOpHash.toLowerCase(),
-        JSON.stringify(input.userOp),
-        now,
-        now
-      );
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO wallet_user_ops (
+             id, wallet_address, chain_id, user_op_hash, user_op_json, status,
+             version, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, 'pending', 1, ?, ?)`
+        )
+        .run(
+          id,
+          input.walletAddress.toLowerCase(),
+          input.chainId,
+          input.userOpHash.toLowerCase(),
+          JSON.stringify(input.userOp),
+          now,
+          now
+        );
+    } catch (error) {
+      const code = String((error as { code?: string }).code ?? "");
+      const message = error instanceof Error ? error.message : String(error);
+      if (code.startsWith("SQLITE_CONSTRAINT") || /UNIQUE constraint failed: wallet_user_ops/i.test(message)) {
+        const existing = this.getWalletUserOpByHash(input.userOpHash);
+        if (existing) return existing;
+      }
+      throw error;
+    }
     return this.getWalletUserOpByHash(input.userOpHash)!;
   }
 
@@ -1987,9 +2011,13 @@ export class CommerceDb {
   }
 
   getWalletProposal(id: string): WalletProposalRecord | null {
-    const row = this.db.prepare(`SELECT * FROM wallet_proposals WHERE id = ?`).get(id) as
-      | WalletProposalRow
-      | undefined;
+    const row = this.db
+      .prepare(
+        `SELECT p.*,
+         (SELECT COUNT(*) FROM wallet_proposal_sigs s WHERE s.proposal_id = p.id) AS signature_count
+         FROM wallet_proposals p WHERE p.id = ?`
+      )
+      .get(id) as WalletProposalRow | undefined;
     return row ? mapWalletProposal(row) : null;
   }
 
@@ -3542,6 +3570,7 @@ function mapWalletPairing(row: WalletPairingRow): WalletPairingRecord {
     chainId: row.chain_id,
     newOwnerQx: row.new_owner_qx,
     newOwnerQy: row.new_owner_qy,
+    newOwnerCredentialId: row.new_owner_credential_id ?? null,
     deviceLabel: row.device_label,
     status: row.status,
     expiresAt: row.expires_at,
