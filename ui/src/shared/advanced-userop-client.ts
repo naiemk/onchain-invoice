@@ -64,6 +64,20 @@ export async function buildAdvancedKeySignature(input: {
   credentialId?: string;
   eoaSigner?: { signMessage: (msg: Uint8Array | string) => Promise<string> };
 }): Promise<string> {
+  const { keyId, sig } = await signKeyInner(input);
+  return encodeAdvancedSignature([{ keyId, sig }]);
+}
+
+async function signKeyInner(input: {
+  userOpHash: string;
+  entityId: string;
+  keyType: AdvancedKeyType;
+  qx?: string;
+  qy?: string;
+  eoa?: string;
+  credentialId?: string;
+  eoaSigner?: { signMessage: (msg: Uint8Array | string) => Promise<string> };
+}): Promise<{ keyId: string; sig: string }> {
   const qx = input.qx ?? zeroPadValue("0x00", 32);
   const qy = input.qy ?? zeroPadValue("0x00", 32);
   const eoa = input.eoa ?? zeroPadValue("0x00", 20);
@@ -80,7 +94,7 @@ export async function buildAdvancedKeySignature(input: {
       requireUv: input.keyType === KEY_YUBIKEY,
     });
   }
-  return encodeAdvancedSignature([{ keyId, sig }]);
+  return { keyId, sig };
 }
 
 export async function buildAdvancedWebAuthnSignature(input: {
@@ -192,6 +206,7 @@ export async function buildSignedRemoveEntityUserOp(input: {
   walletAddress: string;
   adminEntityId: string;
   entityId: string;
+  keyIds?: string[];
   qx: string;
   qy: string;
   feeAmount: bigint;
@@ -200,7 +215,7 @@ export async function buildSignedRemoveEntityUserOp(input: {
   return buildPolicyUserOp({
     config: input.config,
     walletAddress: input.walletAddress,
-    innerCallData: encodeRemoveEntity(input.entityId),
+    innerCallData: encodeRemoveEntity(input.entityId, input.keyIds ?? []),
     feeAmount: input.feeAmount,
     sign: (userOpHash) =>
       buildAdvancedWebAuthnSignature({
@@ -247,6 +262,8 @@ export async function buildSignedAddKeyUserOp(input: {
   adminQx: string;
   adminQy: string;
   adminCredentialId?: string;
+  adminKeyType?: AdvancedKeyType;
+  adminEoa?: string;
   targetEntityId: string;
   keyType: AdvancedKeyType;
   qx: string;
@@ -270,10 +287,12 @@ export async function buildSignedAddKeyUserOp(input: {
       buildAdvancedKeySignature({
         userOpHash,
         entityId: input.adminEntityId,
-        keyType: KEY_WEBAUTHN,
+        keyType: input.adminKeyType ?? KEY_WEBAUTHN,
         qx: input.adminQx,
         qy: input.adminQy,
+        eoa: input.adminEoa,
         credentialId: input.adminCredentialId,
+        eoaSigner: input.eoaSigner,
       }),
   });
 }
@@ -333,7 +352,8 @@ export async function signProposalUserOp(input: {
   credentialId?: string;
   eoaSigner?: { signMessage: (msg: Uint8Array | string) => Promise<string> };
 }): Promise<string> {
-  return buildAdvancedKeySignature(input);
+  const { sig } = await signKeyInner(input);
+  return sig;
 }
 
 export function passkeyToKeyFields(owner: PasskeyOwner): { qx: string; qy: string; credentialId: string } {

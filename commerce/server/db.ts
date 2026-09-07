@@ -1976,7 +1976,10 @@ export class CommerceDb {
     const result = this.db
       .prepare(
         `UPDATE wallet_proposals SET nonce = ?, status = 'signing', updated_at = ?
-         WHERE id = ? AND status IN ('draft', 'signing')`
+         WHERE id = ? AND (
+           status IN ('draft', 'signing', 'ready')
+           OR (status = 'executed' AND tx_hash IS NULL)
+         )`
       )
       .run(nonce, now, id);
     if (result.changes === 0) return null;
@@ -2022,7 +2025,9 @@ export class CommerceDb {
   updateWalletProposalTxHash(id: string, txHash: string): WalletProposalRecord | null {
     const now = new Date().toISOString();
     const result = this.db
-      .prepare(`UPDATE wallet_proposals SET tx_hash = ?, updated_at = ? WHERE id = ?`)
+      .prepare(
+        `UPDATE wallet_proposals SET tx_hash = ?, status = 'executed', updated_at = ? WHERE id = ?`
+      )
       .run(txHash, now, id);
     if (result.changes === 0) return null;
     return this.getWalletProposal(id);

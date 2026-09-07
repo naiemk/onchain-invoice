@@ -219,27 +219,27 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
       }
 
       if (!onChainAdvanced) {
-        items.push(
-          {
-            id: "devices",
-            title: t("wallet.advancedDevicesTitle"),
-            description: t(devicesBodyKey, { count: deviceCount }),
-            href: "/wallet/security",
-          },
-          {
-            id: "recovery",
-            title: t("wallet.advancedRecoveryTitle"),
-            description: t("wallet.advancedRecoveryBody"),
-            href: "/wallet/security#recovery",
-          }
-        );
+        items.push({
+          id: "recovery",
+          title: t("wallet.advancedRecoveryTitle"),
+          description: t("wallet.advancedRecoveryBody"),
+          href: "/wallet/security#recovery",
+        });
       }
-      items.push({
-        id: "invoices",
-        title: t("wallet.advancedInvoicesTitle"),
-        description: t("wallet.advancedInvoicesBody"),
-        href: "/wallet/invoices",
-      });
+      items.push(
+        {
+          id: "devices",
+          title: t("wallet.advancedDevicesTitle"),
+          description: t(devicesBodyKey, { count: deviceCount }),
+          href: "/wallet/security",
+        },
+        {
+          id: "invoices",
+          title: t("wallet.advancedInvoicesTitle"),
+          description: t("wallet.advancedInvoicesBody"),
+          href: "/wallet/invoices",
+        }
+      );
 
       setNotices(items);
     })();
@@ -387,15 +387,13 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
           </section>
         )}
         {advanced && notices.length > 0 && <NoticeCarousel items={notices} />}
-        {!isSuperWallet && (
-          <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
             <span className="font-medium">{t("wallet.thisDeviceChip")}</span>{" "}
             <Link to="/wallet/security" className="text-primary hover:underline">
               {t("wallet.manageDevices")}
             </Link>{" "}
             · {t("wallet.pairOtherDevices")}
           </p>
-        )}
         {chains.length > 0 && (
           <section className="rounded-xl border border-border bg-card p-5">
             <h2 className="mb-3 text-sm font-semibold">{t("wallet.byChain")}</h2>

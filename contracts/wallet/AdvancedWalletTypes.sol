@@ -36,6 +36,8 @@ library AdvancedWalletTypes {
     error InsufficientEntityVotes();
     error VetoRequired();
     error EntityHasKeys();
+    /// @dev Removing this key would leave its identity with zero keys (unable to sign).
+    error LastKey();
     error RecoveryDisabledInAdvanced();
     error CannotEnableWithPendingRecovery();
     error TooManyEntities();

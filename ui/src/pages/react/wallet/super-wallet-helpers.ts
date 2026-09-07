@@ -11,6 +11,7 @@ import type {
   WalletKeyEnrollmentRequestRecord,
 } from "../../../../../commerce/shared/wallet.js";
 import { buildSignedAddKeyUserOp, buildSignedRemoveEntityUserOp, buildSignedRemoveKeyUserOp } from "@/shared/advanced-userop-client.js";
+import { asAdvancedKeyType, resolveSessionSigningKey } from "@/shared/advanced-signing-key.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
 import { fetchWalletBalance, primaryChain, waitForUserOp, type WalletPublicConfig } from "@/shared/wallet-api.js";
 import {
@@ -43,6 +44,14 @@ export function shortKeyDisplayFromRequest(r: WalletKeyEnrollmentRequestRecord):
 
 export function shortEntity(entityId: string): string {
   return `${entityId.slice(0, 10)}…${entityId.slice(-6)}`;
+}
+
+export function isLastEntityKey(entityKeyCount: number): boolean {
+  return entityKeyCount <= 1;
+}
+
+export function wouldDropBelowThreshold(entityCount: number, threshold: number): boolean {
+  return entityCount <= threshold;
 }
 
 export function formatUserOpRejectReason(reason: string | null | undefined): string {
@@ -120,15 +129,19 @@ export async function submitAddKey(input: {
 }): Promise<void> {
   const fee = BigInt(input.config.bundlerFeeUsdc || "0");
   const keyId = computeKeyId(input.targetEntityId, input.keyType, input.qx, input.qy, input.eoa);
+  const resolved = await resolveSessionSigningKey(input.session);
+  if (!resolved) throw new Error(t("wallet.superWalletNoSigningKey"));
   const { userOp, userOpHash } = await buildSignedAddKeyUserOp({
     config: input.config,
-    walletAddress: input.session.address,
-    adminEntityId: input.adminEntity.entityId,
-    adminQx: input.session.qx,
-    adminQy: input.session.qy,
-    adminCredentialId: input.session.credentialId,
+    walletAddress: resolved.session.address,
+    adminEntityId: resolved.key.entityId,
+    adminKeyType: asAdvancedKeyType(resolved.key.keyType),
+    adminQx: resolved.key.qx || resolved.session.qx,
+    adminQy: resolved.key.qy || resolved.session.qy,
+    adminEoa: resolved.key.eoa ?? undefined,
+    adminCredentialId: resolved.key.credentialId ?? resolved.session.credentialId,
     targetEntityId: input.targetEntityId,
-    keyType: input.keyType,
+    keyType: asAdvancedKeyType(input.keyType),
     qx: input.qx,
     qy: input.qy,
     eoa: input.eoa,
@@ -159,6 +172,7 @@ export async function submitRemoveEntity(input: {
   config: WalletPublicConfig;
   adminEntity: WalletEntityRecord;
   entityId: string;
+  keyIds: string[];
 }): Promise<void> {
   const fee = BigInt(input.config.bundlerFeeUsdc || "0");
   const { userOp, userOpHash } = await buildSignedRemoveEntityUserOp({
@@ -166,6 +180,7 @@ export async function submitRemoveEntity(input: {
     walletAddress: input.session.address,
     adminEntityId: input.adminEntity.entityId,
     entityId: input.entityId,
+    keyIds: input.keyIds,
     qx: input.session.qx,
     qy: input.session.qy,
     feeAmount: fee,

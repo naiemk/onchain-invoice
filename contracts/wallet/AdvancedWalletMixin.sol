@@ -119,16 +119,24 @@ abstract contract AdvancedWalletMixin {
         for (uint256 i = 0; i < vetoEntityIds.length; ++i) {
             _setVetoInternal(vetoEntityIds[i], true);
         }
+        _assertEntitiesUsable();
     }
 
     function _addEntity(bytes32 entityId) internal onlyAdvanced {
         _registerEntity(entityId);
     }
 
-    function _removeEntity(bytes32 entityId) internal onlyAdvanced {
+    function _removeEntity(bytes32 entityId, bytes32[] memory keyIds) internal onlyAdvanced {
         if (!_entityExists[entityId]) revert AdvancedWalletTypes.EntityNotFound();
+        // Remaining identities must still satisfy the current M-of-N threshold.
+        if (entityCount <= threshold) revert AdvancedWalletTypes.InvalidThreshold();
+        uint256 keyLen = keyIds.length;
+        for (uint256 i = 0; i < keyLen; ++i) {
+            AdvancedWalletTypes.KeyRecord memory key = _keys[keyIds[i]];
+            if (key.entityId != entityId) revert AdvancedWalletTypes.KeyNotFound();
+            _removeKeyInternal(keyIds[i]);
+        }
         if (_entityKeyCount[entityId] > 0) revert AdvancedWalletTypes.EntityHasKeys();
-        if (entityCount - 1 < threshold) revert AdvancedWalletTypes.InvalidThreshold();
         _removeEntityInternal(entityId);
     }
 
@@ -140,9 +148,8 @@ abstract contract AdvancedWalletMixin {
     function _removeKey(bytes32 keyId) internal onlyAdvanced {
         AdvancedWalletTypes.KeyRecord memory key = _keys[keyId];
         if (key.entityId == bytes32(0)) revert AdvancedWalletTypes.KeyNotFound();
-        if (_entityKeyCount[key.entityId] <= 1 && entityCount <= threshold) {
-            revert AdvancedWalletTypes.InvalidThreshold();
-        }
+        // An identity with zero keys cannot produce a valid entity signature.
+        if (_entityKeyCount[key.entityId] <= 1) revert AdvancedWalletTypes.LastKey();
         _removeKeyInternal(keyId);
     }
 
@@ -267,6 +274,13 @@ abstract contract AdvancedWalletMixin {
             }
         }
         emit VetoUpdated(entityId, isVeto);
+    }
+
+    function _assertEntitiesUsable() internal view {
+        uint256 n = entityCount;
+        for (uint256 i = 0; i < n; ++i) {
+            if (_entityKeyCount[_entityAtBit[uint8(i)]] == 0) revert AdvancedWalletTypes.LastKey();
+        }
     }
 
     function _migrateSimpleOwnersToEntity(bytes32 adminEntityId) internal virtual;

@@ -30,6 +30,14 @@ contract WalletAdvancedTestHelper is Wallet {
         _setVeto(entityId, isVeto);
     }
 
+    function exposedRemoveKey(bytes32 keyId) external {
+        _removeKey(keyId);
+    }
+
+    function exposedRemoveEntity(bytes32 entityId, bytes32[] calldata keyIds) external {
+        _removeEntity(entityId, keyIds);
+    }
+
     function exposedValidateAdvanced(bytes32 digest, bytes calldata signature) external view returns (bool) {
         return _validateAdvancedSignatures(digest, signature);
     }

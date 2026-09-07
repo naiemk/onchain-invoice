@@ -108,8 +108,8 @@ contract Wallet is Account, ERC7821, Initializable, P256OwnerRegistry, AdvancedW
         _addEntity(entityId);
     }
 
-    function removeEntity(bytes32 entityId) external onlyEntryPointOrSelf whenNotPaused {
-        _removeEntity(entityId);
+    function removeEntity(bytes32 entityId, bytes32[] calldata keyIds) external onlyEntryPointOrSelf whenNotPaused {
+        _removeEntity(entityId, keyIds);
     }
 
     function addKey(bytes32 entityId, uint8 keyType, bytes32 qx, bytes32 qy, address eoa)

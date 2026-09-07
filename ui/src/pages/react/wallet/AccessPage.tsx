@@ -56,6 +56,7 @@ import { WalletFrame } from "./WalletFrame";
 import {
   KEY_EOA,
   KEY_YUBIKEY,
+  isLastEntityKey,
   keyTypeLabel,
   shortEntity,
   shortKeyDisplay,
@@ -63,6 +64,7 @@ import {
   submitAddKey,
   submitRemoveEntity,
   submitRemoveKey,
+  wouldDropBelowThreshold,
 } from "./super-wallet-helpers";
 
 type StatusKind = "info" | "error" | "success";
@@ -451,11 +453,28 @@ export function AccessPage() {
   };
 
   const removeEntity = async (entityId: string) => {
-    if (!session || !config || !adminEntity) return;
+    if (!session || !config || !adminEntity || !policy) return;
+    const entityKeys = keys.filter((k) => k.entityId === entityId);
+    if (wouldDropBelowThreshold(policy.entityCount, policy.threshold)) {
+      setStatus({
+        kind: "error",
+        message: t("wallet.superWalletRemoveEntityBelowThreshold", {
+          threshold: String(policy.threshold),
+          count: String(policy.entityCount),
+        }),
+      });
+      return;
+    }
     if (!window.confirm(t("wallet.superWalletRemoveEntityConfirm"))) return;
     setBusy(`remove-entity-${entityId}`);
     try {
-      await submitRemoveEntity({ session, config, adminEntity, entityId });
+      await submitRemoveEntity({
+        session,
+        config,
+        adminEntity,
+        entityId,
+        keyIds: entityKeys.map((k) => k.keyId),
+      });
       await runRefresh();
       await refreshPolicy();
     } catch (error) {
@@ -467,6 +486,11 @@ export function AccessPage() {
 
   const removeKey = async (entityId: string, keyId: string) => {
     if (!session || !config || !adminEntity) return;
+    const entityKeyCount = keys.filter((k) => k.entityId === entityId).length;
+    if (isLastEntityKey(entityKeyCount)) {
+      setStatus({ kind: "error", message: t("wallet.superWalletRemoveLastKeyBlocked") });
+      return;
+    }
     if (!window.confirm(t("wallet.superWalletRemoveKeyConfirm"))) return;
     setBusy(`remove-key-${keyId}`);
     try {
@@ -634,7 +658,7 @@ function ManageSection({
   onRemoveKey,
   busy,
 }: {
-  t: (k: string) => string;
+  t: (k: string, vars?: Record<string, string | number>) => string;
   policy: AdvancedPolicy;
   entities: WalletEntityRecord[];
   keys: WalletEntityKeyRecord[];
@@ -731,6 +755,8 @@ function ManageSection({
             {entities.map((e) => {
               const entityKeys = keys.filter((k) => k.entityId === e.entityId);
               const isAdmin = adminEntityId && e.entityId === adminEntityId;
+              const lastKey = isLastEntityKey(entityKeys.length);
+              const belowThreshold = wouldDropBelowThreshold(policy.entityCount, policy.threshold);
               return (
                 <li key={e.entityId} className="space-y-3 p-4" data-entity-id={e.entityId}>
                   <div>
@@ -744,7 +770,9 @@ function ManageSection({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            disabled={busy !== null}
+                            data-testid="remove-key"
+                            disabled={busy !== null || lastKey}
+                            title={lastKey ? t("wallet.superWalletRemoveLastKeyBlocked") : undefined}
                             onClick={() => onRemoveKey(e.entityId, k.keyId)}
                           >
                             {t("wallet.superWalletRemoveKey")}
@@ -752,6 +780,11 @@ function ManageSection({
                         </li>
                       ))}
                     </ul>
+                    {lastKey && entityKeys.length > 0 ? (
+                      <p className="mt-2 text-xs text-muted-foreground" data-testid="last-key-blocked">
+                        {t("wallet.superWalletRemoveLastKeyBlocked")}
+                      </p>
+                    ) : null}
                   </div>
                   {isAdmin ? (
                     <div className="flex flex-wrap gap-2">
@@ -793,11 +826,28 @@ function ManageSection({
                         type="button"
                         size="sm"
                         variant="ghost"
-                        disabled={busy !== null}
+                        data-testid="remove-entity"
+                        disabled={busy !== null || belowThreshold}
+                        title={
+                          belowThreshold
+                            ? t("wallet.superWalletRemoveEntityBelowThreshold", {
+                                threshold: String(policy.threshold),
+                                count: String(policy.entityCount),
+                              })
+                            : undefined
+                        }
                         onClick={() => onRemoveEntity(e.entityId)}
                       >
                         {t("wallet.superWalletRemoveEntity")}
                       </Button>
+                      {belowThreshold ? (
+                        <p className="basis-full text-xs text-muted-foreground" data-testid="remove-entity-blocked">
+                          {t("wallet.superWalletRemoveEntityBelowThreshold", {
+                            threshold: String(policy.threshold),
+                            count: String(policy.entityCount),
+                          })}
+                        </p>
+                      ) : null}
                     </div>
                   )}
                 </li>

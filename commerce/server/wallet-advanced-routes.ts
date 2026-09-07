@@ -8,7 +8,7 @@ import {
   encodeExecuteCallData,
   userOpToTuple,
 } from "../shared/userop.js";
-import { encodeAdvancedSignature } from "../shared/advanced-wallet.js";
+import { encodeAdvancedSignature, unwrapAdvancedInnerSig } from "../shared/advanced-wallet.js";
 import { recordProposalTransfers } from "./wallet-transfer-sync.js";
 
 const WALLET_POLICY_ABI = [
@@ -233,13 +233,21 @@ export function registerWalletAdvancedRoutes(
 
       if (action === "execute" && req.method === "POST") {
         const body = await handlers.readJson(req);
+        if (proposal.txHash) {
+          handlers.sendJson(res, 409, { error: "already_executed" });
+          return true;
+        }
+        if (proposal.status === "cancelled") {
+          handlers.sendJson(res, 409, { error: "proposal_cancelled" });
+          return true;
+        }
         const signatures = db.listWalletProposalSigs(proposalId);
         if (signatures.length === 0) {
           handlers.sendJson(res, 400, { error: "no_signatures" });
           return true;
         }
         let proposalRecord = proposal;
-        if (!proposalRecord.nonce) {
+        if (!proposalRecord.nonce || proposalRecord.status === "executed") {
           const chain = appConfig.wallet.chains.find((c) => c.chainId === proposal.chainId) ?? appConfig.wallet;
           if (!chain.rpcUrl) {
             handlers.sendJson(res, 503, { error: "rpc_unavailable" });
@@ -248,10 +256,13 @@ export function registerWalletAdvancedRoutes(
           const provider = new JsonRpcProvider(chain.rpcUrl);
           const entryPoint = new Contract(appConfig.wallet.entryPointAddress, ENTRYPOINT_ABI, provider);
           const nonce = (await entryPoint.getNonce(wallet, 0)).toString();
-          proposalRecord = db.prepareWalletProposal(proposalId, nonce)!;
+          proposalRecord = db.prepareWalletProposal(proposalId, nonce) ?? proposalRecord;
         }
         const packedSig = encodeAdvancedSignature(
-          signatures.map((s) => ({ keyId: s.keyId, sig: s.signature }))
+          signatures.map((s) => ({
+            keyId: s.keyId,
+            sig: unwrapAdvancedInnerSig(s.signature, s.keyId),
+          }))
         );
         const feeAmount = BigInt(appConfig.wallet.bundlerFeeUsdc);
         const userOp = await buildProposalUserOp({
@@ -265,13 +276,34 @@ export function registerWalletAdvancedRoutes(
         const provider = new JsonRpcProvider(chain.rpcUrl!);
         const entryPoint = new Contract(appConfig.wallet.entryPointAddress, ENTRYPOINT_ABI, provider);
         const userOpHash = await entryPoint.getUserOpHash(userOpToTuple(userOp));
-        const record = db.createWalletUserOp({
-          walletAddress: wallet,
-          chainId: proposal.chainId,
-          userOpHash,
-          userOp,
-        });
-        db.updateWalletProposalStatus(proposalId, "executed");
+        const existing = db.getWalletUserOpByHash(userOpHash);
+        if (existing?.status === "included") {
+          if (existing.txHash) db.updateWalletProposalTxHash(proposalId, existing.txHash);
+          handlers.sendJson(res, 200, { userOpHash, userOp: existing });
+          return true;
+        }
+        if (existing && existing.status !== "rejected" && existing.status !== "failed") {
+          handlers.sendJson(res, 200, { userOpHash, userOp: existing });
+          return true;
+        }
+        const record =
+          existing != null
+            ? db.requeueWalletUserOp({
+                userOpHash,
+                userOp,
+                walletAddress: wallet,
+                chainId: proposal.chainId,
+              })
+            : db.createWalletUserOp({
+                walletAddress: wallet,
+                chainId: proposal.chainId,
+                userOpHash,
+                userOp,
+              });
+        if (!record) {
+          handlers.sendJson(res, 409, { error: "duplicate_user_op_hash" });
+          return true;
+        }
         handlers.sendJson(res, 200, { userOpHash, userOp: record });
         return true;
       }

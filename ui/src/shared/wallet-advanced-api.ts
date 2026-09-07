@@ -7,6 +7,11 @@ import type {
 } from "../../../commerce/shared/wallet.js";
 import { apiUrl } from "./site.js";
 
+async function readError(res: Response, fallback: string): Promise<string> {
+  const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+  return body.message || body.error || fallback;
+}
+
 export interface AdvancedPolicy {
   wallet: string;
   advanced: boolean;
@@ -213,7 +218,7 @@ export async function createProposal(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(`create_proposal_${res.status}`);
+  if (!res.ok) throw new Error(await readError(res, `create_proposal_${res.status}`));
   const data = (await res.json()) as { proposal: WalletProposalRecord };
   return data.proposal;
 }
@@ -236,7 +241,7 @@ export async function prepareProposal(
     headers: { "Content-Type": "application/json" },
     body: "{}",
   });
-  if (!res.ok) throw new Error(`prepare_proposal_${res.status}`);
+  if (!res.ok) throw new Error(await readError(res, `prepare_proposal_${res.status}`));
   return (await res.json()) as { proposal: WalletProposalRecord; userOpHash: string };
 }
 
@@ -256,7 +261,7 @@ export async function signProposal(input: {
       body: JSON.stringify(input),
     }
   );
-  if (!res.ok) throw new Error(`sign_proposal_${res.status}`);
+  if (!res.ok) throw new Error(await readError(res, `sign_proposal_${res.status}`));
   const data = (await res.json()) as { signature: WalletProposalSigRecord };
   return data.signature;
 }
@@ -274,7 +279,7 @@ export async function executeProposal(
       body: JSON.stringify(signature ? { signature } : {}),
     }
   );
-  if (!res.ok) throw new Error(`execute_proposal_${res.status}`);
+  if (!res.ok) throw new Error(await readError(res, `execute_proposal_${res.status}`));
   const data = (await res.json()) as { userOpHash: string };
   return data;
 }
@@ -289,7 +294,7 @@ export async function attachProposalTx(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ txHash }),
   });
-  if (!res.ok) throw new Error(`proposal_tx_${res.status}`);
+  if (!res.ok) throw new Error(await readError(res, `proposal_tx_${res.status}`));
   const data = (await res.json()) as { proposal: WalletProposalRecord };
   return data.proposal;
 }

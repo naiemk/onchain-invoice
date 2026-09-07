@@ -283,6 +283,63 @@ describe("Wallet advanced entity M-of-N", function () {
     const packed = encodeAdvancedSignature([{ keyId, sig }]);
     expect(await wallet.exposedValidateAdvanced(digest, packed)).to.equal(true);
   });
+
+  it("rejects removing the last key of an identity", async function () {
+    const { wallet, eoaA } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    const keyId = computeKeyId(
+      ADMIN_ENTITY,
+      KEY_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      await eoaA.getAddress()
+    );
+    await wallet.exposedAddKey(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress());
+    const migrated = computeKeyId(ADMIN_ENTITY, 0, zeroPadValue("0x01", 32), zeroPadValue("0x02", 32), "0x0000000000000000000000000000000000000000");
+    await wallet.exposedRemoveKey(migrated);
+    await expectRevert(wallet.exposedRemoveKey(keyId), errorSel("LastKey"));
+  });
+
+  it("allows removing a non-last key", async function () {
+    const { wallet, eoaA } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await wallet.exposedAddKey(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress());
+    const migrated = computeKeyId(ADMIN_ENTITY, 0, zeroPadValue("0x01", 32), zeroPadValue("0x02", 32), "0x0000000000000000000000000000000000000000");
+    await wallet.exposedRemoveKey(migrated);
+    expect(await wallet.getEntityKeyCount(ADMIN_ENTITY)).to.equal(1n);
+  });
+
+  it("rejects removing an identity when it would drop below M-of-N", async function () {
+    const { wallet, eoaA, eoaB } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await wallet.exposedAddEntity(ENTITY_B);
+    await wallet.exposedAddKey(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress());
+    await wallet.exposedAddKey(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await wallet.exposedSetThreshold(2);
+    const keyB = computeKeyId(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await expectRevert(wallet.exposedRemoveEntity(ENTITY_B, [keyB]), errorSel("InvalidThreshold"));
+  });
+
+  it("removes an identity and its keys when remaining identities still meet the threshold", async function () {
+    const { wallet, eoaB } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await wallet.exposedAddEntity(ENTITY_B);
+    await wallet.exposedAddKey(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await wallet.exposedSetThreshold(1);
+    const keyB = computeKeyId(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await wallet.exposedRemoveEntity(ENTITY_B, [keyB]);
+    expect(await wallet.entityCount()).to.equal(1n);
+    expect((await wallet.getKeyRecord(keyB)).entityId).to.equal("0x" + "00".repeat(32));
+    expect(await wallet.getEntityKeyCount(ADMIN_ENTITY)).to.equal(1n);
+  });
+
+  it("rejects removeEntity if not all keys are supplied", async function () {
+    const { wallet, eoaB } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await wallet.exposedAddEntity(ENTITY_B);
+    await wallet.exposedAddKey(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await expectRevert(wallet.exposedRemoveEntity(ENTITY_B, []), errorSel("EntityHasKeys"));
+  });
 });
 
 async function expectRevert(promise: Promise<unknown>, fragment: string): Promise<void> {
@@ -291,6 +348,11 @@ async function expectRevert(promise: Promise<unknown>, fragment: string): Promis
     expect.fail(`Expected revert containing ${fragment}`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    expect(msg).to.include(fragment);
+    const extra = typeof err === "object" && err && "data" in err ? String((err as { data?: unknown }).data) : "";
+    expect(`${msg} ${extra}`).to.include(fragment);
   }
+}
+
+function errorSel(name: string): string {
+  return name;
 }

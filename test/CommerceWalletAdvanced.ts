@@ -12,6 +12,7 @@ import {
   encodeAdvancedSignature,
   KEY_EOA,
   signEoaPersonalDigest,
+  unwrapAdvancedInnerSig,
 } from "../commerce/shared/advanced-wallet.js";
 import { encodeErc20Transfer } from "../commerce/shared/userop.js";
 
@@ -172,6 +173,13 @@ describe("commerce wallet advanced API", function () {
       expect(detail.signatures).to.have.length(1);
       expect(detail.proposal.txHash).to.equal(null);
 
+      const execute = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}/execute`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(execute.status).to.equal(503);
+
       const tx = `0x${"ab".repeat(32)}`;
       const patch = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}`, {
         method: "PATCH",
@@ -190,12 +198,12 @@ describe("commerce wallet advanced API", function () {
       expect(row?.txHash).to.equal(tx);
       expect(row?.signatureCount).to.equal(1);
 
-      const execute = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}/execute`, {
+      const executeAgain = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}/execute`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({}),
       });
-      expect(execute.status).to.equal(503);
+      expect(executeAgain.status).to.equal(409);
     });
   });
 
@@ -250,6 +258,11 @@ describe("commerce wallet advanced API", function () {
 
         const userOp = await fetch(`${baseUrl}/api/wallet/userops/${body.userOpHash}`);
         expect(userOp.status).to.equal(200);
+
+        const after = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}`);
+        const afterBody = (await after.json()) as { proposal: { status: string; txHash: string | null } };
+        expect(afterBody.proposal.status).to.not.equal("executed");
+        expect(afterBody.proposal.txHash).to.equal(null);
       },
       process.env.HARDHAT_RPC_URL ? { WALLET_RPC_URL: process.env.HARDHAT_RPC_URL, EVM_RPC_URL: process.env.HARDHAT_RPC_URL } : {}
     );
@@ -287,6 +300,13 @@ describe("commerce wallet advanced API", function () {
     ]);
     expect(packed.startsWith("0x")).to.equal(true);
     expect(packed.length).to.be.greaterThan(10);
+
+    const inner = "0xabcd";
+    const packedOnce = encodeAdvancedSignature([{ keyId: keyA, sig: inner }]);
+    expect(unwrapAdvancedInnerSig(packedOnce, keyA).toLowerCase()).to.equal(inner);
+    const packedTwice = encodeAdvancedSignature([{ keyId: keyA, sig: packedOnce }]);
+    expect(unwrapAdvancedInnerSig(packedTwice, keyA).toLowerCase()).to.equal(inner);
+    expect(unwrapAdvancedInnerSig(inner, keyA)).to.equal(inner);
   });
 
   it("manages key enrollment requests for teammate join", async function () {
