@@ -30,8 +30,8 @@ import {
 import {
   buildSignedAddEntityUserOp,
   buildSignedAddKeyUserOp,
-  buildSignedConfigureMultisigUserOp,
   buildSignedEnableAdvancedUserOp,
+  buildSignedSetThresholdUserOp,
   passkeyToKeyFields,
 } from "../../shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "../../shared/userop-client.js";
@@ -399,25 +399,11 @@ function bindPolicy(
     try {
       showStatus(status, t("wallet.sendSigning"));
       const fee = BigInt(config.bundlerFeeUsdc || "0");
-      const entityIds = roster.entities.map((e) => e.entityId);
-      const entityIdsForKeys = roster.keys.map((k) => k.entityId);
-      const keyTypes = roster.keys.map((k) => k.keyType);
-      const qx = roster.keys.map((k) => k.qx ?? zeroPadValue("0x00", 32));
-      const qy = roster.keys.map((k) => k.qy ?? zeroPadValue("0x00", 32));
-      const eoa = roster.keys.map((k) => k.eoa ?? zeroPadValue("0x00", 20));
       const passkey = await resolveCurrentWalletPasskey(session, "configure");
-      const { userOp, userOpHash } = await buildSignedConfigureMultisigUserOp({
+      const { userOp, userOpHash } = await buildSignedSetThresholdUserOp({
         config,
         passkey,
-        removeKeyIds: [],
-        entityIds,
-        entityIdsForKeys,
-        keyTypes,
-        qx,
-        qy,
-        eoa,
         threshold,
-        vetoEntityIds: [],
         feeAmount: fee,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });

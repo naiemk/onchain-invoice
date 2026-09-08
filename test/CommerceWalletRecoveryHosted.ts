@@ -1,6 +1,6 @@
 import { expect } from "chai";
-import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
 import { Wallet } from "ethers";
+import { createPasskeyFixture, signPasskeyAssertion, type PasskeyFixture } from "./helpers/passkey-fixture.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -64,57 +64,7 @@ async function withApp(
   }
 }
 
-interface PasskeyFixture {
-  qx: string;
-  qy: string;
-  privateKeyPem: string;
-  credentialId: string;
-}
-
-function createPasskeyFixture(): PasskeyFixture {
-  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
-  const spki = publicKey.export({ type: "spki", format: "der" }) as Buffer;
-  const point = spki.subarray(spki.length - 65);
-  expect(point[0]).to.equal(0x04);
-  const qx = "0x" + point.subarray(1, 33).toString("hex");
-  const qy = "0x" + point.subarray(33, 65).toString("hex");
-  return {
-    qx,
-    qy,
-    privateKeyPem: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
-    credentialId: Buffer.from("cred-" + qx.slice(2, 10)).toString("base64"),
-  };
-}
-
-function signAssertion(input: {
-  privateKeyPem: string;
-  challengeBase64Url: string;
-  origin: string;
-  rpId: string;
-}): { authenticatorData: string; clientDataJSON: string; signature: string } {
-  const clientData = {
-    type: "webauthn.get",
-    challenge: input.challengeBase64Url,
-    origin: input.origin,
-    crossOrigin: false,
-  };
-  const clientDataJSON = JSON.stringify(clientData);
-  const rpIdHash = createHash("sha256").update(input.rpId).digest();
-  const authenticatorData = Buffer.concat([
-    rpIdHash,
-    Buffer.from([0x05]),
-    Buffer.alloc(4),
-  ]);
-  const clientDataHash = createHash("sha256").update(clientDataJSON, "utf8").digest();
-  const signed = Buffer.concat([authenticatorData, clientDataHash]);
-  const key = createPrivateKey(input.privateKeyPem);
-  const signature = sign("sha256", signed, { key, dsaEncoding: "ieee-p1363" });
-  return {
-    authenticatorData: "0x" + authenticatorData.toString("hex"),
-    clientDataJSON,
-    signature: "0x" + signature.toString("hex"),
-  };
-}
+const signAssertion = signPasskeyAssertion;
 
 async function registerWallet(
   baseUrl: string,

@@ -67,6 +67,8 @@
     "test:live-persist-recovery": "LIVE_PERSIST_RECOVERY=1 hardhat test test/live/LivePersistRecovery.ts",
     "test:wallet-advanced": "hardhat test test/WalletAdvanced.ts test/CommerceWalletAdvanced.ts",
     "test:ui-e2e": "npm run commerce:build && playwright test",
+    "test:ui-e2e:local-stack": "npm run commerce:build && playwright test ui/e2e/local-stack.spec.ts",
+    "test:ui-e2e:testnet": "E2E_TESTNET=1 playwright test ui/e2e/local-stack.spec.ts --config playwright.testnet.config.ts",
     "test:live-wallet-testnet": "LIVE_WALLET_TESTNET=1 hardhat test test/live/LiveWalletAdvanced.ts",
     "precommit": "bash scripts/pre-commit-ci.sh",
     "hooks:install": "bash scripts/install-git-hooks.sh"

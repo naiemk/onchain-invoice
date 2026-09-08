@@ -33,7 +33,7 @@ import {
 import { hashEntityEmail } from "../../../../../commerce/shared/advanced-wallet.js";
 import {
   buildSignedAddEntityUserOp,
-  buildSignedConfigureMultisigUserOp,
+  buildSignedSetThresholdUserOp,
 } from "@/shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
 import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
@@ -202,25 +202,11 @@ export function AccessPage() {
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
       const fee = BigInt(config.bundlerFeeUsdc || "0");
-      const entityIds = entities.map((e) => e.entityId);
-      const entityIdsForKeys = keys.map((k) => k.entityId);
-      const keyTypes = keys.map((k) => k.keyType);
-      const qx = keys.map((k) => k.qx ?? zeroPadValue("0x00", 32));
-      const qy = keys.map((k) => k.qy ?? zeroPadValue("0x00", 32));
-      const eoa = keys.map((k) => k.eoa ?? zeroPadValue("0x00", 20));
       const passkey = await resolveCurrentWalletPasskey(session, "configure");
-      const { userOp, userOpHash } = await buildSignedConfigureMultisigUserOp({
+      const { userOp, userOpHash } = await buildSignedSetThresholdUserOp({
         config,
         passkey,
-        removeKeyIds: [],
-        entityIds,
-        entityIdsForKeys,
-        keyTypes,
-        qx,
-        qy,
-        eoa,
         threshold,
-        vetoEntityIds: [],
         feeAmount: fee,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });

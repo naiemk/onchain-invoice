@@ -1,3 +1,7 @@
+/**
+ * Playwright UI e2e against **local Hardhat** (`e2eLocal`, chainId 11155111).
+ * Live testnet is opt-in: `npm run test:ui-e2e:testnet` (not used in CI).
+ */
 import { defineConfig } from "@playwright/test";
 
 const API_PORT = process.env.E2E_API_PORT ?? "8080";
@@ -18,30 +22,39 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `npx hardhat node --port ${HARDHAT_PORT}`,
+      command: `npx hardhat node --port ${HARDHAT_PORT} --network e2eLocal`,
       url: `http://127.0.0.1:${HARDHAT_PORT}`,
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
-    {
-      command: "node commerce-dist/server/index.js",
-      url: `http://127.0.0.1:${API_PORT}/api/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       env: {
         ...process.env,
+        EVM_PRIVATE_KEY: "",
+        SWEEPER_PRIVATE_KEY: "",
+      },
+    },
+    {
+      command: "node ui/e2e/stack/boot.mjs",
+      url: `http://127.0.0.1:${API_PORT}/api/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+      env: {
+        ...process.env,
         PORT: API_PORT,
-        DB_PATH: "/tmp/tc-super-wallet-e2e.db",
-        WALLET_RPC_URL: `http://127.0.0.1:${HARDHAT_PORT}`,
-        EVM_RPC_URL: `http://127.0.0.1:${HARDHAT_PORT}`,
-        SWEEPER_ADDRESS: process.env.SWEEPER_ADDRESS ?? "0x0000000000000000000000000000000000000001",
-        FORWARDER_IMPLEMENTATION:
-          process.env.FORWARDER_IMPLEMENTATION ?? "0x0000000000000000000000000000000000000002",
+        E2E_API_PORT: API_PORT,
+        E2E_HARDHAT_PORT: HARDHAT_PORT,
+        HARDHAT_RPC_URL: `http://127.0.0.1:${HARDHAT_PORT}`,
         PERSIST_LOG_DIR: process.env.PERSIST_LOG_DIR ?? "/tmp/tc-e2e-persist-logs",
-        RATE_LIMIT_CREATE_PER_SECOND: "500",
-        RATE_LIMIT_PUBLIC_PER_SECOND: "500",
         TURNSTILE_SECRET: "",
         TURNSTILE_SITE_KEY: "",
+        EVM_PRIVATE_KEY: "",
+        SWEEPER_PRIVATE_KEY: "",
+        ONRAMPER_ENABLED: "0",
+        ONRAMPER_API_KEY: "",
+        ONRAMPER_SECRET_KEY: "",
+        ONRAMPER_SIGNING_KEY: "",
+        E2E_BUNDLER_TICK_PORT: process.env.E2E_BUNDLER_TICK_PORT ?? "18741",
+        E2E_SWEEPER_TICK_PORT: process.env.E2E_SWEEPER_TICK_PORT ?? "18742",
+        E2E_DEPLOYER_TICK_PORT: process.env.E2E_DEPLOYER_TICK_PORT ?? "18743",
       },
     },
     {
@@ -52,6 +65,7 @@ export default defineConfig({
       env: {
         ...process.env,
         VITE_DEV_PROXY_TARGET: `http://127.0.0.1:${API_PORT}`,
+        VITE_E2E_WEBAUTHN: "1",
       },
     },
   ],

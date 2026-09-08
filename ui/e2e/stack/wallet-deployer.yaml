@@ -1,0 +1,13 @@
+serverUrl: "${SERVER_URL}"
+sweeperApiKey: "${SWEEPER_API_KEY}"
+intervalMs: 500
+activityLogPath: "${ACTIVITY_LOG_PATH}"
+chains:
+  - chainId: "${WALLET_CHAIN_ID}"
+    rpcUrl: "${EVM_RPC_URL}"
+    factoryAddress: "${WALLET_FACTORY_ADDRESS}"
+    privateKey: "${WALLET_DEPLOYER_PRIVATE_KEY}"
+    guardianPrivateKey: "${WALLET_GUARDIAN_PRIVATE_KEY}"
+    recoveryAddress: "${WALLET_RECOVERY_ADDRESS}"
+    feeTokenAddress: "${WALLET_BUNDLER_FEE_TOKEN}"
+    minBalanceUsdc: 1

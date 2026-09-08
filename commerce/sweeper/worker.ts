@@ -21,6 +21,12 @@ import type { InvoiceRecord } from "../shared/types.js";
 import { signSweeperRequest } from "../server/sweeper-auth.js";
 import { ActivityLog } from "./activity-log.js";
 import { load as loadYaml } from "./config-loader.js";
+import {
+  attachWorkerTickServer,
+  idleUntilStopped,
+  workerTickPortFromEnv,
+} from "../shared/worker-tick-server.js";
+import type { Server } from "node:http";
 
 export type SweeperRole = "evm" | "tron" | "solana" | "all";
 
@@ -151,6 +157,7 @@ export function filterEvmSweepChains(chains: EvmChainConfig[]): EvmChainConfig[]
 export class SweeperWorker {
   private stopped = false;
   private tickInFlight: Promise<void> | null = null;
+  private tickServer: Server | null = null;
   private wallet: Wallet | null = null;
   private readonly activity: ActivityLog | null;
   private readonly role: SweeperRole;
@@ -264,22 +271,38 @@ export class SweeperWorker {
         this.tron = undefined;
       }
     }
+    const tickPort = workerTickPortFromEnv();
+    if (tickPort > 0) {
+      this.tickServer = await attachWorkerTickServer(tickPort, () => this.runExclusiveTick());
+      await idleUntilStopped(() => this.stopped);
+      return;
+    }
     while (!this.stopped) {
-      this.tickInFlight = this.tick().catch((error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error("sweeper tick failed", error);
-        this.activity?.append("tick-failed", { payload: { error: message } });
-      });
-      await this.tickInFlight;
-      this.tickInFlight = null;
+      await this.runExclusiveTick();
       if (this.stopped) break;
       await sleep(this.config.intervalMs ?? 15_000);
+    }
+  }
+
+  private async runExclusiveTick(): Promise<void> {
+    if (this.tickInFlight) await this.tickInFlight;
+    this.tickInFlight = this.tick().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("sweeper tick failed", error);
+      this.activity?.append("tick-failed", { payload: { error: message } });
+    });
+    try {
+      await this.tickInFlight;
+    } finally {
+      this.tickInFlight = null;
     }
   }
 
   /** Request stop and wait for the in-flight tick (claim/sweep) to finish. */
   async stopAndWait(): Promise<void> {
     this.stopped = true;
+    this.tickServer?.close();
+    this.tickServer = null;
     if (this.tickInFlight) {
       await this.tickInFlight;
       this.tickInFlight = null;

@@ -13,6 +13,7 @@ import {
   encodeExecuteCallData,
   encodeRemoveEntity,
   encodeRemoveKey,
+  encodeSetThreshold,
   userOpToTuple,
 } from "../../../commerce/shared/userop.js";
 import {
@@ -183,6 +184,21 @@ export async function buildSignedAddEntityUserOp(input: {
     innerCallData: encodeAddEntity(input.entityId),
     feeAmount: input.feeAmount,
     sign: signPasskey(input.passkey, "add-entity"),
+  });
+}
+
+export async function buildSignedSetThresholdUserOp(input: {
+  config: WalletPublicConfig;
+  passkey: CurrentWalletPasskey;
+  threshold: number;
+  feeAmount: bigint;
+}): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
+  return buildPolicyUserOp({
+    config: input.config,
+    walletAddress: input.passkey.address,
+    innerCallData: encodeSetThreshold(input.threshold),
+    feeAmount: input.feeAmount,
+    sign: signPasskey(input.passkey, "configure"),
   });
 }
 
