@@ -1,0 +1,10 @@
+evm:
+  chains:
+    "11155111":
+      rpcUrl: "${EVM_RPC_URL}"
+      sweeperAddress: "${SWEEPER_ADDRESS}"
+      forwarderImplementation: "${FORWARDER_IMPLEMENTATION}"
+      tokens:
+        USDC:
+          address: "${WALLET_BUNDLER_FEE_TOKEN}"
+          decimals: 6

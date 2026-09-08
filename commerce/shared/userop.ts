@@ -19,7 +19,7 @@ export const WALLET_EXECUTE_ABI = [
   "function enableAdvanced(bytes32 adminEntityId)",
   "function configureMultisig(bytes32[] removeKeyIds, bytes32[] entityIds, bytes32[] entityIdsForKeys, uint8[] keyTypes, bytes32[] qx, bytes32[] qy, address[] eoa, uint8 threshold, bytes32[] vetoEntityIds)",
   "function addEntity(bytes32 entityId)",
-  "function removeEntity(bytes32 entityId)",
+  "function removeEntity(bytes32 entityId, bytes32[] keyIds)",
   "function addKey(bytes32 entityId, uint8 keyType, bytes32 qx, bytes32 qy, address eoa)",
   "function removeKey(bytes32 keyId)",
   "function setThreshold(uint8 m)",
@@ -142,8 +142,8 @@ export function encodeAddEntity(entityId: string): string {
   return walletIface.encodeFunctionData("addEntity", [entityId]);
 }
 
-export function encodeRemoveEntity(entityId: string): string {
-  return walletIface.encodeFunctionData("removeEntity", [entityId]);
+export function encodeRemoveEntity(entityId: string, keyIds: string[] = []): string {
+  return walletIface.encodeFunctionData("removeEntity", [entityId, keyIds]);
 }
 
 export function encodeRemoveKey(keyId: string): string {

@@ -1,0 +1,19 @@
+serverUrl: "${SERVER_URL}"
+sweeperWalletKey: "${SWEEPER_WALLET_KEY}"
+apiKey: "${SWEEPER_API_KEY}"
+activityLogPath: "${ACTIVITY_LOG_PATH}"
+intervalMs: 500
+maxRetries: 5
+chains:
+  - chainId: "11155111"
+    rpcUrl: "${EVM_RPC_URL}"
+    sweeperAddress: "${SWEEPER_ADDRESS}"
+    privateKey: "${SWEEPER_PRIVATE_KEY}"
+    tokens:
+      - symbol: USDC
+        address: "${WALLET_BUNDLER_FEE_TOKEN}"
+        decimals: 6
+tron:
+  enabled: false
+solana:
+  enabled: false

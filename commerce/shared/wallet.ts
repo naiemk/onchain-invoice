@@ -61,6 +61,7 @@ export interface WalletPairingRecord {
   chainId: string;
   newOwnerQx: string | null;
   newOwnerQy: string | null;
+  newOwnerCredentialId: string | null;
   deviceLabel: string | null;
   status: "pending" | "approved" | "consumed" | "expired";
   expiresAt: string;

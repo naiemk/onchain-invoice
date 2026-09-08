@@ -9,6 +9,12 @@ export const walletEn = {
   securityTab: "Security",
   securityPageTitle: "Never lose the route back.",
   securityPageLede: "Manage trusted devices and choose recovery people before you need them.",
+  securityPageLedeSuper: "Pair another device or a security key for your identity. Team access and policy are on Access.",
+  details: "Details",
+  superWalletSecuritySigners: "{threshold} of {count} identities must sign.",
+  superWalletSecurityAsideTitle: "This identity",
+  superWalletSecurityAsideBody:
+    "A second passkey or security key can sign for you. Identities and the M-of-N policy are managed on Access.",
   devicesTab: "Devices",
   recoveryMethodsTitle: "Recovery methods",
   recoveryMethodsHint: "Email and guardian recovery stay visible — not buried in settings.",
@@ -27,7 +33,7 @@ export const walletEn = {
   invoicesTab: "Invoices",
   accessTab: "Access",
   accessPageTitle: "Wallet access",
-  accessPageLede: "Entities, signing keys, and the approval threshold for this Super Wallet.",
+  accessPageLede: "Other identities and the M-of-N policy. Add keys for this identity on Security.",
   superWalletShieldTooltip: "Super Wallet. Conversion is permanent — there is no convert back.",
   developersTab: "Developers",
   actionGetPaid: "Get paid",
@@ -195,6 +201,13 @@ export const walletEn = {
   pairStep1: "On this device, start pairing and show the QR or link.",
   pairStep2: "On the other device, open the link or scan the QR.",
   pairStep3: "Come back here and approve with your passkey.",
+  pairWizardShare: "Share",
+  pairWizardWaiting: "Waiting",
+  pairWizardApprove: "Approve",
+  pairWizardWaitingHint: "Waiting for the other device to create a passkey…",
+  pairLinkShow: "Show full link",
+  pairLinkHide: "Hide full link",
+  keyPublicAdvanced: "Advanced",
   passkeys: "Devices",
   remove: "Remove",
   addDevice: "Pair another device",
@@ -429,7 +442,8 @@ export const walletEn = {
   superWalletUpgradeNeedFunds:
     "Add USDC to this wallet first — the network fee is paid from your balance when you convert.",
   userOpInsufficientBalance: "Not enough funds in this wallet to cover the send amount and network fee.",
-  userOpSignatureInvalid: "Passkey signature did not match this wallet. Lock the wallet, reopen it with the correct passkey, and try again.",
+  userOpSignatureInvalid:
+    "The wallet rejected this signature. Face ID / Touch ID succeeding only proves the browser unlocked a passkey — not that the Super Wallet contract accepted it.",
   userOpPrefundFailed: "Could not fund the EntryPoint gas deposit. Try again in a moment.",
   userOpAccountNotDeployed: "Your wallet is funded but still activating on-chain. Wait a moment, refresh, and try again.",
   userOpSimulationRevert: "The transaction would fail on-chain. Check your balance and try again.",
@@ -448,8 +462,12 @@ export const walletEn = {
   superWalletAddEntity: "Add entity",
   superWalletRemoveEntity: "Remove entity",
   superWalletRemoveKey: "Remove key",
-  superWalletRemoveEntityConfirm: "Remove this entity from the Super Wallet? This is signed on-chain.",
-  superWalletRemoveKeyConfirm: "Remove this key? This is signed on-chain.",
+  superWalletRemoveEntityConfirm: "Remove this identity and all of its keys from the Super Wallet? This is signed on-chain.",
+  superWalletRemoveKeyConfirm: "Remove this key? This is signed on-chain. The identity must keep at least one key.",
+  superWalletRemoveLastKeyBlocked:
+    "This identity must keep at least one key. Removing it would leave the identity unable to sign.",
+  superWalletRemoveEntityBelowThreshold:
+    "Cannot remove this identity: the wallet needs at least {threshold} of {count}. Lower the threshold first.",
   proposalsTitle: "Proposals",
   proposalsLede: "Team sends require {threshold} entity signatures.",
   proposalsInbox: "Inbox",
@@ -490,6 +508,8 @@ export const walletEn = {
   superWalletKeyYubiKey: "Security key",
   superWalletKeyEoa: "Wallet",
   superWalletNoSigningKey: "No enrolled key found for this device or wallet",
+  superWalletPairNeedsOneSigner:
+    "Pairing another device needs a 1-of-N policy. Lower the threshold on Access, add this key, then raise it again.",
   yubikeyPinRequiredTitle: "YubiKey PIN required",
   yubikeyPinRequiredWhy:
     "Without a FIDO2 PIN, anyone who steals your YubiKey can authorize payments with a tap alone. Set a PIN on your key so stolen hardware is not enough.",
@@ -525,11 +545,21 @@ export const walletEn = {
   keyPublicPasskey: "Passkey / YubiKey public key",
   keyPublicEoa: "Wallet address",
   keyPublicHint: "YubiKey uses the same public key format as a passkey (P-256 coordinates).",
-  advancedDevicesBodySuper: "{count} key(s) — invite teammates",
+  advancedDevicesBodySuper: "{count} device(s) — pair another or add a security key",
   advancedDevicesBodySimple: "{count} device(s) — pair or remove",
   txHistoryTitle: "Activity",
   txHistoryEmpty: "No transfers yet.",
   txHistoryIn: "Received",
   txHistoryOut: "Sent",
   txHistoryLoading: "Loading activity…",
+  passkeyNotOnChain:
+    "This passkey is not registered on the wallet. Lock and reopen with the passkey you used to create or pair this device.",
+  userOpAlreadySubmitted: "This transaction is already in progress.",
+  identityEmailTitle: "This identity",
+  identityChangeEmail: "Change email",
+  identityEmailNone: "No email attached yet.",
+  identityBackupHint:
+    "This identity has only one key. Add another passkey, security key, or wallet — if you lose this device you may lose access.",
+  connectWalletNeedsEmail:
+    "Verify an email on this wallet before connecting an external wallet. That email becomes your Super Wallet identity.",
 };

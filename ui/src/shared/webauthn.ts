@@ -1,5 +1,6 @@
 import { encodeWebAuthnSignature } from "../../../commerce/shared/webauthn-signature.js";
 import { credentialIdToBytes, credentialIdsMatch } from "./credential-id.js";
+import { formatPasskeyName, inferDeviceLabel } from "./passkey-name.js";
 import {
   listWalletRegistry,
   upsertWalletSession,
@@ -30,6 +31,31 @@ export interface PasskeyOwner {
     clientDataJSON: string;
     attestationObject: string;
   };
+}
+
+export type E2eWebAuthnBridge = {
+  createPasskey: (
+    displayName: string,
+    options?: { attachment?: "platform" | "cross-platform"; walletLabel?: string; deviceLabel?: string }
+  ) => Promise<PasskeyOwner>;
+  authenticatePasskey: (input?: {
+    credentialId?: string;
+  }) => Promise<(PasskeyOwner & { fromRegistry: boolean }) | null>;
+  signUserOpHash: (
+    userOpHashHex: string,
+    credentialId?: string,
+    options?: { requireUv?: boolean }
+  ) => Promise<string>;
+  assertPasskeyChallenge: (input: { challengeBase64Url: string; credentialId?: string }) => Promise<{
+    assertion: { authenticatorData: string; clientDataJSON: string; signature: string };
+    credentialId: string;
+  }>;
+};
+
+function e2eWebAuthn(): E2eWebAuthnBridge | null {
+  if (import.meta.env.VITE_E2E_WEBAUTHN !== "1") return null;
+  if (typeof window === "undefined") return null;
+  return (window as Window & { __TC_E2E_WEBAUTHN__?: E2eWebAuthnBridge }).__TC_E2E_WEBAUTHN__ ?? null;
 }
 
 /** Thrown when a cross-platform (YubiKey) ceremony completes without user verification (UV). */
@@ -137,6 +163,7 @@ export function spkiToP256Coordinates(spki: ArrayBuffer): { qx: string; qy: stri
 }
 
 export function webAuthnSupported(): boolean {
+  if (e2eWebAuthn()) return true;
   return typeof window !== "undefined" && !!window.PublicKeyCredential;
 }
 
@@ -222,8 +249,10 @@ async function webAuthnCreate(options: CredentialCreationOptions): Promise<Publi
 
 export async function createPasskey(
   displayName: string,
-  options?: { attachment?: "platform" | "cross-platform" }
+  options?: { attachment?: "platform" | "cross-platform"; walletLabel?: string; deviceLabel?: string }
 ): Promise<PasskeyOwner> {
+  const shim = e2eWebAuthn();
+  if (shim) return shim.createPasskey(displayName, options);
   assertWebAuthnSupported();
   const challenge = randomChallenge();
   const authenticatorSelection: AuthenticatorSelectionCriteria = {
@@ -233,6 +262,14 @@ export async function createPasskey(
   if (options?.attachment) {
     authenticatorSelection.authenticatorAttachment = options.attachment;
   }
+  const passkeyName = formatPasskeyName({
+    walletLabel: options?.walletLabel ?? displayName,
+    deviceLabel:
+      options?.deviceLabel ??
+      (options?.walletLabel && options.walletLabel.trim() !== displayName.trim()
+        ? displayName
+        : inferDeviceLabel()),
+  });
   let cred: PublicKeyCredential | null;
   try {
     cred = await webAuthnCreate({
@@ -241,8 +278,8 @@ export async function createPasskey(
         rp: { name: "Trustless Commerce Wallet", id: rpId() },
         user: {
           id: crypto.getRandomValues(new Uint8Array(16)),
-          name: displayName,
-          displayName,
+          name: passkeyName,
+          displayName: passkeyName,
         },
         pubKeyCredParams: [{ alg: -7, type: "public-key" }],
         authenticatorSelection,
@@ -277,8 +314,15 @@ export async function createPasskey(
 }
 
 /** Enroll a cross-platform security key (YubiKey) with UV/PIN required. */
-export async function createSecurityKey(displayName: string): Promise<PasskeyOwner> {
-  return createPasskey(displayName, { attachment: "cross-platform" });
+export async function createSecurityKey(
+  displayName: string,
+  options?: { walletLabel?: string }
+): Promise<PasskeyOwner> {
+  return createPasskey(displayName, {
+    attachment: "cross-platform",
+    walletLabel: options?.walletLabel ?? displayName,
+    deviceLabel: "YubiKey",
+  });
 }
 
 async function getPasskeyAssertion(
@@ -315,6 +359,8 @@ function requireWalletBoundCredentialId(credentialId: string | undefined): strin
 export async function authenticatePasskey(input?: {
   credentialId?: string;
 }): Promise<(PasskeyOwner & { fromRegistry: boolean }) | null> {
+  const shim = e2eWebAuthn();
+  if (shim) return shim.authenticatePasskey(input);
   assertWebAuthnSupported();
   const allowCredentials = input?.credentialId?.trim()
     ? [{ id: credentialIdToBytesLocal(input.credentialId), type: "public-key" as const }]
@@ -356,17 +402,6 @@ export async function ensureSessionCredential(session: WalletSession): Promise<W
     return next;
   }
 
-  const { listDevices } = await import("./wallet-api.js");
-  const devices = await listDevices(session.address, session.chainId);
-  const match = devices.find(
-    (d) => d.credentialId && d.ownerQx === session.qx && d.ownerQy === session.qy
-  );
-  if (match?.credentialId) {
-    const next = { ...session, credentialId: match.credentialId };
-    upsertWalletSession(next);
-    return next;
-  }
-
   return session;
 }
 
@@ -388,6 +423,8 @@ export async function signUserOpHash(
   credentialId?: string,
   options?: { requireUv?: boolean; session?: WalletSession }
 ): Promise<string> {
+  const shim = e2eWebAuthn();
+  if (shim) return shim.signUserOpHash(userOpHashHex, credentialId, options);
   assertWebAuthnSupported();
   const hashBytes = hexToBytes(userOpHashHex);
   const boundCredentialId = requireWalletBoundCredentialId(credentialId);
@@ -428,6 +465,8 @@ export async function assertPasskeyChallenge(input: {
   };
   credentialId: string;
 }> {
+  const shim = e2eWebAuthn();
+  if (shim) return shim.assertPasskeyChallenge(input);
   assertWebAuthnSupported();
   const challenge = base64UrlToBytes(input.challengeBase64Url);
   const allowCredentials = input.credentialId?.trim()

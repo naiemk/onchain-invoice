@@ -16,6 +16,12 @@ import { signBundlerRequest } from "../server/bundler-auth.js";
 import { ActivityLog } from "../sweeper/activity-log.js";
 import { load as loadYaml } from "../sweeper/config-loader.js";
 import { isUnsetSecret } from "../sweeper/worker.js";
+import {
+  attachWorkerTickServer,
+  idleUntilStopped,
+  workerTickPortFromEnv,
+} from "../shared/worker-tick-server.js";
+import type { Server } from "node:http";
 
 export interface BundlerChainConfig {
   chainId: string | number;
@@ -46,6 +52,7 @@ export class BundlerWorker {
   private readonly activity?: ActivityLog;
   private stopped = false;
   private inFlight: Promise<void> | null = null;
+  private tickServer: Server | null = null;
 
   constructor(config: BundlerConfig) {
     this.config = config;
@@ -56,10 +63,14 @@ export class BundlerWorker {
   }
 
   async start(): Promise<void> {
+    const tickPort = workerTickPortFromEnv();
+    if (tickPort > 0) {
+      this.tickServer = await attachWorkerTickServer(tickPort, () => this.runExclusiveTick());
+      await idleUntilStopped(() => this.stopped);
+      return;
+    }
     while (!this.stopped) {
-      this.inFlight = this.tick();
-      await this.inFlight;
-      this.inFlight = null;
+      await this.runExclusiveTick();
       if (this.stopped) break;
       await sleep(this.config.intervalMs ?? 15_000);
     }
@@ -67,10 +78,22 @@ export class BundlerWorker {
 
   async stopAndWait(): Promise<void> {
     this.stopped = true;
+    this.tickServer?.close();
+    this.tickServer = null;
     if (this.inFlight) await this.inFlight;
   }
 
-  private async tick(): Promise<void> {
+  private async runExclusiveTick(): Promise<void> {
+    if (this.inFlight) await this.inFlight;
+    this.inFlight = this.tick();
+    try {
+      await this.inFlight;
+    } finally {
+      this.inFlight = null;
+    }
+  }
+
+  async tick(): Promise<void> {
     if (isUnsetSecret(this.config.bundlerWalletKey)) {
       this.activity?.append("soft-skip", {
         payload: { reason: "BUNDLER_WALLET_KEY unset — fill .env then recreate bundler-evm" },

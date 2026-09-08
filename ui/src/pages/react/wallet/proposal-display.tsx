@@ -8,8 +8,19 @@ export function isClosedProposal(p: WalletProposalRecord): boolean {
   return p.status === "executed" || p.status === "cancelled";
 }
 
-export function isFullySigned(p: WalletProposalRecord, threshold: number): boolean {
-  return (p.signatureCount ?? 0) >= threshold;
+export function proposalSignatureCount(
+  p: WalletProposalRecord,
+  signatures?: { length: number }
+): number {
+  return p.signatureCount ?? signatures?.length ?? 0;
+}
+
+export function isFullySigned(
+  p: WalletProposalRecord,
+  threshold: number,
+  signatures?: { length: number }
+): boolean {
+  return proposalSignatureCount(p, signatures) >= threshold;
 }
 
 export function isErc20TransferData(data: string): boolean {

@@ -4,9 +4,9 @@ import {
   getWalletAccount,
   listDevices,
   registerDevice,
-  registerWalletAccount,
 } from "./wallet-api.js";
 import { credentialIdsMatch } from "./credential-id.js";
+import { isPoisonedDeviceRow } from "./wallet-passkey-bind.js";
 import {
   authenticatePasskey,
   ensureSessionCredential,
@@ -35,20 +35,6 @@ async function rebindDeviceCredential(input: {
     label: input.session.label,
     credentialId: input.credentialId,
   });
-  const account = await getWalletAccount(input.session.address);
-  if (
-    account &&
-    account.ownerQx === input.session.qx &&
-    account.ownerQy === input.session.qy
-  ) {
-    await registerWalletAccount({
-      address: input.session.address,
-      salt: account.salt,
-      ownerQx: account.ownerQx,
-      ownerQy: account.ownerQy,
-      credentialId: input.credentialId,
-    });
-  }
 }
 
 async function isCredentialAuthorizedForWallet(
@@ -113,22 +99,38 @@ async function buildSessionFromAuth(
       throw Object.assign(new Error(t("wallet.unlockWrongWallet")), { code: "wrong_wallet" });
     }
 
+    const devices = await listDevices(entry.address, config.chainId).catch(() => []);
+    const byCred = devices.find((d) => d.credentialId && credentialIdsMatch(d.credentialId, auth.credentialId));
+    const deviceOk = byCred && !isPoisonedDeviceRow(byCred, account);
+    const registryMatch = credentialIdsMatch(auth.credentialId, entry.credentialId);
+    const accountMatch = credentialIdsMatch(auth.credentialId, account.credentialId);
+    const qx =
+      (deviceOk ? byCred.ownerQx : "") ||
+      (registryMatch ? entry.qx : "") ||
+      (accountMatch ? account.ownerQx : "") ||
+      auth.qx;
+    const qy =
+      (deviceOk ? byCred.ownerQy : "") ||
+      (registryMatch ? entry.qy : "") ||
+      (accountMatch ? account.ownerQy : "") ||
+      auth.qy;
+    if (!qx || !qy) {
+      throw Object.assign(new Error(t("wallet.passkeyNotOnChain")), { code: "missing_credential_id" });
+    }
+
     const session: WalletSession = {
       ...entry,
       address: account.address,
       chainId: config.chainId,
       salt: account.salt,
-      qx: account.ownerQx,
-      qy: account.ownerQy,
+      qx,
+      qy,
       credentialId: auth.credentialId,
       rawId: auth.rawId || entry.rawId,
       label: entry.label || t("wallet.defaultDevice"),
     };
 
-    if (
-      !credentialIdsMatch(auth.credentialId, account.credentialId) ||
-      !credentialIdsMatch(auth.credentialId, entry.credentialId)
-    ) {
+    if (!byCred && (registryMatch || accountMatch)) {
       await rebindDeviceCredential({
         session,
         credentialId: auth.credentialId,
@@ -156,8 +158,13 @@ async function buildSessionFromAuth(
 
   const { account, device } = found;
   const config = await fetchWalletConfig();
-  const qx = device?.ownerQx || account.ownerQx;
-  const qy = device?.ownerQy || account.ownerQy;
+  const deviceOk = device && !isPoisonedDeviceRow(device, account);
+  const accountMatch = credentialIdsMatch(auth.credentialId, account.credentialId);
+  const qx = (deviceOk ? device.ownerQx : "") || (accountMatch ? account.ownerQx : "") || auth.qx;
+  const qy = (deviceOk ? device.ownerQy : "") || (accountMatch ? account.ownerQy : "") || auth.qy;
+  if (!qx || !qy) {
+    throw Object.assign(new Error(t("wallet.passkeyNotOnChain")), { code: "missing_credential_id" });
+  }
   let label = device?.label || t("wallet.defaultDevice");
   try {
     const devices = await listDevices(account.address, config.chainId);

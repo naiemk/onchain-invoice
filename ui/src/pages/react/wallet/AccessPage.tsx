@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getAddress, zeroPadValue } from "ethers";
+import { zeroPadValue } from "ethers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,22 +30,17 @@ import {
   resolveAdvancedPolicy,
   type AdvancedPolicy,
 } from "@/shared/wallet-advanced-api.js";
-import { hashEntityEmail, KEY_WEBAUTHN } from "../../../../../commerce/shared/advanced-wallet.js";
+import { hashEntityEmail } from "../../../../../commerce/shared/advanced-wallet.js";
 import {
   buildSignedAddEntityUserOp,
-  buildSignedConfigureMultisigUserOp,
-  passkeyToKeyFields,
+  buildSignedSetThresholdUserOp,
 } from "@/shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
-import { loadWalletSession, saveWalletSession, type WalletSession } from "@/shared/wallet-session.js";
+import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
+import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 import { healSuperWalletFromEmail, healWalletSession } from "@/shared/wallet-session-heal.js";
 import { useWalletPolicy } from "./wallet-policy";
-import {
-  createPasskey,
-  createSecurityKey,
-  isYubiKeyPinRequiredError,
-} from "@/shared/webauthn.js";
-import { connectEoaWallet, initEoaConnector } from "@/shared/eoa-connector.js";
+import { initEoaConnector } from "@/shared/eoa-connector.js";
 import type {
   WalletEntityKeyRecord,
   WalletEntityRecord,
@@ -54,8 +49,7 @@ import type {
 } from "../../../../../commerce/shared/wallet.js";
 import { WalletFrame } from "./WalletFrame";
 import {
-  KEY_EOA,
-  KEY_YUBIKEY,
+  isLastEntityKey,
   keyTypeLabel,
   shortEntity,
   shortKeyDisplay,
@@ -63,6 +57,7 @@ import {
   submitAddKey,
   submitRemoveEntity,
   submitRemoveKey,
+  wouldDropBelowThreshold,
 } from "./super-wallet-helpers";
 
 type StatusKind = "info" | "error" | "success";
@@ -124,32 +119,6 @@ export function AccessPage() {
       setKeys(roster.keys);
       const pending = await listKeyEnrollmentRequests(sess.address, "pending").catch(() => []);
       setPendingEnrollments(pending);
-
-      if (!sess.entityId && roster.keys.length > 0) {
-        const mine =
-          roster.keys.find((k) => k.credentialId && k.credentialId === sess.credentialId) ??
-          roster.keys.find((k) => k.qx === sess.qx && k.qy === sess.qy);
-        if (mine) {
-          const healed: WalletSession = {
-            ...sess,
-            entityId: mine.entityId,
-            keyId: mine.keyId,
-            keyType: mine.keyType,
-            ...(mine.credentialId && !sess.credentialId?.trim()
-              ? { credentialId: mine.credentialId }
-              : {}),
-          };
-          saveWalletSession(healed);
-          setSession(healed);
-        }
-      } else if (!sess.credentialId?.trim() && roster.keys.length > 0) {
-        const mine = roster.keys.find((k) => k.qx === sess.qx && k.qy === sess.qy && k.credentialId);
-        if (mine?.credentialId) {
-          const healed = { ...sess, credentialId: mine.credentialId };
-          saveWalletSession(healed);
-          setSession(healed);
-        }
-      }
     } else {
       setEntities([]);
       setKeys([]);
@@ -233,28 +202,11 @@ export function AccessPage() {
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
       const fee = BigInt(config.bundlerFeeUsdc || "0");
-      const entityIds = entities.map((e) => e.entityId);
-      const entityIdsForKeys = keys.map((k) => k.entityId);
-      const keyTypes = keys.map((k) => k.keyType);
-      const qx = keys.map((k) => k.qx ?? zeroPadValue("0x00", 32));
-      const qy = keys.map((k) => k.qy ?? zeroPadValue("0x00", 32));
-      const eoa = keys.map((k) => k.eoa ?? zeroPadValue("0x00", 20));
-      const { userOp, userOpHash } = await buildSignedConfigureMultisigUserOp({
+      const passkey = await resolveCurrentWalletPasskey(session, "configure");
+      const { userOp, userOpHash } = await buildSignedSetThresholdUserOp({
         config,
-        walletAddress: session.address,
-        adminEntityId: adminEntity.entityId,
-        adminQx: session.qx,
-        adminQy: session.qy,
-        adminCredentialId: session.credentialId,
-        removeKeyIds: [],
-        entityIds,
-        entityIdsForKeys,
-        keyTypes,
-        qx,
-        qy,
-        eoa,
+        passkey,
         threshold,
-        vetoEntityIds: [],
         feeAmount: fee,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
@@ -284,15 +236,12 @@ export function AccessPage() {
     try {
       const entityId = hashEntityEmail(email);
       const fee = BigInt(config.bundlerFeeUsdc || "0");
+      const passkey = await resolveCurrentWalletPasskey(session, "add-entity");
       const { userOp, userOpHash } = await buildSignedAddEntityUserOp({
         config,
-        walletAddress: session.address,
-        adminEntityId: adminEntity.entityId,
+        passkey,
         entityId,
-        qx: session.qx,
-        qy: session.qy,
         feeAmount: fee,
-        credentialId: session.credentialId,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
@@ -358,104 +307,29 @@ export function AccessPage() {
     }
   };
 
-  const addPasskey = async (entityId: string) => {
-    if (!session || !config || !adminEntity) return;
-    setBusy(`passkey-${entityId}`);
-    setStatus({ kind: "info", message: t("wallet.superWalletEnrollPasskey") });
-    try {
-      const passkey = await createPasskey("Super Wallet key", { attachment: "platform" });
-      const fields = passkeyToKeyFields(passkey);
-      await submitAddKey({
-        session,
-        config,
-        adminEntity,
-        targetEntityId: entityId,
-        keyType: KEY_WEBAUTHN,
-        qx: fields.qx,
-        qy: fields.qy,
-        eoa: zeroPadValue("0x00", 20),
-        credentialId: fields.credentialId,
-      });
-      setStatus(null);
-      await runRefresh();
-    } catch (error) {
-      setStatus({
-        kind: "error",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const addYubiKey = async (entityId: string) => {
-    if (!session || !config || !adminEntity) return;
-    setBusy(`yubikey-${entityId}`);
-    setStatus({ kind: "info", message: t("wallet.superWalletEnrollYubiKey") });
-    try {
-      const passkey = await createSecurityKey("Security key");
-      const fields = passkeyToKeyFields(passkey);
-      await submitAddKey({
-        session,
-        config,
-        adminEntity,
-        targetEntityId: entityId,
-        keyType: KEY_YUBIKEY,
-        qx: fields.qx,
-        qy: fields.qy,
-        eoa: zeroPadValue("0x00", 20),
-        credentialId: fields.credentialId,
-      });
-      setStatus(null);
-      await runRefresh();
-    } catch (error) {
-      setStatus({
-        kind: "error",
-        message: isYubiKeyPinRequiredError(error)
-          ? t("wallet.yubikeyPinRequiredTitle")
-          : error instanceof Error
-            ? error.message
-            : String(error),
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const addEoa = async (entityId: string) => {
-    if (!session || !config || !adminEntity) return;
-    setBusy(`eoa-${entityId}`);
-    setStatus({ kind: "info", message: t("wallet.superWalletConnectWalletHint") });
-    try {
-      const eoa = getAddress(await connectEoaWallet());
-      await submitAddKey({
-        session,
-        config,
-        adminEntity,
-        targetEntityId: entityId,
-        keyType: KEY_EOA,
-        qx: zeroPadValue("0x00", 32),
-        qy: zeroPadValue("0x00", 32),
-        eoa,
-      });
-      setStatus(null);
-      await runRefresh();
-    } catch (error) {
-      setStatus({
-        kind: "error",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const removeEntity = async (entityId: string) => {
-    if (!session || !config || !adminEntity) return;
+    if (!session || !config || !adminEntity || !policy) return;
+    const entityKeys = keys.filter((k) => k.entityId === entityId);
+    if (wouldDropBelowThreshold(policy.entityCount, policy.threshold)) {
+      setStatus({
+        kind: "error",
+        message: t("wallet.superWalletRemoveEntityBelowThreshold", {
+          threshold: String(policy.threshold),
+          count: String(policy.entityCount),
+        }),
+      });
+      return;
+    }
     if (!window.confirm(t("wallet.superWalletRemoveEntityConfirm"))) return;
     setBusy(`remove-entity-${entityId}`);
     try {
-      await submitRemoveEntity({ session, config, adminEntity, entityId });
+      await submitRemoveEntity({
+        session,
+        config,
+        adminEntity,
+        entityId,
+        keyIds: entityKeys.map((k) => k.keyId),
+      });
       await runRefresh();
       await refreshPolicy();
     } catch (error) {
@@ -467,6 +341,11 @@ export function AccessPage() {
 
   const removeKey = async (entityId: string, keyId: string) => {
     if (!session || !config || !adminEntity) return;
+    const entityKeyCount = keys.filter((k) => k.entityId === entityId).length;
+    if (isLastEntityKey(entityKeyCount)) {
+      setStatus({ kind: "error", message: t("wallet.superWalletRemoveLastKeyBlocked") });
+      return;
+    }
     if (!window.confirm(t("wallet.superWalletRemoveKeyConfirm"))) return;
     setBusy(`remove-key-${keyId}`);
     try {
@@ -529,9 +408,6 @@ export function AccessPage() {
           onOpenPolicy={() => setPolicyOpen(true)}
           onApprove={(id) => void approveEnrollment(id)}
           onReject={(id) => void rejectEnrollment(id)}
-          onAddPasskey={(id) => void addPasskey(id)}
-          onAddYubiKey={(id) => void addYubiKey(id)}
-          onAddEoa={(id) => void addEoa(id)}
           onRemoveEntity={(id) => void removeEntity(id)}
           onRemoveKey={(entityId, keyId) => void removeKey(entityId, keyId)}
           busy={busy}
@@ -627,14 +503,11 @@ function ManageSection({
   onOpenPolicy,
   onApprove,
   onReject,
-  onAddPasskey,
-  onAddYubiKey,
-  onAddEoa,
   onRemoveEntity,
   onRemoveKey,
   busy,
 }: {
-  t: (k: string) => string;
+  t: (k: string, vars?: Record<string, string | number>) => string;
   policy: AdvancedPolicy;
   entities: WalletEntityRecord[];
   keys: WalletEntityKeyRecord[];
@@ -650,9 +523,6 @@ function ManageSection({
   onOpenPolicy: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
-  onAddPasskey: (entityId: string) => void;
-  onAddYubiKey: (entityId: string) => void;
-  onAddEoa: (entityId: string) => void;
   onRemoveEntity: (entityId: string) => void;
   onRemoveKey: (entityId: string, keyId: string) => void;
   busy: string | null;
@@ -731,6 +601,7 @@ function ManageSection({
             {entities.map((e) => {
               const entityKeys = keys.filter((k) => k.entityId === e.entityId);
               const isAdmin = adminEntityId && e.entityId === adminEntityId;
+              const belowThreshold = wouldDropBelowThreshold(policy.entityCount, policy.threshold);
               return (
                 <li key={e.entityId} className="space-y-3 p-4" data-entity-id={e.entityId}>
                   <div>
@@ -744,6 +615,7 @@ function ManageSection({
                             type="button"
                             size="sm"
                             variant="ghost"
+                            data-testid="remove-key"
                             disabled={busy !== null}
                             onClick={() => onRemoveKey(e.entityId, k.keyId)}
                           >
@@ -753,51 +625,35 @@ function ManageSection({
                       ))}
                     </ul>
                   </div>
-                  {isAdmin ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        data-add-passkey={e.entityId}
-                        disabled={busy !== null}
-                        onClick={() => onAddPasskey(e.entityId)}
-                      >
-                        {t("wallet.superWalletAddPasskey")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        data-add-yubikey={e.entityId}
-                        disabled={busy !== null}
-                        onClick={() => onAddYubiKey(e.entityId)}
-                      >
-                        {t("wallet.superWalletAddYubiKey")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        data-add-eoa={e.entityId}
-                        disabled={busy !== null}
-                        onClick={() => onAddEoa(e.entityId)}
-                      >
-                        {t("wallet.superWalletConnectWallet")}
-                      </Button>
-                    </div>
-                  ) : (
+                  {isAdmin ? null : (
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm text-muted-foreground">{t("wallet.inviteTeammateHint")}</p>
                       <Button
                         type="button"
                         size="sm"
                         variant="ghost"
-                        disabled={busy !== null}
+                        data-testid="remove-entity"
+                        disabled={busy !== null || belowThreshold}
+                        title={
+                          belowThreshold
+                            ? t("wallet.superWalletRemoveEntityBelowThreshold", {
+                                threshold: String(policy.threshold),
+                                count: String(policy.entityCount),
+                              })
+                            : undefined
+                        }
                         onClick={() => onRemoveEntity(e.entityId)}
                       >
                         {t("wallet.superWalletRemoveEntity")}
                       </Button>
+                      {belowThreshold ? (
+                        <p className="basis-full text-xs text-muted-foreground" data-testid="remove-entity-blocked">
+                          {t("wallet.superWalletRemoveEntityBelowThreshold", {
+                            threshold: String(policy.threshold),
+                            count: String(policy.entityCount),
+                          })}
+                        </p>
+                      ) : null}
                     </div>
                   )}
                 </li>

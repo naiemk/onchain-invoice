@@ -34,32 +34,19 @@ import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 import { buildSignedAdvancedSendUserOp } from "@/shared/advanced-userop-client.js";
 import { buildSignedSendUserOp, submitSignedUserOp } from "@/shared/userop-client.js";
+import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
 import { ERC20_ABI, parseUsdcInput } from "../../../../../commerce/shared/userop.js";
+import { formatSendRejectReason } from "@/shared/userop-errors.js";
 import { WalletFrame } from "./WalletFrame";
 import { SuperPayPage } from "./SuperPayPage";
 import { useWalletPolicy } from "./wallet-policy";
 import { TxHistory } from "./TxHistory";
 
-function formatSendRejectReason(reason: string | null | undefined, t: (key: string, vars?: Record<string, string | number>) => string): string {
-  switch (reason) {
-    case "signature_invalid":
-      return t("wallet.userOpSignatureInvalid");
-    case "insufficient_balance":
-      return t("wallet.userOpInsufficientBalance");
-    case "simulation_revert":
-      return t("wallet.userOpSimulationRevert");
-    case "execution_reverted":
-      return t("wallet.userOpExecutionReverted");
-    case "prefund_failed":
-      return t("wallet.userOpPrefundFailed");
-    default:
-      return reason?.startsWith("simulation_revert:") ? t("wallet.userOpSimulationRevert") : reason ?? t("wallet.sendFailed");
-  }
-}
-
 export function SendPage() {
   const { isSuperWallet } = useWalletPolicy();
-  if (isSuperWallet) return <SuperPayPage />;
+  if (isSuperWallet) {
+    return <SuperPayPage />;
+  }
   return <SimpleSendPage />;
 }
 
@@ -257,31 +244,26 @@ function SimpleSendPage() {
         setStatus({ kind: "error", message: t("wallet.sendInsufficientBalance") });
         return;
       }
-      const { userOp, userOpHash } =
-        advancedEntityId != null
-          ? await buildSignedAdvancedSendUserOp({
-              config,
-              walletAddress: session.address,
-              entityId: advancedEntityId,
-              qx: session.qx,
-              qy: session.qy,
-              recipient: getAddress(recipient),
-              sendAmount,
-              feeAmount: feeAtoms,
-              credentialId: session.credentialId,
-              chainId: chain.chainId,
-              sendTokenAddress: token.address,
-            })
-          : await buildSignedSendUserOp({
-              config,
-              walletAddress: session.address,
-              recipient: getAddress(recipient),
-              sendAmount,
-              feeAmount: feeAtoms,
-              credentialId: session.credentialId,
-              chainId: chain.chainId,
-              sendTokenAddress: token.address,
-            });
+      const passkey = await resolveCurrentWalletPasskey(session, "send");
+      const { userOp, userOpHash } = passkey.advanced
+        ? await buildSignedAdvancedSendUserOp({
+            config,
+            passkey,
+            recipient: getAddress(recipient),
+            sendAmount,
+            feeAmount: feeAtoms,
+            chainId: chain.chainId,
+            sendTokenAddress: token.address,
+          })
+        : await buildSignedSendUserOp({
+            config,
+            passkey,
+            recipient: getAddress(recipient),
+            sendAmount,
+            feeAmount: feeAtoms,
+            chainId: chain.chainId,
+            sendTokenAddress: token.address,
+          });
       setStatus({ kind: "info", message: t("wallet.sendSubmitting") });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);

@@ -128,6 +128,7 @@ export async function submitPairing(input: {
   newOwnerQx: string;
   newOwnerQy: string;
   deviceLabel: string;
+  newOwnerCredentialId?: string | null;
 }) {
   const res = await fetch(apiUrl("/api/wallet/pairing"), {
     method: "POST",
@@ -150,6 +151,7 @@ export async function pollPairing(nonce: string) {
       status: string;
       newOwnerQx: string | null;
       newOwnerQy: string | null;
+      newOwnerCredentialId: string | null;
       deviceLabel: string | null;
     };
   };
@@ -180,8 +182,16 @@ export function pairingQrPayload(input: {
   chainId: string;
   nonce: string;
   rpId: string;
+  walletLabel?: string;
 }): string {
-  return JSON.stringify(input);
+  const walletLabel = input.walletLabel?.trim();
+  return JSON.stringify({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    nonce: input.nonce,
+    rpId: input.rpId,
+    ...(walletLabel ? { walletLabel: walletLabel.slice(0, 48) } : {}),
+  });
 }
 
 export function pairingDeepLink(payload: string): string {
@@ -194,12 +204,14 @@ export function parsePairingQr(raw: string): {
   chainId: string;
   nonce: string;
   rpId: string;
+  walletLabel?: string;
 } {
   return JSON.parse(raw) as {
     walletAddress: string;
     chainId: string;
     nonce: string;
     rpId: string;
+    walletLabel?: string;
   };
 }
 

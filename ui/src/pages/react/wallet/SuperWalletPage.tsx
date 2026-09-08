@@ -28,9 +28,9 @@ import {
 import { hashEntityEmail, computeKeyId, KEY_WEBAUTHN } from "../../../../../commerce/shared/advanced-wallet.js";
 import { buildSignedEnableAdvancedUserOp } from "@/shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
+import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
 import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
-import { ensureSessionCredential } from "@/shared/webauthn.js";
 import { saveWalletMode } from "@/shared/wallet-mode.js";
 import { initEoaConnector } from "@/shared/eoa-connector.js";
 import type { WalletPublicConfig } from "../../../../../commerce/shared/wallet.js";
@@ -166,19 +166,17 @@ export function SuperWalletPage() {
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
       await assertUpgradePreflight(session, config);
-      const signingSession = await ensureSessionCredential(session);
+      const passkey = await resolveCurrentWalletPasskey(session, "enable-advanced");
+      const signingSession = { ...session, qx: passkey.qx, qy: passkey.qy, credentialId: passkey.credentialId };
       if (signingSession !== session) setSession(signingSession);
       const email = adminEmail.trim();
       const adminEntityId = hashEntityEmail(email);
       const fee = BigInt(config.bundlerFeeUsdc || "0");
       const { userOp, userOpHash } = await buildSignedEnableAdvancedUserOp({
         config,
-        walletAddress: signingSession.address,
+        passkey,
         adminEntityId,
-        qx: signingSession.qx,
-        qy: signingSession.qy,
         feeAmount: fee,
-        credentialId: signingSession.credentialId,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
@@ -188,15 +186,15 @@ export function SuperWalletPage() {
       await confirmAdvancedUpgrade(session.address);
       await registerWalletEntity({ walletAddress: session.address, entityId: adminEntityId, label: email });
       await registerWalletEntityKey({
-        walletAddress: session.address,
+        walletAddress: signingSession.address,
         entityId: adminEntityId,
-        keyId: computeKeyId(adminEntityId, KEY_WEBAUTHN, session.qx, session.qy, zeroPadValue("0x00", 20)),
+        keyId: computeKeyId(adminEntityId, KEY_WEBAUTHN, signingSession.qx, signingSession.qy, zeroPadValue("0x00", 20)),
         keyType: KEY_WEBAUTHN,
-        qx: session.qx,
-        qy: session.qy,
+        qx: signingSession.qx,
+        qy: signingSession.qy,
         credentialId: signingSession.credentialId ?? null,
       });
-      persistSessionAfterUpgrade(session, adminEntityId, email);
+      persistSessionAfterUpgrade(signingSession, adminEntityId, email);
       await refreshPolicy();
       navigate("/wallet", { replace: true });
     } catch (error) {

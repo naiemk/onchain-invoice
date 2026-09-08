@@ -319,7 +319,13 @@ export function registerWalletRoutes(
           handlers.sendJson(res, 400, { error: "nonce, newOwnerQx, newOwnerQy required" });
           return true;
         }
-        const pairing = db.submitWalletPairing(nonce, newOwnerQx, newOwnerQy, str(body.deviceLabel) || null);
+        const pairing = db.submitWalletPairing(
+          nonce,
+          newOwnerQx,
+          newOwnerQy,
+          str(body.deviceLabel) || null,
+          str(body.newOwnerCredentialId) || str(body.credentialId) || null
+        );
         if (!pairing) {
           handlers.sendJson(res, 404, { error: "pairing_not_found" });
           return true;

@@ -47,18 +47,28 @@ library AdvancedWalletLib {
         }
         if (key.keyType == AdvancedWalletTypes.KEY_WEBAUTHN || key.keyType == AdvancedWalletTypes.KEY_YUBIKEY) {
             if (key.qx == bytes32(0) && key.qy == bytes32(0)) return false;
-            bytes calldata sigCalldata = _asCalldata(sig);
-            (bool decodeSuccess, WebAuthn.WebAuthnAuth calldata auth) = WebAuthn.tryDecodeAuth(sigCalldata);
-            if (!decodeSuccess) return false;
+            // `sig` is already a memory copy from AWD1 decode. Casting it to
+            // calldata and calling tryDecodeAuth reads the *transaction*
+            // calldata at that memory address — AA24 for a valid passkey.
+            if (sig.length < 0xC0) return false;
+            (
+                bytes32 r,
+                bytes32 s,
+                uint256 challengeIndex,
+                uint256 typeIndex,
+                bytes memory authenticatorData,
+                string memory clientDataJSON
+            ) = abi.decode(sig, (bytes32, bytes32, uint256, uint256, bytes, string));
+            WebAuthn.WebAuthnAuth memory auth = WebAuthn.WebAuthnAuth({
+                r: r,
+                s: s,
+                challengeIndex: challengeIndex,
+                typeIndex: typeIndex,
+                authenticatorData: authenticatorData,
+                clientDataJSON: clientDataJSON
+            });
             return WebAuthn.verify(abi.encodePacked(digest), auth, key.qx, key.qy);
         }
         return false;
-    }
-
-    function _asCalldata(bytes memory data) private pure returns (bytes calldata result) {
-        assembly ("memory-safe") {
-            result.offset := add(data, 32)
-            result.length := mload(data)
-        }
     }
 }

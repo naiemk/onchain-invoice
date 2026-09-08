@@ -51,6 +51,27 @@ export function decodeAdvancedSignature(data: string): EntitySigInput[] {
   return (decoded[0] as Array<[string, string]>).map(([keyId, sig]) => ({ keyId, sig }));
 }
 
+/**
+ * Proposal rows store the inner key signature. Older clients stored a packed AWD1
+ * blob; unwrap so execute can pack once.
+ */
+export function unwrapAdvancedInnerSig(stored: string, keyId?: string): string {
+  let current = stored;
+  for (let i = 0; i < 3; i++) {
+    if (!current.toLowerCase().startsWith(ADVANCED_SIG_MAGIC)) return current;
+    try {
+      const parts = decodeAdvancedSignature(current);
+      const match =
+        (keyId ? parts.find((p) => p.keyId.toLowerCase() === keyId.toLowerCase()) : null) ?? parts[0];
+      if (!match?.sig) return current;
+      current = match.sig;
+    } catch {
+      return current;
+    }
+  }
+  return current;
+}
+
 /** Sign a UserOp digest with personal_sign (EIP-191) for EOA advanced keys. */
 export async function signEoaPersonalDigest(
   privateKey: string,
@@ -80,7 +101,7 @@ export const WALLET_ADVANCED_ABI = [
   "function enableAdvanced(bytes32 adminEntityId)",
   "function configureMultisig(bytes32[] removeKeyIds, bytes32[] entityIds, bytes32[] entityIdsForKeys, uint8[] keyTypes, bytes32[] qx, bytes32[] qy, address[] eoa, uint8 threshold, bytes32[] vetoEntityIds)",
   "function addEntity(bytes32 entityId)",
-  "function removeEntity(bytes32 entityId)",
+  "function removeEntity(bytes32 entityId, bytes32[] keyIds)",
   "function addKey(bytes32 entityId, uint8 keyType, bytes32 qx, bytes32 qy, address eoa)",
   "function removeKey(bytes32 keyId)",
   "function setThreshold(uint8 m)",

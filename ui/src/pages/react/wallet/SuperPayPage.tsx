@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Contract, JsonRpcProvider, formatUnits, getAddress, isAddress, isHexString } from "ethers";
-import { ArrowUpRight, Shield } from "lucide-react";
+import { ArrowUpRight, Loader2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,12 +14,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageCard, PageSplit } from "@/components/PageSplit";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SendScanButton } from "@/components/SendScanDialog";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletConfig, primaryChain, waitForUserOp } from "@/shared/wallet-api.js";
+import { formatSendRejectReason } from "@/shared/userop-errors.js";
 import {
   attachProposalTx,
   createProposal,
@@ -27,23 +29,22 @@ import {
   fetchAdvancedPolicy,
   getProposal,
   listProposals,
-  listWalletEntities,
   prepareProposal,
   signProposal,
   type AdvancedPolicy,
 } from "@/shared/wallet-advanced-api.js";
 import { signProposalUserOp } from "@/shared/advanced-userop-client.js";
+import { asAdvancedKeyType, resolveSessionSigningKey } from "@/shared/advanced-signing-key.js";
 import { ERC20_ABI, encodeErc20Transfer, parseUsdcInput } from "../../../../../commerce/shared/userop.js";
-import { KEY_EOA } from "../../../../../commerce/shared/advanced-wallet.js";
 import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
-import { connectEoaWallet, getConnectedEoaAddress, initEoaConnector } from "@/shared/eoa-connector.js";
+import { initEoaConnector } from "@/shared/eoa-connector.js";
 import type {
   WalletProposalRecord,
   WalletProposalSigRecord,
   WalletPublicConfig,
 } from "../../../../../commerce/shared/wallet.js";
 import { WalletFrame } from "./WalletFrame";
-import { isClosedProposal, isFullySigned, ProposalSummaryLine } from "./proposal-display";
+import { isClosedProposal, isFullySigned, proposalSignatureCount, ProposalSummaryLine } from "./proposal-display";
 import { TxHistory } from "./TxHistory";
 
 type StatusKind = "info" | "error" | "success";
@@ -81,11 +82,11 @@ export function SuperPayPage() {
   const closedView = searchParams.get("status") === "closed";
   const openId = searchParams.get("id");
 
-  const loadDetail = useCallback(async (proposalId: string, sess: WalletSession) => {
+  const loadDetail = useCallback(async (proposalId: string, sess: WalletSession, opts?: { keepStatus?: boolean }) => {
     try {
       const data = await getProposal(sess.address, proposalId);
       setDetail(data);
-      setStatus(null);
+      if (!opts?.keepStatus) setStatus(null);
     } catch (error) {
       setDetail(null);
       setStatus({
@@ -305,49 +306,24 @@ export function SuperPayPage() {
     }
   };
 
-  const resolveSigningKey = async (sess: WalletSession) => {
-    const roster = await listWalletEntities(sess.address);
-    let myKey =
-      (sess.keyId ? roster.keys.find((k) => k.keyId === sess.keyId) : null) ??
-      roster.keys.find((k) => k.qx === sess.qx && k.qy === sess.qy) ??
-      null;
-    if (!myKey) {
-      const connected = await getConnectedEoaAddress();
-      if (connected) {
-        myKey =
-          roster.keys.find(
-            (k) => k.keyType === KEY_EOA && k.eoa?.toLowerCase() === connected.toLowerCase()
-          ) ?? null;
-      }
-    }
-    if (!myKey) {
-      const connected = await connectEoaWallet().catch(() => null);
-      if (connected) {
-        myKey =
-          roster.keys.find(
-            (k) => k.keyType === KEY_EOA && k.eoa?.toLowerCase() === connected.toLowerCase()
-          ) ?? null;
-      }
-    }
-    return myKey;
-  };
-
   const signCurrent = async () => {
-    if (!session || !config || !detail || !policy) return;
+    if (!session || !config || !detail || !policy || busy) return;
     setBusy("sign");
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
-      const myKey = await resolveSigningKey(session);
-      if (!myKey) throw new Error(t("wallet.superWalletNoSigningKey"));
+      const resolved = await resolveSessionSigningKey(session);
+      if (!resolved) throw new Error(t("wallet.superWalletNoSigningKey"));
+      const myKey = resolved.key;
       const prepared = await prepareProposal(session.address, detail.proposal.id);
       const signature = await signProposalUserOp({
         userOpHash: prepared.userOpHash,
+        passkey: resolved.passkey,
         entityId: myKey.entityId,
-        keyType: myKey.keyType,
+        keyType: asAdvancedKeyType(myKey.keyType),
         qx: myKey.qx ?? undefined,
         qy: myKey.qy ?? undefined,
         eoa: myKey.eoa ?? undefined,
-        credentialId: session.credentialId,
+        credentialId: myKey.credentialId ?? session.credentialId,
       });
       await signProposal({
         walletAddress: session.address,
@@ -357,38 +333,59 @@ export function SuperPayPage() {
         keyType: myKey.keyType,
         signature,
       });
-      setStatus({ kind: "info", message: t("wallet.proposalsSigned") });
+      const data = await getProposal(session.address, detail.proposal.id);
+      const signed = {
+        ...data,
+        proposal: {
+          ...data.proposal,
+          signatureCount: proposalSignatureCount(data.proposal, data.signatures),
+        },
+      };
+      setDetail(signed);
       await reloadList(session);
-      await loadDetail(detail.proposal.id, session);
+      if (proposalSignatureCount(signed.proposal, signed.signatures) >= policy.threshold) {
+        await runExecute(session, signed.proposal.id);
+      } else {
+        setStatus({ kind: "info", message: t("wallet.proposalsSigned") });
+      }
     } catch (error) {
       setStatus({
         kind: "error",
-        message: error instanceof Error ? error.message : String(error),
+        message: formatSendRejectReason(error instanceof Error ? error.message : String(error), t),
       });
     } finally {
       setBusy(null);
     }
   };
 
+  const runExecute = async (sess: WalletSession, proposalId: string) => {
+    setBusy("execute");
+    setStatus({ kind: "info", message: t("wallet.proposalsExecuting") });
+    const { userOpHash } = await executeProposal(sess.address, proposalId);
+    setStatus({ kind: "info", message: t("wallet.sendPending") });
+    const result = await waitForUserOp(userOpHash);
+    if (result.status !== "included") {
+      throw new Error(result.rejectReason ?? result.status);
+    }
+    if (result.txHash) {
+      await attachProposalTx(sess.address, proposalId, result.txHash);
+    }
+    setStatus({ kind: "success", message: t("wallet.proposalsExecuted") });
+    setHistoryKey((n) => n + 1);
+    await reloadList(sess);
+    await loadDetail(proposalId, sess, { keepStatus: true });
+  };
+
   const executeCurrent = async () => {
-    if (!session || !detail) return;
+    if (!session || !detail || busy) return;
     setBusy("execute");
     setStatus({ kind: "info", message: t("wallet.proposalsExecuting") });
     try {
-      const { userOpHash } = await executeProposal(session.address, detail.proposal.id);
-      const result = await waitForUserOp(userOpHash);
-      if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
-      if (result.txHash) {
-        await attachProposalTx(session.address, detail.proposal.id, result.txHash);
-      }
-      setStatus({ kind: "success", message: t("wallet.proposalsExecuted") });
-      setHistoryKey((n) => n + 1);
-      await reloadList(session);
-      await loadDetail(detail.proposal.id, session);
+      await runExecute(session, detail.proposal.id);
     } catch (error) {
       setStatus({
         kind: "error",
-        message: error instanceof Error ? error.message : String(error),
+        message: formatSendRejectReason(error instanceof Error ? error.message : String(error), t),
       });
     } finally {
       setBusy(null);
@@ -509,10 +506,10 @@ export function SuperPayPage() {
                         onChange={(e) => setNote(e.target.value)}
                       />
                     </div>
-                    <Button
+            <Button
                       id="review-proposal"
                       type="button"
-                      disabled={busy === "create"}
+                      disabled={busy !== null}
                       onClick={openReview}
                     >
                       {t("wallet.sendReview")}
@@ -556,10 +553,17 @@ export function SuperPayPage() {
                     <Button
                       id="create-call-proposal"
                       type="button"
-                      disabled={busy === "create"}
+                      disabled={busy !== null}
                       onClick={() => void createCall()}
                     >
-                      {t("wallet.proposalsCreateCta")}
+                      {busy === "create" ? (
+                        <>
+                          <Loader2 className="animate-spin" />
+                          {t("wallet.proposalsCreateCta")}
+                        </>
+                      ) : (
+                        t("wallet.proposalsCreateCta")
+                      )}
                     </Button>
                   </div>
                 )}
@@ -631,6 +635,7 @@ export function SuperPayPage() {
                             type="button"
                             size="sm"
                             variant="outline"
+                            disabled={busy !== null}
                             onClick={() => {
                               setSearchParams(
                                 closedView ? { status: "closed", id: p.id } : { id: p.id },
@@ -648,7 +653,7 @@ export function SuperPayPage() {
                 )}
               </PageCard>
 
-              {status && (
+              {status && !detail && (
                 <p
                   id="proposal-status"
                   role="status"
@@ -699,11 +704,18 @@ export function SuperPayPage() {
             </div>
           </dl>
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => setReviewOpen(false)}>
+            <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setReviewOpen(false)}>
               {t("wallet.cancel")}
             </Button>
-            <Button id="create-proposal" type="button" disabled={busy === "create"} onClick={() => void createTransfer()}>
-              {t("wallet.proposalsCreateCta")}
+            <Button id="create-proposal" type="button" disabled={busy !== null} onClick={() => void createTransfer()}>
+              {busy === "create" ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  {t("wallet.proposalsCreateCta")}
+                </>
+              ) : (
+                t("wallet.proposalsCreateCta")
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -713,13 +725,22 @@ export function SuperPayPage() {
         open={Boolean(detail && policy)}
         onOpenChange={(open) => {
           if (!open) {
+            if (busy) return;
             setDetail(null);
             setSearchParams(closedView ? { status: "closed" } : {}, { replace: true });
           }
         }}
       >
         {detail && policy && (
-          <DialogContent id="proposal-detail">
+          <DialogContent
+            id="proposal-detail"
+            onPointerDownOutside={(event) => {
+              if (busy) event.preventDefault();
+            }}
+            onEscapeKeyDown={(event) => {
+              if (busy) event.preventDefault();
+            }}
+          >
             <DialogHeader>
               <DialogTitle>{t("wallet.proposalsDetail")}</DialogTitle>
               <DialogDescription>{detail.proposal.status}</DialogDescription>
@@ -729,16 +750,30 @@ export function SuperPayPage() {
             </p>
             <p className="text-sm">
               {t("wallet.proposalsSigCount", {
-                count: String(detail.signatures.length),
+                count: String(proposalSignatureCount(detail.proposal, detail.signatures)),
                 threshold: String(policy.threshold),
               })}
-              {isFullySigned(
-                { ...detail.proposal, signatureCount: detail.signatures.length },
-                policy.threshold
-              )
+              {isFullySigned(detail.proposal, policy.threshold, detail.signatures)
                 ? ` · ${t("wallet.proposalsFullySigned")}`
                 : ` · ${t("wallet.proposalsAwaitingSignatures")}`}
             </p>
+            {status && (
+              <Alert
+                variant={status.kind === "error" ? "destructive" : status.kind === "success" ? "ok" : "default"}
+                id="proposal-status"
+              >
+                <AlertDescription className="flex items-center gap-2">
+                  {busy ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : null}
+                  {status.message}
+                </AlertDescription>
+              </Alert>
+            )}
+            {busy && !status && (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {busy === "sign" ? t("wallet.sendSigning") : t("wallet.proposalsExecuting")}
+              </p>
+            )}
             <DialogFooter className="flex-col gap-2 sm:flex-row">
               <Button
                 id="sign-proposal"
@@ -747,15 +782,33 @@ export function SuperPayPage() {
                 disabled={busy !== null || detail.proposal.status === "executed"}
                 onClick={() => void signCurrent()}
               >
-                {t("wallet.proposalsSign")}
+                {busy === "sign" ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    {t("wallet.sendSigning")}
+                  </>
+                ) : (
+                  t("wallet.proposalsSign")
+                )}
               </Button>
               <Button
                 id="execute-proposal"
                 type="button"
-                disabled={busy !== null || detail.proposal.status === "executed"}
+                disabled={
+                  busy !== null ||
+                  detail.proposal.status === "executed" ||
+                  !isFullySigned(detail.proposal, policy.threshold, detail.signatures)
+                }
                 onClick={() => void executeCurrent()}
               >
-                {t("wallet.proposalsExecute")}
+                {busy === "execute" ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    {t("wallet.sendPending")}
+                  </>
+                ) : (
+                  t("wallet.proposalsExecute")
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

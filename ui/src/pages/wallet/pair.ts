@@ -9,6 +9,7 @@ import {
   submitPairing,
 } from "../../shared/wallet-api.js";
 import { createPasskey, saveWalletSession } from "../../shared/webauthn.js";
+import { inferDeviceLabel } from "../../shared/passkey-name.js";
 import {
   paintWalletPage,
   setButtonLoading,
@@ -152,19 +153,20 @@ async function runPair(root: HTMLElement): Promise<void> {
   const payloadEl = root.querySelector<HTMLInputElement | HTMLTextAreaElement>("#pair-payload");
   const raw = payloadEl?.value.trim();
   const label =
-    root.querySelector<HTMLInputElement>("#pair-device-name")?.value.trim() || t("wallet.defaultDevice");
+    root.querySelector<HTMLInputElement>("#pair-device-name")?.value.trim() || inferDeviceLabel();
   if (!raw || !status) return;
   try {
     setButtonLoading(btn, true, t("wallet.creatingPasskey"));
     showStatus(status, t("wallet.creatingPasskey"));
     setStepper(root, "passkey");
     const payload = parsePairingQr(raw);
-    const owner = await createPasskey(label);
+    const owner = await createPasskey(label, { walletLabel: payload.walletLabel });
     await submitPairing({
       nonce: payload.nonce,
       newOwnerQx: owner.qx,
       newOwnerQy: owner.qy,
       deviceLabel: label,
+      newOwnerCredentialId: owner.credentialId,
     });
 
     setStepper(root, "approve");

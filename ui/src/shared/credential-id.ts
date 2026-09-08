@@ -15,13 +15,17 @@ export function credentialIdToBytes(credentialId: string): Uint8Array {
 export function credentialIdsMatch(a?: string | null, b?: string | null): boolean {
   if (!a?.trim() || !b?.trim()) return false;
   if (a.trim() === b.trim()) return true;
-  const ab = credentialIdToBytes(a);
-  const bb = credentialIdToBytes(b);
-  if (ab.length !== bb.length) return false;
-  for (let i = 0; i < ab.length; i++) {
-    if (ab[i] !== bb[i]) return false;
+  try {
+    const ab = credentialIdToBytes(a);
+    const bb = credentialIdToBytes(b);
+    if (ab.length !== bb.length) return false;
+    for (let i = 0; i < ab.length; i++) {
+      if (ab[i] !== bb[i]) return false;
+    }
+    return true;
+  } catch {
+    return false;
   }
-  return true;
 }
 
 function hexToBytes(hex: string): Uint8Array {

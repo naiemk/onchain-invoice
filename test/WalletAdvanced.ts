@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
 import { network } from "hardhat";
 import { zeroPadValue } from "ethers";
 import {
@@ -9,6 +10,7 @@ import {
   KEY_WEBAUTHN,
   signEoaPersonalDigest,
 } from "../commerce/shared/advanced-wallet.js";
+import { encodeWebAuthnSignatureFromJson } from "../commerce/shared/webauthn-signature.js";
 import {
   ERC7821_BATCH_MODE,
   encodeBatch,
@@ -16,6 +18,7 @@ import {
   buildFeeTransferCall,
   encodeErc20Transfer,
 } from "../commerce/shared/userop.js";
+import { userOpHashToWebAuthnChallenge } from "../ui/src/shared/webauthn-p256.js";
 
 describe("Wallet advanced entity M-of-N", function () {
   const ENTRYPOINT = "0x433709009B8330FDa32311DF1C2AFA402eD8D009";
@@ -283,6 +286,95 @@ describe("Wallet advanced entity M-of-N", function () {
     const packed = encodeAdvancedSignature([{ keyId, sig }]);
     expect(await wallet.exposedValidateAdvanced(digest, packed)).to.equal(true);
   });
+
+  it("accepts a migrated passkey after wrapping AWD1", async function () {
+    const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
+    const [owner] = await ethers.getSigners();
+    const passkey = p256Passkey();
+    const Helper = await ethers.getContractFactory("WalletAdvancedTestHelper");
+    const walletImpl = await Helper.deploy();
+    const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
+    const recovery = await Recovery.deploy(owner.address, owner.address);
+    const Factory = await ethers.getContractFactory("WalletFactory");
+    const factory = await Factory.deploy(
+      await walletImpl.getAddress(),
+      await recovery.getAddress(),
+      3600n,
+      owner.address
+    );
+    const salt = ethers.id("wallet-advanced-webauthn");
+    await factory.createAccount(passkey.qx, passkey.qy, salt);
+    const wallet = await ethers.getContractAt("WalletAdvancedTestHelper", await factory.predictAddress(salt));
+
+    const digest = ethers.id("advanced-webauthn-userop");
+    const inner = signWebAuthn(passkey.pem, digest);
+    expect(await wallet.exposedValidateRaw(digest, inner)).to.equal(true);
+
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await expectRevert(wallet.exposedValidateRaw(digest, inner), "InvalidEntitySig");
+
+    const keyId = computeKeyId(ADMIN_ENTITY, KEY_WEBAUTHN, passkey.qx, passkey.qy, "0x0000000000000000000000000000000000000000");
+    const packed = encodeAdvancedSignature([{ keyId, sig: inner }]);
+    expect(await wallet.exposedValidateAdvanced(digest, packed)).to.equal(true);
+    expect(await wallet.exposedValidateRaw(digest, packed)).to.equal(true);
+  });
+
+  it("rejects removing the last key of an identity", async function () {
+    const { wallet, eoaA } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    const keyId = computeKeyId(
+      ADMIN_ENTITY,
+      KEY_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      await eoaA.getAddress()
+    );
+    await wallet.exposedAddKey(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress());
+    const migrated = computeKeyId(ADMIN_ENTITY, 0, zeroPadValue("0x01", 32), zeroPadValue("0x02", 32), "0x0000000000000000000000000000000000000000");
+    await wallet.exposedRemoveKey(migrated);
+    await expectRevert(wallet.exposedRemoveKey(keyId), errorSel("LastKey"));
+  });
+
+  it("allows removing a non-last key", async function () {
+    const { wallet, eoaA } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await wallet.exposedAddKey(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress());
+    const migrated = computeKeyId(ADMIN_ENTITY, 0, zeroPadValue("0x01", 32), zeroPadValue("0x02", 32), "0x0000000000000000000000000000000000000000");
+    await wallet.exposedRemoveKey(migrated);
+    expect(await wallet.getEntityKeyCount(ADMIN_ENTITY)).to.equal(1n);
+  });
+
+  it("rejects removing an identity when it would drop below M-of-N", async function () {
+    const { wallet, eoaA, eoaB } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await wallet.exposedAddEntity(ENTITY_B);
+    await wallet.exposedAddKey(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress());
+    await wallet.exposedAddKey(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await wallet.exposedSetThreshold(2);
+    const keyB = computeKeyId(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await expectRevert(wallet.exposedRemoveEntity(ENTITY_B, [keyB]), errorSel("InvalidThreshold"));
+  });
+
+  it("removes an identity and its keys when remaining identities still meet the threshold", async function () {
+    const { wallet, eoaB } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await wallet.exposedAddEntity(ENTITY_B);
+    await wallet.exposedAddKey(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await wallet.exposedSetThreshold(1);
+    const keyB = computeKeyId(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await wallet.exposedRemoveEntity(ENTITY_B, [keyB]);
+    expect(await wallet.entityCount()).to.equal(1n);
+    expect((await wallet.getKeyRecord(keyB)).entityId).to.equal("0x" + "00".repeat(32));
+    expect(await wallet.getEntityKeyCount(ADMIN_ENTITY)).to.equal(1n);
+  });
+
+  it("rejects removeEntity if not all keys are supplied", async function () {
+    const { wallet, eoaB } = await deployHelper();
+    await wallet.exposedEnableAdvanced(ADMIN_ENTITY);
+    await wallet.exposedAddEntity(ENTITY_B);
+    await wallet.exposedAddKey(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress());
+    await expectRevert(wallet.exposedRemoveEntity(ENTITY_B, []), errorSel("EntityHasKeys"));
+  });
 });
 
 async function expectRevert(promise: Promise<unknown>, fragment: string): Promise<void> {
@@ -291,6 +383,51 @@ async function expectRevert(promise: Promise<unknown>, fragment: string): Promis
     expect.fail(`Expected revert containing ${fragment}`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    expect(msg).to.include(fragment);
+    const extra = typeof err === "object" && err && "data" in err ? String((err as { data?: unknown }).data) : "";
+    expect(`${msg} ${extra}`).to.include(fragment);
   }
+}
+
+function errorSel(name: string): string {
+  return name;
+}
+
+function p256Passkey(): { qx: string; qy: string; pem: string } {
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const spki = publicKey.export({ type: "spki", format: "der" }) as Buffer;
+  const point = spki.subarray(spki.length - 65);
+  expect(point[0]).to.equal(0x04);
+  return {
+    qx: zeroPadValue("0x" + point.subarray(1, 33).toString("hex"), 32),
+    qy: zeroPadValue("0x" + point.subarray(33, 65).toString("hex"), 32),
+    pem: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
+  };
+}
+
+function signWebAuthn(pem: string, userOpHash: string): string {
+  const challenge = userOpHashToWebAuthnChallenge(userOpHash);
+  const clientDataJSON = JSON.stringify({
+    type: "webauthn.get",
+    challenge,
+    origin: "http://localhost",
+    crossOrigin: false,
+  });
+  const authenticatorData = Buffer.concat([
+    createHash("sha256").update("localhost").digest(),
+    Buffer.from([0x05]),
+    Buffer.alloc(4),
+  ]);
+  const signed = Buffer.concat([
+    authenticatorData,
+    createHash("sha256").update(clientDataJSON, "utf8").digest(),
+  ]);
+  const signature = sign("sha256", signed, {
+    key: createPrivateKey(pem),
+    dsaEncoding: "ieee-p1363",
+  });
+  return encodeWebAuthnSignatureFromJson({
+    authenticatorData: "0x" + authenticatorData.toString("hex"),
+    clientDataJSON,
+    signature: "0x" + signature.toString("hex"),
+  });
 }

@@ -84,6 +84,46 @@ async function mockSuperWalletActiveApis(page: Page): Promise<void> {
       }),
     });
   });
+  await page.route("**/api/wallet/devices**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ devices: [] }),
+    });
+  });
+  await page.route("**/api/wallet/pairing", async (route) => {
+    const body = (route.request().postDataJSON() ?? {}) as { action?: string };
+    if (body.action === "create") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          pairing: {
+            nonce: "e2e-pair-nonce",
+            walletAddress: E2E_WALLET,
+            chainId: "11155111",
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+          },
+        }),
+      });
+      return;
+    }
+    if (body.action === "poll") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          pairing: { status: "pending", newOwnerQx: null, newOwnerQy: null, newOwnerCredentialId: null, deviceLabel: null },
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ pairing: { status: "expired" } }),
+    });
+  });
   await page.route("**/api/wallet/**/proposals", async (route) => {
     if (route.request().method() !== "GET") {
       await route.continue();
@@ -230,6 +270,65 @@ test.describe("Super Wallet UI", () => {
     await expect(page.locator("#add-entity")).toBeVisible();
   });
 
+  test("blocks last-key and below-threshold identity removal on Access", async ({ page }) => {
+    const adminEntityId = `0x${"aa".repeat(32)}`;
+    const teammateEntityId = `0x${"bb".repeat(32)}`;
+    const adminKeyId = `0x${"11".repeat(32)}`;
+    const teammateKeyId = `0x${"22".repeat(32)}`;
+    await seedSimpleWalletSession(page);
+    await mockSuperWalletActiveApis(page);
+    await page.route("**/api/wallet/**/entities", async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          entities: [
+            { entityId: adminEntityId, label: "admin@example.com" },
+            { entityId: teammateEntityId, label: "teammate@example.com" },
+          ],
+          keys: [
+            {
+              entityId: adminEntityId,
+              keyId: adminKeyId,
+              keyType: 0,
+              qx: `0x${"0a".repeat(32)}`,
+              qy: `0x${"0b".repeat(32)}`,
+              eoa: null,
+            },
+            {
+              entityId: teammateEntityId,
+              keyId: teammateKeyId,
+              keyType: 0,
+              qx: `0x${"0c".repeat(32)}`,
+              qy: `0x${"0d".repeat(32)}`,
+              eoa: null,
+            },
+          ],
+        }),
+      });
+    });
+    await page.goto("/wallet/access");
+    await expect(page.getByTestId("access-page")).toBeVisible();
+
+    const admin = page.locator(`[data-entity-id="${adminEntityId}"]`);
+    await expect(admin.getByTestId("remove-key")).toBeEnabled();
+    await expect(admin.getByTestId("last-key-blocked")).toHaveCount(0);
+    await expect(admin.getByRole("button", { name: "Add passkey" })).toHaveCount(0);
+    await expect(admin.getByTestId("remove-entity")).toHaveCount(0);
+    await admin.getByTestId("remove-key").click();
+    await expect(page.locator("#super-status")).toContainText("at least one key");
+
+    const teammate = page.locator(`[data-entity-id="${teammateEntityId}"]`);
+    await expect(teammate.getByTestId("remove-key")).toBeEnabled();
+    await expect(teammate.getByTestId("last-key-blocked")).toHaveCount(0);
+    await expect(teammate.getByTestId("remove-entity")).toBeDisabled();
+    await expect(teammate.getByTestId("remove-entity-blocked")).toContainText("at least 2 of 2");
+  });
+
   test("locks Super Wallet chrome and Pay proposals after convert", async ({ page }) => {
     await seedSimpleWalletSession(page);
     await mockSuperWalletActiveApis(page);
@@ -238,14 +337,24 @@ test.describe("Super Wallet UI", () => {
     await expect(page.getByTestId("super-wallet-shield")).toBeVisible();
     await expect(page.getByTestId("super-wallet-home-summary")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Wallet navigation" })).toContainText("Access");
+    await expect(page.getByRole("navigation", { name: "Wallet navigation" })).toContainText("Security");
     await expect(page.getByRole("navigation", { name: "Wallet navigation" })).not.toContainText("Super Wallet");
-    await expect(page.getByRole("navigation", { name: "Wallet navigation" })).not.toContainText("Security");
     await expect(page.getByRole("group", { name: "Wallet mode" })).toHaveCount(0);
 
     await page.goto("/wallet/security");
-    await expect(page).toHaveURL(/\/wallet\/access/);
+    await expect(page).toHaveURL(/\/wallet\/security/);
+    await expect(page.getByTestId("super-wallet-policy-card")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Details" }).first()).toHaveAttribute("href", "/wallet/access");
+    await expect(page.getByRole("button", { name: "Pair another device" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add security key (YubiKey)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
+    await expect(page.getByTestId("identity-email-card")).toBeVisible();
+    await page.getByRole("button", { name: "Pair another device" }).click();
+    await expect(page.getByTestId("pair-device-dialog")).toBeVisible();
+    await expect(page.getByTestId("pair-copy-link")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recovery center" })).toHaveCount(0);
     await page.goto("/wallet/recover");
-    await expect(page).toHaveURL(/\/wallet\/access/);
+    await expect(page).toHaveURL(/\/wallet\/security/);
 
     await page.goto("/wallet/send");
     await expect(page.getByTestId("super-wallet-pay")).toBeVisible();

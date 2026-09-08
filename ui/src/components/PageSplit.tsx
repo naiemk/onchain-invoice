@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export function PageSplit({
@@ -18,12 +18,10 @@ export function PageSplit({
 export function PageCard({
   className,
   children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("rounded-xl border border-border bg-card p-5 shadow-sm md:p-6", className)}>
+    <div className={cn("rounded-xl border border-border bg-card p-5 shadow-sm md:p-6", className)} {...props}>
       {children}
     </div>
   );

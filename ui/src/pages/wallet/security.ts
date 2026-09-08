@@ -11,10 +11,7 @@ import {
   pairingQrPayload,
   pollPairing,
   primaryChain,
-  registerDevice,
   rejectPairing,
-  superJoinDeepLink,
-  superJoinPayload,
   waitForUserOp,
 } from "../../shared/wallet-api.js";
 import {
@@ -24,10 +21,10 @@ import {
 } from "../../shared/webauthn.js";
 import { currentSpaRender, isSpaRenderCurrent, spaNavigate } from "../../shared/spa-render.js";
 import {
-  buildSignedAddOwnerUserOp,
   buildSignedRemoveOwnerUserOp,
   submitSignedUserOp,
 } from "../../shared/userop-client.js";
+import { resolveCurrentWalletPasskey } from "../../shared/current-wallet-passkey.js";
 import {
   bindCopyButtons,
   formatKeyFingerprint,
@@ -41,8 +38,10 @@ import {
 } from "../../shared/wallet-ui.js";
 import { escapeHtml } from "../../shared/dom.js";
 import { fetchWalletEmail } from "../../shared/wallet-recovery-api.js";
-import { fetchAdvancedPolicy, listWalletEntities } from "../../shared/wallet-advanced-api.js";
+import { fetchAdvancedPolicy } from "../../shared/wallet-advanced-api.js";
 import { isAdvancedMode } from "../../shared/wallet-mode.js";
+import { addPasskeySigner } from "../../shared/wallet-add-signer.js";
+import { KEY_WEBAUTHN, KEY_YUBIKEY } from "../../../../commerce/shared/advanced-wallet.js";
 
 const WALLET_ABI = [
   "function pendingOwner() view returns (bytes32 qx, bytes32 qy, uint64 executableAt, bytes32 requestId, bool active)",
@@ -87,14 +86,6 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
     devices = await listDevices(session.address, session.chainId);
   } catch {
     devices = [];
-  }
-  let entityKeys: Awaited<ReturnType<typeof listWalletEntities>>["keys"] = [];
-  if (onChainAdvanced) {
-    try {
-      entityKeys = (await listWalletEntities(session.address)).keys;
-    } catch {
-      entityKeys = [];
-    }
   }
   if (!isSpaRenderCurrent(gen)) return;
 
@@ -145,55 +136,51 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
       </article>
 
         <section class="wallet-other-devices" id="devices">
-        <h2>${escapeHtml(onChainAdvanced ? t("wallet.superWalletEntitiesTitle") : t("wallet.otherDevicesTitle"))}</h2>
+        <h2>${escapeHtml(t("wallet.otherDevicesTitle"))}</h2>
         ${
-          onChainAdvanced
-            ? renderAdvancedKeys(entityKeys)
-            : others.length === 0
-              ? `<p class="field-hint">${escapeHtml(t("wallet.otherDevicesEmpty"))}</p>`
-              : `<ul class="wallet-device-list">
-                  ${others
-                    .map(
-                      (d) => `
-                    <li>
-                      <div>
-                        <strong>${escapeHtml(d.label)}</strong>
-                        <span class="mono faint">${escapeHtml(formatKeyFingerprint(d.ownerQx, d.ownerQy))}</span>
-                      </div>
-                      <button type="button" class="tc-btn secondary small" data-remove="${escapeHtml(d.ownerQx)}|${escapeHtml(d.ownerQy)}">${escapeHtml(t("wallet.remove"))}</button>
-                    </li>`
-                    )
-                    .join("")}
-                </ul>`
+          others.length === 0
+            ? `<p class="field-hint">${escapeHtml(t("wallet.otherDevicesEmpty"))}</p>`
+            : `<ul class="wallet-device-list">
+                ${others
+                  .map(
+                    (d) => `
+                  <li>
+                    <div>
+                      <strong>${escapeHtml(d.label)}</strong>
+                      <span class="mono faint">${escapeHtml(formatKeyFingerprint(d.ownerQx, d.ownerQy))}</span>
+                    </div>
+                    ${
+                      onChainAdvanced
+                        ? ""
+                        : `<button type="button" class="tc-btn secondary small" data-remove="${escapeHtml(d.ownerQx)}|${escapeHtml(d.ownerQy)}">${escapeHtml(t("wallet.remove"))}</button>`
+                    }
+                  </li>`
+                  )
+                  .join("")}
+              </ul>`
         }
 
-        ${
-          onChainAdvanced
-            ? `<div class="wallet-pair-howto">
-                <h3>${escapeHtml(t("wallet.inviteTeammate"))}</h3>
-                <p class="field-hint">${escapeHtml(t("wallet.inviteTeammateHint"))}</p>
-                <button type="button" class="tc-btn" id="invite-teammate-qr">${escapeHtml(t("wallet.inviteTeammate"))}</button>
-              </div>
-              <div id="join-qr-box" class="wallet-qr-wrap hidden"></div>`
-            : `<div class="wallet-pair-howto">
-                <h3>${escapeHtml(t("wallet.pairStepsTitle"))}</h3>
-                <ol class="wallet-pair-steps">
-                  <li>${escapeHtml(t("wallet.pairStep1"))}</li>
-                  <li>${escapeHtml(t("wallet.pairStep2"))}</li>
-                  <li>${escapeHtml(t("wallet.pairStep3"))}</li>
-                </ol>
-                <div class="cta-row">
-                  <button type="button" class="tc-btn" id="add-device-qr">${escapeHtml(t("wallet.addDevice"))}</button>
-                  <button type="button" class="tc-btn secondary" id="add-security-key">${escapeHtml(t("wallet.addSecurityKey"))}</button>
-                </div>
-                <p class="field-hint">${escapeHtml(t("wallet.addSecurityKeyHint"))}</p>
-                <div id="yubikey-pin-help" class="hidden"></div>
-              </div>
-              <div id="pair-qr-box" class="wallet-qr-wrap hidden"></div>`
-        }
+        <div class="wallet-pair-howto">
+          <h3>${escapeHtml(t("wallet.pairStepsTitle"))}</h3>
+          <ol class="wallet-pair-steps">
+            <li>${escapeHtml(t("wallet.pairStep1"))}</li>
+            <li>${escapeHtml(t("wallet.pairStep2"))}</li>
+            <li>${escapeHtml(t("wallet.pairStep3"))}</li>
+          </ol>
+          <div class="cta-row">
+            <button type="button" class="tc-btn" id="add-device-qr">${escapeHtml(t("wallet.addDevice"))}</button>
+            <button type="button" class="tc-btn secondary" id="add-security-key">${escapeHtml(t("wallet.addSecurityKey"))}</button>
+          </div>
+          <p class="field-hint">${escapeHtml(t("wallet.addSecurityKeyHint"))}</p>
+          <div id="yubikey-pin-help" class="hidden"></div>
+        </div>
+        <div id="pair-qr-box" class="wallet-qr-wrap hidden"></div>
       </section>
 
-      <section class="wallet-recovery-section hidden">
+      ${
+        onChainAdvanced
+          ? ""
+          : `<section class="wallet-recovery-section hidden">
         <h2>${escapeHtml(t("wallet.recoverySection"))}</h2>
         <p class="field-hint" id="security-email-status">${escapeHtml(t("wallet.recoverEmailLoading"))}</p>
         <p class="field-hint">${escapeHtml(t("wallet.recoveryTimelock", { hours: Math.round(config.recoveryTimelockSeconds / 3600) }))}</p>
@@ -205,14 +192,15 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
               : ""
           }
         </div>
-      </section>
+      </section>`
+      }
       ${
-        isAdvancedMode()
+        isAdvancedMode() && !onChainAdvanced
           ? `<section class="wallet-super-section">
               <h2>${escapeHtml(t("wallet.superWalletTitle"))}</h2>
-              <p class="field-hint">${escapeHtml(onChainAdvanced ? t("wallet.superWalletActiveShort") : t("wallet.superWalletUpgradeShort"))}</p>
+              <p class="field-hint">${escapeHtml(t("wallet.superWalletUpgradeShort"))}</p>
               <div class="cta-row">
-                <a class="tc-btn${onChainAdvanced ? " secondary" : ""}" href="/wallet/super-wallet" data-route>${escapeHtml(onChainAdvanced ? t("wallet.superWalletManage") : t("wallet.superWalletConvertCta"))}</a>
+                <a class="tc-btn" href="/wallet/super-wallet" data-route>${escapeHtml(t("wallet.superWalletConvertCta"))}</a>
               </div>
             </section>`
           : ""
@@ -244,67 +232,22 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
     spaNavigate("/wallet/security#recovery");
   });
 
-  r.querySelector("#invite-teammate-qr")?.addEventListener("click", async () => {
-    const box = r.querySelector<HTMLElement>("#join-qr-box");
-    const btn = r.querySelector<HTMLButtonElement>("#invite-teammate-qr");
-    if (!box) return;
-    setButtonLoading(btn, true);
-    try {
-      const payload = superJoinPayload({ walletAddress: session.address, chainId: session.chainId });
-      const deepLink = superJoinDeepLink(payload);
-      let qrDataUrl = "";
-      try {
-        qrDataUrl = await QRCode.toDataURL(deepLink, {
-          margin: 1,
-          width: 200,
-          color: { dark: "#0a2540", light: "#ffffff" },
-        });
-      } catch {
-        qrDataUrl = "";
-      }
-      box.classList.remove("hidden");
-      box.innerHTML = `
-        <p class="field-hint">${escapeHtml(t("wallet.scanToJoinSuper"))}</p>
-        ${qrDataUrl ? `<img class="wallet-qr-img" src="${qrDataUrl}" alt="" width="200" height="200" />` : ""}
-        <div class="address-box wallet-address-box">
-          <code class="mono wallet-pair-link">${escapeHtml(deepLink)}</code>
-          <button type="button" class="tc-btn secondary small copy-btn" data-copy-text="${escapeHtml(deepLink)}">${escapeHtml(t("wallet.copy"))}</button>
-        </div>`;
-      bindCopyButtons(box);
-    } finally {
-      setButtonLoading(btn, false);
-    }
-  });
-
   r.querySelector("#add-security-key")?.addEventListener("click", async () => {
-    if (onChainAdvanced) return;
     const status = r.querySelector<HTMLElement>("#security-status");
     const btn = r.querySelector<HTMLButtonElement>("#add-security-key");
     setButtonLoading(btn, true);
     try {
       showStatus(status, t("wallet.superWalletEnrollYubiKey"));
-      const key = await createSecurityKey(t("wallet.addSecurityKey"));
+      const key = await createSecurityKey(session.label, { walletLabel: session.label });
       showStatus(status, t("wallet.sendSigning"));
-      const cfg = await fetchWalletConfig();
-      const fee = BigInt(cfg.bundlerFeeUsdc || "0");
-      const { userOp, userOpHash } = await buildSignedAddOwnerUserOp({
-        config: cfg,
-        walletAddress: session.address,
+      await addPasskeySigner({
+        session,
+        advanced: onChainAdvanced,
         qx: key.qx,
         qy: key.qy,
-        feeAmount: fee,
-        credentialId: session.credentialId,
-      });
-      await submitSignedUserOp({ config: cfg, userOp, userOpHash, walletAddress: session.address });
-      const result = await waitForUserOp(userOpHash);
-      if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
-      await registerDevice({
-        walletAddress: session.address,
-        chainId: session.chainId,
-        ownerQx: key.qx,
-        ownerQy: key.qy,
-        label: t("wallet.superWalletKeyYubiKey"),
         credentialId: key.credentialId,
+        label: t("wallet.superWalletKeyYubiKey"),
+        keyType: KEY_YUBIKEY,
       });
       const { upsertWalletSession } = await import("../../shared/wallet-session.js");
       upsertWalletSession({ ...session, securityKeyCredentialId: key.credentialId });
@@ -325,7 +268,6 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
     }
   });
 
-  if (!onChainAdvanced) {
   r.querySelector("#add-device-qr")?.addEventListener("click", async () => {
     const box = r.querySelector<HTMLElement>("#pair-qr-box");
     const btn = r.querySelector<HTMLButtonElement>("#add-device-qr");
@@ -338,6 +280,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
         chainId: session.chainId,
         nonce: pairing.pairing.nonce,
         rpId: window.location.hostname,
+        walletLabel: session.label,
       });
       const deepLink = pairingDeepLink(payload);
       let qrDataUrl = "";
@@ -447,28 +390,16 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
               const status = r.querySelector<HTMLElement>("#security-status");
               try {
                 showStatus(status, t("wallet.sendSigning"));
-                const cfg = await fetchWalletConfig();
-                const fee = BigInt(cfg.bundlerFeeUsdc || "0");
-                const { userOp, userOpHash } = await buildSignedAddOwnerUserOp({
-                  config: cfg,
-                  walletAddress: session.address,
+                await addPasskeySigner({
+                  session,
+                  advanced: onChainAdvanced,
                   qx: p.newOwnerQx!,
                   qy: p.newOwnerQy!,
-                  feeAmount: fee,
-                  credentialId: session.credentialId,
-                });
-                await submitSignedUserOp({ config: cfg, userOp, userOpHash, walletAddress: session.address });
-                const result = await waitForUserOp(userOpHash);
-                if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
-                await consumePairing(nonce);
-                await registerDevice({
-                  walletAddress: session.address,
-                  chainId: session.chainId,
-                  ownerQx: p.newOwnerQx!,
-                  ownerQy: p.newOwnerQy!,
+                  credentialId: p.newOwnerCredentialId ?? null,
                   label: p.deviceLabel ?? "Device",
-                  credentialId: null,
+                  keyType: KEY_WEBAUTHN,
                 });
+                await consumePairing(nonce);
                 closed = true;
                 if (interval != null) clearInterval(interval);
                 await renderWalletSecurity(r, opts);
@@ -485,7 +416,6 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
       setButtonLoading(btn, false);
     }
   });
-  }
 
   if (!onChainAdvanced) {
   r.querySelectorAll("[data-remove]").forEach((btn) => {
@@ -497,13 +427,13 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
         showStatus(status, t("wallet.sendSigning"));
         const cfg = await fetchWalletConfig();
         const fee = BigInt(cfg.bundlerFeeUsdc || "0");
+        const passkey = await resolveCurrentWalletPasskey(session, "remove-key");
         const { userOp, userOpHash } = await buildSignedRemoveOwnerUserOp({
           config: cfg,
-          walletAddress: session.address,
+          passkey,
           qx,
           qy,
           feeAmount: fee,
-          credentialId: session.credentialId,
         });
         await submitSignedUserOp({ config: cfg, userOp, userOpHash, walletAddress: session.address });
         const result = await waitForUserOp(userOpHash);
@@ -518,31 +448,4 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
   }
     }
   );
-}
-
-function renderAdvancedKeys(keys: Awaited<ReturnType<typeof listWalletEntities>>["keys"]): string {
-  if (keys.length === 0) {
-    return `<p class="field-hint">${escapeHtml(t("wallet.superWalletEntitiesEmpty"))}</p>`;
-  }
-  return `<ul class="wallet-device-list">
-    ${keys
-      .map((k) => {
-        const isEoa = k.keyType === 2;
-        const display = isEoa && k.eoa ? k.eoa : formatKeyFingerprint(k.qx ?? "", k.qy);
-        return `<li>
-          <div>
-            <strong>${escapeHtml(isEoa ? t("wallet.keyPublicEoa") : t("wallet.keyPublicPasskey"))}</strong>
-            <span class="mono faint">${escapeHtml(display)}</span>
-          </div>
-          ${
-            !isEoa && k.qx && k.qy
-              ? `<button type="button" class="tc-btn secondary small copy-btn" data-copy-text="${escapeHtml(k.qx + " " + k.qy)}">${escapeHtml(t("wallet.copy"))}</button>`
-              : k.eoa
-                ? `<button type="button" class="tc-btn secondary small copy-btn" data-copy-text="${escapeHtml(k.eoa)}">${escapeHtml(t("wallet.copy"))}</button>`
-                : ""
-          }
-        </li>`;
-      })
-      .join("")}
-  </ul>`;
 }

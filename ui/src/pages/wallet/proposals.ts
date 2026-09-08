@@ -18,14 +18,13 @@ import {
   listProposals,
   prepareProposal,
   signProposal,
-  listWalletEntities,
 } from "../../shared/wallet-advanced-api.js";
 import { fetchWalletConfig, waitForUserOp } from "../../shared/wallet-api.js";
 import { signProposalUserOp } from "../../shared/advanced-userop-client.js";
+import { asAdvancedKeyType, resolveSessionSigningKey } from "../../shared/advanced-signing-key.js";
 import { encodeErc20Transfer, parseUsdcInput } from "../../../../commerce/shared/userop.js";
-import { KEY_EOA } from "../../../../commerce/shared/advanced-wallet.js";
 import { isAdvancedMode } from "../../shared/wallet-mode.js";
-import { connectEoaWallet, getConnectedEoaAddress, initEoaConnector } from "../../shared/eoa-connector.js";
+import { initEoaConnector } from "../../shared/eoa-connector.js";
 
 export async function renderWalletProposals(root: HTMLElement, opts?: WalletRenderOptions): Promise<void> {
   const gen = currentSpaRender();
@@ -176,37 +175,19 @@ async function openProposalDetail(
       setButtonLoading(btn, true);
       try {
         showStatus(status, t("wallet.sendSigning"));
-        const roster = await listWalletEntities(session.address);
-        let myKey =
-          (session.keyId ? roster.keys.find((k) => k.keyId === session.keyId) : null) ??
-          roster.keys.find((k) => k.qx === session.qx && k.qy === session.qy) ??
-          null;
-        if (!myKey) {
-          const connected = await getConnectedEoaAddress();
-          if (connected) {
-            myKey = roster.keys.find(
-              (k) => k.keyType === KEY_EOA && k.eoa?.toLowerCase() === connected.toLowerCase()
-            ) ?? null;
-          }
-        }
-        if (!myKey) {
-          const connected = await connectEoaWallet().catch(() => null);
-          if (connected) {
-            myKey = roster.keys.find(
-              (k) => k.keyType === KEY_EOA && k.eoa?.toLowerCase() === connected.toLowerCase()
-            ) ?? null;
-          }
-        }
-        if (!myKey) throw new Error(t("wallet.superWalletNoSigningKey"));
+        const resolved = await resolveSessionSigningKey(session);
+        if (!resolved) throw new Error(t("wallet.superWalletNoSigningKey"));
+        const myKey = resolved.key;
         const prepared = await prepareProposal(session.address, proposalId);
         const signature = await signProposalUserOp({
           userOpHash: prepared.userOpHash,
+          passkey: resolved.passkey,
           entityId: myKey.entityId,
-          keyType: myKey.keyType,
+          keyType: asAdvancedKeyType(myKey.keyType),
           qx: myKey.qx ?? undefined,
           qy: myKey.qy ?? undefined,
           eoa: myKey.eoa ?? undefined,
-          credentialId: session.credentialId,
+          credentialId: myKey.credentialId ?? session.credentialId,
         });
         await signProposal({
           walletAddress: session.address,

@@ -148,7 +148,11 @@ export async function renderWalletJoinSuper(root: HTMLElement, opts?: WalletRend
         const btn = r.querySelector<HTMLButtonElement>("#join-passkey");
         setButtonLoading(btn, true);
         try {
-          const passkey = await createPasskey(t("wallet.joinSuperPasskeyLabel"), { attachment: "platform" });
+          const email = (r.querySelector<HTMLInputElement>("#join-email")?.value ?? "").trim();
+          const passkey = await createPasskey(email || t("wallet.joinSuperPasskeyLabel"), {
+            attachment: "platform",
+            walletLabel: email || undefined,
+          });
           const fields = passkeyToKeyFields(passkey);
           await enroll(KEY_WEBAUTHN, {
             qx: fields.qx,
@@ -169,7 +173,10 @@ export async function renderWalletJoinSuper(root: HTMLElement, opts?: WalletRend
         const btn = r.querySelector<HTMLButtonElement>("#join-yubikey");
         setButtonLoading(btn, true);
         try {
-          const passkey = await createSecurityKey(t("wallet.joinSuperYubiKeyLabel"));
+          const email = (r.querySelector<HTMLInputElement>("#join-email")?.value ?? "").trim();
+          const passkey = await createSecurityKey(email || t("wallet.joinSuperYubiKeyLabel"), {
+            walletLabel: email || undefined,
+          });
           const fields = passkeyToKeyFields(passkey);
           await enroll(KEY_YUBIKEY, {
             qx: fields.qx,

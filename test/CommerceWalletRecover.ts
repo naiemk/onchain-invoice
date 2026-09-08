@@ -1,6 +1,6 @@
 import { expect } from "chai";
-import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
 import { ethers as ethersLib } from "ethers";
+import { createPasskeyFixture, signPasskeyAssertion } from "./helpers/passkey-fixture.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -29,51 +29,18 @@ const BASE_ENV = {
   TURNSTILE_SECRET: "",
 } as const;
 
-function createPasskeyFixture() {
-  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
-  const spki = publicKey.export({ type: "spki", format: "der" }) as Buffer;
-  const point = spki.subarray(spki.length - 65);
-  expect(point[0]).to.equal(0x04);
-  return {
-    qx: "0x" + point.subarray(1, 33).toString("hex"),
-    qy: "0x" + point.subarray(33, 65).toString("hex"),
-    privateKeyPem: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
-    credentialId: Buffer.from("cred-" + point.subarray(1, 5).toString("hex")).toString("base64"),
-  };
-}
-
 function signAssertion(input: {
   privateKeyPem: string;
   challengeBase64Url: string;
   origin?: string;
   rpId?: string;
 }): { authenticatorData: string; clientDataJSON: string; signature: string } {
-  const origin = input.origin ?? "http://localhost";
-  const rpId = input.rpId ?? "localhost";
-  const clientDataJSON = JSON.stringify({
-    type: "webauthn.get",
-    challenge: input.challengeBase64Url,
-    origin,
-    crossOrigin: false,
+  return signPasskeyAssertion({
+    privateKeyPem: input.privateKeyPem,
+    challengeBase64Url: input.challengeBase64Url,
+    origin: input.origin ?? "http://localhost",
+    rpId: input.rpId ?? "localhost",
   });
-  const authenticatorData = Buffer.concat([
-    createHash("sha256").update(rpId).digest(),
-    Buffer.from([0x05]),
-    Buffer.alloc(4),
-  ]);
-  const signed = Buffer.concat([
-    authenticatorData,
-    createHash("sha256").update(clientDataJSON, "utf8").digest(),
-  ]);
-  const signature = sign("sha256", signed, {
-    key: createPrivateKey(input.privateKeyPem),
-    dsaEncoding: "ieee-p1363",
-  });
-  return {
-    authenticatorData: "0x" + authenticatorData.toString("hex"),
-    clientDataJSON,
-    signature: "0x" + signature.toString("hex"),
-  };
 }
 
 async function withApp(fn: (baseUrl: string) => Promise<void>): Promise<void> {

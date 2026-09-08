@@ -30,11 +30,12 @@ import {
 import {
   buildSignedAddEntityUserOp,
   buildSignedAddKeyUserOp,
-  buildSignedConfigureMultisigUserOp,
   buildSignedEnableAdvancedUserOp,
+  buildSignedSetThresholdUserOp,
   passkeyToKeyFields,
 } from "../../shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "../../shared/userop-client.js";
+import { resolveCurrentWalletPasskey } from "../../shared/current-wallet-passkey.js";
 import { isAdvancedMode } from "../../shared/wallet-mode.js";
 import { connectEoaWallet, initEoaConnector } from "../../shared/eoa-connector.js";
 import type {
@@ -349,14 +350,12 @@ function bindUpgrade(
       showStatus(status, t("wallet.sendSigning"));
       const adminEntityId = hashEntityEmail(email);
       const fee = BigInt(config.bundlerFeeUsdc || "0");
+      const passkey = await resolveCurrentWalletPasskey(session, "enable-advanced");
       const { userOp, userOpHash } = await buildSignedEnableAdvancedUserOp({
         config,
-        walletAddress: session.address,
+        passkey,
         adminEntityId,
-        qx: session.qx,
-        qy: session.qy,
         feeAmount: fee,
-        credentialId: session.credentialId,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
@@ -400,28 +399,11 @@ function bindPolicy(
     try {
       showStatus(status, t("wallet.sendSigning"));
       const fee = BigInt(config.bundlerFeeUsdc || "0");
-      const entityIds = roster.entities.map((e) => e.entityId);
-      const entityIdsForKeys = roster.keys.map((k) => k.entityId);
-      const keyTypes = roster.keys.map((k) => k.keyType);
-      const qx = roster.keys.map((k) => k.qx ?? zeroPadValue("0x00", 32));
-      const qy = roster.keys.map((k) => k.qy ?? zeroPadValue("0x00", 32));
-      const eoa = roster.keys.map((k) => k.eoa ?? zeroPadValue("0x00", 20));
-      const { userOp, userOpHash } = await buildSignedConfigureMultisigUserOp({
+      const passkey = await resolveCurrentWalletPasskey(session, "configure");
+      const { userOp, userOpHash } = await buildSignedSetThresholdUserOp({
         config,
-        walletAddress: session.address,
-        adminEntityId: adminEntity.entityId,
-        adminQx: session.qx,
-        adminQy: session.qy,
-        adminCredentialId: session.credentialId,
-        removeKeyIds: [],
-        entityIds,
-        entityIdsForKeys,
-        keyTypes,
-        qx,
-        qy,
-        eoa,
+        passkey,
         threshold,
-        vetoEntityIds: [],
         feeAmount: fee,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
@@ -457,15 +439,12 @@ function bindEntities(
     try {
       showStatus(status, t("wallet.sendSigning"));
       const fee = BigInt(config.bundlerFeeUsdc || "0");
+      const passkey = await resolveCurrentWalletPasskey(session, "add-entity");
       const { userOp, userOpHash } = await buildSignedAddEntityUserOp({
         config,
-        walletAddress: session.address,
-        adminEntityId: adminEntity.entityId,
+        passkey,
         entityId,
-        qx: session.qx,
-        qy: session.qy,
         feeAmount: fee,
-        credentialId: session.credentialId,
       });
       await submitSignedUserOp({ config, userOp, userOpHash, walletAddress: session.address });
       const result = await waitForUserOp(userOpHash);
@@ -496,7 +475,7 @@ function bindKeyActions(
       const status = root.querySelector<HTMLElement>("#super-status");
       try {
         showStatus(status, t("wallet.superWalletEnrollPasskey"));
-        const passkey = await createPasskey("Super Wallet key", { attachment: "platform" });
+        const passkey = await createPasskey(session.label, { attachment: "platform", walletLabel: session.label });
         const fields = passkeyToKeyFields(passkey);
         await submitAddKey({
           session,
@@ -522,7 +501,7 @@ function bindKeyActions(
       const status = root.querySelector<HTMLElement>("#super-status");
       try {
         showStatus(status, t("wallet.superWalletEnrollYubiKey"));
-        const passkey = await createSecurityKey("Security key");
+        const passkey = await createSecurityKey(session.label, { walletLabel: session.label });
         const fields = passkeyToKeyFields(passkey);
         await submitAddKey({
           session,
@@ -584,13 +563,10 @@ async function submitAddKey(input: {
 }): Promise<void> {
   const fee = BigInt(input.config.bundlerFeeUsdc || "0");
   const keyId = computeKeyId(input.targetEntityId, input.keyType, input.qx, input.qy, input.eoa);
+  const passkey = await resolveCurrentWalletPasskey(input.session, "add-key");
   const { userOp, userOpHash } = await buildSignedAddKeyUserOp({
     config: input.config,
-    walletAddress: input.session.address,
-    adminEntityId: input.adminEntity.entityId,
-    adminQx: input.session.qx,
-    adminQy: input.session.qy,
-    adminCredentialId: input.session.credentialId,
+    passkey,
     targetEntityId: input.targetEntityId,
     keyType: input.keyType,
     qx: input.qx,
