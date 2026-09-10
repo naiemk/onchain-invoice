@@ -35,6 +35,37 @@ function normalizeAddress(address: string): string {
   return address.toLowerCase();
 }
 
+function normalizeHex(value: string | undefined | null): string {
+  return (value ?? "").toLowerCase();
+}
+
+/** Compare session payloads, ignoring lastOpenedAt (heal/persist no-ops). */
+export function walletSessionsEquivalent(a: WalletSession, b: WalletSession): boolean {
+  return (
+    normalizeAddress(a.address) === normalizeAddress(b.address) &&
+    a.chainId === b.chainId &&
+    normalizeHex(a.salt) === normalizeHex(b.salt) &&
+    normalizeHex(a.qx) === normalizeHex(b.qx) &&
+    normalizeHex(a.qy) === normalizeHex(b.qy) &&
+    a.credentialId === b.credentialId &&
+    a.rawId === b.rawId &&
+    a.label === b.label &&
+    (a.role ?? "owner") === (b.role ?? "owner") &&
+    normalizeHex(a.entityId) === normalizeHex(b.entityId) &&
+    normalizeHex(a.keyId) === normalizeHex(b.keyId) &&
+    (a.keyType ?? 0) === (b.keyType ?? 0) &&
+    normalizeHex(a.eoa) === normalizeHex(b.eoa) &&
+    (a.securityKeyCredentialId ?? "") === (b.securityKeyCredentialId ?? "")
+  );
+}
+
+export function isActiveWalletAddress(address: string): boolean {
+  if (typeof localStorage === "undefined") return false;
+  migrateWalletSessionStorage();
+  const active = localStorage.getItem(ACTIVE_KEY);
+  return Boolean(active && normalizeAddress(active) === normalizeAddress(address));
+}
+
 function readRegistryRaw(): WalletSession[] {
   try {
     const raw = localStorage.getItem(REGISTRY_KEY);
@@ -102,12 +133,22 @@ export function addWalletToRegistry(session: WalletSession): void {
 export function upsertWalletSession(session: WalletSession): void {
   migrateWalletSessionStorage();
   const addr = normalizeAddress(session.address);
-  const next: WalletSession = { ...session, address: addr, lastOpenedAt: new Date().toISOString() };
-  const registry = readRegistryRaw().filter((w) => normalizeAddress(w.address) !== addr);
-  registry.unshift(next);
-  writeRegistry(registry);
+  const registry = readRegistryRaw();
+  const existing = registry.find((w) => normalizeAddress(w.address) === addr);
+  const next: WalletSession = {
+    ...session,
+    address: addr,
+    lastOpenedAt: existing?.lastOpenedAt ?? new Date().toISOString(),
+  };
+  const active = localStorage.getItem(ACTIVE_KEY);
+  // Already the open wallet with the same payload — skip write/notify so heal cannot loop.
+  if (active && normalizeAddress(active) === addr && existing && walletSessionsEquivalent(existing, next)) {
+    return;
+  }
+  const updated: WalletSession = { ...next, lastOpenedAt: new Date().toISOString() };
+  writeRegistry([updated, ...registry.filter((w) => normalizeAddress(w.address) !== addr)]);
   localStorage.setItem(ACTIVE_KEY, addr);
-  localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(next));
+  localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(updated));
   notifyWalletSessionChange();
 }
 
@@ -188,6 +229,16 @@ export function clearWalletSession(): void {
 /** Persist session as active + registry entry (create / unlock). */
 export function saveWalletSession(session: WalletSession): void {
   upsertWalletSession({ ...session, role: session.role ?? "owner" });
+}
+
+/**
+ * Update the open wallet in place. No-op if the user locked or switched away,
+ * so in-flight heals cannot restore a previous session.
+ */
+export function saveWalletSessionIfActive(session: WalletSession): boolean {
+  if (!isActiveWalletAddress(session.address)) return false;
+  saveWalletSession(session);
+  return true;
 }
 
 export function shortAddress(address: string): string {

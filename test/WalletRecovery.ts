@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { ethers as ethersLib } from "ethers";
+import { getWalletContractFactory } from "./helpers/wallet-factory.js";
 
 describe("Wallet + pluggable recovery", function () {
   const QX = ethersLib.zeroPadValue("0x01", 32);
@@ -18,7 +19,7 @@ describe("Wallet + pluggable recovery", function () {
     const [owner, guardian, user, attacker] = await ethers.getSigners();
 
     const implName = useHelper ? "WalletTestHelper" : "Wallet";
-    const WalletImpl = await ethers.getContractFactory(implName);
+    const WalletImpl = await getWalletContractFactory(ethers, implName);
     const walletImpl = await WalletImpl.deploy();
 
     const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");

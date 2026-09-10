@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpRight, ChevronDown, ChevronUp, Shield } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronUp, Copy, Share2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,10 +20,17 @@ import { chainLogoSvg, networkShort } from "@/shared/networks.js";
 import { shortAddress } from "@/shared/wallet-session.js";
 import { LOCALES, LOCALE_NATIVE_NAMES } from "@/i18n/locales.js";
 import { listCountries } from "@/pages/create/country.js";
-import { AUTO_VALUE } from "@/pages/create/fiat-rules.js";
 import type { PaymentMode } from "@/shared/types.js";
 import type { PayChrome } from "@/shared/pay-chrome.js";
 import { useCreateForm } from "@/pages/react/create/useCreateForm.js";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function ChainLogo({ chainId, size = 20 }: { chainId: string; size?: number }) {
   return (
@@ -40,6 +47,8 @@ export function CreatePage() {
   const { t } = useLocale();
   const [docsOpen, setDocsOpen] = useState(location.hash === "#docs");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [payLinkOpen, setPayLinkOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const form = useCreateForm();
   const {
     state,
@@ -126,7 +135,12 @@ export function CreatePage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                void handleSubmit();
+                void handleSubmit().then((ok) => {
+                  if (ok) {
+                    setLinkCopied(false);
+                    setPayLinkOpen(true);
+                  }
+                });
               }}
               autoComplete="off"
               className="space-y-6"
@@ -258,13 +272,13 @@ export function CreatePage() {
                   {!skipChainToken && (
                     <div className="space-y-2">
                       <Label>
-                        {paymentMode === "fiat" ? t("create.settlementNetworkLabel") : t("create.networksLabel")}{" "}
+                        {paymentMode !== "crypto" ? t("create.settlementNetworkLabel") : t("create.networksLabel")}{" "}
                         <span className="text-destructive">{t("common.required")}</span>
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        {paymentMode === "fiat" ? t("create.settlementNetworkHint") : t("create.networksHint")}
+                        {paymentMode !== "crypto" ? t("create.settlementNetworkHint") : t("create.networksHint")}
                       </p>
-                      {paymentMode === "fiat" && (
+                      {paymentMode !== "crypto" && (
                         <p className="text-sm text-muted-foreground">{t("create.fiatNetworksLockedHint")}</p>
                       )}
                       <div className="flex flex-wrap gap-2" role="group" aria-label={t("create.networksAria")}>
@@ -523,73 +537,6 @@ export function CreatePage() {
                           ))}
                         </datalist>
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="quotePaymentMethod">{t("create.quoteMethodLabel")}</Label>
-                        <Select
-                          value={state.quotePaymentMethod || AUTO_VALUE}
-                          onValueChange={(v) =>
-                            onFiatFieldChange("paymentMethod", (prev) => ({ ...prev, quotePaymentMethod: v }))
-                          }
-                        >
-                          <SelectTrigger id="quotePaymentMethod">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={AUTO_VALUE}>{t("create.quoteMethodAuto")}</SelectItem>
-                            {state.quotePaymentMethods.map((m) => (
-                              <SelectItem key={m.id} value={m.id}>
-                                {m.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="quoteProvider">{t("create.quoteProviderLabel")}</Label>
-                        <Select
-                          value={state.quoteProvider || AUTO_VALUE}
-                          onValueChange={(v) =>
-                            onFiatFieldChange("provider", (prev) => ({ ...prev, quoteProvider: v }))
-                          }
-                        >
-                          <SelectTrigger id="quoteProvider">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={AUTO_VALUE}>{t("create.quoteProviderAuto")}</SelectItem>
-                            {state.quoteProviders.map((q) => (
-                              <SelectItem key={q.provider} value={q.provider}>
-                                {q.provider} · {q.cryptoAmount} {state.quotedToken ?? "USDC"}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="quoteSlippagePct">{t("create.quoteSlippageLabel")}</Label>
-                        <p className="text-sm text-muted-foreground">{t("create.quoteSlippageHint")}</p>
-                        <Input
-                          id="quoteSlippagePct"
-                          inputMode="decimal"
-                          placeholder="1"
-                          value={state.quoteSlippagePct}
-                          onChange={(e) =>
-                            onFiatFieldChange("drift", (prev) => ({ ...prev, quoteSlippagePct: e.target.value }))
-                          }
-                        />
-                      </div>
-
-                      {state.fiatChargePreview && (
-                        <Alert variant="ok">
-                          <AlertDescription>{state.fiatChargePreview}</AlertDescription>
-                        </Alert>
-                      )}
-                      {state.fiatQuoteStatus && (
-                        <p className="text-sm text-muted-foreground">{state.fiatQuoteStatus}</p>
-                      )}
                     </div>
                   )}
                 </div>
@@ -738,6 +685,56 @@ ${t("create.docsStatusLine")}`}</pre>
           )}
         </Card>
       </section>
+
+      <Dialog open={payLinkOpen} onOpenChange={setPayLinkOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("create.payLinkReadyTitle")}</DialogTitle>
+            <DialogDescription>{t("create.payLinkReadyLede")}</DialogDescription>
+          </DialogHeader>
+          <Input readOnly value={preview?.link ?? ""} className="font-mono text-xs" />
+          <DialogFooter className="flex-row gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                void copyPayLink().then(() => setLinkCopied(true));
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {linkCopied ? t("create.payLinkCopied") : t("create.copyPayLink")}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                void (async () => {
+                  if (!preview?.link) return;
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({
+                        title: t("brand"),
+                        text: preview.link,
+                        url: preview.link,
+                      });
+                      return;
+                    }
+                  } catch {
+                    /* ignore cancel */
+                  }
+                  await copyPayLink();
+                  setLinkCopied(true);
+                })();
+              }}
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              {t("create.sharePayLink")}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setPayLinkOpen(false)}>
+              {t("common.close")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

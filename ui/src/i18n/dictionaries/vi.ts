@@ -403,7 +403,8 @@ export const vi = {
     paymentModeFiatTitle: "Chỉ thẻ hoặc ngân hàng",
     paymentModeFiatHint: "Khách không bao giờ thấy địa chỉ crypto. Vẫn tất toán thành USDC/USDT trên một mạng.",
     settlementNetworkLabel: "Mạng tất toán",
-    settlementNetworkHint: "Ethereum, Base và Tron bắt buộc cho thẻ/ngân hàng (bật Revolut Pay và hơn thế). Bạn có thể thêm các đường ray khác do Onramper hỗ trợ.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "Thu ~{amount} {fiat}",
     settlePreview: "Bạn nhận ~{amount} {token}",
     fiatPayLabel: "Khách thanh toán",
@@ -501,7 +502,8 @@ export const vi = {
 
   pay: {
     faucetTitle: "Faucet testnet",
-    faucetHint: "Sandbox Onramper không nạp địa chỉ testnet. Nhập bí mật faucet của operator để gửi số tiền tất toán on-chain để sweeper hoàn tất thanh toán.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "Bí mật faucet",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "Nạp hóa đơn (testnet)",
@@ -787,4 +789,4 @@ export const vi = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

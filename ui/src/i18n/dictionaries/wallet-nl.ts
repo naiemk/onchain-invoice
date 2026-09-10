@@ -176,6 +176,24 @@ export const walletNl = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "Je wallets op dit apparaat",
   chooseWalletLede:
     "Selecteer een wallet om te openen. Elke is aangemaakt met een passkey in deze browser.",
@@ -289,8 +307,8 @@ export const walletNl = {
     "Koop USDC of USDT met een kaart of overschrijving. Crypto gaat rechtstreeks naar je wallet — geen factuur-sweep.",
   depositFiatLabel: "Je betaalt met",
   depositContinue: "Doorgaan naar checkout",
-  depositHint:
-    "Onramper kiest de beste aanbieder voor je regio. Ondersteunde stables: USDC en USDT waar beschikbaar.",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "Sandboxmodus — geen echte afschrijving en geen on-chain-storting.",
   depositLoading: "Checkout laden…",
   depositIframeTitle: "Stortingscheckout",
@@ -299,14 +317,14 @@ export const walletNl = {
   depositFailed: "Stortingscheckout kon niet worden gestart",
   withdrawCta: "Naar bank / kaart",
   withdrawTitle: "Uitbetalen naar bank of kaart",
-  withdrawLede:
-    "Verkoop USDC of USDT vanuit je wallet. Je bevestigt het verzenden met je passkey wanneer Onramper klaar is.",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "Uitbetalen naar",
   withdrawContinue: "Doorgaan naar uitbetalen",
   withdrawHint:
     "Nadat je een aanbieder kiest, vragen we je om te bevestigen dat je crypto vanuit deze wallet verstuurt.",
-  withdrawSandboxNote:
-    "Sandboxmodus — de verkoopflow is een lokale stub tot Onramper-sleutels zijn geconfigureerd.",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "Uitbetalen laden…",
   withdrawIframeTitle: "Uitbetaalcheckout",
   withdrawUnavailable: "Kaart- en bankuitbetaling is niet ingeschakeld op deze instantie.",

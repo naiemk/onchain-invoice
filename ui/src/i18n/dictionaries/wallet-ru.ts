@@ -176,6 +176,24 @@ export const walletRu = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "Ваши кошельки на этом устройстве",
   chooseWalletLede: "Выберите кошелёк для открытия. Каждый создан с passkey в этом браузере.",
   balanceLoading: "…",
@@ -292,8 +310,8 @@ export const walletRu = {
     "Купите USDC или USDT картой или банковским переводом. Криптовалюта поступит сразу на ваш кошелёк — без свипа счёта.",
   depositFiatLabel: "Оплата",
   depositContinue: "Перейти к оплате",
-  depositHint:
-    "Onramper выбирает лучшего провайдера для вашего региона. Поддерживаемые стейблкоины: USDC и USDT там, где доступны.",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "Режим песочницы — без реального списания и без ончейн-зачисления.",
   depositLoading: "Загрузка оплаты…",
   depositIframeTitle: "Оплата пополнения",
@@ -302,14 +320,14 @@ export const walletRu = {
   depositFailed: "Не удалось начать оплату пополнения",
   withdrawCta: "На карту / в банк",
   withdrawTitle: "Вывести на карту или в банк",
-  withdrawLede:
-    "Продайте USDC или USDT из кошелька. Отправку подтвердите passkey, когда Onramper будет готов.",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "Вывести на",
   withdrawContinue: "Перейти к выводу",
   withdrawHint:
     "После выбора провайдера мы попросим подтвердить отправку криптовалюты с этого кошелька.",
-  withdrawSandboxNote:
-    "Режим песочницы — поток продажи локальный, пока не настроены ключи Onramper.",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "Загрузка вывода…",
   withdrawIframeTitle: "Оформление вывода",
   withdrawUnavailable: "Вывод на карту и в банк на этом экземпляре не включён.",

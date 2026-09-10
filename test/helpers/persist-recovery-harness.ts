@@ -9,6 +9,7 @@ import { resetRateLimitBuckets } from "../../commerce/server/rate-limit.js";
 import { SweeperWorker, type SweeperConfig } from "../../commerce/sweeper/worker.js";
 import { WalletDeployerWorker, type WalletDeployerConfig } from "../../commerce/wallet-deployer/worker.js";
 import { deriveWalletSalt, predictWalletAddress } from "../../commerce/shared/wallet-address.js";
+import { getWalletContractFactory } from "./wallet-factory.js";
 import { ENTRYPOINT_V09, ERC7821_BATCH_MODE, encodeBatch, encodeErc20Transfer } from "../../commerce/shared/userop.js";
 
 export const HH_DEPLOYER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
@@ -130,7 +131,7 @@ export async function deployPersistRecoveryStack(ethers: {
   const sweeper = await ethers.getContractAt("CommerceInvoiceSweeper", sweeperAddress);
   const forwarderImplementation = await (sweeper as { forwarderImplementation: () => Promise<string> }).forwarderImplementation();
 
-  const WalletImpl = await ethers.getContractFactory("Wallet");
+  const WalletImpl = await getWalletContractFactory(ethers, "Wallet");
   const walletImpl = await WalletImpl.deploy();
   await walletImpl.waitForDeployment?.();
   const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");

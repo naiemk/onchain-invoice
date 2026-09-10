@@ -8,8 +8,9 @@ import {
   KEY_EOA,
   KEY_YUBIKEY,
   KEY_WEBAUTHN,
-  signEoaPersonalDigest,
 } from "../commerce/shared/advanced-wallet.js";
+import { signEoaUserOpTypedData } from "../commerce/shared/wallet-eip712.js";
+import { getWalletContractFactory } from "./helpers/wallet-factory.js";
 import { encodeWebAuthnSignatureFromJson } from "../commerce/shared/webauthn-signature.js";
 import {
   ERC7821_BATCH_MODE,
@@ -40,7 +41,7 @@ describe("Wallet advanced entity M-of-N", function () {
     const QX = zeroPadValue("0x01", 32);
     const QY = zeroPadValue("0x02", 32);
 
-    const Helper = await ethers.getContractFactory("WalletAdvancedTestHelper");
+    const Helper = await getWalletContractFactory(ethers, "WalletAdvancedTestHelper");
     const walletImpl = await Helper.deploy();
     const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
     const recovery = await Recovery.deploy(owner.address, owner.address);
@@ -57,6 +58,12 @@ describe("Wallet advanced entity M-of-N", function () {
     const wallet = await ethers.getContractAt("WalletAdvancedTestHelper", walletAddress);
 
     return { ethers, wallet, owner, eoaA, eoaB, eoaC, eoaVeto, QX, QY };
+  }
+
+  async function signEoa(wallet: { getAddress: () => Promise<string> }, ethers: any, privateKey: string, digest: string) {
+    const walletAddress = await wallet.getAddress();
+    const { chainId } = await ethers.provider.getNetwork();
+    return signEoaUserOpTypedData(privateKey, walletAddress, digest, BigInt(chainId));
   }
 
   async function selfSigner(ethers: any, wallet: { getAddress: () => Promise<string> }) {
@@ -108,8 +115,8 @@ describe("Wallet advanced entity M-of-N", function () {
     await wallet.exposedSetThreshold(2);
 
     const digest = ethers.id("user-op-hash");
-    const sigA = await signEoaPersonalDigest(HARDHAT_KEYS[1], digest);
-    const sigB = await signEoaPersonalDigest(HARDHAT_KEYS[2], digest);
+    const sigA = await signEoa(wallet, ethers, HARDHAT_KEYS[1], digest);
+    const sigB = await signEoa(wallet, ethers, HARDHAT_KEYS[2], digest);
 
     const packed = encodeAdvancedSignature([
       { keyId: keyA, sig: sigA },
@@ -117,7 +124,7 @@ describe("Wallet advanced entity M-of-N", function () {
     ]);
     expect(await wallet.exposedValidateAdvanced(digest, packed)).to.equal(true);
 
-    const sigC = await signEoaPersonalDigest(HARDHAT_KEYS[3], digest);
+    const sigC = await signEoa(wallet, ethers, HARDHAT_KEYS[3], digest);
     const onlyOne = encodeAdvancedSignature([{ keyId: keyC, sig: sigC }]);
     expect(await wallet.exposedValidateAdvanced(digest, onlyOne)).to.equal(false);
   });
@@ -135,15 +142,15 @@ describe("Wallet advanced entity M-of-N", function () {
     await wallet.exposedSetVeto(ENTITY_VETO, true);
 
     const digest = ethers.id("veto-test");
-    const sigA = await signEoaPersonalDigest(HARDHAT_KEYS[1], digest);
-    const sigB = await signEoaPersonalDigest(HARDHAT_KEYS[2], digest);
+    const sigA = await signEoa(wallet, ethers, HARDHAT_KEYS[1], digest);
+    const sigB = await signEoa(wallet, ethers, HARDHAT_KEYS[2], digest);
     const withoutVeto = encodeAdvancedSignature([
       { keyId: computeKeyId(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress()), sig: sigA },
       { keyId: computeKeyId(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress()), sig: sigB },
     ]);
     expect(await wallet.exposedValidateAdvanced(digest, withoutVeto)).to.equal(false);
 
-    const sigV = await signEoaPersonalDigest(HARDHAT_KEYS[4], digest);
+    const sigV = await signEoa(wallet, ethers, HARDHAT_KEYS[4], digest);
     const withVeto = encodeAdvancedSignature([
       { keyId: computeKeyId(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress()), sig: sigA },
       { keyId: computeKeyId(ENTITY_VETO, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaVeto.getAddress()), sig: sigV },
@@ -190,8 +197,8 @@ describe("Wallet advanced entity M-of-N", function () {
     await wallet.exposedSetThreshold(2);
 
     const digest = ethers.id("gas-compare");
-    const sigA = await signEoaPersonalDigest(HARDHAT_KEYS[1], digest);
-    const sigB = await signEoaPersonalDigest(HARDHAT_KEYS[2], digest);
+    const sigA = await signEoa(wallet, ethers, HARDHAT_KEYS[1], digest);
+    const sigB = await signEoa(wallet, ethers, HARDHAT_KEYS[2], digest);
     const packed = encodeAdvancedSignature([
       { keyId: computeKeyId(ADMIN_ENTITY, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaA.getAddress()), sig: sigA },
       { keyId: computeKeyId(ENTITY_B, KEY_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), await eoaB.getAddress()), sig: sigB },
@@ -275,7 +282,7 @@ describe("Wallet advanced entity M-of-N", function () {
     expect(await token.balanceOf(RECIPIENT)).to.equal(sendAmount);
 
     const digest = ethers.id("advanced-userop-hash");
-    const sig = await signEoaPersonalDigest(HARDHAT_KEYS[1], digest);
+    const sig = await signEoa(wallet, ethers, HARDHAT_KEYS[1], digest);
     const keyId = computeKeyId(
       ADMIN_ENTITY,
       KEY_EOA,
@@ -291,7 +298,7 @@ describe("Wallet advanced entity M-of-N", function () {
     const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
     const [owner] = await ethers.getSigners();
     const passkey = p256Passkey();
-    const Helper = await ethers.getContractFactory("WalletAdvancedTestHelper");
+    const Helper = await getWalletContractFactory(ethers, "WalletAdvancedTestHelper");
     const walletImpl = await Helper.deploy();
     const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
     const recovery = await Recovery.deploy(owner.address, owner.address);

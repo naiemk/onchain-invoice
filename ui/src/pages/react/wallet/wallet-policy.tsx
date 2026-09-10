@@ -19,7 +19,7 @@ const WalletPolicyContext = createContext<WalletPolicyValue>({
 export function WalletPolicyProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState(() => loadWalletSession()?.address ?? null);
   const [policy, setPolicy] = useState<AdvancedPolicy | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(loadWalletSession()));
 
   useEffect(() => {
     const sync = () => setAddress(loadWalletSession()?.address ?? null);
@@ -31,6 +31,7 @@ export function WalletPolicyProvider({ children }: { children: ReactNode }) {
     const sess = loadWalletSession();
     if (!sess) {
       setPolicy(null);
+      setLoading(false);
       return;
     }
     setLoading(true);

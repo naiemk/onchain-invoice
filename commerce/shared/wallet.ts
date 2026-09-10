@@ -275,6 +275,8 @@ export type WalletRecoveryRequestStatus =
   | "rejected"
   | "archived";
 
+export type WalletRecoveryNewOwnerKind = "webauthn" | "yubikey" | "eoa";
+
 export interface WalletRecoveryRequestRecord {
   id: string;
   walletAddress: string;
@@ -283,6 +285,8 @@ export interface WalletRecoveryRequestRecord {
   newQy: string;
   credentialId: string;
   deviceLabel: string | null;
+  newOwnerKind: WalletRecoveryNewOwnerKind;
+  newEoa: string | null;
   status: WalletRecoveryRequestStatus;
   emailVerifiedAt: string | null;
   captchaOkAt: string | null;
@@ -295,6 +299,10 @@ export interface WalletRecoveryRequestRecord {
 }
 
 export type HostedRecoveryChallengePurpose = "attach" | "recover" | "cancel" | "record";
+
+export function recoveryNewOwnerMessage(challenge: string): string {
+  return ["Trustless Commerce wallet recovery", `Challenge: ${challenge}`].join("\n");
+}
 
 export interface HostedRecoveryChallengeRecord {
   id: string;

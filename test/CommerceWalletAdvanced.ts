@@ -11,9 +11,9 @@ import {
   computeKeyId,
   encodeAdvancedSignature,
   KEY_EOA,
-  signEoaPersonalDigest,
   unwrapAdvancedInnerSig,
 } from "../commerce/shared/advanced-wallet.js";
+import { signEoaUserOpTypedData } from "../commerce/shared/wallet-eip712.js";
 import { encodeErc20Transfer } from "../commerce/shared/userop.js";
 
 const FACTORY = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
@@ -154,7 +154,7 @@ describe("commerce wallet advanced API", function () {
       expect(prepare.status).to.equal(503);
 
       const digest = ethersLib.id("proposal-sign-test");
-      const sig = await signEoaPersonalDigest(HARDHAT_EOA_KEY, digest);
+      const sig = await signEoaUserOpTypedData(HARDHAT_EOA_KEY, wallet, digest, 11155111n);
       const sign = await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}/sign`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -227,7 +227,7 @@ describe("commerce wallet advanced API", function () {
         });
         const { proposal } = (await create.json()) as { proposal: { id: string } };
 
-        const sig = await signEoaPersonalDigest(HARDHAT_EOA_KEY, ethersLib.id("exec-test"));
+        const sig = await signEoaUserOpTypedData(HARDHAT_EOA_KEY, wallet, ethersLib.id("exec-test"), 11155111n);
         await fetch(`${baseUrl}/api/wallet/${wallet}/proposals/${proposal.id}/sign`, {
           method: "POST",
           headers: { "content-type": "application/json" },

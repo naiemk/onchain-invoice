@@ -189,7 +189,7 @@ export const walletFaPatches = {
   superWalletAddPasskey: "افزودن کلید عبور",
   superWalletAddYubiKey: "افزودن کلید امنیتی",
   superWalletConnectWallet: "اتصال کیف پول",
-  superWalletConnectWalletHint: "MetaMask یا WalletConnect را متصل کنید…",
+  superWalletConnectWalletHint: "با MetaMask یا WalletConnect امضا کنید تا این آدرس به‌عنوان مالک اضافه شود.",
   superWalletEnrollPasskey: "ایجاد کلید عبور برای این موجودیت…",
   superWalletEnrollYubiKey: "کلید امنیتی را وارد یا لمس کنید…",
   superWalletKeyPasskey: "کلید عبور",

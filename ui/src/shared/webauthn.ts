@@ -3,7 +3,7 @@ import { credentialIdToBytes, credentialIdsMatch } from "./credential-id.js";
 import { formatPasskeyName, inferDeviceLabel } from "./passkey-name.js";
 import {
   listWalletRegistry,
-  upsertWalletSession,
+  saveWalletSessionIfActive,
   type WalletSession,
 } from "./wallet-session.js";
 import { t } from "../i18n/t.js";
@@ -397,9 +397,7 @@ export async function ensureSessionCredential(session: WalletSession): Promise<W
     (w) => w.address.toLowerCase() === session.address.toLowerCase() && w.credentialId?.trim()
   );
   if (reg?.credentialId) {
-    const next = { ...session, credentialId: reg.credentialId, rawId: reg.rawId || session.rawId };
-    upsertWalletSession(next);
-    return next;
+    return { ...session, credentialId: reg.credentialId, rawId: reg.rawId || session.rawId };
   }
 
   return session;
@@ -410,7 +408,7 @@ export function syncSessionCredentialId(session: WalletSession, rawId: ArrayBuff
   const credentialId = credentialIdFromRawId(rawId);
   if (session.credentialId === credentialId) return session;
   const next = { ...session, credentialId, rawId: bufferToHex(rawId) };
-  upsertWalletSession(next);
+  saveWalletSessionIfActive(next);
   return next;
 }
 

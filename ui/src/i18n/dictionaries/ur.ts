@@ -403,7 +403,8 @@ export const ur = {
     paymentModeFiatTitle: "صرف کارڈ یا بینک",
     paymentModeFiatHint: "گاہک کرپٹو پتہ نہیں دیکھتا۔ پھر بھی ایک نیٹ ورک پر USDC/USDT کے طور پر تصفیہ ہوتا ہے۔",
     settlementNetworkLabel: "تصفیہ نیٹ ورکس",
-    settlementNetworkHint: "کارڈ/بینک کے لیے Ethereum، Base اور Tron لازمی ہیں (Revolut Pay اور مزید فعال کرتے ہیں)۔ آپ دیگر Onramper معاون ریلز شامل کر سکتے ہیں۔",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "چارج ~{amount} {fiat}",
     settlePreview: "آپ وصول کرتے ہیں ~{amount} {token}",
     fiatPayLabel: "گاہک ادا کرتا ہے",
@@ -500,7 +501,8 @@ export const ur = {
 
   pay: {
     faucetTitle: "ٹیسٹ نیٹ فوسٹ",
-    faucetHint: "Onramper سینڈ باکس ٹیسٹ نیٹ پتوں کو فنڈ نہیں کرتا۔ تصفیہ کی رقم آن چین بھیجنے کے لیے آپریٹر فوسٹ سیکریٹ درج کریں تاکہ سویپر ادائیگی مکمل کر سکے۔",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "فوسٹ سیکریٹ",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "انوائس فنڈ کریں (ٹیسٹ نیٹ)",
@@ -786,4 +788,4 @@ export const ur = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

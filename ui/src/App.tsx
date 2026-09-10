@@ -12,6 +12,7 @@ import { SecurityPage } from "@/pages/react/SecurityPage";
 import { IntegrationsPage } from "@/pages/react/IntegrationsPage";
 import { CreatePage } from "@/pages/react/CreatePage";
 import { PayPage } from "@/pages/react/PayPage";
+import { BuyPage } from "@/pages/react/BuyPage";
 import { MerchantPage } from "@/pages/react/MerchantPage";
 import { DevelopersPage } from "@/pages/react/DevelopersPage";
 import { AdminPage } from "@/pages/react/AdminPage";
@@ -44,6 +45,8 @@ function pageMeta(path: string, t: (key: MessageKey) => string): { title: string
       return { title: t("meta.createTitle"), description: t("meta.createDescription") };
     case "/pay":
       return { title: t("meta.payTitle"), description: t("meta.payDescription") };
+    case "/buy":
+      return { title: t("buy.metaTitle"), description: t("buy.metaDescription") };
     case "/merchant":
       return { title: t("meta.merchantTitle"), description: t("meta.merchantDescription") };
     case "/integrations":
@@ -113,7 +116,10 @@ function AppRoutes() {
   useFocusMainOnNavigate();
   useHashScroll();
 
-  const chrome = location.pathname === "/pay" ? currentPayChromeFromLocation() : "full";
+  const chrome =
+    location.pathname === "/pay" || location.pathname === "/buy"
+      ? currentPayChromeFromLocation()
+      : "full";
 
   return (
     <AppShell chrome={chrome}>
@@ -124,6 +130,7 @@ function AppRoutes() {
         <Route path="/integrations" element={<IntegrationsPage />} />
         <Route path="/create" element={<CreatePage />} />
         <Route path="/pay" element={<PayPage />} />
+        <Route path="/buy" element={<BuyPage />} />
         <Route path="/merchant" element={<MerchantPage />} />
         <Route path="/merchant/*" element={<MerchantPage />} />
         <Route path="/developers" element={<DevelopersPage />} />

@@ -7,6 +7,7 @@ import {
   encodeErc20Transfer,
   buildFeeTransferCall,
 } from "../commerce/shared/userop.js";
+import { getWalletContractFactory } from "./helpers/wallet-factory.js";
 
 describe("Wallet userOp batch (fee + transfer)", function () {
   const ENTRYPOINT = "0x433709009B8330FDa32311DF1C2AFA402eD8D009";
@@ -20,7 +21,7 @@ describe("Wallet userOp batch (fee + transfer)", function () {
     const QY = zeroPadValue("0x02", 32);
     const TIMELOCK = 3600n;
 
-    const WalletImpl = await ethers.getContractFactory("Wallet");
+    const WalletImpl = await getWalletContractFactory(ethers, "Wallet");
     const walletImpl = await WalletImpl.deploy();
     const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
     const recovery = await Recovery.deploy(owner.address, owner.address);

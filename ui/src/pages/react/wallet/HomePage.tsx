@@ -23,7 +23,9 @@ import {
   listWalletRegistry,
   listWalletRegistryForDeployment,
   loadWalletSession,
+  isActiveWalletAddress,
   shortAddress,
+  walletSessionsEquivalent,
   WALLET_SESSION_EVENT,
   type WalletSession,
 } from "@/shared/wallet-session.js";
@@ -98,10 +100,12 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
 
   useEffect(() => {
     let cancelled = false;
+    const target = initialSession;
     void (async () => {
       try {
-        const healed = await healWalletSession(initialSession);
+        const healed = await healWalletSession(target);
         if (cancelled) return;
+        if (!isActiveWalletAddress(target.address)) return;
         setSession(healed.session);
         if (healed.needsSuperWalletEmail) {
           setHealNotice(t("wallet.superWalletRestoreEmailHint"));
@@ -113,7 +117,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
     return () => {
       cancelled = true;
     };
-  }, [initialSession, t]);
+  }, [initialSession.address, t]);
 
   const loadBalance = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -411,10 +415,10 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
 
 function AnotherWalletMenu({
   disabled,
-  onRecover,
+  onRelink,
 }: {
   disabled?: boolean;
-  onRecover: () => void;
+  onRelink: () => void;
 }) {
   const { t } = useLocale();
   const navigate = useNavigate();
@@ -430,7 +434,10 @@ function AnotherWalletMenu({
         <DropdownMenuItem onClick={() => navigate("/wallet/pair")}>
           {t("wallet.pairWithAnotherDevice")}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onRecover}>{t("wallet.recoverExistingOnDevice")}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/wallet/recover")}>
+          {t("wallet.recoverExistingOnDevice")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onRelink}>{t("wallet.relinkThisDevice")}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -567,7 +574,7 @@ function WalletPicker({
         <Button asChild variant="outline">
           <Link to="/wallet/create">{t("wallet.createAnother")}</Link>
         </Button>
-        <AnotherWalletMenu disabled={Boolean(openingAddress) || addingPasskey} onRecover={() => openRecovery()} />
+        <AnotherWalletMenu disabled={Boolean(openingAddress) || addingPasskey} onRelink={() => openRecovery()} />
       </div>
       <p className="mt-4 text-sm text-muted-foreground">{t("wallet.addWalletFromPasskeyHint")}</p>
       {status && (
@@ -635,7 +642,7 @@ function WalletEmpty({ onOpened }: { onOpened: () => void }) {
               {busy ? t("wallet.sendSigning") : t("wallet.unlock")}
             </Button>
             <p className="text-xs text-muted-foreground">{t("wallet.pairFromOtherHint")}</p>
-            <AnotherWalletMenu disabled={busy} onRecover={() => setRecoveryOpen(true)} />
+            <AnotherWalletMenu disabled={busy} onRelink={() => setRecoveryOpen(true)} />
           </CardContent>
         </Card>
       </div>
@@ -675,7 +682,13 @@ export function HomePage() {
     [session, deploymentIsTestnet]
   );
 
-  const refresh = useCallback(() => setSession(loadWalletSession()), []);
+  const refresh = useCallback(() => {
+    setSession((prev) => {
+      const next = loadWalletSession();
+      if (!prev || !next) return next;
+      return walletSessionsEquivalent(prev, next) ? prev : next;
+    });
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -687,7 +700,7 @@ export function HomePage() {
     return () => window.removeEventListener(WALLET_SESSION_EVENT, handler);
   }, [refresh]);
 
-  if (session) return <WalletDashboard session={session} />;
+  if (session) return <WalletDashboard key={session.address} session={session} />;
   if (registry.length > 0) return <WalletPicker registry={registry} onOpened={refresh} />;
   if (allRegistry.length > 0) {
     return <WalletNetworkMismatch count={allRegistry.length} deploymentIsTestnet={deploymentIsTestnet} />;

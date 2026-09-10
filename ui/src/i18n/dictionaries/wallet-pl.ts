@@ -176,6 +176,24 @@ export const walletPl = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "Twoje portfele na tym urządzeniu",
   chooseWalletLede: "Wybierz portfel do otwarcia. Każdy utworzono z passkey w tej przeglądarce.",
   balanceLoading: "…",
@@ -290,8 +308,8 @@ export const walletPl = {
     "Kup USDC lub USDT kartą albo przelewem. Krypto trafia bezpośrednio do portfela — bez sweepu faktury.",
   depositFiatLabel: "Płacisz",
   depositContinue: "Przejdź do kasy",
-  depositHint:
-    "Onramper wybiera najlepszego dostawcę dla Twojego regionu. Obsługiwane stablecoiny: USDC i USDT, gdzie dostępne.",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "Tryb sandbox — bez realnej opłaty i bez zasilenia on-chain.",
   depositLoading: "Ładowanie kasy…",
   depositIframeTitle: "Kasa wpłaty",
@@ -300,13 +318,13 @@ export const walletPl = {
   depositFailed: "Nie udało się uruchomić kasy wpłaty",
   withdrawCta: "Na konto / kartę",
   withdrawTitle: "Wypłata na konto lub kartę",
-  withdrawLede:
-    "Sprzedaj USDC lub USDT z portfela. Potwierdzisz wysyłkę passkey, gdy Onramper będzie gotowy.",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "Wypłać na",
   withdrawContinue: "Przejdź do wypłaty",
   withdrawHint: "Po wyborze dostawcy poprosimy o potwierdzenie wysyłki krypto z tego portfela.",
-  withdrawSandboxNote:
-    "Tryb sandbox — przepływ sprzedaży to lokalna zaślepka, dopóki nie skonfigurujesz kluczy Onramper.",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "Ładowanie wypłaty…",
   withdrawIframeTitle: "Kasa wypłaty",
   withdrawUnavailable: "Wypłata na kartę i konto nie jest włączona w tej instancji.",

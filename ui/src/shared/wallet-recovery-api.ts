@@ -1,5 +1,14 @@
 import { apiUrl } from "./site.js";
 
+export type RecoveryExistingOwner = {
+  address: string;
+  advanced: boolean;
+  entityId: string | null;
+  keyId: string | null;
+  threshold: number;
+  eoa: string;
+};
+
 export type RecoveryRequestPublic = {
   id: string;
   walletAddress: string;
@@ -8,6 +17,8 @@ export type RecoveryRequestPublic = {
   newQy: string;
   credentialId: string;
   deviceLabel: string | null;
+  newOwnerKind?: "webauthn" | "yubikey" | "eoa";
+  newEoa?: string | null;
   status: string;
   emailVerifiedAt: string | null;
   guardianAddress: string | null;
@@ -16,6 +27,12 @@ export type RecoveryRequestPublic = {
   chainId: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type RecoveryEmailWallet = {
+  address: string;
+  createdAt: string;
+  activeRecovery: boolean;
 };
 
 async function readError(res: Response): Promise<string> {
@@ -109,23 +126,80 @@ export async function verifyWalletEmailOtp(input: {
 
 export async function createRecoveryRequest(input: {
   walletAddress?: string;
+  walletAddresses?: string[];
   email?: string;
+  emailSession?: string;
   challengeId: string;
-  ownerQx: string;
-  ownerQy: string;
-  credentialId: string;
+  ownerQx?: string;
+  ownerQy?: string;
+  credentialId?: string;
+  ownerKind?: "webauthn" | "yubikey" | "eoa";
+  eoaAddress?: string;
+  eoaSignature?: string;
   label?: string;
-  assertion: unknown;
+  assertion?: unknown;
   captchaToken?: string | null;
   chainId?: string;
-}): Promise<{ request: RecoveryRequestPublic; otpSent: boolean }> {
+}): Promise<{
+  request: RecoveryRequestPublic | null;
+  requests: RecoveryRequestPublic[];
+  otpSent: boolean;
+  existingOwner?: boolean;
+  existingOwners?: RecoveryExistingOwner[];
+  advanced?: boolean;
+  entityId?: string | null;
+  keyId?: string | null;
+}> {
   const res = await fetch(apiUrl("/api/wallet/recovery/requests"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await readError(res));
-  return res.json() as Promise<{ request: RecoveryRequestPublic; otpSent: boolean }>;
+  return res.json() as Promise<{
+    request: RecoveryRequestPublic | null;
+    requests: RecoveryRequestPublic[];
+    otpSent: boolean;
+    existingOwner?: boolean;
+    existingOwners?: RecoveryExistingOwner[];
+    advanced?: boolean;
+    entityId?: string | null;
+    keyId?: string | null;
+  }>;
+}
+
+export async function startRecoveryEmailLookup(input: {
+  email: string;
+  captchaToken?: string | null;
+}): Promise<void> {
+  const res = await fetch(apiUrl("/api/wallet/recovery/email/start"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+}
+
+export async function verifyRecoveryEmailLookup(input: {
+  email: string;
+  code: string;
+  captchaToken?: string | null;
+}): Promise<{ emailSession: string }> {
+  const res = await fetch(apiUrl("/api/wallet/recovery/email/verify"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ emailSession: string }>;
+}
+
+export async function listRecoveryEmailWallets(emailSession: string): Promise<{ wallets: RecoveryEmailWallet[] }> {
+  const res = await fetch(apiUrl("/api/wallet/recovery/email/wallets"), {
+    headers: { authorization: `Bearer ${emailSession}` },
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ wallets: RecoveryEmailWallet[] }>;
 }
 
 export async function verifyRecoveryEmailOtp(input: {

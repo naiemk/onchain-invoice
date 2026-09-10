@@ -1,14 +1,9 @@
 import { expect } from "chai";
-import { generateKeyPairSync } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../commerce/server/app.js";
 import { loadConfig } from "../commerce/server/config.js";
-import { clearOnrampQuoteCaches } from "../commerce/shared/onramper-quotes.js";
-
-const { privateKey } = generateKeyPairSync("ed25519");
-const SIGNING_KEY_PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 
 const BASE_ENV = {
   PORT: "0",
@@ -19,43 +14,13 @@ const BASE_ENV = {
   EVM_RPC_URL: "https://sepolia.example",
   SWEEPER_ADDRESS: "0x5bcbEF31E3DcE37235CF8B2900ca7a1439e46cB9",
   FORWARDER_IMPLEMENTATION: "0x0bA4bb324eB41d9c0f1c4Ac7a3876dEfcc4d72b9",
+  EVM_8453_RPC_URL: "https://base.example",
+  EVM_8453_SWEEPER_ADDRESS: "0x5bcbEF31E3DcE37235CF8B2900ca7a1439e46cB9",
+  EVM_8453_FORWARDER_IMPLEMENTATION: "0x0bA4bb324eB41d9c0f1c4Ac7a3876dEfcc4d72b9",
   SWEEPER_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-  ONRAMPER_ENABLED: "1",
-  ONRAMPER_API_KEY: "pk_test_faucet",
-  ONRAMPER_SIGNING_KEY: SIGNING_KEY_PEM,
   FAUCET_SECRET: "test-faucet-secret",
   FAUCET_DRY_RUN: "1",
 } as const;
-
-function withMockedOnramperQuotes<T>(fn: () => Promise<T>): Promise<T> {
-  clearOnrampQuoteCaches();
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (input, init) => {
-    const url = String(input);
-    if (url.includes("/quotes/")) {
-      const u = new URL(url);
-      const amount = Number(u.searchParams.get("amount") || "10");
-      return new Response(
-        JSON.stringify([
-          {
-            ramp: "moonpay",
-            paymentMethod: "creditcard",
-            rate: 1,
-            payout: amount,
-            inAmount: amount,
-            recommendations: ["BestPrice"],
-            quoteId: "q-faucet",
-          },
-        ]),
-        { status: 200, headers: { "content-type": "application/json" } }
-      );
-    }
-    return originalFetch(input, init);
-  };
-  return fn().finally(() => {
-    globalThis.fetch = originalFetch;
-  });
-}
 
 describe("commerce testnet faucet", function () {
   async function withApp(
@@ -64,7 +29,6 @@ describe("commerce testnet faucet", function () {
   ): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), "commerce-faucet-"));
     const config = loadConfig({
-      ...process.env,
       ...BASE_ENV,
       ...env,
       DB_PATH: join(dir, "test.db"),
@@ -84,22 +48,23 @@ describe("commerce testnet faucet", function () {
     }
   }
 
-  async function createFiatInvoice(baseUrl: string): Promise<{ id: string }> {
+  async function createFiatInvoice(baseUrl: string): Promise<{ id: string; chainId?: string }> {
     const res = await fetch(`${baseUrl}/api/invoices`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         paymentMode: "fiat",
+        price: "10",
         displayFiat: "USD",
         displayAmount: "10",
         to: ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"],
-        chains: ["11155111"],
+        chains: ["8453"],
         tokens: ["USDC"],
         title: "Faucet test",
       }),
     });
     expect(res.status).to.equal(201);
-    const body = (await res.json()) as { invoice: { id: string } };
+    const body = (await res.json()) as { invoice: { id: string; chainId?: string } };
     return body.invoice;
   }
 
@@ -131,18 +96,16 @@ describe("commerce testnet faucet", function () {
   });
 
   it("rejects wrong secret", async function () {
-    await withMockedOnramperQuotes(async () => {
-      await withApp({}, async (baseUrl) => {
-        const invoice = await createFiatInvoice(baseUrl);
-        const res = await fetch(`${baseUrl}/api/invoices/${invoice.id}/faucet`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ secret: "wrong" }),
-        });
-        expect(res.status).to.equal(403);
-        const body = (await res.json()) as { code?: string };
-        expect(body.code).to.equal("faucet_forbidden");
+    await withApp({}, async (baseUrl) => {
+      const invoice = await createFiatInvoice(baseUrl);
+      const res = await fetch(`${baseUrl}/api/invoices/${invoice.id}/faucet`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ secret: "wrong" }),
       });
+      expect(res.status).to.equal(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).to.equal("faucet_forbidden");
     });
   });
 
@@ -172,27 +135,18 @@ describe("commerce testnet faucet", function () {
     });
   });
 
-  it("funds fiat testnet invoice in dry-run", async function () {
-    await withMockedOnramperQuotes(async () => {
-      await withApp({}, async (baseUrl) => {
-        const invoice = await createFiatInvoice(baseUrl);
-        const res = await fetch(`${baseUrl}/api/invoices/${invoice.id}/faucet`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ secret: "test-faucet-secret" }),
-        });
-        expect(res.status).to.equal(200);
-        const body = (await res.json()) as {
-          ok: boolean;
-          txHash: string;
-          chainId: string;
-          dryRun: boolean;
-        };
-        expect(body.ok).to.equal(true);
-        expect(body.dryRun).to.equal(true);
-        expect(body.chainId).to.equal("11155111");
-        expect(body.txHash).to.match(/^0xdryrun/);
+  it("rejects faucet for Base fiat invoices", async function () {
+    await withApp({}, async (baseUrl) => {
+      const invoice = await createFiatInvoice(baseUrl);
+      expect(invoice.chainId).to.equal("8453");
+      const res = await fetch(`${baseUrl}/api/invoices/${invoice.id}/faucet`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ secret: "test-faucet-secret" }),
       });
+      expect(res.status).to.equal(400);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).to.equal("faucet_mainnet");
     });
   });
 });

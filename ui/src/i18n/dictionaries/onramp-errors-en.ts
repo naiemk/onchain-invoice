@@ -1,4 +1,4 @@
-/** Onramper quote error copy (English). Locales override; this is the fallback. */
+/** Quote error copy (English). Locales override; this is the fallback. */
 export const onrampErrorsEn = {
   onrampLimitMismatch: "Amount must be between {min} and {max} {fiat}.",
   onrampLimitMin: "Minimum amount is {min} {fiat}.",

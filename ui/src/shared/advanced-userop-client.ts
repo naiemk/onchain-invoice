@@ -8,6 +8,7 @@ import {
   buildSendBatchCalls,
   encodeAddEntity,
   encodeAddKey,
+  encodeAddKeyEoa,
   encodeConfigureMultisig,
   encodeEnableAdvanced,
   encodeExecuteCallData,
@@ -22,11 +23,10 @@ import {
   KEY_EOA,
   KEY_WEBAUTHN,
   KEY_YUBIKEY,
-  signEoaPersonalDigestWithSigner,
 } from "../../../commerce/shared/advanced-wallet.js";
 import { signUserOpHash, type PasskeyOwner } from "./webauthn.js";
 import { primaryChain } from "./wallet-api.js";
-import { signUserOpHashPersonal } from "./eoa-connector.js";
+import { signUserOpTypedData } from "./eoa-connector.js";
 import {
   signWithCurrentWalletPasskey,
   type CurrentWalletPasskey,
@@ -62,13 +62,14 @@ async function buildPolicyUserOp(input: {
 
 export async function buildAdvancedKeySignature(input: {
   userOpHash: string;
+  walletAddress?: string;
+  chainId?: number | bigint;
   entityId: string;
   keyType: AdvancedKeyType;
   qx?: string;
   qy?: string;
   eoa?: string;
   credentialId?: string;
-  eoaSigner?: { signMessage: (msg: Uint8Array | string) => Promise<string> };
 }): Promise<string> {
   const { keyId, sig } = await signKeyInner(input);
   return encodeAdvancedSignature([{ keyId, sig }]);
@@ -76,13 +77,14 @@ export async function buildAdvancedKeySignature(input: {
 
 async function signKeyInner(input: {
   userOpHash: string;
+  walletAddress?: string;
+  chainId?: number | bigint;
   entityId: string;
   keyType: AdvancedKeyType;
   qx?: string;
   qy?: string;
   eoa?: string;
   credentialId?: string;
-  eoaSigner?: { signMessage: (msg: Uint8Array | string) => Promise<string> };
 }): Promise<{ keyId: string; sig: string }> {
   const qx = input.qx ?? zeroPadValue("0x00", 32);
   const qy = input.qy ?? zeroPadValue("0x00", 32);
@@ -90,11 +92,14 @@ async function signKeyInner(input: {
   const keyId = computeKeyId(input.entityId, input.keyType, qx, qy, eoa);
   let sig: string;
   if (input.keyType === KEY_EOA) {
-    if (input.eoaSigner) {
-      sig = await signEoaPersonalDigestWithSigner(input.eoaSigner, input.userOpHash);
-    } else {
-      sig = await signUserOpHashPersonal(input.userOpHash);
+    if (!input.walletAddress || input.chainId == null) {
+      throw new Error("EIP-712 UserOp signing needs wallet and chainId");
     }
+    sig = await signUserOpTypedData({
+      wallet: input.walletAddress,
+      userOpHash: input.userOpHash,
+      chainId: input.chainId,
+    });
   } else {
     sig = await signUserOpHash(input.userOpHash, input.credentialId, {
       requireUv: input.keyType === KEY_YUBIKEY,
@@ -242,7 +247,6 @@ export async function buildSignedAddKeyUserOp(input: {
   qy: string;
   eoa: string;
   feeAmount: bigint;
-  eoaSigner?: { signMessage: (msg: Uint8Array | string) => Promise<string> };
 }): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
   return buildPolicyUserOp({
     config: input.config,
@@ -255,16 +259,24 @@ export async function buildSignedAddKeyUserOp(input: {
       getAddress(input.eoa)
     ),
     feeAmount: input.feeAmount,
-    sign: input.eoaSigner
-      ? (userOpHash) =>
-          buildAdvancedKeySignature({
-            userOpHash,
-            entityId: input.passkey.entityId ?? "",
-            keyType: KEY_EOA,
-            eoa: input.passkey.eoa,
-            eoaSigner: input.eoaSigner,
-          })
-      : signPasskey(input.passkey, "add-key"),
+    sign: signPasskey(input.passkey, "add-key"),
+  });
+}
+
+export async function buildSignedAddKeyEoaUserOp(input: {
+  config: WalletPublicConfig;
+  passkey: CurrentWalletPasskey;
+  targetEntityId: string;
+  eoa: string;
+  bindSignature: string;
+  feeAmount: bigint;
+}): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
+  return buildPolicyUserOp({
+    config: input.config,
+    walletAddress: input.passkey.address,
+    innerCallData: encodeAddKeyEoa(input.targetEntityId, input.eoa, input.bindSignature),
+    feeAmount: input.feeAmount,
+    sign: signPasskey(input.passkey, "add-key"),
   });
 }
 
@@ -304,13 +316,14 @@ export async function buildSignedConfigureMultisigUserOp(input: {
 export async function signProposalUserOp(input: {
   userOpHash: string;
   passkey?: CurrentWalletPasskey;
+  walletAddress?: string;
+  chainId?: number | bigint;
   entityId?: string;
   keyType?: AdvancedKeyType;
   qx?: string;
   qy?: string;
   eoa?: string;
   credentialId?: string;
-  eoaSigner?: { signMessage: (msg: Uint8Array | string) => Promise<string> };
 }): Promise<string> {
   if (input.passkey) {
     return signWithCurrentWalletPasskey(input.userOpHash, input.passkey, {
@@ -320,13 +333,14 @@ export async function signProposalUserOp(input: {
   }
   const { sig } = await signKeyInner({
     userOpHash: input.userOpHash,
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
     entityId: input.entityId ?? "",
     keyType: input.keyType ?? KEY_WEBAUTHN,
     qx: input.qx,
     qy: input.qy,
     eoa: input.eoa,
     credentialId: input.credentialId,
-    eoaSigner: input.eoaSigner,
   });
   return sig;
 }

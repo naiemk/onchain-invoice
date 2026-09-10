@@ -9,7 +9,7 @@ nav:
   - Home: index.md
   - Create invoice: create.md
   - Invoice types: invoice-types.md
-  - Quote API: quote.md
+  - Pay-in API: quote.md
   - HTTP API: api.md
   - Wallet client API: wallet-client-api.md
   - Platform integrations: platform-integration.md

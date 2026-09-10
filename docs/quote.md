@@ -1,131 +1,68 @@
-# Quote API (Onramper)
+# Pay-in API (card / bank → Base USDC)
 
-Public endpoints that price card/bank funding into on-chain USDC/USDT settlement. Used by the create-invoice wizard and by agents that build fiat / combined invoices.
+Public endpoints that quote and start card/bank checkout into **USDC on Base** (`8453`). Used by `/buy`, invoice card checkout on `/pay`, and wallet cash-in.
 
-Requires Onramper enabled on the instance. When keys are absent, responses may include `"demo": true` with synthetic quotes.
+Requires MetaMask pay-in enabled on the instance (`METAMASK_ONRAMP_ENABLED`, default on). Checkout opens in a **new tab** at the provider (MoonPay, Banxa, Ramp, Coinbase). There is no create-time quote and no Onramper session.
 
-## `GET /api/public/onramp`
+Fiat and combined invoices settle as Base USDC. Crypto-only invoices stay multi-chain.
+
+## `GET /api/public/pay-in/config`
 
 Instance capability probe.
 
 ```json
 {
   "enabled": true,
-  "sandbox": false,
-  "demo": false,
-  "fiats": ["SEK", "EUR", "USD", "GBP"],
-  "supportedPairs": [
-    { "chainId": "1", "token": "USDC" },
-    { "chainId": "8453", "token": "USDC" },
-    { "chainId": "tron", "token": "USDT" }
-  ]
+  "chainId": "8453",
+  "token": "USDC",
+  "tokenAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 }
 ```
 
-## `GET /api/public/onramp-methods`
+## `GET /api/public/pay-in/countries`
 
-Payment methods available for a fiat + country + pair set.
+Regions MetaMask can quote (id, name, default fiat).
+
+## `GET /api/public/pay-in/geo`
+
+Payer country from CDN/edge IP headers (`CF-IPCountry`, `x-vercel-ip-country`, …). The UI prefers Cloudflare’s browser `cdn-cgi/trace` (client IP) and uses this as fallback. Query `country=` still overrides.
+
+```json
+{ "country": "LT" }
+```
+
+## `GET /api/public/pay-in/quotes`
 
 | Query | Notes |
 |-------|-------|
-| `fiat` | Required (e.g. `SEK`) |
-| `country` | ISO-3166 alpha-2 (default `us`) |
-| `pairs` | `1:USDC,8453:USDC,tron:USDT` |
-| `chains` + `tokens` | Alias for `pairs` (cartesian product of supported pairs) |
-| `expand=1` | Include method metadata |
+| `region` or `country` | MetaMask region id (`de`, `us-mi`) |
+| `fiat` | e.g. `EUR` |
+| `amount` | Fiat to spend |
+| `address` or `walletAddress` | Destination EVM wallet (required) |
 
-## `GET /api/public/onramp-quote`
+Response includes `quotes[]` with provider, payment method, USDC out, and fees. All listed providers can be opened in a new tab.
 
-### Query parameters
+## `GET /api/public/pay-in/widget`
 
-| Param | Aliases | Notes |
-|-------|---------|-------|
-| `fiat` | — | Required |
-| `direction` | — | `receive` (fixed crypto → fiat cost) or `pay` (fixed fiat → crypto settlement). Default `receive`. |
-| `cryptoAmount` | `crypto_amount` | Required for `receive` |
-| `fiatAmount` | `fiat_amount` | Required for `pay` |
-| `country` | — | Default `us` |
-| `paymentMethod` | `payment_method` | Omit for Auto / recommended |
-| `provider` | — | Preferred Onramper ramp id |
-| `chainId` + `token` | `chain_id` | Single-pair mode |
-| `pairs` | `pair` | Multi-pair (comma-separated `chainId:token`) |
-| `chains` + `tokens` | — | Same shape as `POST /api/invoices`; expanded to supported pairs |
-| `slippageBps` | `slippage_bps` | Optional; response includes `minSettlement` / `maxSettlement` |
+Returns `{ widgetUrl, embeddable, provider, orderId }` for the chosen quote. The UI opens `widgetUrl` in a new tab (popup-safe: blank tab on click, then navigate).
 
-### Response
+| Query | Notes |
+|-------|-------|
+| `region`, `fiat`, `amount`, `address` | Same as quotes |
+| `providerId` | e.g. `/providers/moonpay` |
+| `paymentMethodId` | e.g. `/payments/debit-credit-card` |
 
-```json
-{
-  "fiat": "SEK",
-  "fiatAmount": "500.00",
-  "cryptoAmount": "45.12",
-  "paymentMethod": "swish",
-  "country": "se",
-  "direction": "pay",
-  "chainId": "8453",
-  "token": "USDC",
-  "provider": "revolut",
-  "slippageBps": 100,
-  "minSettlement": "44.6688",
-  "maxSettlement": "45.5712",
-  "quotes": [
-    {
-      "provider": "revolut",
-      "paymentMethod": "swish",
-      "fiatAmount": "500.00",
-      "cryptoAmount": "45.12"
-    }
-  ],
-  "recommended": {
-    "provider": "revolut",
-    "paymentMethod": "swish",
-    "fiatAmount": "500.00",
-    "cryptoAmount": "45.12"
-  }
-}
-```
+`GET /api/public/pay-in/buy-url` is an alias of this route.
 
-`chainId` / `token` / `country` / `paymentMethod` / `provider` are always echoed so the quote maps 1:1 onto create.
+## Card funding an invoice
 
-### Quote → create mapping
+1. Create a fiat or combined invoice with `price` (USDC), `chains: ["8453"]`, `tokens: ["USDC"]`. Optional `displayFiat` / `displayAmount` / `quoteCountry` are payer hints only.
+2. Payer opens `/pay?id=…` (crypto QR still works for combined) or `/buy?address={invoiceAddress}&amount=…&fiat=EUR&country=de&invoice={id}`.
+3. Continue fetches the widget URL and opens provider checkout in a new tab.
+4. Poll `GET /api/invoices/{id}` until `paid` — funding is detected on `invoiceAddress`; there is no onramp-session webhook.
 
-| Quote field | Invoice create field |
-|-------------|----------------------|
-| `fiat` | `displayFiat` |
-| `fiatAmount` | `displayAmount` |
-| `cryptoAmount` | `price` |
-| `country` | `quoteCountry` |
-| `paymentMethod` | `quotePaymentMethod` |
-| `recommended.provider` (or chosen provider) | `quoteProvider` |
-| `slippageBps` | `quoteSlippageBps` |
-| `chainId` / `token` | `chainId` / `token` (and include in `chains` / `tokens`) |
-
-### Cascade rules
-
-See [Invoice types — Fiat field cascade](invoice-types.md#fiat-field-cascade-create-ui--agents).
-
-### Errors
-
-Structured Onramper errors return JSON with `code` such as:
-
-- `onramp_limit_mismatch` — amount outside `minAmount` / `maxAmount`
-- `onramp_no_payment_method`
-- `onramp_quote_unavailable`
-- `onramp_provider_unavailable`
+Direct buy (no invoice): `/buy?address=0x…&amount=100&fiat=SEK&country=se`.
 
 ### Rate limits
 
-Quote and methods use the dedicated **`quote`** bucket (default 2/s sustained, burst 20 per IP). Exceeding returns **429** with `Retry-After`, `RateLimit-Remaining`, and `RateLimit-Reset`. See [HTTP API — Rate limiting](api.md#rate-limiting).
-
-## Pay-time session
-
-After create, card checkout:
-
-```http
-POST /api/invoices/{id}/onramp-session
-Content-Type: application/json
-
-{ "fiat": "SEK" }
-```
-
-Requotes with `skipCache: true` and enforces `quoteSlippageBps`. Drift beyond the limit → **410** `quote_expired`.
+Pay-in routes use the dedicated **`quote`** bucket (default 2/s sustained, burst 20 per IP). Exceeding returns **429** with `Retry-After`, `RateLimit-Remaining`, and `RateLimit-Reset`. See [HTTP API — Rate limiting](api.md#rate-limiting).

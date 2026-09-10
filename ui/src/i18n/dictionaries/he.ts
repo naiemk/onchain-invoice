@@ -403,7 +403,8 @@ export const he = {
     paymentModeFiatTitle: "כרטיס או בנק בלבד",
     paymentModeFiatHint: "הלקוח לא רואה כתובת קריפטו. עדיין נסלק כ-USDC/USDT ברשת אחת.",
     settlementNetworkLabel: "רשתות סליקה",
-    settlementNetworkHint: "Ethereum, Base ו-Tron נדרשות לכרטיס/בנק (מפעילות Revolut Pay ועוד). אפשר להוסיף מסילות אחרות שנתמכות ב-Onramper.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "חיוב ~{amount} {fiat}",
     settlePreview: "מקבלים ~{amount} {token}",
     fiatPayLabel: "הלקוח משלם",
@@ -500,7 +501,8 @@ export const he = {
 
   pay: {
     faucetTitle: "ברז רשת בדיקות",
-    faucetHint: "ארגז החול של Onramper לא מממן כתובות רשת בדיקות. הזינו את סוד ברז המפעיל כדי לשלוח את סכום הסליקה בשרשרת כדי שהאוסף יוכל להשלים תשלום.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "סוד הברז",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "מימון חשבונית (רשת בדיקות)",
@@ -786,4 +788,4 @@ export const he = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

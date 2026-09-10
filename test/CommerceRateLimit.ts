@@ -26,7 +26,6 @@ describe("commerce central rate limiting", function () {
       RATE_LIMIT_PUBLIC_PER_SECOND: "2",
       RATE_LIMIT_QUOTE_PER_SECOND: "1",
       RATE_LIMIT_QUOTE_BURST: "2",
-      ONRAMPER_ENABLED: "1",
       ...env,
     } as NodeJS.ProcessEnv);
 
@@ -70,14 +69,16 @@ describe("commerce central rate limiting", function () {
       RATE_LIMIT_QUOTE_PER_SECOND: "3",
       RATE_LIMIT_QUOTE_BURST: "15",
     } as NodeJS.ProcessEnv).rateLimit;
-    const quote = resolveRateLimit("GET", "/api/public/onramp-quote", cfg);
+    const quote = resolveRateLimit("GET", "/api/public/pay-in/quotes", cfg);
     expect(quote?.bucket).to.equal("quote");
     expect(quote?.perSecond).to.equal(3);
     expect(quote?.burst).to.equal(15);
     const create = resolveRateLimit("POST", "/api/invoices", cfg);
     expect(create?.bucket).to.equal("create");
-    const pub = resolveRateLimit("GET", "/api/public/onramp", cfg);
-    expect(pub?.bucket).to.equal("public");
+    const pub = resolveRateLimit("GET", "/api/public/pay-in/config", cfg);
+    expect(pub?.bucket).to.equal("quote");
+    const faucet = resolveRateLimit("GET", "/api/public/faucet", cfg);
+    expect(faucet?.bucket).to.equal("public");
   });
 
   it("takeToken supports burst above sustained rate", function () {
@@ -95,7 +96,7 @@ describe("commerce central rate limiting", function () {
       const statuses: number[] = [];
       let retryAfter: string | null = null;
       for (let i = 0; i < 5; i++) {
-        const res = await fetch(`${baseUrl}/api/public/onramp`);
+        const res = await fetch(`${baseUrl}/api/public/faucet`);
         statuses.push(res.status);
         if (res.status === 429) {
           retryAfter = res.headers.get("retry-after");
@@ -122,10 +123,9 @@ describe("commerce central rate limiting", function () {
     });
   });
 
-  it("applies the quote bucket to onramp-quote", async function () {
+  it("applies the quote bucket to pay-in", async function () {
     await withApp({}, async (baseUrl) => {
-      const url =
-        `${baseUrl}/api/public/onramp-quote?fiat=USD&chainId=11155111&token=USDC&direction=receive&cryptoAmount=10`;
+      const url = `${baseUrl}/api/public/pay-in/config`;
       const first = await fetch(url);
       expect(first.status).to.equal(200);
       const second = await fetch(url);

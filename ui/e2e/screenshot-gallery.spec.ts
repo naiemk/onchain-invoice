@@ -12,6 +12,7 @@ const ROUTES = [
   "/integrations",
   "/create",
   "/pay?invalid=1",
+  "/buy",
   "/merchant",
   "/wallet",
   "/wallet/create",

@@ -1,7 +1,7 @@
 import { getAddress } from "ethers";
 import type { AppConfig, WalletChainEntry } from "./config.js";
 import type { CommerceDb } from "./db.js";
-import { walletStableTokensForChain } from "../shared/onramper-assets.js";
+import { walletStableTokensForChain } from "../shared/evm-stables.js";
 import {
   outgoingTransferFromProposal,
   outgoingTransfersFromUserOp,

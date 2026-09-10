@@ -1,19 +1,32 @@
 import { randomBytes, createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { Contract, JsonRpcProvider, getAddress, isAddress, verifyMessage } from "ethers";
+import { Contract, JsonRpcProvider, ZeroHash, getAddress, isAddress, verifyMessage } from "ethers";
 import type { AppConfig } from "./config.js";
 import type { CommerceDb } from "./db.js";
 import { verifyCaptcha } from "./captcha.js";
-import { generateOtpCode, hashOtpCode, maskEmail, sendOtpEmail } from "./email.js";
+import { generateOtpCode, hashOtpCode, maskEmail, sendOtpEmail, sendRecoveryRequestedEmail } from "./email.js";
+import {
+  emailLookupOtpWallet,
+  issueRecoveryEmailSession,
+  verifyRecoveryEmailSession,
+} from "./recovery-email-session.js";
 import {
   challengeToBase64Url,
   verifyWebAuthnAssertion,
   type WebAuthnAssertionJson,
 } from "../shared/webauthn-verify.js";
-import type {
-  HostedRecoveryChallengePurpose,
-  WalletRecoveryRequestStatus,
+import {
+  recoveryNewOwnerMessage,
+  type HostedRecoveryChallengePurpose,
+  type WalletRecoveryNewOwnerKind,
+  type WalletRecoveryRequestRecord,
+  type WalletRecoveryRequestStatus,
 } from "../shared/wallet.js";
+import { KEY_EOA } from "../shared/advanced-wallet.js";
+import {
+  eoaOwnerCoords,
+  verifyRecoverTypedData,
+} from "../shared/wallet-eip712.js";
 
 type Handlers = {
   sendJson: (res: ServerResponse, code: number, body: unknown) => void;
@@ -55,6 +68,21 @@ export function registerHostedRecoveryRoutes(
 
     if (req.method === "POST" && url.pathname === "/api/wallet/email/verify") {
       await verifyEmailOtp(req, res, db, appConfig, handlers, "attach");
+      return true;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/wallet/recovery/email/start") {
+      await startRecoveryEmailLookup(req, res, db, appConfig, handlers);
+      return true;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/wallet/recovery/email/verify") {
+      await verifyRecoveryEmailLookup(req, res, db, appConfig, handlers);
+      return true;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/wallet/recovery/email/wallets") {
+      await listRecoveryEmailWallets(req, res, db, appConfig, handlers);
       return true;
     }
 
@@ -267,6 +295,122 @@ async function verifyEmailOtp(
   });
 }
 
+const ZERO_PUBKEY = `0x${"0".repeat(64)}`;
+
+function emailSessionSecret(appConfig: AppConfig): string {
+  return appConfig.guardianSessionSecret ?? appConfig.adminApiKey ?? "";
+}
+
+function readEmailSessionToken(req: IncomingMessage, body?: Record<string, unknown>): string | undefined {
+  const fromBody = str(body?.emailSession);
+  if (fromBody) return fromBody;
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length).trim();
+  return undefined;
+}
+
+async function startRecoveryEmailLookup(
+  req: IncomingMessage,
+  res: ServerResponse,
+  db: CommerceDb,
+  appConfig: AppConfig,
+  handlers: Handlers
+): Promise<void> {
+  const body = await handlers.readJson(req);
+  try {
+    await requireCaptcha(appConfig, body, req);
+  } catch (e) {
+    handlers.sendJson(res, statusOf(e), { error: codeOf(e), message: messageOf(e) });
+    return;
+  }
+  const email = str(body.email)?.toLowerCase();
+  if (!email?.includes("@")) {
+    handlers.sendJson(res, 400, { error: "invalid_email" });
+    return;
+  }
+  const wallets = db.listWalletsByVerifiedEmail(email);
+  if (wallets.length) {
+    const code = generateOtpCode();
+    db.createWalletEmailOtp({
+      walletAddress: emailLookupOtpWallet(email),
+      email,
+      purpose: "recover",
+      codeHash: hashOtpCode(code),
+    });
+    try {
+      await sendOtpEmail(appConfig.email, { to: email, code, purpose: "recover" });
+    } catch (e) {
+      handlers.sendJson(res, statusOf(e), { error: "email_send_failed", message: messageOf(e) });
+      return;
+    }
+  }
+  handlers.sendJson(res, 200, { ok: true });
+}
+
+async function verifyRecoveryEmailLookup(
+  req: IncomingMessage,
+  res: ServerResponse,
+  db: CommerceDb,
+  appConfig: AppConfig,
+  handlers: Handlers
+): Promise<void> {
+  const body = await handlers.readJson(req);
+  try {
+    await requireCaptcha(appConfig, body, req);
+  } catch (e) {
+    handlers.sendJson(res, statusOf(e), { error: codeOf(e), message: messageOf(e) });
+    return;
+  }
+  const email = str(body.email)?.toLowerCase();
+  const code = str(body.code);
+  if (!email?.includes("@") || !code) {
+    handlers.sendJson(res, 400, { error: "email and code required" });
+    return;
+  }
+  const ok = db.consumeWalletEmailOtp({
+    walletAddress: emailLookupOtpWallet(email),
+    email,
+    purpose: "recover",
+    codeHash: hashOtpCode(code),
+  });
+  if (!ok) {
+    handlers.sendJson(res, 400, { error: "invalid_otp" });
+    return;
+  }
+  const secret = emailSessionSecret(appConfig);
+  if (!secret) {
+    handlers.sendJson(res, 503, { error: "email_session_unavailable" });
+    return;
+  }
+  const emailSession = issueRecoveryEmailSession(secret, email);
+  handlers.sendJson(res, 200, { emailSession, email: maskEmail(email) });
+}
+
+async function listRecoveryEmailWallets(
+  req: IncomingMessage,
+  res: ServerResponse,
+  db: CommerceDb,
+  appConfig: AppConfig,
+  handlers: Handlers
+): Promise<void> {
+  const email = verifyRecoveryEmailSession(emailSessionSecret(appConfig), readEmailSessionToken(req));
+  if (!email) {
+    handlers.sendJson(res, 401, { error: "invalid_email_session" });
+    return;
+  }
+  const records = db.listWalletsByVerifiedEmail(email);
+  const wallets = records.map((row) => {
+    const account = db.getWalletAccount(row.walletAddress);
+    const active = db.getActiveWalletRecoveryRequest(row.walletAddress);
+    return {
+      address: row.walletAddress,
+      createdAt: account?.createdAt ?? row.createdAt,
+      activeRecovery: Boolean(active),
+    };
+  });
+  handlers.sendJson(res, 200, { wallets });
+}
+
 async function createRecoveryRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -281,40 +425,34 @@ async function createRecoveryRequest(
     handlers.sendJson(res, statusOf(e), { error: codeOf(e), message: messageOf(e) });
     return;
   }
-  let walletAddress = str(body.walletAddress);
+
+  const sessionEmail = verifyRecoveryEmailSession(
+    emailSessionSecret(appConfig),
+    readEmailSessionToken(req, body)
+  );
   const emailInput = str(body.email)?.toLowerCase();
-  if (!walletAddress && emailInput) {
+  const fromArray = Array.isArray(body.walletAddresses)
+    ? body.walletAddresses.filter((v): v is string => typeof v === "string" && isAddress(v)).map((a) => getAddress(a))
+    : [];
+  let single = str(body.walletAddress);
+  if (!single && !fromArray.length && emailInput && !sessionEmail) {
     const byEmail = db.findWalletByVerifiedEmail(emailInput);
-    walletAddress = byEmail?.walletAddress;
+    single = byEmail?.walletAddress;
   }
-  const challengeId = str(body.challengeId);
-  const ownerQx = normalizeHex32(str(body.ownerQx) ?? str(body.newOwnerQx));
-  const ownerQy = normalizeHex32(str(body.ownerQy) ?? str(body.newOwnerQy));
-  const credentialId = str(body.credentialId);
-  if (!walletAddress || !isAddress(walletAddress) || !challengeId || !ownerQx || !ownerQy || !credentialId) {
-    handlers.sendJson(res, 400, {
-      error: "walletAddress (or verified email), challengeId, ownerQx, ownerQy, credentialId required",
-    });
-    return;
-  }
-  const account = db.getWalletAccount(walletAddress);
-  if (!account) {
-    handlers.sendJson(res, 404, { error: "account_not_found" });
-    return;
-  }
-  const emailRecord = db.getWalletEmail(walletAddress);
-  const email = emailInput ?? emailRecord?.email;
-  if (!email) {
-    handlers.sendJson(res, 400, {
-      error: "email_required",
-      message: "Attach and verify an email on this wallet before recovery, or pass email",
-    });
+  const walletAddresses = fromArray.length
+    ? fromArray
+    : single && isAddress(single)
+      ? [getAddress(single)]
+      : [];
+  if (!walletAddresses.length) {
+    handlers.sendJson(res, 400, { error: "walletAddress or walletAddresses required" });
     return;
   }
 
-  const existing = db.getActiveWalletRecoveryRequest(walletAddress);
-  if (existing) {
-    handlers.sendJson(res, 409, { error: "recovery_already_active", request: publicRequest(existing) });
+  const ownerKind = parseOwnerKind(str(body.ownerKind) ?? str(body.newOwnerKind));
+  const challengeId = str(body.challengeId);
+  if (!challengeId) {
+    handlers.sendJson(res, 400, { error: "challengeId required" });
     return;
   }
 
@@ -323,63 +461,340 @@ async function createRecoveryRequest(
     handlers.sendJson(res, 400, { error: "invalid_or_expired_challenge" });
     return;
   }
-  const assertion = body.assertion as WebAuthnAssertionJson | undefined;
-  if (!assertion) {
-    handlers.sendJson(res, 400, { error: "assertion required" });
-    return;
-  }
-  try {
-    verifyWebAuthnAssertion(assertion, {
-      expectedChallengeBase64Url: challenge.challenge,
-      rpId: hostedRpId(appConfig),
-      origins: null,
-      ownerQx,
-      ownerQy,
-    });
-  } catch (e) {
-    handlers.sendJson(res, statusOf(e), {
-      error: (e as { code?: string }).code ?? "assertion_failed",
-      message: messageOf(e),
-    });
-    return;
-  }
 
-  const emailVerified = Boolean(emailRecord?.verifiedAt && emailRecord.email === email);
-  const now = new Date().toISOString();
-  const status = emailVerified ? "awaiting_guardian" : "awaiting_email";
-  const request = db.createWalletRecoveryRequest({
-    walletAddress,
-    email,
-    newQx: ownerQx,
-    newQy: ownerQy,
-    credentialId,
-    deviceLabel: str(body.label) || "Recovery device",
-    status,
-    emailVerifiedAt: emailVerified ? now : null,
-    captchaOkAt: now,
-    chainId: str(body.chainId) ?? appConfig.wallet.chainId,
-  });
+  let ownerQx = normalizeHex32(str(body.ownerQx) ?? str(body.newOwnerQx));
+  let ownerQy = normalizeHex32(str(body.ownerQy) ?? str(body.newOwnerQy));
+  let credentialId = str(body.credentialId);
+  let newEoa: string | null = null;
+  let eoaSignature: string | null = null;
 
-  if (!emailVerified) {
-    const code = generateOtpCode();
-    db.createWalletEmailOtp({
-      walletAddress,
-      email,
-      purpose: "recover",
-      codeHash: hashOtpCode(code),
-    });
+  if (ownerKind === "eoa") {
+    const eoaAddress = str(body.eoaAddress);
+    eoaSignature = str(body.eoaSignature) ?? null;
+    if (!eoaAddress || !isAddress(eoaAddress) || !eoaSignature) {
+      handlers.sendJson(res, 400, { error: "eoaAddress and eoaSignature required" });
+      return;
+    }
     try {
-      await sendOtpEmail(appConfig.email, { to: email, code, purpose: "recover" });
+      const leftover = getAddress(verifyMessage(recoveryNewOwnerMessage(challenge.challenge), eoaSignature));
+      if (leftover === getAddress(eoaAddress)) {
+        handlers.sendJson(res, 400, { error: "eoa_personal_sign_rejected" });
+        return;
+      }
+    } catch {
+      // Not an EIP-191 recovery message — continue with EIP-712.
+    }
+    newEoa = getAddress(eoaAddress);
+    ownerQx = ZERO_PUBKEY;
+    ownerQy = ZERO_PUBKEY;
+    credentialId = `eoa:${newEoa.toLowerCase()}`;
+  } else {
+    if (!ownerQx || !ownerQy || !credentialId) {
+      handlers.sendJson(res, 400, { error: "ownerQx, ownerQy, credentialId required" });
+      return;
+    }
+    const assertion = body.assertion as WebAuthnAssertionJson | undefined;
+    if (!assertion) {
+      handlers.sendJson(res, 400, { error: "assertion required" });
+      return;
+    }
+    try {
+      verifyWebAuthnAssertion(assertion, {
+        expectedChallengeBase64Url: challenge.challenge,
+        rpId: hostedRpId(appConfig),
+        origins: null,
+        ownerQx,
+        ownerQy,
+      });
     } catch (e) {
-      handlers.sendJson(res, statusOf(e), { error: "email_send_failed", message: messageOf(e) });
+      handlers.sendJson(res, statusOf(e), {
+        error: (e as { code?: string }).code ?? "assertion_failed",
+        message: messageOf(e),
+      });
       return;
     }
   }
 
-  handlers.sendJson(res, 201, {
-    request: publicRequest(request),
-    otpSent: !emailVerified,
+  const now = new Date().toISOString();
+  const chainId = str(body.chainId) ?? appConfig.wallet.chainId;
+  const recoverChainId = Number(chainId);
+  const deviceLabel = str(body.label) || (ownerKind === "eoa" ? "Recovery wallet" : "Recovery device");
+  const created: WalletRecoveryRequestRecord[] = [];
+  const skipped: Array<{ address: string; error: string }> = [];
+  const existingOwners: EoaExistingOwner[] = [];
+
+  for (const walletAddress of walletAddresses) {
+    const account = db.getWalletAccount(walletAddress);
+    if (!account) {
+      skipped.push({ address: walletAddress, error: "account_not_found" });
+      continue;
+    }
+    const existing = db.getActiveWalletRecoveryRequest(walletAddress);
+    if (existing) {
+      skipped.push({ address: walletAddress, error: "recovery_already_active" });
+      continue;
+    }
+    if (ownerKind === "eoa" && newEoa && eoaSignature) {
+      try {
+        const recovered = verifyRecoverTypedData(
+          walletAddress,
+          challenge.challenge,
+          newEoa,
+          recoverChainId,
+          eoaSignature
+        );
+        if (recovered !== newEoa) {
+          skipped.push({ address: walletAddress, error: "eoa_signature_mismatch" });
+          continue;
+        }
+      } catch (e) {
+        skipped.push({
+          address: walletAddress,
+          error: "eoa_signature_failed",
+        });
+        void e;
+        continue;
+      }
+      const onChain = await lookupEoaOwner({
+        db,
+        rpcUrl: appConfig.wallet.rpcUrl,
+        wallet: walletAddress,
+        eoa: newEoa,
+      });
+      if (onChain.existingOwner && onChain.threshold > 1) {
+        skipped.push({ address: walletAddress, error: "threshold_not_one" });
+        continue;
+      }
+      if (onChain.existingOwner) {
+        existingOwners.push({
+          address: walletAddress,
+          advanced: onChain.advanced,
+          entityId: onChain.entityId ?? null,
+          keyId: onChain.keyId ?? null,
+          threshold: onChain.threshold,
+          eoa: newEoa,
+        });
+        continue;
+      }
+    }
+    const emailRecord = db.getWalletEmail(walletAddress);
+    if (sessionEmail) {
+      if (!emailRecord?.verifiedAt || emailRecord.email !== sessionEmail) {
+        skipped.push({ address: walletAddress, error: "email_mismatch" });
+        continue;
+      }
+    }
+    let email = sessionEmail ?? emailInput ?? emailRecordEmail(emailRecord);
+    const emailVerified = Boolean(
+      sessionEmail || (email && emailRecord?.verifiedAt && emailRecord.email === email)
+    );
+    const status = email && !emailVerified ? "awaiting_email" : "awaiting_guardian";
+    const request = db.createWalletRecoveryRequest({
+      walletAddress,
+      email: email ?? "",
+      newQx: ownerQx,
+      newQy: ownerQy,
+      credentialId,
+      deviceLabel,
+      newOwnerKind: ownerKind,
+      newEoa,
+      status,
+      emailVerifiedAt: emailVerified || !email ? now : null,
+      captchaOkAt: now,
+      chainId,
+    });
+    created.push(request);
+
+    if (email && !emailVerified) {
+      const code = generateOtpCode();
+      db.createWalletEmailOtp({
+        walletAddress,
+        email,
+        purpose: "recover",
+        codeHash: hashOtpCode(code),
+      });
+      try {
+        await sendOtpEmail(appConfig.email, { to: email, code, purpose: "recover" });
+      } catch (e) {
+        handlers.sendJson(res, statusOf(e), { error: "email_send_failed", message: messageOf(e) });
+        return;
+      }
+    }
+  }
+
+  if (!created.length) {
+    if (existingOwners.length) {
+      handlers.sendJson(res, 200, {
+        request: null,
+        requests: [],
+        skipped,
+        otpSent: false,
+        existingOwner: true,
+        existingOwners,
+        advanced: existingOwners[0]!.advanced,
+        entityId: existingOwners[0]!.entityId,
+        keyId: existingOwners[0]!.keyId,
+      });
+      return;
+    }
+    const personal = skipped.find((s) => s.error === "eoa_personal_sign_rejected");
+    if (personal && walletAddresses.length === 1) {
+      handlers.sendJson(res, 400, { error: "eoa_personal_sign_rejected", skipped });
+      return;
+    }
+    const sigFail = skipped.find(
+      (s) => s.error === "eoa_signature_failed" || s.error === "eoa_signature_mismatch"
+    );
+    if (sigFail && walletAddresses.length === 1) {
+      handlers.sendJson(res, 400, { error: sigFail.error, skipped });
+      return;
+    }
+    if (skipped.every((s) => s.error === "threshold_not_one") && skipped.length) {
+      handlers.sendJson(res, 400, { error: "threshold_not_one", skipped });
+      return;
+    }
+    const conflict = skipped.find((s) => s.error === "recovery_already_active");
+    if (conflict && walletAddresses.length === 1) {
+      const existing = db.getActiveWalletRecoveryRequest(walletAddresses[0]!);
+      handlers.sendJson(res, 409, { error: "recovery_already_active", request: existing ? publicRequest(existing) : undefined });
+      return;
+    }
+    handlers.sendJson(res, 404, { error: skipped[0]?.error ?? "account_not_found", skipped });
+    return;
+  }
+
+  await notifyRecoveryRequested(appConfig, created).catch((e) => {
+    console.error("[email] recovery notify:", e);
   });
+
+  const otpSent = created.some((r) => r.status === "awaiting_email");
+  handlers.sendJson(res, 201, {
+    request: publicRequest(created[0]!),
+    requests: created.map(publicRequest),
+    skipped,
+    otpSent,
+    existingOwner: existingOwners.length > 0,
+    existingOwners,
+    advanced: existingOwners[0]?.advanced ?? false,
+    entityId: existingOwners[0]?.entityId ?? null,
+    keyId: existingOwners[0]?.keyId ?? null,
+  });
+}
+
+type EoaExistingOwner = {
+  address: string;
+  advanced: boolean;
+  entityId: string | null;
+  keyId: string | null;
+  threshold: number;
+  eoa: string;
+};
+
+const EOA_OWNER_LOOKUP_ABI = [
+  "function advanced() view returns (bool)",
+  "function isOwner(bytes32 qx, bytes32 qy) view returns (bool)",
+  "function threshold() view returns (uint8)",
+  "function getKeyRecord(bytes32 keyId) view returns (tuple(bytes32 entityId, uint8 keyType, bytes32 qx, bytes32 qy, address eoa))",
+];
+
+async function lookupEoaOwner(input: {
+  db: CommerceDb;
+  rpcUrl?: string;
+  wallet: string;
+  eoa: string;
+}): Promise<{
+  existingOwner: boolean;
+  advanced: boolean;
+  entityId?: string;
+  keyId?: string;
+  threshold: number;
+}> {
+  const empty = { existingOwner: false, advanced: false, threshold: 1 };
+  if (!input.rpcUrl) return empty;
+  try {
+    const provider = new JsonRpcProvider(input.rpcUrl);
+    const code = await provider.getCode(input.wallet);
+    if (!code || code === "0x" || code === "0x0") return empty;
+    const contract = new Contract(input.wallet, EOA_OWNER_LOOKUP_ABI, provider);
+    let advanced = false;
+    try {
+      advanced = Boolean(await contract.advanced());
+    } catch {
+      advanced = false;
+    }
+    if (advanced) {
+      let threshold = 1;
+      try {
+        threshold = Number(await contract.threshold());
+      } catch {
+        threshold = 1;
+      }
+      const keys = input.db.listWalletEntityKeys(input.wallet);
+      const match = keys.find(
+        (k) => k.keyType === KEY_EOA && k.eoa && getAddress(k.eoa) === input.eoa
+      );
+      if (match) {
+        try {
+          const rec = await contract.getKeyRecord(match.keyId);
+          if (rec?.eoa && getAddress(rec.eoa) === input.eoa && rec.entityId !== ZeroHash) {
+            return {
+              existingOwner: true,
+              advanced: true,
+              entityId: rec.entityId,
+              keyId: match.keyId,
+              threshold,
+            };
+          }
+        } catch {
+          // Record missing on-chain.
+        }
+      }
+      return { existingOwner: false, advanced: true, threshold };
+    }
+    const { qx, qy } = eoaOwnerCoords(input.eoa);
+    try {
+      if (await contract.isOwner(qx, qy)) {
+        return { existingOwner: true, advanced: false, threshold: 1 };
+      }
+    } catch {
+      // Pre-EOA implementations revert on sentinel owners.
+    }
+    return empty;
+  } catch {
+    return empty;
+  }
+}
+
+function emailRecordEmail(record: { email: string } | null): string | undefined {
+  return record?.email;
+}
+
+function parseOwnerKind(value: string | undefined): WalletRecoveryNewOwnerKind {
+  if (value === "yubikey" || value === "eoa") return value;
+  return "webauthn";
+}
+
+async function notifyRecoveryRequested(
+  appConfig: AppConfig,
+  requests: WalletRecoveryRequestRecord[]
+): Promise<void> {
+  const lines = [
+    "A hosted wallet recovery was requested.",
+    "",
+    ...requests.flatMap((r) => [
+      `Request: ${r.id}`,
+      `Wallet: ${r.walletAddress}`,
+      `Email: ${r.email || "(none)"}`,
+      `Signer: ${r.newOwnerKind}`,
+      r.newEoa ? `EOA: ${r.newEoa}` : `New key: ${r.newQx.slice(0, 18)}… / ${r.newQy.slice(0, 18)}…`,
+      `Device: ${r.deviceLabel ?? ""}`,
+      `Chain: ${r.chainId}`,
+      `Created: ${r.createdAt}`,
+      `Status: ${r.status}`,
+      "",
+    ]),
+  ];
+  await sendRecoveryRequestedEmail(appConfig.email, { text: lines.join("\n").trim() });
 }
 
 async function verifyRecoveryEmail(
@@ -699,8 +1114,15 @@ async function handleGuardian(
       handlers.sendJson(res, 400, { error: "not_awaiting_guardian", status: request.status });
       return true;
     }
-    if (!request.emailVerifiedAt) {
+    if (!request.emailVerifiedAt && request.email) {
       handlers.sendJson(res, 400, { error: "email_not_verified" });
+      return true;
+    }
+    if (request.newOwnerKind === "eoa" || isZeroPubkey(request.newQx, request.newQy)) {
+      handlers.sendJson(res, 400, {
+        error: "eoa_new_owner_manual",
+        message: "EOA new owners are not initiated on-chain. Review the request and handle manually.",
+      });
       return true;
     }
     const job = db.createWalletRecoveryJob({
@@ -846,6 +1268,8 @@ function publicRequest(r: {
   newQy: string;
   credentialId: string;
   deviceLabel: string | null;
+  newOwnerKind?: WalletRecoveryNewOwnerKind;
+  newEoa?: string | null;
   status: string;
   emailVerifiedAt: string | null;
   guardianAddress: string | null;
@@ -858,11 +1282,13 @@ function publicRequest(r: {
   return {
     id: r.id,
     walletAddress: r.walletAddress,
-    email: maskEmail(r.email),
+    email: r.email ? maskEmail(r.email) : "",
     newQx: r.newQx,
     newQy: r.newQy,
     credentialId: r.credentialId,
     deviceLabel: r.deviceLabel,
+    newOwnerKind: r.newOwnerKind ?? "webauthn",
+    newEoa: r.newEoa,
     status: r.status,
     emailVerifiedAt: r.emailVerifiedAt,
     guardianAddress: r.guardianAddress,
@@ -883,6 +1309,10 @@ function normalizeHex32(value: string | undefined): string | null {
   const v = value.trim().toLowerCase();
   if (!/^0x[0-9a-f]{64}$/.test(v)) return null;
   return v;
+}
+
+function isZeroPubkey(qx: string, qy: string): boolean {
+  return /^0x0+$/.test(qx.trim().toLowerCase()) && /^0x0+$/.test(qy.trim().toLowerCase());
 }
 
 function str(value: unknown): string | undefined {

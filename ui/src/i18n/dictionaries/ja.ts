@@ -406,7 +406,8 @@ export const ja = {
     paymentModeFiatTitle: "カードまたは銀行のみ",
     paymentModeFiatHint: "お客様に暗号資産アドレスは見えません。1 つのネットワークで USDC/USDT として着金します。",
     settlementNetworkLabel: "着金ネットワーク",
-    settlementNetworkHint: "カード／銀行には Ethereum、Base、Tron が必要です（Revolut Pay などを有効にします）。Onramper 対応の他のレールも追加できます。",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "請求 ~{amount} {fiat}",
     settlePreview: "受取 ~{amount} {token}",
     fiatPayLabel: "お客様の支払い",
@@ -504,7 +505,8 @@ export const ja = {
 
   pay: {
     faucetTitle: "テストネットフォーセット",
-    faucetHint: "Onramper サンドボックスはテストネットアドレスに入金しません。オペレーターのフォーセットシークレットを入力して着金額をオンチェーンで送り、スイーパーが支払いを完了できるようにします。",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "フォーセットシークレット",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "請求書に入金（テストネット）",
@@ -790,4 +792,4 @@ export const ja = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

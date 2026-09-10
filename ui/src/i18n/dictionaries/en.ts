@@ -9,6 +9,7 @@ import { createPasskeyEn } from "./create-passkey-en.js";
 import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
 import { payFaucetEn } from "./pay-faucet-en.js";
+import { buyEn } from "./buy-en.js";
 
 export const en = {
   brand: "Trustless Commerce",
@@ -171,6 +172,7 @@ export const en = {
     ctaFieldGuide: "Read the field guide",
     ctaCreate: "Create an invoice",
     ctaOpenWallet: "Open wallet",
+    heroImageAlt: "A person receiving a customer payment at their desk",
     ctaLiveCheckout: "See a live checkout",
     trustRowLabel: "Built-in trust signals",
     trustPasskey: "Passkey",
@@ -307,18 +309,18 @@ export const en = {
   getPaid: {
     breadcrumb: "GET PAID",
     eyebrow: "Get paid",
-    title: "Three ways to take payment.",
-    lede: "Quick invoice, open invoices, or share your wallet address — settlement stays with you.",
-    createTitle: "Create an invoice",
-    createBody: "Amount, networks, and a pay link — settlement binds to your wallet on-chain.",
-    createCta: "Create invoice",
-    listTitle: "Invoice list",
-    listBody: "See awaiting and paid invoices for your merchant address.",
+    title: "Three ways to get paid.",
+    lede: "Send a payment link, check who has paid, or show a QR so someone can pay you on the spot.",
+    createTitle: "Send a payment link",
+    createBody: "Name the customer, set the amount, and share a link they can open to pay you.",
+    createCta: "Create payment link",
+    listTitle: "See your invoices",
+    listBody: "Check who has paid and who still needs to.",
     listCta: "Open list",
-    receiveTitle: "Receive to wallet",
-    receiveBody: "Share your passkey wallet address or QR for direct USDC.",
-    receiveCta: "Receive",
-    advancedHint: "Need invoice ops in the wallet chrome?",
+    receiveTitle: "Show a QR code",
+    receiveBody: "Let someone pay you directly by scanning a code on their phone.",
+    receiveCta: "Show QR",
+    advancedHint: "Need a fuller invoice list inside your account?",
     switchAdvanced: "Switch to Advanced mode",
   },
 
@@ -410,16 +412,16 @@ export const en = {
     paymentModeBothTitle: "Crypto or card",
     paymentModeBothHint: "Wallet or card/bank. You still receive the stablecoin on-chain.",
     paymentModeFiatTitle: "Card or bank only",
-    paymentModeFiatHint: "Customer never sees a crypto address. Still settles as USDC/USDT on one network.",
-    settlementNetworkLabel: "Settlement networks",
+    paymentModeFiatHint: "Customer never sees a crypto address. Still settles as USDC on Base.",
+    settlementNetworkLabel: "Settlement network",
     settlementNetworkHint:
-      "Ethereum, Base, and Tron are required for card/bank (enables Revolut Pay and more). You can add other Onramper-supported rails.",
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "Charge ~{amount} {fiat}",
     settlePreview: "You receive ~{amount} {token}",
     fiatReceiveLabel: "You receive (settlement)",
     fiatReceiveHint: "Stablecoin amount that must arrive on-chain. Customer pays in fiat at checkout.",
     fiatPayLabel: "Customer pays",
-    fiatPayHint: "Invoice amount in the customer’s currency. Settlement USDC/USDT is quoted below.",
+    fiatPayHint: "Optional hint for the payer’s currency. Settlement is the USDC amount you set above.",
     displayFiatLabel: "Customer pays in",
     quoteCountryLabel: "Customer country",
     quoteMethodLabel: "Payment method",
@@ -472,6 +474,10 @@ export const en = {
     embedCopied: "Embed HTML copied.",
     openedCheckout: "Opened checkout in a new tab.",
     payLinkCopied: "Pay link copied.",
+    payLinkReadyTitle: "Your payment link is ready",
+    payLinkReadyLede: "Copy or share this link with your customer. They open it to pay you.",
+    sharePayLink: "Share",
+    payLinkShared: "Share sheet opened.",
     docsEyebrow: "Developers",
     docsTitle: "Create invoices programmatically",
     docsIntro:
@@ -752,6 +758,8 @@ export const en = {
       },
     },
   },
+
+  buy: buyEn,
 
   wallet: walletEn,
 };

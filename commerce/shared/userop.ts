@@ -15,12 +15,14 @@ export const ERC20_ABI = [
 export const WALLET_EXECUTE_ABI = [
   "function execute(bytes32 mode, bytes executionData)",
   "function addOwner(bytes32 qx, bytes32 qy)",
+  "function addOwnerEoa(address owner, bytes signature)",
   "function removeOwner(bytes32 qx, bytes32 qy)",
   "function enableAdvanced(bytes32 adminEntityId)",
   "function configureMultisig(bytes32[] removeKeyIds, bytes32[] entityIds, bytes32[] entityIdsForKeys, uint8[] keyTypes, bytes32[] qx, bytes32[] qy, address[] eoa, uint8 threshold, bytes32[] vetoEntityIds)",
   "function addEntity(bytes32 entityId)",
   "function removeEntity(bytes32 entityId, bytes32[] keyIds)",
   "function addKey(bytes32 entityId, uint8 keyType, bytes32 qx, bytes32 qy, address eoa)",
+  "function addKeyEoa(bytes32 entityId, address eoa, bytes signature)",
   "function removeKey(bytes32 keyId)",
   "function setThreshold(uint8 m)",
   "function setVeto(bytes32 entityId, bool isVeto)",
@@ -130,6 +132,10 @@ export function encodeAddOwner(qx: string, qy: string): string {
   return walletIface.encodeFunctionData("addOwner", [qx, qy]);
 }
 
+export function encodeAddOwnerEoa(owner: string, signature: string): string {
+  return walletIface.encodeFunctionData("addOwnerEoa", [getAddress(owner), signature]);
+}
+
 export function encodeRemoveOwner(qx: string, qy: string): string {
   return walletIface.encodeFunctionData("removeOwner", [qx, qy]);
 }
@@ -158,6 +164,10 @@ export function encodeAddKey(
   eoa: string
 ): string {
   return walletIface.encodeFunctionData("addKey", [entityId, keyType, qx, qy, eoa]);
+}
+
+export function encodeAddKeyEoa(entityId: string, eoa: string, signature: string): string {
+  return walletIface.encodeFunctionData("addKeyEoa", [entityId, getAddress(eoa), signature]);
 }
 
 export function encodeSetThreshold(m: number): string {
@@ -268,6 +278,24 @@ export function buildAddOwnerBatchCalls(input: {
       target: getAddress(input.wallet),
       value: 0n,
       data: encodeAddOwner(input.qx, input.qy),
+    },
+  ];
+}
+
+export function buildAddOwnerEoaBatchCalls(input: {
+  feeToken: string;
+  beneficiary: string;
+  feeAmount: bigint;
+  wallet: string;
+  owner: string;
+  signature: string;
+}): BatchCall[] {
+  return [
+    buildFeeTransferCall(input.feeToken, input.beneficiary, input.feeAmount),
+    {
+      target: getAddress(input.wallet),
+      value: 0n,
+      data: encodeAddOwnerEoa(input.owner, input.signature),
     },
   ];
 }

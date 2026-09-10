@@ -9,10 +9,11 @@
 | POST | `/api/invoices` | Create (rate limited — `create` bucket) |
 | GET | `/api/invoices/:id` | Status + events |
 | GET | `/api/invoices?to=0x…` | Merchant list (signed) |
-| GET | `/api/public/onramp` | Onramper capability probe |
-| GET | `/api/public/onramp-quote` | Fiat↔crypto quote ([Quote API](quote.md)) |
-| GET | `/api/public/onramp-methods` | Payment methods for a quote |
-| POST | `/api/invoices/:id/onramp-session` | Start card/bank checkout widget |
+| GET | `/api/public/pay-in/config` | MetaMask pay-in capability (Base USDC) |
+| GET | `/api/public/pay-in/countries` | Quote regions |
+| GET | `/api/public/pay-in/geo` | Payer country from CDN IP headers |
+| GET | `/api/public/pay-in/quotes` | Card/bank quotes ([Pay-in API](quote.md)) |
+| GET | `/api/public/pay-in/widget` | Provider checkout URL (new tab) |
 
 Invoice type field shapes and worked examples: [Invoice types](invoice-types.md).
 
@@ -60,9 +61,12 @@ User-facing recovery for the hosted `/wallet` product (not the HMAC partner API)
 |--------|------|------|
 | GET/POST | `/api/wallet/email` | Passkey + captcha (POST); public masked GET |
 | POST | `/api/wallet/email/verify` | OTP + captcha |
+| POST | `/api/wallet/recovery/email/start` | Email + captcha. Always 200 (no enumeration). OTP only if wallets exist |
+| POST | `/api/wallet/recovery/email/verify` | OTP + captcha → `emailSession` |
+| GET | `/api/wallet/recovery/email/wallets` | Bearer `emailSession` — all wallets for that email |
 | POST | `/api/wallet/recovery/challenges` | Public |
 | GET | `/api/wallet/recovery` | Public (active request + `pendingOwner`) |
-| POST | `/api/wallet/recovery/requests` | New-device passkey + captcha |
+| POST | `/api/wallet/recovery/requests` | New key (WebAuthn, YubiKey, or EOA) + captcha. Email optional. `walletAddresses[]` + `emailSession` for email-first |
 | POST | `/api/wallet/recovery/requests/:id/verify-email` | OTP + captcha |
 | POST | `/api/wallet/recovery/requests/:id/cancel` | Owner passkey + captcha |
 | GET | `/api/guardian/nonce` | Guardian address query |
@@ -91,8 +95,8 @@ Central table-driven limiter (IP + bucket). New public routes are limited by def
 | Bucket | Default | Env | Used for |
 |--------|---------|-----|----------|
 | `create` | 1/s | `RATE_LIMIT_CREATE_PER_SECOND` | `POST /api/invoices` (+ aliases, faucet capped) |
-| `public` | 20/s | `RATE_LIMIT_PUBLIC_PER_SECOND` | Public GETs, hosted wallet APIs, onramp config |
-| `quote` | 2/s, burst 20 | `RATE_LIMIT_QUOTE_PER_SECOND`, `RATE_LIMIT_QUOTE_BURST` | `/api/public/onramp-quote`, `/api/public/onramp-methods` |
+| `public` | 20/s | `RATE_LIMIT_PUBLIC_PER_SECOND` | Public GETs, hosted wallet APIs |
+| `quote` | 2/s, burst 20 | `RATE_LIMIT_QUOTE_PER_SECOND`, `RATE_LIMIT_QUOTE_BURST` | `/api/public/pay-in/` |
 | `sweeper` | 50/s | `RATE_LIMIT_SWEEPER_PER_SECOND` | Sweeper + bundler signed APIs |
 | `wallet_client` | 50/s | `RATE_LIMIT_WALLET_CLIENT_PER_SECOND` | `/api/client/wallets*` |
 

@@ -72,10 +72,4 @@ rateLimit:
   publicPerIpPerSecond: 20
   sweeperPerIpPerSecond: 50
 claimLeaseMs: 180000
-# Optional card/bank funding via Onramper (mainnet). Default off until keys are set.
-# onramper:
-#   enabled: false
-#   apiKey: ${ONRAMPER_API_KEY}
-#   signingKey: ${ONRAMPER_SIGNING_KEY}
-#   widgetOrigin: https://buy.onramper.com
-#   fiats: [USD, EUR, GBP, SEK]
+# MetaMask pay-in (/buy, invoice card, wallet cash-in). Default ON. Settles as Base USDC.

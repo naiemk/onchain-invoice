@@ -9,6 +9,7 @@ import {AdvancedWalletMixin} from "./AdvancedWalletMixin.sol";
 import {AdvancedWalletTypes} from "./AdvancedWalletTypes.sol";
 import {P256OwnerRegistry} from "./P256OwnerRegistry.sol";
 import {IWalletRecoveryTarget} from "./IWalletRecovery.sol";
+import {WalletEip712} from "./WalletEip712.sol";
 
 /// @notice Passkey smart wallet with pluggable recovery and optional advanced entity M-of-N policy.
 contract Wallet is Account, ERC7821, Initializable, P256OwnerRegistry, AdvancedWalletMixin, IWalletRecoveryTarget {
@@ -120,6 +121,16 @@ contract Wallet is Account, ERC7821, Initializable, P256OwnerRegistry, AdvancedW
         _addKey(entityId, keyType, qx, qy, eoa);
     }
 
+    function addKeyEoa(bytes32 entityId, address eoa, bytes calldata signature)
+        external
+        onlyEntryPointOrSelf
+        whenNotPaused
+    {
+        if (eoa == address(0)) revert InvalidOwnerKey();
+        if (!WalletEip712.recoverAddKey(address(this), entityId, eoa, signature)) revert InvalidSignature();
+        _addKey(entityId, AdvancedWalletTypes.KEY_EOA, bytes32(0), bytes32(0), eoa);
+    }
+
     function removeKey(bytes32 keyId) external onlyEntryPointOrSelf whenNotPaused {
         _removeKey(keyId);
     }
@@ -204,6 +215,14 @@ contract Wallet is Account, ERC7821, Initializable, P256OwnerRegistry, AdvancedW
         _addOwnerKey(qx, qy);
     }
 
+    function addOwnerEoa(address owner, bytes calldata signature) external onlyEntryPointOrSelf whenNotPaused {
+        if (advanced) revert AdvancedWalletTypes.AdvancedModeActive();
+        if (owner == address(0)) revert InvalidOwnerKey();
+        if (!WalletEip712.recoverAddOwner(address(this), owner, signature)) revert InvalidSignature();
+        (bytes32 qx, bytes32 qy) = WalletEip712.eoaOwnerCoords(owner);
+        _addOwnerKey(qx, qy);
+    }
+
     function removeOwner(bytes32 qx, bytes32 qy) external onlyEntryPointOrSelf whenNotPaused {
         if (advanced) revert AdvancedWalletTypes.AdvancedModeActive();
         _removeOwnerKey(qx, qy);
@@ -252,7 +271,17 @@ contract Wallet is Account, ERC7821, Initializable, P256OwnerRegistry, AdvancedW
             bytes32 id = _ownerIds[i];
             if (!_owners[id]) continue;
             (bytes32 qx, bytes32 qy) = _ownerKeyById(id);
-            _addKeyInternal(adminEntityId, AdvancedWalletTypes.KEY_WEBAUTHN, qx, qy, address(0));
+            if (WalletEip712.isEoaOwnerQy(qy)) {
+                _addKeyInternal(
+                    adminEntityId,
+                    AdvancedWalletTypes.KEY_EOA,
+                    bytes32(0),
+                    bytes32(0),
+                    WalletEip712.eoaFromQx(qx)
+                );
+            } else {
+                _addKeyInternal(adminEntityId, AdvancedWalletTypes.KEY_WEBAUTHN, qx, qy, address(0));
+            }
         }
     }
 

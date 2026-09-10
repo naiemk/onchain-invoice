@@ -403,7 +403,8 @@ export const ar = {
     paymentModeFiatTitle: "بطاقة أو بنك فقط",
     paymentModeFiatHint: "لا يرى العميل عنوان عملة رقمية. ما زال يُسوَّى كـ USDC/USDT على شبكة واحدة.",
     settlementNetworkLabel: "شبكات التسوية",
-    settlementNetworkHint: "Ethereum وBase وTron مطلوبة للبطاقة/البنك (تفعّل Revolut Pay والمزيد). يمكنك إضافة سكك أخرى يدعمها Onramper.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "الرسوم ~{amount} {fiat}",
     settlePreview: "تستلم ~{amount} {token}",
     fiatPayLabel: "يدفع العميل",
@@ -500,7 +501,8 @@ export const ar = {
 
   pay: {
     faucetTitle: "صنبور شبكة الاختبار",
-    faucetHint: "وضع Onramper التجريبي لا يموّل عناوين شبكة الاختبار. أدخل سر صنبور المشغّل لإرسال مبلغ التسوية على السلسلة حتى يُكمل المُحوِّل الدفع.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "سر الصنبور",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "تمويل الفاتورة (شبكة اختبار)",
@@ -786,4 +788,4 @@ export const ar = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

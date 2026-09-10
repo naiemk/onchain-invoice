@@ -158,6 +158,24 @@ export const walletFa = {
     "با اسکن QR روی دستگاه دیگر این مرورگر را جفت کنید، یا کیف پولی را که از قبل دارید بازیابی کنید.",
   pairWithAnotherDevice: "جفت کردن با دستگاه دیگر",
   recoverExistingOnDevice: "بازیابی کیف پول‌های موجود روی این دستگاه",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   localRecoveryTitle: "بازیابی محلی",
   localRecoveryLede:
     "وجوه شما روی زنجیره می‌مانند. سعی می‌کنیم رکورد سرور این کلید عبور را بازگردانیم.",
@@ -357,8 +375,8 @@ export const walletFa = {
     "با کارت یا انتقال بانکی USDC یا USDT بخرید. رمزارز مستقیم به کیف پول می‌رود — بدون برداشت فاکتور.",
   depositFiatLabel: "با این می‌پردازید",
   depositContinue: "ادامه به تسویه‌حساب",
-  depositHint:
-    "Onramper بهترین ارائه‌دهنده را برای منطقهٔ شما برمی‌گزیند. استیبل‌های پشتیبانی‌شده: USDC و USDT در صورت موجود بودن.",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "حالت آزمایشی — بدون هزینهٔ واقعی و بدون تأمین روی زنجیره.",
   depositLoading: "در حال بارگذاری تسویه‌حساب…",
   depositIframeTitle: "تسویه‌حساب واریز",
@@ -367,13 +385,14 @@ export const walletFa = {
   depositFailed: "شروع تسویه‌حساب واریز ممکن نشد",
   withdrawCta: "به بانک / کارت",
   withdrawTitle: "برداشت نقد به بانک یا کارت",
-  withdrawLede:
-    "از کیف پول USDC یا USDT بفروشید. وقتی Onramper آماده باشد ارسال را با کلید عبور تأیید می‌کنید.",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "برداشت نقد به",
   withdrawContinue: "ادامه به برداشت نقد",
   withdrawHint:
     "پس از انتخاب ارائه‌دهنده، از شما می‌خواهیم ارسال رمزارز از این کیف پول را تأیید کنید.",
-  withdrawSandboxNote: "حالت آزمایشی — جریان فروش تا پیکربندی کلیدهای Onramper یک stub محلی است.",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "در حال بارگذاری برداشت نقد…",
   withdrawIframeTitle: "تسویه‌حساب برداشت نقد",
   withdrawUnavailable: "برداشت نقد به کارت و بانک در این نسخه فعال نیست.",
@@ -530,7 +549,7 @@ export const walletFa = {
   superWalletAddPasskey: "افزودن کلید عبور",
   superWalletAddYubiKey: "افزودن کلید امنیتی",
   superWalletConnectWallet: "اتصال کیف پول",
-  superWalletConnectWalletHint: "MetaMask یا WalletConnect را متصل کنید…",
+  superWalletConnectWalletHint: "با MetaMask یا WalletConnect امضا کنید تا این آدرس به‌عنوان مالک اضافه شود.",
   superWalletEnrollPasskey: "ایجاد کلید عبور برای این موجودیت…",
   superWalletEnrollYubiKey: "کلید امنیتی را وارد یا لمس کنید…",
   superWalletKeyPasskey: "کلید عبور",

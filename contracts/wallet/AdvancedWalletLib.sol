@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {WebAuthn} from "@openzeppelin/contracts/utils/cryptography/WebAuthn.sol";
 import {AdvancedWalletTypes} from "./AdvancedWalletTypes.sol";
+import {WalletEip712} from "./WalletEip712.sol";
 
 /// @dev Hot-path helpers for advanced wallet signature validation.
 library AdvancedWalletLib {
@@ -42,8 +41,7 @@ library AdvancedWalletLib {
     ) internal view returns (bool) {
         if (key.keyType == AdvancedWalletTypes.KEY_EOA) {
             if (key.eoa == address(0)) return false;
-            bytes32 ethSigned = MessageHashUtils.toEthSignedMessageHash(abi.encodePacked(digest));
-            return ECDSA.recover(ethSigned, sig) == key.eoa;
+            return WalletEip712.recoverUserOp(address(this), digest, key.eoa, sig);
         }
         if (key.keyType == AdvancedWalletTypes.KEY_WEBAUTHN || key.keyType == AdvancedWalletTypes.KEY_YUBIKEY) {
             if (key.qx == bytes32(0) && key.qy == bytes32(0)) return false;

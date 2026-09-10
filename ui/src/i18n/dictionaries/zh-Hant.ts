@@ -406,7 +406,8 @@ export const zhHant = {
     paymentModeFiatTitle: "僅限卡或銀行",
     paymentModeFiatHint: "客戶看不到加密地址。仍在一條網路上以 USDC/USDT 結算。",
     settlementNetworkLabel: "結算網路",
-    settlementNetworkHint: "卡/銀行結算必須包含 Ethereum、Base 和 Tron（以啟用 Revolut Pay 等）。你還可以新增其他 Onramper 支援的通道。",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "收費 ~{amount} {fiat}",
     settlePreview: "你收到 ~{amount} {token}",
     fiatPayLabel: "客戶支付",
@@ -504,7 +505,8 @@ export const zhHant = {
 
   pay: {
     faucetTitle: "測試網水龍頭",
-    faucetHint: "Onramper 沙盒不會向測試網地址入金。輸入營運方水龍頭密鑰，以在鏈上傳送結算金額，以便歸集服務完成付款。",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "水龍頭密鑰",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "為發票注資（測試網）",
@@ -790,4 +792,4 @@ export const zhHant = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

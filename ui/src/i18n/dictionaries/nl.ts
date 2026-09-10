@@ -407,7 +407,8 @@ export const nl = {
     paymentModeFiatTitle: "Alleen kaart of bank",
     paymentModeFiatHint: "Klant ziet nooit een crypto-adres. Wordt nog steeds afgerekend als USDC/USDT op één netwerk.",
     settlementNetworkLabel: "Afrekeningsnetwerken",
-    settlementNetworkHint: "Ethereum, Base en Tron zijn vereist voor kaart/bank (maakt Revolut Pay en meer mogelijk). Je kunt andere door Onramper ondersteunde rails toevoegen.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "Kosten ~{amount} {fiat}",
     settlePreview: "Je ontvangt ~{amount} {token}",
     fiatPayLabel: "Klant betaalt",
@@ -506,7 +507,8 @@ export const nl = {
 
   pay: {
     faucetTitle: "Testnet-faucet",
-    faucetHint: "De Onramper-sandbox financiert geen testnetadressen. Voer het operator-faucetgeheim in om het afrekeningsbedrag on-chain te sturen zodat de sweeper de betaling kan afronden.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "Faucetgeheim",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "Factuur financieren (testnet)",
@@ -796,4 +798,4 @@ export const nl = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

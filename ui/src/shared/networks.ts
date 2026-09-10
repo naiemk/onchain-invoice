@@ -184,7 +184,7 @@ export function tokenAllowedOnChain(chainId: string, token: string): boolean {
   if (kind === "solana") return symbol === "USDC";
   // Base: USDC only
   if (id === "8453") return symbol === "USDC";
-  // Ethereum mainnet: USDC only (Onramper + settlement)
+  // Ethereum mainnet: USDC only
   if (id === "1") return symbol === "USDC";
   // BNB Smart Chain: USDC + USDT
   if (id === "56") return symbol === "USDC" || symbol === "USDT";

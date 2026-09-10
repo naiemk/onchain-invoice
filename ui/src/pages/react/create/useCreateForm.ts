@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { encodePayLink, payPath } from "@/shared/invoice.js";
 import { withPayChrome, type PayChrome } from "@/shared/pay-chrome.js";
 import { copyText } from "@/shared/dom.js";
-import { localizeError, localizeOnrampQuoteError } from "@/i18n/errors.js";
+import { localizeError } from "@/i18n/errors.js";
 import { createCounterfactualWallet } from "@/shared/wallet-create.js";
 import { loadWalletSession, listWalletRegistry } from "@/shared/wallet-session.js";
 import {
   deploymentMode,
   networkKind,
-  networkShort,
   normalizeAddress,
   tokenAllowedOnChain,
   tokensForChains,
@@ -18,7 +17,7 @@ import {
 } from "@/shared/networks.js";
 import { apiUrl } from "@/shared/site.js";
 import type { PayLinkFields, PaymentMode } from "@/shared/types.js";
-import { AUTO_VALUE, ruleFor, type FiatField } from "@/pages/create/fiat-rules.js";
+import { type FiatField } from "@/pages/create/fiat-rules.js";
 import {
   fiatMinimumChainIds,
   fiatMinimumTokenForChain,
@@ -26,24 +25,6 @@ import {
 } from "@/pages/create/form.js";
 import { loadCreatePrefs, patchCreatePrefs, pickRemembered } from "@/pages/create/prefs.js";
 import { useLocale } from "@/providers/LocaleProvider";
-
-interface OnrampPublicConfig {
-  enabled: boolean;
-  sandbox?: boolean;
-  fiats: string[];
-  supportedPairs: Array<{ chainId: string; token: string }>;
-}
-
-interface OnrampQuoteResponse {
-  fiatAmount: string;
-  cryptoAmount: string;
-  fiat: string;
-  demo?: boolean;
-  quotes?: Array<{ provider: string; paymentMethod: string; fiatAmount: string; cryptoAmount: string }>;
-  recommended?: { provider: string; paymentMethod: string; fiatAmount: string; cryptoAmount: string };
-  chainId?: string;
-  token?: string;
-}
 
 export interface TokenCheckbox {
   id: string;
@@ -131,24 +112,9 @@ function effectivePaymentMode(onrampEnabled: boolean, paymentMode: PaymentMode):
   return paymentMode;
 }
 
-function selectedOnrampPairs(state: CreateFormState): Array<{ chainId: string; token: string }> {
-  const supported = onrampSupportedSet(state.onrampPairs);
-  const pairs: Array<{ chainId: string; token: string }> = [];
-  for (const chainId of state.chains) {
-    for (const token of state.tokens) {
-      if (supported.size === 0) {
-        if (tokenAllowedOnChain(chainId, token)) pairs.push({ chainId, token });
-      } else if (supported.has(`${chainId}:${token}`)) {
-        pairs.push({ chainId, token });
-      }
-    }
-  }
-  return pairs;
-}
-
 function isChainTokenSkippable(state: CreateFormState, networks: NetworkOption[]): boolean {
   const mode = effectivePaymentMode(state.onrampEnabled, state.paymentMode);
-  if (mode === "fiat") return true;
+  if (mode === "fiat" || mode === "crypto_or_fiat") return true;
   const enabled = networks.filter((n) => n.enabled !== false);
   if (enabled.length !== 1) return false;
   return tokensForChains([enabled[0]!.id]).length === 1;
@@ -180,11 +146,6 @@ function validateStepState(state: CreateFormState, step: WizardStep, tr: Transla
     return;
   }
   if (!state.price.trim()) throw new Error(tr("errors.missingPrice"));
-  if (mode === "fiat") {
-    if (!state.quotedSettlement || state.quotedSettlement === "0") {
-      throw new Error(tr("create.quoteError"));
-    }
-  }
 }
 
 function readFormFromState(state: CreateFormState, tr: Translate): PayLinkFields {
@@ -207,7 +168,7 @@ function readFormFromState(state: CreateFormState, tr: Translate): PayLinkFields
   const includeFiat = mode === "fiat" || mode === "crypto_or_fiat";
 
   return {
-    price: mode === "fiat" ? state.quotedSettlement || "0" : price,
+    price: price || "0",
     to,
     chains,
     tokens,
@@ -220,20 +181,9 @@ function readFormFromState(state: CreateFormState, tr: Translate): PayLinkFields
     ...(state.lang.trim() ? { lang: state.lang.trim() } : {}),
     ...(includeFiat
       ? {
-          displayFiat: state.displayFiat || state.quotedDisplayFiat || undefined,
-          displayAmount:
-            mode === "fiat" ? price || state.quotedDisplayAmount || undefined : state.quotedDisplayAmount || undefined,
-          quoteCountry: state.quoteCountry.trim() || "us",
-          quotePaymentMethod: state.quotePaymentMethod || undefined,
-          quoteProvider: state.quoteProvider || state.quotedProvider || undefined,
-          quoteSlippageBps: (() => {
-            const pct = Number(state.quoteSlippagePct || "1");
-            if (!Number.isFinite(pct) || pct < 0) return 100;
-            return Math.round(pct * 100);
-          })(),
-          ...(mode === "fiat"
-            ? { price: state.quotedSettlement || "0", displayAmount: price || state.quotedDisplayAmount || undefined }
-            : {}),
+          displayFiat: state.displayFiat || undefined,
+          displayAmount: state.displayFiat ? price || undefined : undefined,
+          quoteCountry: state.quoteCountry.trim() || undefined,
         }
       : {}),
   };
@@ -268,7 +218,7 @@ function readFormLooseFromState(state: CreateFormState): PayLinkFields {
 
 function computeTokenOptions(state: CreateFormState, tr: Translate): TokenCheckbox[] {
   const mode = effectivePaymentMode(state.onrampEnabled, state.paymentMode);
-  const fiatMode = mode === "fiat";
+  const fiatMode = mode === "fiat" || mode === "crypto_or_fiat";
   const supported = onrampSupportedSet(state.onrampPairs);
   let tokens = tokensForChains(state.chains);
   if (fiatMode && supported.size > 0) {
@@ -317,7 +267,7 @@ function applyFiatChainLocks(
     locked: false,
   }));
 
-  if (mode !== "fiat") {
+  if (mode !== "fiat" && mode !== "crypto_or_fiat") {
     let chains = state.chains.filter((id) => networks.some((n) => n.id === id));
     if (chains.length === 0 && networks[0]) chains = [networks[0].id];
     return {
@@ -386,8 +336,8 @@ function initialState(): CreateFormState {
     allowPartial: false,
     displayFiat: prefs.displayFiat || "SEK",
     quoteCountry: prefs.quoteCountry || "se",
-    quotePaymentMethod: prefs.quotePaymentMethod || AUTO_VALUE,
-    quoteProvider: prefs.quoteProvider || AUTO_VALUE,
+    quotePaymentMethod: prefs.quotePaymentMethod || "",
+    quoteProvider: prefs.quoteProvider || "",
     quoteSlippagePct: prefs.quoteSlippagePct || "1",
     onrampEnabled: false,
     onrampSandbox: false,
@@ -417,7 +367,6 @@ export function useCreateForm() {
   const { t, locale } = useLocale();
 
   const [state, setState] = useState<CreateFormState>(() => initialState());
-  const fiatQuoteTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const mode = deploymentMode();
   const networks = useMemo(() => networksForDeployment(mode), [mode]);
@@ -502,207 +451,31 @@ export function useCreateForm() {
     [t]
   );
 
-  const loadQuotePaymentMethods = useCallback(async (s: CreateFormState) => {
-    const mode = effectivePaymentMode(s.onrampEnabled, s.paymentMode);
-    if (mode !== "fiat" && mode !== "crypto_or_fiat") return;
-    const pairs = selectedOnrampPairs(s);
-    const fiat = s.displayFiat || "SEK";
-    const country = s.quoteCountry.trim().toLowerCase() || "us";
-    if (pairs.length === 0) return;
-    const prefs = loadCreatePrefs();
-    try {
-      const params = new URLSearchParams({ fiat, country, expand: "1" });
-      params.set("pairs", pairs.map((p) => `${p.chainId}:${p.token}`).join(","));
-      const res = await fetch(apiUrl(`/api/public/onramp-methods?${params}`));
-      if (!res.ok) return;
-      const body = (await res.json()) as { methods?: Array<{ id: string; name: string }> };
-      const methods = body.methods ?? [];
-      const ids = methods.map((m) => m.id);
-      const remembered = pickRemembered(ids, prefs.quotePaymentMethod, AUTO_VALUE);
-      setState((prev) => ({
-        ...prev,
-        quotePaymentMethods: methods,
-        quotePaymentMethod: remembered,
-      }));
-    } catch {
-      /* keep defaults */
-    }
-  }, []);
-
-  const reselectProvider = useCallback(
-    (s: CreateFormState) => {
-      const activeProvider = s.quoteProvider;
-      const quotes = s.quoteProviders;
-      if (quotes.length === 0) return s;
-      const active = quotes.find((q) => q.provider === activeProvider) ?? quotes[0];
-      if (!active) return s;
-      const settleToken = s.quotedToken ?? "USDC";
-      const settleChain = s.quotedChainId ? ` · ${networkShort(s.quotedChainId)}` : "";
-      return {
-        ...s,
-        fiatChargePreview: t("create.settlePreview", { amount: active.cryptoAmount, token: settleToken }) + settleChain,
-        quotedSettlement: active.cryptoAmount,
-        quotedDisplayAmount: active.fiatAmount,
-        quotedProvider: active.provider,
-      };
-    },
-    [t]
-  );
-
-  const refreshFiatQuote = useCallback(
-    async (s: CreateFormState) => {
-      const mode = effectivePaymentMode(s.onrampEnabled, s.paymentMode);
-      if (mode !== "fiat" && mode !== "crypto_or_fiat") return s;
-      const pairs = selectedOnrampPairs(s);
-      const fiatAmount = s.price.trim();
-      const fiat = s.displayFiat || "SEK";
-      const country = s.quoteCountry.trim().toLowerCase() || "us";
-      const paymentMethod = s.quotePaymentMethod || undefined;
-      const preferredProvider = s.quoteProvider.trim() || undefined;
-      if (pairs.length === 0 || !fiatAmount) return s;
-
-      const direction = mode === "fiat" ? "pay" : "receive";
-      let next: CreateFormState = {
-        ...s,
-        fiatQuoteStatus: t("create.quoteLoading"),
-        fiatChargePreview: null,
-        amountLimits: null,
-      };
-      setState(next);
-
-      try {
-        const params = new URLSearchParams({
-          fiat,
-          country,
-          direction,
-          pairs: pairs.map((p) => `${p.chainId}:${p.token}`).join(","),
-        });
-        if (paymentMethod) params.set("paymentMethod", paymentMethod);
-        if (preferredProvider) params.set("provider", preferredProvider);
-        if (direction === "pay") params.set("fiatAmount", fiatAmount);
-        else params.set("cryptoAmount", fiatAmount);
-        const slippagePct = Number(s.quoteSlippagePct || "1");
-        if (Number.isFinite(slippagePct) && slippagePct >= 0) {
-          params.set("slippageBps", String(Math.round(slippagePct * 100)));
-        }
-        const res = await fetch(apiUrl(`/api/public/onramp-quote?${params}`));
-        const body = (await res.json()) as OnrampQuoteResponse & {
-          error?: string;
-          code?: string;
-          minAmount?: number;
-          maxAmount?: number;
-        };
-        if (!res.ok) {
-          if (body.code === "onramp_limit_mismatch" || body.minAmount != null || body.maxAmount != null) {
-            next = {
-              ...next,
-              amountLimits: t("create.amountLimits", {
-                min: String(body.minAmount ?? "—"),
-                max: String(body.maxAmount ?? "—"),
-                fiat: body.fiat ?? fiat,
-              }),
-            };
-          }
-          const localized = localizeOnrampQuoteError(body);
-          throw new Error(localized ?? body.error ?? t("create.quoteError"));
-        }
-        const settleToken = body.token ?? "USDC";
-        const recommended = body.recommended ?? {
-          provider: body.quotes?.[0]?.provider ?? "demo",
-          paymentMethod: paymentMethod || "creditcard",
-          fiatAmount: body.fiatAmount,
-          cryptoAmount: body.cryptoAmount,
-        };
-        const prefs = loadCreatePrefs();
-        const quotes = body.quotes ?? [recommended];
-        const ids = quotes.map((q) => q.provider);
-        let quoteProvider = preferredProvider || prefs.quoteProvider || AUTO_VALUE;
-        quoteProvider = pickRemembered(ids, quoteProvider, AUTO_VALUE);
-        if (quoteProvider !== AUTO_VALUE && !ids.includes(quoteProvider)) {
-          quoteProvider = AUTO_VALUE;
-        }
-        const activeProvider =
-          quoteProvider && quoteProvider !== AUTO_VALUE ? quoteProvider : recommended.provider;
-        const active = quotes.find((q) => q.provider === activeProvider) ?? recommended;
-        const settleChain = body.chainId ? ` · ${networkShort(body.chainId)}` : "";
-        next = {
-          ...next,
-          quoteProviders: quotes,
-          quoteProvider,
-          fiatChargePreview:
-            t("create.settlePreview", { amount: active.cryptoAmount, token: settleToken }) + settleChain,
-          fiatQuoteStatus: body.demo ? "Demo quote (no live Onramper keys)" : "",
-          quotedDisplayAmount: active.fiatAmount,
-          quotedDisplayFiat: body.fiat,
-          quotedSettlement: active.cryptoAmount,
-          quotedProvider: active.provider ?? activeProvider,
-          quotedChainId: body.chainId ?? null,
-          quotedToken: body.token ?? null,
-          amountLimits: null,
-        };
-        setState(next);
-        return next;
-      } catch (error) {
-        next = {
-          ...next,
-          fiatQuoteStatus: error instanceof Error ? localizeError(error) : t("create.quoteError"),
-          quotedSettlement: null,
-          quotedDisplayAmount: null,
-          quotedProvider: null,
-        };
-        setState(next);
-        return next;
-      }
-    },
-    [t]
-  );
-
   const runFiatCascade = useCallback(
-    (field: FiatField) => {
-      const mode = effectivePaymentMode(state.onrampEnabled, state.paymentMode);
-      if (mode !== "fiat" && mode !== "crypto_or_fiat") return;
-      const rule = ruleFor(field);
-      const exec = async () => {
-        let s = fullState;
-        for (const action of rule.actions) {
-          if (action === "none") continue;
-          if (action === "refetchMethods") await loadQuotePaymentMethods(s);
-          if (action === "refetchProviders") {
-            s = (await refreshFiatQuote(s)) ?? s;
-          }
-          if (action === "reselectProvider") {
-            setState((prev) => reselectProvider(prev));
-          }
-        }
-        persistPrefs();
-      };
-      if (rule.debounceMs) {
-        clearTimeout(fiatQuoteTimer.current);
-        fiatQuoteTimer.current = setTimeout(() => void exec(), rule.debounceMs);
-      } else {
-        void exec();
-      }
+    (_field: FiatField) => {
+      persistPrefs();
     },
-    [state.onrampEnabled, state.paymentMode, fullState, loadQuotePaymentMethods, refreshFiatQuote, reselectProvider, persistPrefs]
+    [persistPrefs]
   );
 
   const loadOnrampConfig = useCallback(async () => {
     try {
-      const res = await fetch(apiUrl("/api/public/onramp"));
+      const res = await fetch(apiUrl("/api/public/pay-in/config"));
       if (!res.ok) return;
-      const body = (await res.json()) as OnrampPublicConfig;
+      const body = (await res.json()) as { enabled?: boolean; chainId?: string; token?: string };
       const prefs = loadCreatePrefs();
+      const enabled =
+        Boolean(body.enabled) &&
+        networksForDeployment().some((n) => n.id === (body.chainId ?? "8453"));
+      const pairs = enabled
+        ? [{ chainId: body.chainId ?? "8453", token: (body.token ?? "USDC").toUpperCase() }]
+        : [];
+      const fiats = ["USD", "EUR", "GBP", "SEK"];
       setState((prev) => {
         let displayFiat = prev.displayFiat;
         let paymentMode = prev.paymentMode;
-        if (body.enabled && body.fiats.length > 0) {
-          displayFiat = pickRemembered(
-            body.fiats,
-            prefs.displayFiat,
-            body.fiats.includes("SEK") ? "SEK" : body.fiats[0]!
-          );
-        }
-        if (body.enabled) {
+        if (enabled) {
+          displayFiat = pickRemembered(fiats, prefs.displayFiat, fiats.includes("SEK") ? "SEK" : fiats[0]!);
           const remembered = prefs.paymentMode;
           paymentMode =
             remembered === "crypto" || remembered === "crypto_or_fiat" || remembered === "fiat"
@@ -711,10 +484,10 @@ export function useCreateForm() {
         }
         return {
           ...prev,
-          onrampEnabled: body.enabled,
-          onrampSandbox: Boolean(body.sandbox),
-          onrampPairs: body.supportedPairs ?? [],
-          onrampFiats: body.fiats ?? [],
+          onrampEnabled: enabled,
+          onrampSandbox: false,
+          onrampPairs: pairs,
+          onrampFiats: fiats,
           displayFiat,
           paymentMode,
         };
@@ -743,13 +516,6 @@ export function useCreateForm() {
       document.getElementById("create-docs")?.scrollIntoView({ behavior: "smooth" });
     }
   }, [loadOnrampConfig]);
-
-  useEffect(() => {
-    const mode = effectivePaymentMode(state.onrampEnabled, state.paymentMode);
-    if (mode !== "crypto") {
-      void loadQuotePaymentMethods(fullState).then(() => void refreshFiatQuote(fullState));
-    }
-  }, [state.onrampEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const preview = useMemo((): CreatePreview | null => {
     try {
@@ -895,40 +661,24 @@ export function useCreateForm() {
     [state.currentStep, omitNetworkStep, goToStep, fullState, applySingletonChainToken, t]
   );
 
-  const handleSubmit = useCallback(async () => {
-    if (paymentMode === "fiat") {
-      setState((prev) => ({ ...prev, formActionStatus: t("pay.creatingAddress"), formActionError: false }));
-      try {
-        const quoted = await refreshFiatQuote(fullState);
-        const s = quoted ?? fullState;
-        const fields = readFormFromState(s, t);
-        if (!fields.displayAmount || !fields.displayFiat) throw new Error(t("create.quoteError"));
-        if (!fields.price || fields.price === "0") throw new Error(t("create.quoteError"));
-        window.open(withPayChrome(payPath(fields), state.payChrome), "_blank", "noopener,noreferrer");
-        setState((prev) => ({ ...prev, formActionStatus: t("create.openedCheckout"), formActionError: false }));
-        persistPrefs();
-      } catch (error) {
-        setState((prev) => ({
-          ...prev,
-          formActionStatus: error instanceof Error ? localizeError(error) : t("errors.fillRequired"),
-          formActionError: true,
-        }));
-      }
-      return;
-    }
+  const handleSubmit = useCallback(async (): Promise<boolean> => {
     try {
       const fields = readFormFromState(fullState, t);
-      window.open(withPayChrome(payPath(fields), state.payChrome), "_blank", "noopener,noreferrer");
-      setState((prev) => ({ ...prev, formActionStatus: t("create.openedCheckout"), formActionError: false }));
+      if (paymentMode === "fiat" && (!fields.price || fields.price === "0")) {
+        throw new Error(t("errors.missingPrice"));
+      }
       persistPrefs();
+      setState((prev) => ({ ...prev, formActionStatus: null, formActionError: false }));
+      return true;
     } catch (error) {
       setState((prev) => ({
         ...prev,
         formActionStatus: error instanceof Error ? localizeError(error) : t("errors.fillRequired"),
         formActionError: true,
       }));
+      return false;
     }
-  }, [paymentMode, refreshFiatQuote, fullState, state.payChrome, persistPrefs, t]);
+  }, [paymentMode, fullState, persistPrefs, t]);
 
   const copyPayLink = useCallback(async () => {
     if (!preview?.link) return;

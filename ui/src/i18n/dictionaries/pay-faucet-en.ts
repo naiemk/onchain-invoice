@@ -2,7 +2,7 @@
 export const payFaucetEn = {
   faucetTitle: "Testnet faucet",
   faucetHint:
-    "Onramper sandbox does not fund testnet addresses. Enter the operator faucet secret to send the settlement amount on-chain so the sweeper can complete payment.",
+    "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
   faucetSecretLabel: "Faucet secret",
   faucetSecretPlaceholder: "FAUCET_SECRET",
   faucetButton: "Fund invoice (testnet)",

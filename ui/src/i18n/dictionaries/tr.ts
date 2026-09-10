@@ -411,7 +411,8 @@ export const tr = {
     paymentModeFiatTitle: "Yalnızca kart veya banka",
     paymentModeFiatHint: "Müşteri hiç kripto adresi görmez. Yine tek ağda USDC/USDT olarak yerleşir.",
     settlementNetworkLabel: "Yerleşim ağları",
-    settlementNetworkHint: "Kart/banka için Ethereum, Base ve Tron gerekir (Revolut Pay ve daha fazlasını açar). Onramper’ın desteklediği diğer rayları ekleyebilirsiniz.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "Tahsilat ~{amount} {fiat}",
     settlePreview: "Alacağınız ~{amount} {token}",
     fiatPayLabel: "Müşteri öder",
@@ -511,7 +512,8 @@ export const tr = {
 
   pay: {
     faucetTitle: "Test ağı faucet",
-    faucetHint: "Onramper sandbox’ı test ağı adreslerini fonlamaz. Sweeper ödemeyi tamamlayabilsin diye yerleşim tutarını zincir üstüne göndermek için operatör faucet sırrını girin.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "Faucet sırrı",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "Faturayı fonla (test ağı)",
@@ -800,4 +802,4 @@ export const tr = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

@@ -1,34 +1,40 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { mountTurnstile } from "@/shared/turnstile.js";
 
 export type TurnstileControl = {
   getToken: () => string | null;
   reset: () => void;
+  destroy?: () => void;
 };
 
 export function TurnstileWidget({
   siteKey,
   onTokenChange,
   controlRef,
+  className,
 }: {
   siteKey: string | null | undefined;
-  onTokenChange: (ready: boolean) => void;
-  controlRef: React.MutableRefObject<TurnstileControl | null>;
+  onTokenChange?: (ready: boolean) => void;
+  controlRef: MutableRefObject<TurnstileControl | null>;
+  className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onTokenChangeRef = useRef(onTokenChange);
+  onTokenChangeRef.current = onTokenChange;
 
   useEffect(() => {
+    const notify = (ready: boolean) => onTokenChangeRef.current?.(ready);
     if (!siteKey || !containerRef.current) {
-      onTokenChange(true);
+      notify(true);
       controlRef.current = null;
       return;
     }
-    onTokenChange(false);
+    notify(false);
     let cancelled = false;
     const container = containerRef.current;
     void mountTurnstile(container, siteKey, {
       onToken: (token) => {
-        if (!cancelled) onTokenChange(Boolean(token));
+        if (!cancelled) notify(Boolean(token));
       },
     }).then((ctl) => {
       if (cancelled) {
@@ -39,11 +45,17 @@ export function TurnstileWidget({
     });
     return () => {
       cancelled = true;
-      controlRef.current?.destroy();
+      controlRef.current?.destroy?.();
       controlRef.current = null;
     };
-  }, [siteKey, onTokenChange, controlRef]);
+  }, [siteKey, controlRef]);
 
   if (!siteKey) return null;
-  return <div ref={containerRef} data-testid="turnstile-widget" className="flex justify-center" />;
+  return (
+    <div
+      ref={containerRef}
+      data-testid="turnstile-widget"
+      className={className ?? "flex justify-center py-4"}
+    />
+  );
 }

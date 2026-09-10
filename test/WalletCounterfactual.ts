@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { ethers as ethersLib } from "ethers";
 import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
+import { getWalletContractFactory } from "./helpers/wallet-factory.js";
 
 describe("Wallet counterfactual address", function () {
   const QX = ethersLib.zeroPadValue("0x01", 32);
@@ -16,7 +17,7 @@ describe("Wallet counterfactual address", function () {
   it("predictWalletAddress matches factory before deploy", async function () {
     const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
     const [owner] = await ethers.getSigners();
-    const WalletImpl = await ethers.getContractFactory("Wallet");
+    const WalletImpl = await getWalletContractFactory(ethers, "Wallet");
     const walletImpl = await WalletImpl.deploy();
     const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
     const recovery = await Recovery.deploy(owner.address, owner.address);
@@ -40,7 +41,7 @@ describe("Wallet counterfactual address", function () {
   it("createAccount is idempotent", async function () {
     const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
     const [owner] = await ethers.getSigners();
-    const WalletImpl = await ethers.getContractFactory("Wallet");
+    const WalletImpl = await getWalletContractFactory(ethers, "Wallet");
     const walletImpl = await WalletImpl.deploy();
     const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
     const recovery = await Recovery.deploy(owner.address, owner.address);

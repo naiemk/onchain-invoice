@@ -404,7 +404,8 @@ export const fa = {
     paymentModeFiatTitle: "فقط کارت یا بانک",
     paymentModeFiatHint: "مشتری هرگز آدرس رمزارز نمی‌بیند. همچنان به‌صورت USDC/USDT روی یک شبکه تسویه می‌شود.",
     settlementNetworkLabel: "شبکه‌های تسویه",
-    settlementNetworkHint: "برای کارت/بانک Ethereum، Base و Tron الزامی‌اند (Revolut Pay و بیشتر را فعال می‌کنند). می‌توانید ریل‌های دیگر پشتیبانی‌شدهٔ Onramper را بیفزایید.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "هزینه ~{amount} {fiat}",
     settlePreview: "دریافت می‌کنید ~{amount} {token}",
     fiatPayLabel: "مشتری می‌پردازد",
@@ -501,7 +502,8 @@ export const fa = {
 
   pay: {
     faucetTitle: "شیر شبکهٔ آزمایشی",
-    faucetHint: "حالت آزمایشی Onramper آدرس‌های شبکهٔ آزمایشی را تأمین نمی‌کند. راز شیر اپراتور را وارد کنید تا مبلغ تسویه روی زنجیره فرستاده شود و برداشت‌کننده پرداخت را کامل کند.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "راز شیر",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "تأمین فاکتور (شبکهٔ آزمایشی)",
@@ -788,4 +790,4 @@ export const fa = {
     englishNotice:
       "این اسناد به انگلیسی ارائه شده‌اند و بدون توجه به زبان انتخابی رابط کاربری اعمال می‌شوند.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;
