@@ -5,14 +5,13 @@ import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLocale } from "@/providers/LocaleProvider";
-import { renderWalletRecover } from "@/pages/wallet/recover.js";
 import { PageCard, PageSplit } from "@/components/PageSplit";
 import { TrustNotice } from "@/components/TrustNotice";
 import { fetchWalletConfig, primaryChain } from "@/shared/wallet-api.js";
 import { isAdvancedMode } from "@/shared/wallet-mode.js";
 import { loadWalletSession } from "@/shared/wallet-session.js";
 import { WalletFrame } from "./WalletFrame";
-import { WalletBodyMount } from "./WalletBodyMount";
+import { RecoveryOptions } from "./RecoveryOptions";
 import { useWalletPolicy } from "./wallet-policy";
 import { DevicesCard } from "./DevicesCard";
 import { IdentityEmailCard } from "./IdentityEmailCard";
@@ -121,7 +120,7 @@ export function SecurityPage() {
             <PageCard>
               <section id="recovery" className="scroll-mt-24">
                 <h2 className="mb-4 text-base font-semibold">{t("wallet.recoverPageTitle")}</h2>
-                <WalletBodyMount render={renderWalletRecover} />
+                <RecoveryOptions />
               </section>
             </PageCard>
           )}

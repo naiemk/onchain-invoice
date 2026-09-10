@@ -403,7 +403,8 @@ export const th = {
     paymentModeFiatTitle: "บัตรหรือธนาคารเท่านั้น",
     paymentModeFiatHint: "ลูกค้าไม่เห็นที่อยู่คริปโต ยังชำระเป็น USDC/USDT บนเครือข่ายเดียว",
     settlementNetworkLabel: "เครือข่ายการชำระ",
-    settlementNetworkHint: "Ethereum, Base และ Tron จำเป็นสำหรับบัตร/ธนาคาร (เปิด Revolut Pay และอื่นๆ) คุณเพิ่มรางอื่นที่ Onramper รองรับได้",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "เรียกเก็บ ~{amount} {fiat}",
     settlePreview: "คุณได้รับ ~{amount} {token}",
     fiatPayLabel: "ลูกค้าจ่าย",
@@ -501,7 +502,8 @@ export const th = {
 
   pay: {
     faucetTitle: "Faucet เทสต์เน็ต",
-    faucetHint: "Sandbox ของ Onramper ไม่เติมที่อยู่เทสต์เน็ต ป้อนรหัสลับ faucet ของผู้ปฏิบัติการเพื่อส่งจำนวนชำระบนเชนให้ sweeper ทำการชำระให้ครบ",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "รหัสลับ faucet",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "เติมใบแจ้งหนี้ (เทสต์เน็ต)",
@@ -787,4 +789,4 @@ export const th = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

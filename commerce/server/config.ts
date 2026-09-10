@@ -7,7 +7,7 @@ import {
   type SolanaChainConfig,
   type SolanaNetworksConfig,
 } from "onchain-invoice";
-import { DEFAULT_ONRAMPER_FIATS } from "../shared/onramper.js";
+
 export interface RateLimitConfig {
   /** Max invoice creates per IP per second (default 1). */
   createPerSecond: number;
@@ -15,7 +15,7 @@ export interface RateLimitConfig {
   sweeperPerIpPerSecond: number;
   /** HMAC wallet-client API per IP per second (default same as sweeper). */
   walletClientPerIpPerSecond: number;
-  /** Sustained Onramper quote/methods requests per IP per second (default 2). */
+  /** Sustained pay-in quote requests per IP per second (default 2). */
   quotePerSecond: number;
   /** Burst capacity for quote/methods (default 20). */
   quoteBurst: number;
@@ -73,8 +73,8 @@ export interface AppConfig {
   rateLimit: RateLimitConfig;
   claimLeaseMs: number;
   configPath?: string;
-  /** Operator-gated Onramper card/bank onramp. Default off. */
-  onramper: OnramperConfig;
+  /** MetaMask aggregator pay-in (/buy, invoice card, wallet cash-in). Default on. */
+  metamaskOnramp: MetamaskOnrampConfig;
   /** Passkey smart wallet factory (Sepolia / per-chain). */
   wallet: WalletConfig;
   /** Testnet faucet for fiat-only invoice e2e (secret-gated). */
@@ -100,6 +100,8 @@ export interface AppConfig {
 export interface EmailConfig {
   resendApiKey?: string;
   from?: string;
+  /** Ops inbox for hosted recovery requests. Unset → log in dev, skip send. */
+  notifyTo?: string;
 }
 
 export interface FaucetConfig {
@@ -141,20 +143,13 @@ export interface WalletChainEntry {
   networkLabel: string;
 }
 
-export interface OnramperConfig {
+export interface MetamaskOnrampConfig {
   enabled: boolean;
-  /**
-   * True when card/bank UX is on without live Onramper keys (testnet).
-   * Session returns a local demo page instead of buy.onramper.com/.dev.
-   */
-  demo: boolean;
-  apiKey?: string;
-  /** Ed25519 PEM (V2) or dashboard HMAC hex (V1). Never expose publicly. */
-  signingKey?: string;
-  /** HMAC secret for `X-Onramper-Webhook-Signature`. Optional. */
-  webhookSecret?: string;
-  widgetOrigin: string;
-  fiats: string[];
+  ordersUrl: string;
+  regionsUrl: string;
+  geoUrl: string;
+  buyOrigin: string;
+  redirectUrl: string;
 }
 
 interface YamlFile {
@@ -191,15 +186,15 @@ interface YamlFile {
   cors?: { origins?: string[] };
   rateLimit?: Partial<RateLimitConfig>;
   claimLeaseMs?: number;
-  email?: { resendApiKey?: string; from?: string };
+  email?: { resendApiKey?: string; from?: string; notifyTo?: string };
   walletAdminGuardian?: string;
-  onramper?: {
+  metamaskOnramp?: {
     enabled?: boolean;
-    apiKey?: string;
-    signingKey?: string;
-    webhookSecret?: string;
-    widgetOrigin?: string;
-    fiats?: string[];
+    ordersUrl?: string;
+    regionsUrl?: string;
+    geoUrl?: string;
+    buyOrigin?: string;
+    redirectUrl?: string;
   };
   faucet?: {
     enabled?: boolean;
@@ -292,7 +287,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     claimLeaseMs: Number(env.CLAIM_LEASE_MS ?? file.claimLeaseMs ?? 180_000),
     configPath,
-    onramper: loadOnramperConfig(env, file.onramper),
+    metamaskOnramp: loadMetamaskOnrampConfig(env, file.metamaskOnramp),
     wallet: loadWalletConfig(env, legacy?.rpcUrl, evmChains, file.wallet),
     faucet: loadFaucetConfig(env, file.faucet, {
       sweeperPrivateKey: blankToUndefined(expand(env.SWEEPER_PRIVATE_KEY ?? file.evm?.sweeperPrivateKey ?? "")),
@@ -300,6 +295,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     email: {
       resendApiKey: blankToUndefined(expand(env.RESEND_API_KEY ?? file.email?.resendApiKey ?? "")),
       from: blankToUndefined(expand(env.RESEND_FROM ?? file.email?.from ?? "")) ?? "Trustless Commerce <noreply@trustless-commerce.com>",
+      notifyTo: blankToUndefined(
+        expand(env.WALLET_RECOVERY_NOTIFY_EMAIL ?? file.email?.notifyTo ?? "")
+      ),
     },
     walletAdminGuardian: blankToUndefined(
       expand(env.WALLET_ADMIN_GUARDIAN ?? file.walletAdminGuardian ?? "")
@@ -469,57 +467,34 @@ function loadWalletChains(
   return entries;
 }
 
-function loadOnramperConfig(
+function loadMetamaskOnrampConfig(
   env: NodeJS.ProcessEnv,
-  file: YamlFile["onramper"] | undefined
-): OnramperConfig {
-  const enabledRaw = (env.ONRAMPER_ENABLED ?? "").trim();
-  const apiKey = blankToUndefined(expand(env.ONRAMPER_API_KEY ?? file?.apiKey ?? ""));
-  const signingKey = blankToUndefined(expand(env.ONRAMPER_SIGNING_KEY ?? file?.signingKey ?? ""));
-  const webhookSecret = blankToUndefined(expand(env.ONRAMPER_WEBHOOK_SECRET ?? file?.webhookSecret ?? ""));
-  const widgetOriginExplicit = blankToUndefined(
-    expand(env.ONRAMPER_WIDGET_ORIGIN ?? file?.widgetOrigin ?? "")
-  );
-  const widgetOrigin =
-    widgetOriginExplicit ??
-    (apiKey?.startsWith("pk_test") ? "https://buy.onramper.dev" : "https://buy.onramper.com");
-  const fiatsFromEnv = env.ONRAMPER_FIATS?.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
-  const fiats =
-    fiatsFromEnv && fiatsFromEnv.length > 0
-      ? fiatsFromEnv
-      : file?.fiats?.map((s) => String(s).trim().toUpperCase()).filter(Boolean) ??
-        [...DEFAULT_ONRAMPER_FIATS];
-
+  file: YamlFile["metamaskOnramp"] | undefined
+): MetamaskOnrampConfig {
+  const enabledRaw = (env.METAMASK_ONRAMP_ENABLED ?? "").trim().toLowerCase();
   const explicitlyOff =
-    enabledRaw === "0" ||
-    enabledRaw.toLowerCase() === "false" ||
-    enabledRaw.toLowerCase() === "no";
-
-  const explicitlyOn =
-    enabledRaw === "1" ||
-    enabledRaw.toLowerCase() === "true" ||
-    enabledRaw.toLowerCase() === "yes" ||
-    file?.enabled === true;
-
-  const hasLiveKeys = Boolean(apiKey && signingKey);
-
-  // Live keys → on by default. Explicit ONRAMPER_ENABLED=1 → on even without keys (testnet demo).
-  const flagOn =
-    !explicitlyOff && (explicitlyOn || (enabledRaw === "" && file?.enabled !== false && hasLiveKeys));
-
-  const enabled = flagOn && (hasLiveKeys || explicitlyOn);
-  const demo = enabled && !hasLiveKeys;
-
+    enabledRaw === "0" || enabledRaw === "false" || enabledRaw === "no" || file?.enabled === false;
+  const ordersUrl = blankToUndefined(expand(env.METAMASK_ONRAMP_ORDERS_URL ?? file?.ordersUrl ?? "")) ??
+    "https://on-ramp.api.cx.metamask.io";
+  const regionsUrl =
+    blankToUndefined(expand(env.METAMASK_ONRAMP_REGIONS_URL ?? file?.regionsUrl ?? "")) ??
+    "https://on-ramp-cache.api.cx.metamask.io";
+  const geoUrl =
+    blankToUndefined(expand(env.METAMASK_ONRAMP_GEO_URL ?? file?.geoUrl ?? "")) ??
+    `${ordersUrl.replace(/\/$/, "")}/geolocation`;
+  const buyOrigin =
+    blankToUndefined(expand(env.METAMASK_ONRAMP_BUY_ORIGIN ?? file?.buyOrigin ?? "")) ??
+    "https://portfolio.metamask.io";
+  const redirectUrl =
+    blankToUndefined(expand(env.METAMASK_ONRAMP_REDIRECT_URL ?? file?.redirectUrl ?? "")) ??
+    buyOrigin.replace(/\/$/, "");
   return {
-    enabled,
-    demo,
-    apiKey,
-    signingKey,
-    webhookSecret,
-    widgetOrigin: demo
-      ? widgetOriginExplicit ?? "https://buy.onramper.dev"
-      : widgetOrigin,
-    fiats,
+    enabled: !explicitlyOff,
+    ordersUrl: ordersUrl.replace(/\/$/, ""),
+    regionsUrl: regionsUrl.replace(/\/$/, ""),
+    geoUrl,
+    buyOrigin: buyOrigin.replace(/\/$/, ""),
+    redirectUrl: redirectUrl.replace(/\/$/, ""),
   };
 }
 

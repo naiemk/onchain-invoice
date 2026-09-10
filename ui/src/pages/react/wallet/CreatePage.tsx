@@ -15,6 +15,8 @@ import { copyText } from "@/shared/dom.js";
 import { deploymentMode } from "@/shared/networks.js";
 import { WalletFrame } from "./WalletFrame";
 import { CreateDisclaimerWizard } from "./CreateDisclaimerWizard";
+import { EmailAttachWizard } from "./EmailAttachWizard";
+import type { WalletSession } from "@/shared/wallet-session.js";
 
 export function CreatePage() {
   const { t } = useLocale();
@@ -24,6 +26,8 @@ export function CreatePage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedSecurityChecks, setAcceptedSecurityChecks] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [emailWizardOpen, setEmailWizardOpen] = useState(false);
+  const [createdSession, setCreatedSession] = useState<WalletSession | null>(null);
   const [status, setStatus] = useState<{ kind: "info" | "error" | "success"; message: string } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
@@ -59,8 +63,9 @@ export function CreatePage() {
     try {
       const result = await createCounterfactualWallet(label, { captchaToken });
       setAddress(result.address);
+      setCreatedSession(result.session);
       setStatus({ kind: "success", message: t("wallet.createdCounterfactual") });
-      navigate("/wallet", { replace: true });
+      setEmailWizardOpen(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message === "captcha_failed") {
@@ -163,6 +168,7 @@ export function CreatePage() {
           siteKey={turnstileSiteKey}
           onTokenChange={handleCaptchaTokenChange}
           controlRef={captchaRef}
+          className="my-6 flex justify-center py-4"
         />
 
         <Button
@@ -182,11 +188,27 @@ export function CreatePage() {
           onOpenChange={setWizardOpen}
           onComplete={() => void runCreate()}
         />
+        <EmailAttachWizard
+          open={emailWizardOpen}
+          onOpenChange={(open) => {
+            setEmailWizardOpen(open);
+            if (!open) navigate("/wallet", { replace: true });
+          }}
+          session={createdSession}
+          allowSkip
+          onDone={() => navigate("/wallet", { replace: true })}
+        />
 
         <details className="mt-4 text-xs text-muted-foreground">
           <summary className="cursor-pointer">{t("wallet.counterfactualShort")}</summary>
           <p className="mt-2">{t("wallet.counterfactualCallout")}</p>
         </details>
+        <p className="mt-4 text-xs text-muted-foreground">
+          {t("wallet.createOtherOptions")}{" "}
+          <Link to="/wallet/recover" className="underline underline-offset-2">
+            {t("wallet.createRecoverByEmail")}
+          </Link>
+        </p>
 
         {address && (
           <div id="wallet-create-result" className="mt-6 space-y-3 border-t border-border pt-6">

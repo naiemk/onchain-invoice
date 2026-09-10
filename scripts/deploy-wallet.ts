@@ -18,7 +18,13 @@ async function main() {
   console.error(`Deploying wallet stack on network=${networkName ?? "default"} as ${deployer.address}`);
   console.error(`guardian=${guardian} recoveryTimelock=${recoveryTimelock}`);
 
-  const WalletImpl = await ethers.getContractFactory("Wallet");
+  const Lib = await ethers.getContractFactory("WalletEip712");
+  const eip712 = await Lib.deploy();
+  await eip712.waitForDeployment();
+
+  const WalletImpl = await ethers.getContractFactory("Wallet", {
+    libraries: { WalletEip712: await eip712.getAddress() },
+  });
   const walletImpl = await WalletImpl.deploy();
   await walletImpl.waitForDeployment();
 
@@ -40,6 +46,7 @@ async function main() {
     network: networkName ?? "unknown",
     chainId,
     walletImplementation: await walletImpl.getAddress(),
+    walletEip712: await eip712.getAddress(),
     recovery: await recovery.getAddress(),
     factory: await factory.getAddress(),
     recoveryTimelock: recoveryTimelock.toString(),

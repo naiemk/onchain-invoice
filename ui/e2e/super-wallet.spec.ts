@@ -19,6 +19,15 @@ async function injectMockEthereum(page: Page): Promise<void> {
             const raw = ethers.getBytes(hexMsg);
             return signer.signMessage(raw);
           }
+          if (method === "eth_signTypedData_v4") {
+            const [, payload] = (params ?? []) as [string, string];
+            const { ethers } = await import("https://cdn.jsdelivr.net/npm/ethers@6.13.5/+esm");
+            const parsed = typeof payload === "string" ? JSON.parse(payload) : payload;
+            const types = { ...(parsed.types ?? {}) };
+            delete types.EIP712Domain;
+            const signer = new ethers.Wallet(privateKey);
+            return signer.signTypedData(parsed.domain, types, parsed.message);
+          }
           throw new Error(`unsupported: ${method}`);
         },
       };
@@ -352,9 +361,11 @@ test.describe("Super Wallet UI", () => {
     await page.getByRole("button", { name: "Pair another device" }).click();
     await expect(page.getByTestId("pair-device-dialog")).toBeVisible();
     await expect(page.getByTestId("pair-copy-link")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Recovery center" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "I lost this device" })).toHaveCount(0);
     await page.goto("/wallet/recover");
-    await expect(page).toHaveURL(/\/wallet\/security/);
+    await expect(page).toHaveURL(/\/wallet\/recover/);
+    await expect(page.getByRole("tab", { name: "With email" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Without email" })).toBeVisible();
 
     await page.goto("/wallet/send");
     await expect(page.getByTestId("super-wallet-pay")).toBeVisible();
@@ -370,6 +381,32 @@ test.describe("Super Wallet UI", () => {
 
     await page.goto("/wallet/access");
     await expect(page.getByTestId("access-page")).toBeVisible();
+  });
+
+  test("Connect wallet on a simple wallet does not require email or enable Super Wallet", async ({ page }) => {
+    await seedSimpleWalletSession(page);
+    await mockSuperWalletUpgradeApis(page);
+    await page.route("**/api/wallet/devices**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ devices: [] }),
+      });
+    });
+    let emailHits = 0;
+    await page.route("**/api/wallet/**/email**", async (route) => {
+      emailHits += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ email: null, verified: false }),
+      });
+    });
+    await page.goto("/wallet/security");
+    await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
+    await page.getByRole("button", { name: "Connect wallet" }).click();
+    await expect(page.locator("#enable-advanced")).toHaveCount(0);
+    await expect.poll(() => emailHits).toBe(0);
   });
 
   test("injected EOA provider is available for wallet connect", async ({ page }) => {

@@ -176,6 +176,24 @@ export const walletId = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "Dompet Anda di perangkat ini",
   chooseWalletLede:
     "Pilih dompet untuk dibuka. Masing-masing dibuat dengan passkey di browser ini.",
@@ -293,8 +311,8 @@ export const walletId = {
     "Beli USDC atau USDT dengan kartu atau transfer bank. Kripto dikirim langsung ke dompet Anda — tanpa sweep faktur.",
   depositFiatLabel: "Anda bayar dengan",
   depositContinue: "Lanjut ke checkout",
-  depositHint:
-    "Onramper memilih penyedia terbaik untuk wilayah Anda. Stablecoin yang didukung: USDC dan USDT jika tersedia.",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "Mode sandbox — tanpa tagihan nyata dan tanpa pendanaan on-chain.",
   depositLoading: "Memuat checkout…",
   depositIframeTitle: "Checkout setor",
@@ -303,14 +321,14 @@ export const walletId = {
   depositFailed: "Tidak dapat memulai checkout setor",
   withdrawCta: "Ke bank / kartu",
   withdrawTitle: "Cairkan ke bank atau kartu",
-  withdrawLede:
-    "Jual USDC atau USDT dari dompet Anda. Anda akan mengonfirmasi pengiriman dengan passkey saat Onramper siap.",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "Cairkan ke",
   withdrawContinue: "Lanjut ke pencairan",
   withdrawHint:
     "Setelah Anda memilih penyedia, kami akan meminta konfirmasi pengiriman kripto dari dompet ini.",
-  withdrawSandboxNote:
-    "Mode sandbox — alur jual adalah stub lokal hingga kunci Onramper dikonfigurasi.",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "Memuat pencairan…",
   withdrawIframeTitle: "Checkout pencairan",
   withdrawUnavailable: "Pencairan kartu dan bank tidak diaktifkan pada instance ini.",

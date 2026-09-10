@@ -3,6 +3,8 @@ import type { EmailConfig } from "./config.js";
 
 /** Last OTP logged in dev/test when Resend is unset (never exposed over HTTP). */
 let lastDevOtp: { to: string; code: string; purpose: "attach" | "recover" } | null = null;
+/** Last ops notify logged in dev/test (never exposed over HTTP). */
+let lastDevNotify: { to: string; subject: string; text: string } | null = null;
 
 export function getLastDevOtp(): typeof lastDevOtp {
   return lastDevOtp;
@@ -10,6 +12,14 @@ export function getLastDevOtp(): typeof lastDevOtp {
 
 export function clearLastDevOtp(): void {
   lastDevOtp = null;
+}
+
+export function getLastDevNotify(): typeof lastDevNotify {
+  return lastDevNotify;
+}
+
+export function clearLastDevNotify(): void {
+  lastDevNotify = null;
 }
 
 export function generateOtpCode(): string {
@@ -70,6 +80,43 @@ export async function sendOtpEmail(
   if (!response.ok) {
     const text = await response.text();
     throw Object.assign(new Error(`Resend failed: ${response.status} ${text}`), { statusCode: 502 });
+  }
+  return { delivered: true, mode: "resend" };
+}
+
+export async function sendRecoveryRequestedEmail(
+  config: EmailConfig,
+  input: { text: string }
+): Promise<{ delivered: boolean; mode: "resend" | "log" | "skip" }> {
+  const subject = "recovery requested";
+  const to = config.notifyTo?.trim();
+  if (!to) {
+    lastDevNotify = { to: "", subject, text: input.text };
+    console.error(`[email:dev] ${subject}\n${input.text}`);
+    return { delivered: false, mode: "skip" };
+  }
+  if (!config.resendApiKey) {
+    lastDevNotify = { to, subject, text: input.text };
+    console.error(`[email:dev] to=${to} subject=${subject}\n${input.text}`);
+    return { delivered: true, mode: "log" };
+  }
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${config.resendApiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from: config.from ?? "Trustless Commerce <noreply@trustless-commerce.com>",
+      to: [to],
+      subject,
+      text: input.text,
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    console.error(`[email] recovery notify failed: ${response.status} ${text}`);
+    return { delivered: false, mode: "resend" };
   }
   return { delivered: true, mode: "resend" };
 }

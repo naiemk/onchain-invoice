@@ -1,4 +1,4 @@
-import { AbiCoder, getBytes, keccak256, Wallet } from "ethers";
+import { AbiCoder, getBytes, keccak256 } from "ethers";
 
 /** Magic prefix for advanced wallet UserOp signatures ("AWD1"). */
 export const ADVANCED_SIG_MAGIC = "0x41574431";
@@ -72,22 +72,6 @@ export function unwrapAdvancedInnerSig(stored: string, keyId?: string): string {
   return current;
 }
 
-/** Sign a UserOp digest with personal_sign (EIP-191) for EOA advanced keys. */
-export async function signEoaPersonalDigest(
-  privateKey: string,
-  digest: string
-): Promise<string> {
-  const wallet = new Wallet(privateKey);
-  return wallet.signMessage(getBytes(digest));
-}
-
-export async function signEoaPersonalDigestWithSigner(
-  signer: { signMessage: (msg: Uint8Array | string) => Promise<string> },
-  digest: string
-): Promise<string> {
-  return signer.signMessage(getBytes(digest));
-}
-
 export const WALLET_ADVANCED_ABI = [
   "function advanced() view returns (bool)",
   "function threshold() view returns (uint8)",
@@ -103,6 +87,7 @@ export const WALLET_ADVANCED_ABI = [
   "function addEntity(bytes32 entityId)",
   "function removeEntity(bytes32 entityId, bytes32[] keyIds)",
   "function addKey(bytes32 entityId, uint8 keyType, bytes32 qx, bytes32 qy, address eoa)",
+  "function addKeyEoa(bytes32 entityId, address eoa, bytes signature)",
   "function removeKey(bytes32 keyId)",
   "function setThreshold(uint8 m)",
   "function setVeto(bytes32 entityId, bool isVeto)",

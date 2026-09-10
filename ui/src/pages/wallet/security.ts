@@ -27,7 +27,7 @@ import {
 import { resolveCurrentWalletPasskey } from "../../shared/current-wallet-passkey.js";
 import {
   bindCopyButtons,
-  formatKeyFingerprint,
+  formatDeviceFingerprint,
   paintWalletLoading,
   paintWalletPage,
   renderYubiKeyPinRequiredPanel,
@@ -147,7 +147,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
                   <li>
                     <div>
                       <strong>${escapeHtml(d.label)}</strong>
-                      <span class="mono faint">${escapeHtml(formatKeyFingerprint(d.ownerQx, d.ownerQy))}</span>
+                      <span class="mono faint">${escapeHtml(formatDeviceFingerprint(d))}</span>
                     </div>
                     ${
                       onChainAdvanced

@@ -1,5 +1,6 @@
 import type { Locale } from "../locales.js";
 import type { Messages } from "./en.js";
+import { buyEn } from "./buy-en.js";
 import { createPasskeyEn } from "./create-passkey-en.js";
 import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
@@ -29,42 +30,51 @@ import { ur } from "./ur.js";
 import { vi } from "./vi.js";
 import { zhHans } from "./zh-Hans.js";
 import { zhHant } from "./zh-Hant.js";
+import { applyLocaleOverlays } from "./overlay-merge.js";
+import { overlayFill } from "./overlay-fill.js";
+import { overlayForce } from "./overlay-force.js";
 
-function withPasskeyCreate(messages: Messages): Messages {
+function withPasskeyCreate(messages: Omit<Messages, "buy"> & { buy?: Messages["buy"] }): Messages {
   return {
     ...messages,
+    buy: { ...buyEn, ...messages.buy },
     create: { ...createPasskeyEn, ...createWizardEn, ...messages.create },
     pay: { ...payFaucetEn, ...messages.pay },
     errors: { ...onrampErrorsEn, ...messages.errors },
-  };
+  } as Messages;
 }
 
-const withPasskey = (m: Messages) => withPasskeyCreate(m);
+function withPasskey(
+  locale: Locale,
+  messages: Omit<Messages, "buy"> & { buy?: Messages["buy"] }
+): Messages {
+  return applyLocaleOverlays(locale, withPasskeyCreate(messages), overlayFill, overlayForce);
+}
 
 export const dictionaries: Record<Locale, Messages> = {
-  en: withPasskey(en),
-  "zh-Hans": withPasskey(zhHans),
-  "zh-Hant": withPasskey(zhHant),
-  es: withPasskey(es),
-  ar: withPasskey(ar),
-  hi: withPasskey(hi),
-  "pt-BR": withPasskey(ptBR),
-  bn: withPasskey(bn),
-  ru: withPasskey(ru),
-  ja: withPasskey(ja),
-  de: withPasskey(de),
-  fr: withPasskey(fr),
-  id: withPasskey(id),
-  ko: withPasskey(ko),
-  tr: withPasskey(tr),
-  it: withPasskey(it),
-  vi: withPasskey(vi),
-  th: withPasskey(th),
-  pl: withPasskey(pl),
-  nl: withPasskey(nl),
-  uk: withPasskey(uk),
-  fa: withPasskey(fa),
-  ms: withPasskey(ms),
-  he: withPasskey(he),
-  ur: withPasskey(ur),
+  en: withPasskey("en", en),
+  "zh-Hans": withPasskey("zh-Hans", zhHans),
+  "zh-Hant": withPasskey("zh-Hant", zhHant),
+  es: withPasskey("es", es),
+  ar: withPasskey("ar", ar),
+  hi: withPasskey("hi", hi),
+  "pt-BR": withPasskey("pt-BR", ptBR),
+  bn: withPasskey("bn", bn),
+  ru: withPasskey("ru", ru),
+  ja: withPasskey("ja", ja),
+  de: withPasskey("de", de),
+  fr: withPasskey("fr", fr),
+  id: withPasskey("id", id),
+  ko: withPasskey("ko", ko),
+  tr: withPasskey("tr", tr),
+  it: withPasskey("it", it),
+  vi: withPasskey("vi", vi),
+  th: withPasskey("th", th),
+  pl: withPasskey("pl", pl),
+  nl: withPasskey("nl", nl),
+  uk: withPasskey("uk", uk),
+  fa: withPasskey("fa", fa),
+  ms: withPasskey("ms", ms),
+  he: withPasskey("he", he),
+  ur: withPasskey("ur", ur),
 };

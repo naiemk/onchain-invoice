@@ -27,6 +27,7 @@ import type {
   WalletEmailOtpPurpose,
   WalletRecoveryRequestRecord,
   WalletRecoveryRequestStatus,
+  WalletRecoveryNewOwnerKind,
   HostedRecoveryChallengePurpose,
   HostedRecoveryChallengeRecord,
   WalletEntityRecord,
@@ -43,7 +44,7 @@ import type {
 } from "../shared/wallet.js";
 import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
 import type { TransferDraft } from "../shared/wallet-transfers.js";
-import { parsePaymentMode } from "../shared/onramper.js";
+import { parsePaymentMode } from "../shared/payment-mode.js";
 import { INVOICE_PERSIST_STREAM, PersistLog, WALLET_PERSIST_STREAM } from "./persist-log.js";
 
 interface InvoiceRow {
@@ -1322,6 +1323,8 @@ export class CommerceDb {
     this.ensureColumn("wallet_accounts", "activation_error", "TEXT");
     this.ensureColumn("wallet_proposals", "tx_hash", "TEXT");
     this.ensureColumn("wallet_pairings", "new_owner_credential_id", "TEXT");
+    this.ensureColumn("wallet_recovery_requests", "new_owner_kind", "TEXT NOT NULL DEFAULT 'webauthn'");
+    this.ensureColumn("wallet_recovery_requests", "new_eoa", "TEXT");
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_wallet_accounts_activation
         ON wallet_accounts(activation_priority_at, activation_status, activation_next_check_at);
@@ -2867,6 +2870,15 @@ export class CommerceDb {
     return row ? mapWalletEmail(row) : null;
   }
 
+  listWalletsByVerifiedEmail(email: string): WalletEmailRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM wallet_emails WHERE email = ? AND verified_at IS NOT NULL ORDER BY updated_at DESC`
+      )
+      .all(normalizeEmail(email)) as WalletEmailRow[];
+    return rows.map(mapWalletEmail);
+  }
+
   markWalletEmailVerified(walletAddress: string, email: string): WalletEmailRecord | null {
     const now = new Date().toISOString();
     const result = this.db
@@ -3028,6 +3040,8 @@ export class CommerceDb {
     newQy: string;
     credentialId: string;
     deviceLabel?: string | null;
+    newOwnerKind?: WalletRecoveryNewOwnerKind;
+    newEoa?: string | null;
     status: WalletRecoveryRequestStatus;
     emailVerifiedAt?: string | null;
     captchaOkAt?: string | null;
@@ -3039,8 +3053,9 @@ export class CommerceDb {
       .prepare(
         `INSERT INTO wallet_recovery_requests (
            id, wallet_address, email, new_qx, new_qy, credential_id, device_label,
+           new_owner_kind, new_eoa,
            status, email_verified_at, captcha_ok_at, chain_id, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -3050,6 +3065,8 @@ export class CommerceDb {
         input.newQy,
         input.credentialId,
         input.deviceLabel ?? null,
+        input.newOwnerKind ?? "webauthn",
+        input.newEoa?.toLowerCase() ?? null,
         input.status,
         input.emailVerifiedAt ?? null,
         input.captchaOkAt ?? null,
@@ -3367,6 +3384,8 @@ interface WalletRecoveryRequestRow {
   new_qy: string;
   credential_id: string;
   device_label: string | null;
+  new_owner_kind: string | null;
+  new_eoa: string | null;
   status: WalletRecoveryRequestStatus;
   email_verified_at: string | null;
   captcha_ok_at: string | null;
@@ -3401,6 +3420,7 @@ function mapHostedChallenge(row: HostedChallengeRow): HostedRecoveryChallengeRec
 }
 
 function mapWalletRecoveryRequest(row: WalletRecoveryRequestRow): WalletRecoveryRequestRecord {
+  const kind = row.new_owner_kind === "yubikey" || row.new_owner_kind === "eoa" ? row.new_owner_kind : "webauthn";
   return {
     id: row.id,
     walletAddress: row.wallet_address,
@@ -3409,6 +3429,8 @@ function mapWalletRecoveryRequest(row: WalletRecoveryRequestRow): WalletRecovery
     newQy: row.new_qy,
     credentialId: row.credential_id,
     deviceLabel: row.device_label,
+    newOwnerKind: kind,
+    newEoa: row.new_eoa,
     status: row.status,
     emailVerifiedAt: row.email_verified_at,
     captchaOkAt: row.captcha_ok_at,

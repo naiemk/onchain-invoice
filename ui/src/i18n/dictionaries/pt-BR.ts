@@ -411,7 +411,8 @@ export const ptBR = {
     paymentModeFiatTitle: "Só cartão ou banco",
     paymentModeFiatHint: "O cliente nunca vê um endereço cripto. Ainda assim liquida como USDC/USDT em uma rede.",
     settlementNetworkLabel: "Redes de liquidação",
-    settlementNetworkHint: "Ethereum, Base e Tron são obrigatórias para cartão/banco (habilita Revolut Pay e mais). Você pode adicionar outros trilhos compatíveis com Onramper.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "Cobrar ~{amount} {fiat}",
     settlePreview: "Você recebe ~{amount} {token}",
     fiatPayLabel: "O cliente paga",
@@ -510,7 +511,8 @@ export const ptBR = {
 
   pay: {
     faucetTitle: "Faucet de testnet",
-    faucetHint: "O sandbox do Onramper não financia endereços de testnet. Informe o segredo do faucet do operador para enviar o valor de liquidação on-chain e o repasse concluir o pagamento.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "Segredo do faucet",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "Financiar cobrança (testnet)",
@@ -797,4 +799,4 @@ export const ptBR = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

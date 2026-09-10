@@ -4,6 +4,7 @@ import type { PackedUserOperationJson } from "../../../commerce/shared/userop.js
 import {
   ENTRYPOINT_ABI,
   buildAddOwnerBatchCalls,
+  buildAddOwnerEoaBatchCalls,
   buildPackedUserOperation,
   buildRemoveOwnerBatchCalls,
   buildSendBatchCalls,
@@ -83,6 +84,37 @@ export async function buildSignedAddOwnerUserOp(input: {
   const unsigned = buildPackedUserOperation({ sender: input.passkey.address, nonce, callData });
   const userOpHash = await entryPoint.getUserOpHash(userOpToTuple(unsigned));
   const signature = await signWithCurrentWalletPasskey(userOpHash, input.passkey, { path: "pairing-confirm" });
+  return { userOp: { ...unsigned, signature }, userOpHash };
+}
+
+export async function buildSignedAddOwnerEoaUserOp(input: {
+  config: WalletPublicConfig;
+  passkey: CurrentWalletPasskey;
+  owner: string;
+  bindSignature: string;
+  feeAmount: bigint;
+}): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
+  const chain = primaryChain(input.config);
+  if (!chain.feeTokenAddress || !input.config.bundlerBeneficiary) {
+    throw new Error("Bundler fee not configured");
+  }
+  if (!chain.rpcUrl) throw new Error("RPC not configured");
+  const provider = new JsonRpcProvider(chain.rpcUrl);
+  const entryPoint = new Contract(input.config.entryPointAddress, ENTRYPOINT_ABI, provider);
+  const nonce = BigInt(await entryPoint.getNonce(input.passkey.address, 0));
+  const callData = encodeExecuteCallData(
+    buildAddOwnerEoaBatchCalls({
+      feeToken: chain.feeTokenAddress,
+      beneficiary: input.config.bundlerBeneficiary,
+      feeAmount: input.feeAmount,
+      wallet: input.passkey.address,
+      owner: input.owner,
+      signature: input.bindSignature,
+    })
+  );
+  const unsigned = buildPackedUserOperation({ sender: input.passkey.address, nonce, callData });
+  const userOpHash = await entryPoint.getUserOpHash(userOpToTuple(unsigned));
+  const signature = await signWithCurrentWalletPasskey(userOpHash, input.passkey, { path: "add-key" });
   return { userOp: { ...unsigned, signature }, userOpHash };
 }
 

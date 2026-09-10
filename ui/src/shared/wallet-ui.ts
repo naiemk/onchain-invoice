@@ -1,6 +1,6 @@
 import { copyText, escapeHtml } from "./dom.js";
 import { t } from "../i18n/t.js";
-import type { WalletBalanceChain } from "../../../commerce/shared/wallet.js";
+import type { WalletBalanceChain, WalletDeviceRecord } from "../../../commerce/shared/wallet.js";
 import {
   clearActiveWallet,
   listWalletRegistry,
@@ -11,6 +11,7 @@ import {
 } from "./wallet-session.js";
 import { spaNavigate } from "./spa-render.js";
 import { isAdvancedMode, loadWalletMode, saveWalletMode, type WalletMode } from "./wallet-mode.js";
+import { eoaFromOwnerQx, isEoaOwnerQy, parseEoaCredentialId } from "../../../commerce/shared/wallet-eip712.js";
 
 export type WalletTab =
   | "home"
@@ -474,6 +475,13 @@ export function renderYubiKeyPinRequiredPanel(): string {
 export function formatKeyFingerprint(qx: string, qy?: string | null): string {
   if (!qx) return "—";
   return qy ? `${shortKey(qx)} / ${shortKey(qy)}` : shortKey(qx);
+}
+
+export function formatDeviceFingerprint(device: Pick<WalletDeviceRecord, "ownerQx" | "ownerQy" | "credentialId">): string {
+  const fromCred = parseEoaCredentialId(device.credentialId);
+  if (fromCred) return shortAddress(fromCred);
+  if (isEoaOwnerQy(device.ownerQy)) return shortAddress(eoaFromOwnerQx(device.ownerQx));
+  return formatKeyFingerprint(device.ownerQx, device.ownerQy);
 }
 
 export { shortAddress };

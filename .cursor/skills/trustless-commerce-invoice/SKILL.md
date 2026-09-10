@@ -5,7 +5,7 @@ description: >-
   or verifying USDC/USDT pay links, invoiceAddress, awaiting_payment,
   POST /api/invoices create invoice API, GET /api/invoices/:id polling, sweep status,
   Trustless Commerce checkout, Sepolia, Nile, fiat/crypto/combined paymentMode,
-  GET /api/public/onramp-quote, or crypto invoice integration for shops and agents.
+  GET /api/public/pay-in/quotes, /buy card funding, or crypto invoice integration for shops and agents.
 ---
 
 # Trustless Commerce — create & check invoices
@@ -14,7 +14,7 @@ description: >-
 
 - Create a payment link or embed button for a shop order
 - Call the one-shot create invoice API (`crypto`, `crypto_or_fiat`, or `fiat`)
-- Quote card/bank → settlement via `GET /api/public/onramp-quote`
+- Fund a Base USDC invoice with card/bank via `/buy` and `GET /api/public/pay-in/*`
 - Check whether an invoice is `created`, `awaiting_payment`, `paid`, `paid_partial`, or `swept`
 
 No merchant wallet connection is required for create or status check.
@@ -24,7 +24,7 @@ No merchant wallet connection is required for create or status check.
 | Bucket | Default | Routes |
 |--------|---------|--------|
 | `create` | ~1/s/IP | `POST /api/invoices` |
-| `quote` | ~2/s, burst 20/IP | `/api/public/onramp-quote`, `/api/public/onramp-methods` |
+| `quote` | ~2/s, burst 20/IP | `/api/public/pay-in/` |
 | `public` | ~20/s/IP | other public GETs |
 
 **429** responses include `Retry-After`, `RateLimit-Remaining`, and `RateLimit-Reset`. Back off and retry — do not hammer create or quote.
@@ -121,68 +121,35 @@ Content-Type: application/json
   "selectedTo": "0x…",
   "paymentMode": "crypto_or_fiat",
   "displayFiat": "EUR",
-  "quoteCountry": "de",
-  "quotePaymentMethod": "creditcard",
-  "quoteSlippageBps": 100
+  "quoteCountry": "de"
 }
 ```
 
-Payer chooses crypto or card on `/pay`. Card funding: `POST /api/invoices/:id/onramp-session` with `{ "fiat": "EUR" }`.
+Payer chooses crypto or card on `/pay`. Card funding: `/buy?address={invoiceAddress}&amount=…&fiat=EUR&country=de&invoice={id}` (or the card panel on `/pay`). Quotes: `GET /api/public/pay-in/quotes`. Checkout URL: `GET /api/public/pay-in/widget`. Poll the invoice; do not create an onramp session.
 
 ### Fiat only
 
-1. Quote (customer pays fixed fiat):
-
-```http
-GET /api/public/onramp-quote?fiat=SEK&direction=pay&fiatAmount=500&country=se&chains=1,8453,tron&tokens=USDC,USDT&slippageBps=100
-```
-
-2. Create with mapped fields:
+Fiat invoices **require `price`** (USDC on Base). The API locks `chains`/`tokens` to `8453` / `USDC`. Optional `displayFiat` / `displayAmount` / `quoteCountry` are payer hints.
 
 ```http
 POST /api/invoices
 Content-Type: application/json
 
 {
-  "to": ["0x…", "T…"],
-  "chains": ["1", "8453", "tron"],
-  "tokens": ["USDC", "USDT"],
+  "price": "49.00",
+  "to": ["0x…"],
+  "chains": ["8453"],
+  "tokens": ["USDC"],
   "clientInvoiceId": "order-fiat-1",
+  "chainId": "8453",
+  "token": "USDC",
+  "selectedTo": "0x…",
   "paymentMode": "fiat",
   "displayFiat": "SEK",
   "displayAmount": "500.00",
-  "quoteCountry": "se",
-  "quotePaymentMethod": "swish",
-  "quoteProvider": "revolut",
-  "quoteSlippageBps": 100
+  "quoteCountry": "se"
 }
 ```
-
-You may omit `price` for fiat — the server quotes and fills settlement. Or set `price` from `cryptoAmount` in the quote response.
-
-### Quote → create mapping
-
-| Quote | Create |
-|-------|--------|
-| `fiat` | `displayFiat` |
-| `fiatAmount` | `displayAmount` |
-| `cryptoAmount` | `price` |
-| `country` | `quoteCountry` |
-| `paymentMethod` | `quotePaymentMethod` |
-| `provider` / `recommended.provider` | `quoteProvider` |
-| `slippageBps` | `quoteSlippageBps` |
-
-### Fiat field cascade
-
-When refining a quote:
-
-- **currency / country / pairs** → refetch methods, then providers; reset method/provider to remembered-if-still-offered else Auto
-- **payment method** → refetch providers only
-- **provider** → no refetch; reselect from `quotes[]`
-- **amount** → refetch providers (debounce)
-- **max drift** → no refetch (enforced at pay time)
-
-Omit method/provider for Auto (server `recommended`).
 
 Full docs: https://naiemk.github.io/onchain-invoice/invoice-types/ and https://naiemk.github.io/onchain-invoice/quote/
 

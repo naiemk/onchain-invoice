@@ -406,7 +406,8 @@ export const ko = {
     paymentModeFiatTitle: "카드 또는 은행만",
     paymentModeFiatHint: "고객은 암호화폐 주소를 보지 않습니다. 한 네트워크에서 USDC/USDT로 정산됩니다.",
     settlementNetworkLabel: "정산 네트워크",
-    settlementNetworkHint: "카드/은행에는 Ethereum, Base, Tron이 필요합니다(Revolut Pay 등을 켭니다). Onramper가 지원하는 다른 레일도 추가할 수 있습니다.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "청구 ~{amount} {fiat}",
     settlePreview: "수령 ~{amount} {token}",
     fiatPayLabel: "고객 결제",
@@ -504,7 +505,8 @@ export const ko = {
 
   pay: {
     faucetTitle: "테스트넷 파셋",
-    faucetHint: "Onramper 샌드박스는 테스트넷 주소에 입금하지 않습니다. 운영자 파셋 시크릿을 입력해 정산 금액을 온체인으로 보내 스위퍼가 결제를 완료하게 하세요.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "파셋 시크릿",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "인보이스에 입금(테스트넷)",
@@ -790,4 +792,4 @@ export const ko = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

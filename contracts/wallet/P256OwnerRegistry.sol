@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {WebAuthn} from "@openzeppelin/contracts/utils/cryptography/WebAuthn.sol";
+import {WalletEip712} from "./WalletEip712.sol";
 
 /// @dev WebAuthn P256 owner set with 1-of-N validation for signatures.
 abstract contract P256OwnerRegistry {
@@ -72,6 +73,11 @@ abstract contract P256OwnerRegistry {
             bytes32 id = _ownerIds[i];
             if (!_owners[id]) continue;
             (bytes32 qx, bytes32 qy) = _ownerKeyById(id);
+            if (WalletEip712.isEoaOwnerQy(qy)) {
+                address eoa = WalletEip712.eoaFromQx(qx);
+                if (WalletEip712.recoverUserOp(address(this), digest, eoa, signature)) return true;
+                continue;
+            }
             if (_validateWebAuthn(digest, signature, qx, qy)) return true;
         }
         return false;

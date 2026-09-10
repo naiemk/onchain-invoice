@@ -12,7 +12,7 @@ export const createWizardEn = {
   walletCreateButton: "Create a passkey wallet",
   walletNoneHint: "No passkey wallets on this device yet.",
   fiatNetworksLockedHint:
-    "Card/bank settlement uses these networks. They are selected automatically for fiat invoices.",
+    "Card/bank invoices settle as USDC on Base. That network is selected automatically.",
   quoteMethodAuto: "Auto (recommended)",
   quoteProviderAuto: "Auto (best quote)",
   countrySearchHint: "Type a country name or ISO code (e.g. se, Sweden).",

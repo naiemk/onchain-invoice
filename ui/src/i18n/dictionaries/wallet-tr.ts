@@ -175,6 +175,24 @@ export const walletTr = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "Bu cihazdaki cüzdanlarınız",
   chooseWalletLede: "Açılacak cüzdanı seçin. Her biri bu tarayıcıda bir passkey ile oluşturuldu.",
   balanceLoading: "…",
@@ -289,8 +307,8 @@ export const walletTr = {
     "Kart veya havale ile USDC veya USDT alın. Kripto doğrudan cüzdanınıza gider — fatura sweep’i yok.",
   depositFiatLabel: "Şununla ödersiniz",
   depositContinue: "Checkout’a devam et",
-  depositHint:
-    "Onramper bölgeniz için en iyi sağlayıcıyı seçer. Desteklenen stablecoinler: uygun olan yerlerde USDC ve USDT.",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "Sandbox modu — gerçek ücret yok ve zincir üstü fonlama yok.",
   depositLoading: "Checkout yükleniyor…",
   depositIframeTitle: "Yatırma checkout’u",
@@ -299,14 +317,14 @@ export const walletTr = {
   depositFailed: "Yatırma checkout’u başlatılamadı",
   withdrawCta: "Banka / karta",
   withdrawTitle: "Banka veya karta çek",
-  withdrawLede:
-    "Cüzdanınızdan USDC veya USDT satın. Onramper hazır olduğunda gönderimi passkey ile onaylarsınız.",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "Şuraya çek",
   withdrawContinue: "Çekime devam et",
   withdrawHint:
     "Bir sağlayıcı seçtikten sonra bu cüzdandan kripto göndermeyi onaylamanızı isteyeceğiz.",
-  withdrawSandboxNote:
-    "Sandbox modu — Onramper anahtarları yapılandırılana kadar satış akışı yerel bir stub’dur.",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "Çekim yükleniyor…",
   withdrawIframeTitle: "Çekim checkout’u",
   withdrawUnavailable: "Kart ve banka çekimi bu kurulumda etkin değil.",

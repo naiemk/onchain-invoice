@@ -408,7 +408,8 @@ export const de = {
     paymentModeFiatTitle: "Nur Karte oder Bank",
     paymentModeFiatHint: "Kunde sieht nie eine Krypto-Adresse. Wird trotzdem als USDC/USDT in einem Netzwerk abgerechnet.",
     settlementNetworkLabel: "Abrechnungsnetzwerke",
-    settlementNetworkHint: "Ethereum, Base und Tron sind für Karte/Bank erforderlich (aktiviert Revolut Pay und mehr). Sie können weitere von Onramper unterstützte Schienen hinzufügen.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "Belastung ~{amount} {fiat}",
     settlePreview: "Sie erhalten ~{amount} {token}",
     fiatPayLabel: "Kunde zahlt",
@@ -507,7 +508,8 @@ export const de = {
 
   pay: {
     faucetTitle: "Testnetz-Faucet",
-    faucetHint: "Die Onramper-Sandbox finanziert keine Testnetz-Adressen. Geben Sie das Operator-Faucet-Geheimnis ein, um den Abrechnungsbetrag on-chain zu senden, damit der Sweeper die Zahlung abschließen kann.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "Faucet-Geheimnis",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "Rechnung finanzieren (Testnet)",
@@ -798,4 +800,4 @@ export const de = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

@@ -174,6 +174,24 @@ export const walletUr = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "اس ڈیوائس پر آپ کی والیٹس",
   chooseWalletLede: "کھولنے کے لیے والیٹ منتخب کریں۔ ہر ایک اسی براؤزر میں پاس کی سے بنائی گئی۔",
   balanceLoading: "…",
@@ -285,8 +303,8 @@ export const walletUr = {
     "کارڈ یا بینک ٹرانسفر سے USDC یا USDT خریدیں۔ کرپٹو سیدھا آپ کے والیٹ میں جاتا ہے — کوئی انوائس سویپ نہیں۔",
   depositFiatLabel: "آپ ادا کرتے ہیں",
   depositContinue: "چیک آؤٹ جاری رکھیں",
-  depositHint:
-    "Onramper آپ کے علاقے کا بہترین فراہم کنندہ چنتا ہے۔ معاون اسٹیبلز: جہاں دستیاب ہوں USDC اور USDT۔",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "سینڈ باکس موڈ — کوئی حقیقی چارج نہیں اور کوئی آن چین فنڈنگ نہیں۔",
   depositLoading: "چیک آؤٹ لوڈ ہو رہا ہے…",
   depositIframeTitle: "جمع چیک آؤٹ",
@@ -295,13 +313,13 @@ export const walletUr = {
   depositFailed: "جمع چیک آؤٹ شروع نہیں ہو سکا",
   withdrawCta: "بینک / کارڈ پر",
   withdrawTitle: "بینک یا کارڈ پر نقد نکالیں",
-  withdrawLede:
-    "اپنے والیٹ سے USDC یا USDT بیچیں۔ Onramper تیار ہونے پر آپ پاس کی سے بھیجنے کی تصدیق کریں گے۔",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "نقد نکالیں",
   withdrawContinue: "نقد نکالنا جاری رکھیں",
   withdrawHint: "فراہم کنندہ چننے کے بعد ہم اس والیٹ سے کرپٹو بھیجنے کی تصدیق مانگیں گے۔",
-  withdrawSandboxNote:
-    "سینڈ باکس موڈ — Onramper کلیدیں ترتیب ہونے تک فروخت کا بہاؤ مقامی اسٹب ہے۔",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "نقد نکالنا لوڈ ہو رہا ہے…",
   withdrawIframeTitle: "نقد نکالنے کا چیک آؤٹ",
   withdrawUnavailable: "اس انسٹنس پر کارڈ اور بینک نقد نکالنا فعال نہیں۔",

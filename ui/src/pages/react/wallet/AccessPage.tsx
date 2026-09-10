@@ -37,7 +37,7 @@ import {
 } from "@/shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
 import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
-import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
+import { loadWalletSession, walletSessionsEquivalent, type WalletSession } from "@/shared/wallet-session.js";
 import { healSuperWalletFromEmail, healWalletSession } from "@/shared/wallet-session-heal.js";
 import { useWalletPolicy } from "./wallet-policy";
 import { initEoaConnector } from "@/shared/eoa-connector.js";
@@ -145,7 +145,7 @@ export function AccessPage() {
         setConfig(cfg);
         const healed = await healWalletSession(sess);
         if (cancelled) return;
-        if (healed.session !== sess) {
+        if (!walletSessionsEquivalent(healed.session, sess)) {
           setSession(healed.session);
           await refresh(healed.session, cfg);
         } else {

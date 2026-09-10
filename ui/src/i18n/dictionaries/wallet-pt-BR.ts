@@ -175,6 +175,24 @@ export const walletPtBR = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "Suas carteiras neste dispositivo",
   chooseWalletLede:
     "Selecione uma carteira para abrir. Cada uma foi criada com uma passkey neste navegador.",
@@ -291,8 +309,8 @@ export const walletPtBR = {
     "Compre USDC ou USDT com cartão ou transferência bancária. A cripto vai direto para a sua carteira — sem repasse de cobrança.",
   depositFiatLabel: "Você paga com",
   depositContinue: "Continuar para o checkout",
-  depositHint:
-    "O Onramper escolhe o melhor provedor para a sua região. Stables compatíveis: USDC e USDT onde disponíveis.",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "Modo sandbox — sem cobrança real e sem funding on-chain.",
   depositLoading: "Carregando o checkout…",
   depositIframeTitle: "Checkout de depósito",
@@ -301,14 +319,14 @@ export const walletPtBR = {
   depositFailed: "Não foi possível iniciar o checkout de depósito",
   withdrawCta: "Para banco / cartão",
   withdrawTitle: "Sacar para banco ou cartão",
-  withdrawLede:
-    "Venda USDC ou USDT da sua carteira. Você confirma o envio com a passkey quando o Onramper estiver pronto.",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "Sacar para",
   withdrawContinue: "Continuar para o saque",
   withdrawHint:
     "Depois que você escolher um provedor, pediremos para confirmar o envio de cripto desta carteira.",
-  withdrawSandboxNote:
-    "Modo sandbox — o fluxo de venda é uma simulação local até as chaves do Onramper serem configuradas.",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "Carregando o saque…",
   withdrawIframeTitle: "Checkout de saque",
   withdrawUnavailable: "Saque para cartão e banco não está habilitado nesta instância.",

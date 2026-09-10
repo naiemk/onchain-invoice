@@ -26,11 +26,8 @@ import type {
   PayLinkFields,
 } from "../shared/types.js";
 import { apiUrl } from "../shared/site.js";
-import {
-  currentUiTheme,
-  FIAT_LABELS,
-  mountOnramperIframe,
-} from "../shared/onramper-iframe.js";
+import { mountOnrampFlow } from "../onramp/mountOnrampFlow.js";
+import { PAY_IN_CHAIN_ID, PAY_IN_TOKEN } from "../../../commerce/shared/metamask-onramp.js";
 import { qrThemeColors } from "../shared/qr-colors.js";
 
 const ACTIVATION_KEY = (invoiceId: string) => `tc.activation.${invoiceId}`;
@@ -335,7 +332,8 @@ async function renderInvoiceStage(
     }
   }
 
-  const showMethodSwitch = paymentMode === "crypto_or_fiat";
+  const cardOk = invoiceAllowsCardOnramp(invoice);
+  const showMethodSwitch = paymentMode === "crypto_or_fiat" && cardOk;
   const methodSwitcher = showMethodSwitch
     ? `<div class="choice-card-row pay-method-row" role="radiogroup" aria-label="${escapeHtml(t("pay.paymentMethod"))}">
         <label class="choice-card is-selected">
@@ -473,7 +471,7 @@ async function renderInvoiceStage(
       if (cardPanel) {
         cardPanel.hidden = method !== "card";
         if (method === "card" && !cardPanel.dataset.ready) {
-          void mountOnrampPanel(cardPanel, invoiceId, invoice, fields, true);
+          void mountOnrampPanel(cardPanel, invoiceId, invoice, fields);
           cardPanel.dataset.ready = "1";
         }
       }
@@ -526,12 +524,8 @@ function renderFiatInvoiceStage(
   `;
 
   const panel = root.querySelector<HTMLElement>("#pay-card-panel");
-  const headlineEl = root.querySelector<HTMLElement>("#fiat-headline");
-  if (headlineEl && invoice.displayFiat) {
-    attachOnramperHeadlineListener(headlineEl, invoice.displayFiat, root);
-  }
   if (panel) {
-    void mountOnrampPanel(panel, invoiceId, invoice, fields, true, headlineEl);
+    void mountOnrampPanel(panel, invoiceId, invoice, fields);
     void mountFaucetPanel(root, invoiceId, invoice);
   }
 }
@@ -562,43 +556,36 @@ function settlementLine(invoice: InvoiceRecord, fields: PayLinkFields): string |
   });
 }
 
-function extractOnramperFiatAmount(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const record = data as Record<string, unknown>;
-  const candidates = [
-    record.fiatAmount,
-    record.amount,
-    record.fiat_amount,
-    (record.payload as Record<string, unknown> | undefined)?.fiatAmount,
-    (record.payload as Record<string, unknown> | undefined)?.amount,
-    (record.data as Record<string, unknown> | undefined)?.fiatAmount,
-  ];
-  for (const value of candidates) {
-    if (value == null) continue;
-    const n = Number(value);
-    if (Number.isFinite(n) && n > 0) return String(n);
-  }
-  return null;
+function invoiceAllowsCardOnramp(invoice: InvoiceRecord): boolean {
+  return String(invoice.chainId) === PAY_IN_CHAIN_ID && (invoice.token ?? "").toUpperCase() === PAY_IN_TOKEN;
 }
 
-function attachOnramperHeadlineListener(
-  headline: HTMLElement | null,
-  fiat: string,
-  panel: HTMLElement
+function mountOnrampPanel(
+  panel: HTMLElement,
+  invoiceId: string,
+  invoice: InvoiceRecord,
+  fields: PayLinkFields
 ): void {
-  if (!headline) return;
-  const handler = (event: MessageEvent) => {
-    try {
-      const origin = event.origin ?? "";
-      if (!origin.includes("onramper.com") && !origin.includes("onramper.dev")) return;
-      const amount = extractOnramperFiatAmount(event.data);
-      if (amount) headline.textContent = formatFiatDisplay(amount, fiat);
-    } catch {
-      /* ignore malformed widget events */
-    }
-  };
-  panel.addEventListener("tc:onramp-cleanup", () => window.removeEventListener("message", handler), { once: true });
-  window.addEventListener("message", handler);
+  const address = invoice.invoiceAddress?.trim() ?? "";
+  if (!address) {
+    panel.innerHTML = `<p class="danger">${escapeHtml(t("pay.checkoutFailed"))}</p>`;
+    return;
+  }
+  if (!invoiceAllowsCardOnramp(invoice)) {
+    panel.innerHTML = `<p class="field-hint">${escapeHtml(t("buy.unavailable"))}</p>`;
+    return;
+  }
+  panel.innerHTML = `<div class="pay-onramp-host"></div>`;
+  const host = panel.querySelector<HTMLElement>(".pay-onramp-host");
+  if (!host) return;
+  mountOnrampFlow(host, {
+    lockedAddress: address,
+    initialAmount: invoice.displayAmount ?? fields.displayAmount,
+    initialFiat: invoice.displayFiat ?? fields.displayFiat,
+    initialRegion: invoice.quoteCountry ?? fields.quoteCountry,
+    invoicePrice: invoice.priceUsd || fields.price,
+    invoiceId,
+  });
 }
 
 async function mountFaucetPanel(
@@ -691,116 +678,6 @@ async function mountFaucetPanel(
       }
     }
   });
-}
-
-async function mountOnrampPanel(
-  panel: HTMLElement,
-  invoiceId: string,
-  invoice: InvoiceRecord,
-  fields: PayLinkFields,
-  lockFiat: boolean,
-  headlineEl?: HTMLElement | null
-): Promise<void> {
-  const token = invoice.token ?? fields.tokens[0] ?? "USDC";
-  const lockedDisplayFiat = lockFiat && invoice.displayFiat ? invoice.displayFiat : null;
-  let fiats = ["USD", "EUR", "GBP", "SEK"];
-  let sandbox = false;
-  try {
-    const res = await fetch(apiUrl("/api/public/onramp"));
-    if (res.ok) {
-      const body = (await res.json()) as { enabled?: boolean; fiats?: string[]; sandbox?: boolean };
-      if (!body.enabled) {
-        panel.innerHTML = `<p class="danger">${escapeHtml(t("pay.checkoutFailed"))}</p>`;
-        return;
-      }
-      if (body.fiats?.length) fiats = body.fiats;
-      sandbox = Boolean(body.sandbox);
-    }
-  } catch {
-    /* use defaults */
-  }
-
-  const defaultFiat =
-    lockedDisplayFiat ??
-    (invoice.payerFiat && fiats.includes(invoice.payerFiat) ? invoice.payerFiat : fiats[0] ?? "USD");
-
-  if (lockedDisplayFiat) {
-    panel.innerHTML = `
-      <div id="onramp-frame-host" class="onramp-frame-host"></div>
-      <p id="onramp-error" class="danger" hidden></p>
-      ${sandbox ? `<p class="callout info">${escapeHtml(t("pay.sandboxNote"))}</p>` : ""}
-    `;
-  } else {
-    panel.innerHTML = `
-    <div class="field">
-      <label for="payer-fiat">${t("pay.payWithLabel")}</label>
-      <p class="field-hint">${t("pay.payWithHint", { price: fields.price })}</p>
-      <select id="payer-fiat">${fiats
-        .map(
-          (code) =>
-            `<option value="${escapeHtml(code)}" ${code === defaultFiat ? "selected" : ""}>${escapeHtml(
-              `${code} · ${FIAT_LABELS[code] ?? code}`
-            )}</option>`
-        )
-        .join("")}</select>
-    </div>
-    <div class="btn-row">
-      <button type="button" id="start-onramp">${t("pay.continueCard")}</button>
-    </div>
-    <p class="field-hint">${escapeHtml(t("pay.cardFeeNote", { token }))}</p>
-    ${sandbox ? `<p class="callout info">${escapeHtml(t("pay.sandboxNote"))}</p>` : ""}
-    <div id="onramp-frame-host" class="onramp-frame-host" hidden></div>
-    <p id="onramp-error" class="danger" hidden></p>
-  `;
-  }
-
-  const start = async () => {
-    const fiat =
-      lockedDisplayFiat ?? panel.querySelector<HTMLSelectElement>("#payer-fiat")?.value ?? defaultFiat;
-    const host = panel.querySelector<HTMLElement>("#onramp-frame-host");
-    const err = panel.querySelector<HTMLElement>("#onramp-error");
-    const btn = panel.querySelector<HTMLButtonElement>("#start-onramp");
-    if (err) {
-      err.hidden = true;
-      err.textContent = "";
-    }
-    if (btn) btn.disabled = true;
-    if (host) {
-      host.hidden = false;
-      host.innerHTML = `<div class="onramp-skeleton" aria-busy="true">${escapeHtml(t("pay.loadingCheckout"))}</div>`;
-    }
-    if (headlineEl && fiat) {
-      attachOnramperHeadlineListener(headlineEl, fiat, panel);
-    }
-    try {
-      const res = await fetch(apiUrl(`/api/invoices/${encodeURIComponent(invoiceId)}/onramp-session`), {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fiat, theme: currentUiTheme() }),
-      });
-      const body = (await res.json()) as { widgetUrl?: string; error?: string; code?: string };
-      if (!res.ok || !body.widgetUrl) {
-        if (res.status === 410 || body.code === "quote_expired") {
-          throw new Error(body.error ?? t("pay.quoteExpired"));
-        }
-        throw new Error(body.error ?? t("pay.checkoutFailed"));
-      }
-      if (host) {
-        await mountOnramperIframe(host, body.widgetUrl, t("pay.onrampIframeTitle"));
-      }
-    } catch (error) {
-      if (host) host.hidden = !lockedDisplayFiat;
-      if (err) {
-        err.hidden = false;
-        err.textContent = error instanceof Error ? localizeError(error) : t("pay.checkoutFailed");
-      }
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  };
-
-  panel.querySelector<HTMLButtonElement>("#start-onramp")?.addEventListener("click", () => void start());
-  if (lockedDisplayFiat) void start();
 }
 
 function renderPaidStage(

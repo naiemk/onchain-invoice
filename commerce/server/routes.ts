@@ -25,28 +25,20 @@ import {
   normalizePayLinkFields,
 } from "../shared/invoice.js";
 import type { InvoiceStatus, PayLinkFields, PaymentMode } from "../shared/types.js";
+import { parsePaymentMode, parseSlippageBps, paymentModeAllowsFiat } from "../shared/payment-mode.js";
+import { walletStableTokensForChain } from "../shared/evm-stables.js";
 import {
-  buildOnrampWidgetSession,
-  isOnramperSandboxOrigin,
-  ONRAMPER_SUPPORTED_PAIRS,
-  onramperSupportedPair,
-  parsePaymentMode,
-  paymentModeAllowsFiat,
-  verifyOnramperWebhookSignature,
-  walletStableTokensForChain,
-} from "../shared/onramper.js";
-import {
-  fetchOnrampPaymentMethods,
-  fetchOnrampPaymentMethodsAcrossPairs,
-  fetchOnrampQuote,
-  fetchOnrampQuoteAcrossPairs,
-  isSettlementWithinSlippage,
-  onrampErrorDetails,
-  parseSlippageBps,
-  settlementAmountFromQuote,
-  settlementDriftBps,
-  type QuoteDirection,
-} from "../shared/onramper-quotes.js";
+  countryFromGeoHeaders,
+  fetchPayInCountries,
+  fetchPayInQuotes,
+  fetchPayInWidget,
+  isPayInEvmAddress,
+  isPayInSettlement,
+  payInConfigPayload,
+  PAY_IN_CHAIN_ID,
+  PAY_IN_TOKEN,
+  PAY_IN_TOKEN_ADDRESS,
+} from "../shared/metamask-onramp.js";
 import { requireApiKey, requireMerchant } from "./auth.js";
 import { verifyCaptcha } from "./captcha.js";
 import { resolveEvmChain, type AppConfig } from "./config.js";
@@ -135,40 +127,39 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         return;
       }
 
-      if (req.method === "GET" && url.pathname === "/api/public/onramp") {
-        const onramper = context.config.onramper;
-        sendJson(res, 200, {
-          enabled: onramper.enabled,
-          sandbox: onramper.enabled && (onramper.demo || isOnramperSandboxOrigin(onramper.widgetOrigin)),
-          demo: onramper.enabled && onramper.demo,
-          fiats: onramper.enabled ? onramper.fiats : [],
-          supportedPairs: onramper.enabled ? [...ONRAMPER_SUPPORTED_PAIRS] : [],
-        });
-        return;
-      }
-
       if (req.method === "GET" && url.pathname === "/api/public/faucet") {
         sendJson(res, 200, { enabled: isFaucetPubliclyEnabled(context.config.faucet) });
         return;
       }
 
-      if (req.method === "GET" && url.pathname === "/api/public/onramp-quote") {
-        await getOnrampQuote(res, context, url);
+      if (req.method === "GET" && url.pathname === "/api/public/pay-in/config") {
+        const mm = context.config.metamaskOnramp;
+        sendJson(res, 200, payInConfigPayload(mm, mm.enabled));
         return;
       }
 
-      if (req.method === "GET" && url.pathname === "/api/public/onramp-methods") {
-        await getOnrampMethods(res, context, url);
+      if (req.method === "GET" && url.pathname === "/api/public/pay-in/countries") {
+        await getPayInCountries(res, context);
         return;
       }
 
-      if (req.method === "GET" && url.pathname === "/api/public/onramp-demo") {
-        sendOnrampDemoHtml(res, url);
+      if (req.method === "GET" && url.pathname === "/api/public/pay-in/geo") {
+        getPayInGeo(req, res, context);
         return;
       }
 
-      if (req.method === "POST" && url.pathname === "/api/public/onramp-webhook") {
-        await handleOnrampWebhook(req, res, context);
+      if (req.method === "GET" && url.pathname === "/api/public/pay-in/quotes") {
+        await getPayInQuotes(res, context, url);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/public/pay-in/buy-url") {
+        await getPayInBuyUrl(res, context, url);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/public/pay-in/widget") {
+        await getPayInBuyUrl(res, context, url);
         return;
       }
 
@@ -359,12 +350,6 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         return;
       }
 
-      const onrampMatch = url.pathname.match(/^\/api\/invoices\/([^/]+)\/onramp-session$/);
-      if (req.method === "POST" && onrampMatch) {
-        await createOnrampSession(req, res, context, decodeURIComponent(onrampMatch[1]));
-        return;
-      }
-
       const faucetMatch = url.pathname.match(/^\/api\/invoices\/([^/]+)\/faucet$/);
       if (req.method === "POST" && faucetMatch) {
         await fundInvoiceFaucet(req, res, context, decodeURIComponent(faucetMatch[1]));
@@ -412,19 +397,6 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         });
         return;
       }
-      const onramp = onrampErrorDetails(error);
-      if (onramp) {
-        sendJson(res, onramp.statusCode, {
-          error: onramp.message,
-          code: onramp.code,
-          fiat: onramp.fiat,
-          minAmount: onramp.minAmount,
-          maxAmount: onramp.maxAmount,
-          errorId: onramp.errorId,
-          type: onramp.type,
-        });
-        return;
-      }
       if (statusCode >= 500) {
         log("error", "request failed", { requestId, path: url.pathname, error: String(error) });
       }
@@ -456,96 +428,31 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
   }
 
   const paymentMode = parsePaymentMode(body.paymentMode ?? body.payment_mode);
-  // Fiat invoices may omit price; settlement USDC is derived from the create-time quote.
   const baseFields = normalizePayLinkFields(
-    paymentMode === "fiat" && (body.price == null || body.price === "")
-      ? { ...body, price: "0" }
+    paymentModeAllowsFiat(paymentMode)
+      ? { ...body, price: body.price ?? body.priceUsd ?? "0", chains: [PAY_IN_CHAIN_ID], tokens: [PAY_IN_TOKEN] }
       : body
   );
   assertPaymentModeAllowed(paymentMode, baseFields, config);
 
   const displayFiat = String(body.displayFiat ?? body.display_fiat ?? "").trim().toUpperCase() || undefined;
   const displayAmount = String(body.displayAmount ?? body.display_amount ?? "").trim() || undefined;
-  const quoteCountry = String(body.quoteCountry ?? body.quote_country ?? "us").trim().toLowerCase();
-  const quotePaymentMethod = String(body.quotePaymentMethod ?? body.quote_payment_method ?? "creditcard")
+  const quoteCountry = String(body.quoteCountry ?? body.quote_country ?? "").trim().toLowerCase() || undefined;
+  const quotePaymentMethod = String(body.quotePaymentMethod ?? body.quote_payment_method ?? "")
     .trim()
-    .toLowerCase();
-  let quoteProvider = String(body.quoteProvider ?? body.quote_provider ?? "").trim().toLowerCase() || undefined;
+    .toLowerCase() || undefined;
+  const quoteProvider = String(body.quoteProvider ?? body.quote_provider ?? "").trim().toLowerCase() || undefined;
   const quoteSlippageBps = parseSlippageBps(body.quoteSlippageBps ?? body.quote_slippage_bps);
 
-  let price = baseFields.price;
-  let resolvedDisplayFiat = displayFiat;
-  let resolvedDisplayAmount = displayAmount;
-
-  if (paymentMode === "fiat") {
-    if (!resolvedDisplayFiat) {
-      throw Object.assign(
-        new Error("displayFiat is required for fiat-only invoices (e.g. SEK). Quote at create time so the widget shows the correct fiat amount."),
-        { statusCode: 400 }
-      );
-    }
-    if (!config.onramper.fiats.includes(resolvedDisplayFiat)) {
-      throw Object.assign(new Error(`Unsupported display fiat: ${resolvedDisplayFiat}`), { statusCode: 400 });
-    }
-
-    const pairs = preferEthereumFirst(
-      baseFields.chains.flatMap((chainId) =>
-        baseFields.tokens
-          .filter((token) => onramperSupportedPair(chainId, token))
-          .map((token) => ({ chainId, token: token.toUpperCase() }))
-      )
-    );
-    if (pairs.length === 0) {
-      throw Object.assign(new Error("No Onramper-supported chain/token pairs selected"), { statusCode: 400 });
-    }
-
-    const quoteBase = {
-      apiKey: config.onramper.apiKey ?? "",
-      demo: config.onramper.demo || !config.onramper.apiKey,
-      widgetOrigin: config.onramper.widgetOrigin,
-      fiat: resolvedDisplayFiat,
-      country: quoteCountry,
-      paymentMethod: quotePaymentMethod,
-      provider: quoteProvider,
-      pairs,
-    };
-
-    let quote;
-    if (resolvedDisplayAmount) {
-      quote = await fetchOnrampQuoteAcrossPairs({
-        ...quoteBase,
-        direction: "pay",
-        fiatAmount: resolvedDisplayAmount,
-      });
-      price = settlementAmountFromQuote(quote.cryptoAmount);
-      resolvedDisplayAmount = quote.fiatAmount;
-    } else if (price && price !== "0") {
-      quote = await fetchOnrampQuoteAcrossPairs({
-        ...quoteBase,
-        direction: "receive",
-        cryptoAmount: price,
-      });
-      resolvedDisplayAmount = quote.fiatAmount;
-    } else {
-      quote = undefined;
-    }
-
-    if (!resolvedDisplayAmount || !quote) {
-      throw Object.assign(
-        new Error("displayAmount is required for fiat-only invoices (or provide price to quote it)"),
-        { statusCode: 400 }
-      );
-    }
-    quoteProvider = (quoteProvider || quote.recommended.provider).toLowerCase();
-    // Prefer body chain when valid; otherwise use the pair that produced the quote.
-    if (quote.chainId && quote.token) {
-      body.chainId = body.chainId ?? body.chain_id ?? quote.chainId;
-      body.token = body.token ?? quote.token;
-    }
-  }
-
+  const price = baseFields.price;
   if (!price || price === "0") {
     throw Object.assign(new Error("price is required"), { statusCode: 400 });
+  }
+  if (displayAmount && !displayFiat) {
+    throw Object.assign(new Error("displayFiat is required when displayAmount is set"), { statusCode: 400 });
+  }
+  if (displayFiat && !/^[A-Z]{3}$/.test(displayFiat)) {
+    throw Object.assign(new Error("displayFiat must be a 3-letter currency code"), { statusCode: 400 });
   }
 
   const invoiceSeed = randomInvoiceSeed();
@@ -554,19 +461,24 @@ async function createInvoice(req: IncomingMessage, res: ServerResponse, { config
     price,
     invoiceSeed,
     paymentMode,
-    ...(resolvedDisplayFiat ? { displayFiat: resolvedDisplayFiat } : {}),
-    ...(resolvedDisplayAmount ? { displayAmount: resolvedDisplayAmount } : {}),
-    ...(resolvedDisplayFiat || resolvedDisplayAmount
-      ? { quoteCountry, quotePaymentMethod, quoteProvider, quoteSlippageBps }
-      : {}),
+    ...(displayFiat ? { displayFiat } : {}),
+    ...(displayAmount ? { displayAmount } : {}),
+    ...(quoteCountry ? { quoteCountry } : {}),
+    ...(quotePaymentMethod ? { quotePaymentMethod } : {}),
+    ...(quoteProvider ? { quoteProvider } : {}),
+    ...(displayFiat || displayAmount ? { quoteSlippageBps } : {}),
     ...(baseFields.lang ? { lang: baseFields.lang } : {}),
   };
-  const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
-  const token = String(body.token ?? fields.tokens[0]).toUpperCase();
+  const chainId = String(
+    paymentModeAllowsFiat(paymentMode) ? PAY_IN_CHAIN_ID : (body.chainId ?? body.chain_id ?? fields.chains[0])
+  );
+  const token = String(
+    paymentModeAllowsFiat(paymentMode) ? PAY_IN_TOKEN : (body.token ?? fields.tokens[0])
+  ).toUpperCase();
   assertTokenChainPair(chainId, token, config);
-  if (paymentModeAllowsFiat(paymentMode) && !onramperSupportedPair(chainId, token)) {
+  if (paymentModeAllowsFiat(paymentMode) && !isPayInSettlement(chainId, token)) {
     throw Object.assign(
-      new Error(`Card/bank payments are not available for ${token} on chain ${chainId}`),
+      new Error("Fiat invoices settle as USDC on Base"),
       { statusCode: 400 }
     );
   }
@@ -621,11 +533,8 @@ async function createSessionDeprecated(
   const chainId = String(body.chainId ?? body.chain_id ?? fields.chains[0]);
   const token = String(body.token ?? fields.tokens[0]).toUpperCase();
   assertTokenChainPair(chainId, token, context.config);
-  if (paymentModeAllowsFiat(paymentMode) && !onramperSupportedPair(chainId, token)) {
-    throw Object.assign(
-      new Error(`Card/bank payments are not available for ${token} on chain ${chainId}`),
-      { statusCode: 400 }
-    );
+  if (paymentModeAllowsFiat(paymentMode) && !isPayInSettlement(chainId, token)) {
+    throw Object.assign(new Error("Fiat invoices settle as USDC on Base"), { statusCode: 400 });
   }
   const selectedTo = resolveSelectedTo(body, fields, chainId);
   const invoiceId = invoiceIdFromPayLink(fields);
@@ -650,221 +559,66 @@ async function createSessionDeprecated(
   });
 }
 
-async function getOnrampQuote(
-  res: ServerResponse,
-  { config }: RouteContext,
-  url: URL
-): Promise<void> {
-  if (!config.onramper.enabled) {
-    throw Object.assign(new Error("Card and bank payments are not enabled on this instance"), {
-      statusCode: 503,
-    });
+function requirePayInEnabled(config: AppConfig): void {
+  if (!config.metamaskOnramp.enabled) {
+    throw Object.assign(new Error("MetaMask pay-in is not enabled on this instance"), { statusCode: 503 });
   }
+}
 
-  const fiat = String(url.searchParams.get("fiat") ?? "").trim().toUpperCase();
-  const chainId = String(url.searchParams.get("chainId") ?? url.searchParams.get("chain_id") ?? "").trim();
-  const token = String(url.searchParams.get("token") ?? "").trim().toUpperCase();
-  const country = String(url.searchParams.get("country") ?? "us").trim().toLowerCase();
-  const paymentMethod = String(url.searchParams.get("paymentMethod") ?? url.searchParams.get("payment_method") ?? "creditcard")
-    .trim()
-    .toLowerCase();
-  const provider = String(url.searchParams.get("provider") ?? "").trim().toLowerCase() || undefined;
-  const direction = (String(url.searchParams.get("direction") ?? "receive").trim().toLowerCase() ||
-    "receive") as QuoteDirection;
-  if (direction !== "receive" && direction !== "pay") {
-    throw Object.assign(new Error("direction must be receive or pay"), { statusCode: 400 });
+async function getPayInCountries(res: ServerResponse, { config }: RouteContext): Promise<void> {
+  requirePayInEnabled(config);
+  const countries = await fetchPayInCountries(config.metamaskOnramp);
+  sendJson(res, 200, { countries });
+}
+
+function getPayInGeo(req: IncomingMessage, res: ServerResponse, { config }: RouteContext): void {
+  requirePayInEnabled(config);
+  sendJson(res, 200, { country: countryFromGeoHeaders(req.headers) });
+}
+
+async function getPayInQuotes(res: ServerResponse, { config }: RouteContext, url: URL): Promise<void> {
+  requirePayInEnabled(config);
+  const region = String(url.searchParams.get("region") ?? url.searchParams.get("country") ?? "").trim();
+  const fiat = String(url.searchParams.get("fiat") ?? "").trim();
+  const amount = String(url.searchParams.get("amount") ?? "").trim();
+  const walletAddress = String(
+    url.searchParams.get("address") ?? url.searchParams.get("walletAddress") ?? ""
+  ).trim();
+  const result = await fetchPayInQuotes(config.metamaskOnramp, { region, fiat, amount, walletAddress });
+  sendJson(res, 200, result);
+}
+
+async function getPayInBuyUrl(res: ServerResponse, { config }: RouteContext, url: URL): Promise<void> {
+  requirePayInEnabled(config);
+  const region = String(url.searchParams.get("region") ?? url.searchParams.get("country") ?? "").trim();
+  const fiat = String(url.searchParams.get("fiat") ?? "USD").trim().toUpperCase();
+  const amount = String(url.searchParams.get("amount") ?? "").trim();
+  const walletAddress = String(
+    url.searchParams.get("address") ?? url.searchParams.get("walletAddress") ?? ""
+  ).trim();
+  const paymentMethodId = String(url.searchParams.get("paymentMethodId") ?? "").trim() || undefined;
+  const providerId = String(url.searchParams.get("providerId") ?? url.searchParams.get("provider") ?? "").trim();
+  if (!providerId) throw Object.assign(new Error("providerId is required"), { statusCode: 400 });
+  if (!isPayInEvmAddress(walletAddress)) {
+    throw Object.assign(new Error("walletAddress must be an EVM address"), { statusCode: 400 });
   }
-  const cryptoAmount = url.searchParams.get("cryptoAmount") ?? url.searchParams.get("crypto_amount") ?? undefined;
-  const fiatAmount = url.searchParams.get("fiatAmount") ?? url.searchParams.get("fiat_amount") ?? undefined;
-  const pairs = parseOnrampPairsQuery(url);
-  const slippageBps = parseSlippageBps(
-    url.searchParams.get("slippageBps") ?? url.searchParams.get("slippage_bps") ?? undefined,
-    -1
-  );
-
-  if (!fiat) throw Object.assign(new Error("fiat is required"), { statusCode: 400 });
-  if (!config.onramper.fiats.includes(fiat)) {
-    throw Object.assign(new Error(`Unsupported fiat currency: ${fiat}`), { statusCode: 400 });
-  }
-
-  const quoteBase = {
-    apiKey: config.onramper.apiKey ?? "",
-    demo: config.onramper.demo || !config.onramper.apiKey,
-    widgetOrigin: config.onramper.widgetOrigin,
+  const widget = await fetchPayInWidget(config.metamaskOnramp, {
+    region,
     fiat,
-    country,
-    paymentMethod,
-    provider,
-    direction,
-    cryptoAmount: cryptoAmount ?? undefined,
-    fiatAmount: fiatAmount ?? undefined,
-  };
-
-  const enrich = (quote: Awaited<ReturnType<typeof fetchOnrampQuote>>, pair?: { chainId: string; token: string }) => {
-    const settlement = quote.cryptoAmount;
-    const resolvedChain = quote.chainId || pair?.chainId || chainId || undefined;
-    const resolvedToken = quote.token || pair?.token || token || undefined;
-    const out: Record<string, unknown> = {
-      ...quote,
-      chainId: resolvedChain,
-      token: resolvedToken,
-      country,
-      paymentMethod: quote.paymentMethod || paymentMethod,
-      provider: provider ?? quote.recommended?.provider,
-    };
-    if (slippageBps >= 0 && settlement) {
-      const amt = Number(settlement);
-      if (Number.isFinite(amt) && amt > 0) {
-        const factor = slippageBps / 10_000;
-        const fmt = (n: number) => {
-          const s = n.toFixed(6);
-          return s.replace(/\.?0+$/, "") || "0";
-        };
-        out.minSettlement = fmt(amt * (1 - factor));
-        out.maxSettlement = fmt(amt * (1 + factor));
-        out.slippageBps = slippageBps;
-      }
-    }
-    return out;
-  };
-
-  if (pairs.length > 0 || (!chainId && !token)) {
-    const candidatePairs =
-      pairs.length > 0
-        ? pairs
-        : ONRAMPER_SUPPORTED_PAIRS.map((p) => ({ chainId: p.chainId, token: p.token }));
-    const quote = await fetchOnrampQuoteAcrossPairs({
-      ...quoteBase,
-      pairs: preferEthereumFirst(candidatePairs),
-    });
-    sendJson(res, 200, enrich(quote));
-    return;
-  }
-
-  if (!chainId) throw Object.assign(new Error("chainId is required"), { statusCode: 400 });
-  if (!token) throw Object.assign(new Error("token is required"), { statusCode: 400 });
-  if (!onramperSupportedPair(chainId, token)) {
-    throw Object.assign(new Error(`Card/bank payments are not available for ${token} on chain ${chainId}`), {
-      statusCode: 400,
-    });
-  }
-
-  const quote = await fetchOnrampQuote({
-    ...quoteBase,
-    chainId,
-    token,
+    amount,
+    walletAddress: getAddress(walletAddress),
+    providerId,
+    paymentMethodId,
+    redirectUrl: config.metamaskOnramp.redirectUrl,
   });
-
-  sendJson(res, 200, enrich(quote, { chainId, token }));
-}
-
-async function getOnrampMethods(
-  res: ServerResponse,
-  { config }: RouteContext,
-  url: URL
-): Promise<void> {
-  if (!config.onramper.enabled) {
-    throw Object.assign(new Error("Card and bank payments are not enabled on this instance"), {
-      statusCode: 503,
-    });
-  }
-
-  const fiat = String(url.searchParams.get("fiat") ?? "").trim().toUpperCase();
-  const chainId = String(url.searchParams.get("chainId") ?? url.searchParams.get("chain_id") ?? "").trim();
-  const token = String(url.searchParams.get("token") ?? "").trim().toUpperCase();
-  const country = String(url.searchParams.get("country") ?? "us").trim().toLowerCase();
-  const pairs = parseOnrampPairsQuery(url);
-  const expand = url.searchParams.get("expand") === "1" || url.searchParams.get("expand") === "true";
-
-  if (!fiat) throw Object.assign(new Error("fiat is required"), { statusCode: 400 });
-
-  if (pairs.length > 0 || expand || (!chainId && !token)) {
-    const candidatePairs =
-      pairs.length > 0
-        ? pairs
-        : ONRAMPER_SUPPORTED_PAIRS.map((p) => ({ chainId: p.chainId, token: p.token }));
-    const methods = await fetchOnrampPaymentMethodsAcrossPairs({
-      apiKey: config.onramper.apiKey ?? "",
-      demo: config.onramper.demo || !config.onramper.apiKey,
-      widgetOrigin: config.onramper.widgetOrigin,
-      fiat,
-      country,
-      pairs: preferEthereumFirst(candidatePairs),
-    });
-    sendJson(res, 200, { fiat, country, pairs: candidatePairs, methods });
-    return;
-  }
-
-  if (!chainId) throw Object.assign(new Error("chainId is required"), { statusCode: 400 });
-  if (!token) throw Object.assign(new Error("token is required"), { statusCode: 400 });
-
-  const methods = await fetchOnrampPaymentMethods({
-    apiKey: config.onramper.apiKey ?? "",
-    demo: config.onramper.demo || !config.onramper.apiKey,
-    widgetOrigin: config.onramper.widgetOrigin,
-    fiat,
-    chainId,
-    token,
-    country,
+  sendJson(res, 200, {
+    widgetUrl: widget.widgetUrl,
+    buyUrl: widget.widgetUrl,
+    orderId: widget.orderId ?? null,
+    provider: widget.provider,
+    embeddable: widget.embeddable,
+    tokenAddress: PAY_IN_TOKEN_ADDRESS,
   });
-
-  sendJson(res, 200, { fiat, chainId, token, country, methods });
-}
-
-/** `pairs=1:USDC,8453:USDC,tron:USDT` or repeated pair params.
- * Also accepts `chains` + `tokens` (same shape as invoice create) and expands the cartesian product
- * of allowed Onramper pairs.
- */
-function parseOnrampPairsQuery(url: URL): Array<{ chainId: string; token: string }> {
-  const raw = [
-    ...url.searchParams.getAll("pairs"),
-    ...url.searchParams.getAll("pair"),
-  ]
-    .flatMap((s) => s.split(","))
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const out: Array<{ chainId: string; token: string }> = [];
-  for (const item of raw) {
-    const [chainId, token] = item.split(":");
-    if (!chainId || !token) continue;
-    out.push({ chainId: chainId.trim(), token: token.trim().toUpperCase() });
-  }
-  if (out.length > 0) return out;
-
-  const chains = String(url.searchParams.get("chains") ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const tokens = String(url.searchParams.get("tokens") ?? "")
-    .split(",")
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean);
-  if (chains.length === 0 || tokens.length === 0) return out;
-  for (const chainId of chains) {
-    for (const token of tokens) {
-      if (onramperSupportedPair(chainId, token)) {
-        out.push({ chainId, token });
-      }
-    }
-  }
-  return out;
-}
-
-/** Prefer Ethereum USDC so Revolut / Apple Pay / Google Pay surface when available. */
-function preferEthereumFirst(
-  pairs: Array<{ chainId: string; token: string }>
-): Array<{ chainId: string; token: string }> {
-  const score = (p: { chainId: string; token: string }) => {
-    const id = String(p.chainId).toLowerCase();
-    const token = p.token.toUpperCase();
-    if ((id === "1" || id === "0x1") && token === "USDC") return 0;
-    if (id === "8453" && token === "USDC") return 1;
-    if ((id === "tron" || id === "0x2b6653dc") && token === "USDT") return 2;
-    if (id === "11155111" && token === "USDC") return 3;
-    if (id === "nile" && token === "USDT") return 4;
-    return 10;
-  };
-  return [...pairs].sort((a, b) => score(a) - score(b));
 }
 
 async function fundInvoiceFaucet(
@@ -896,196 +650,26 @@ async function fundInvoiceFaucet(
   });
 }
 
-async function createOnrampSession(
-  req: IncomingMessage,
-  res: ServerResponse,
-  { config, db }: RouteContext,
-  invoiceId: string
-): Promise<void> {
-  if (!config.onramper.enabled) {
-    throw Object.assign(new Error("Card and bank payments are not enabled on this instance"), {
-      statusCode: 503,
-    });
-  }
-
-  const invoice = db.getInvoice(invoiceId);
-  if (!invoice) {
-    throw Object.assign(new Error("Invoice not found"), { statusCode: 404 });
-  }
-  if (!paymentModeAllowsFiat(invoice.paymentMode)) {
-    throw Object.assign(new Error("This invoice does not accept card or bank payment"), {
-      statusCode: 400,
-    });
-  }
-  if (!invoice.invoiceAddress || !invoice.chainId || !invoice.token) {
-    throw Object.assign(new Error("Invoice is not ready for payment"), { statusCode: 409 });
-  }
-  if (isPaidLikeStatus(invoice.status)) {
-    throw Object.assign(new Error("Invoice is already paid"), { statusCode: 409 });
-  }
-
-  const body = await readJson(req);
-  const lockedFiat = invoice.displayFiat?.trim().toUpperCase();
-  const fiat = (
-    lockedFiat ??
-    String(body.fiat ?? body.currency ?? invoice.payerFiat ?? "").trim().toUpperCase()
-  );
-  if (!fiat) {
-    throw Object.assign(new Error("fiat is required"), { statusCode: 400 });
-  }
-  if (!config.onramper.fiats.includes(fiat)) {
-    throw Object.assign(new Error(`Unsupported fiat currency: ${fiat}`), { statusCode: 400 });
-  }
-
-  if (!lockedFiat) {
-    db.setPayerFiat(invoice.id, fiat);
-  }
-
-  const themeRaw = String(body.theme ?? "").trim().toLowerCase();
-  const theme = themeRaw === "dark" ? "dark" : "light";
-
-  let displayAmount = invoice.displayAmount;
-  const lockedDisplayFiat = invoice.displayFiat?.trim().toUpperCase();
-  const isFiatInvoice = invoice.paymentMode === "fiat" || Boolean(lockedDisplayFiat && displayAmount);
-
-  if (isFiatInvoice && displayAmount && invoice.chainId && invoice.token) {
-    const slippageBps = parseSlippageBps(invoice.quoteSlippageBps);
-    const liveQuote = await fetchOnrampQuote({
-      apiKey: config.onramper.apiKey ?? "",
-      demo: config.onramper.demo || !config.onramper.apiKey,
-      widgetOrigin: config.onramper.widgetOrigin,
-      fiat,
-      chainId: invoice.chainId,
-      token: invoice.token,
-      country: invoice.quoteCountry ?? "us",
-      paymentMethod: invoice.quotePaymentMethod ?? "creditcard",
-      provider: invoice.quoteProvider ?? undefined,
-      direction: "pay",
-      fiatAmount: displayAmount,
-      skipCache: true,
-    });
-    if (!isSettlementWithinSlippage(invoice.priceUsd, liveQuote.cryptoAmount, slippageBps)) {
-      const drift = settlementDriftBps(invoice.priceUsd, liveQuote.cryptoAmount);
-      throw Object.assign(
-        new Error(
-          `Invoice quote expired: settlement moved ${drift} bps (limit ${slippageBps} bps). Create a new invoice and try again.`
-        ),
-        {
-          statusCode: 410,
-          code: "quote_expired",
-          lockedSettlement: invoice.priceUsd,
-          liveSettlement: liveQuote.cryptoAmount,
-          slippageBps,
-          driftBps: drift,
-        }
-      );
-    }
-    displayAmount = liveQuote.fiatAmount;
-  }
-
-  // Testnet demo: no Onramper keys — serve a local stub page so create/pay UX can be exercised.
-  if (config.onramper.demo || !config.onramper.apiKey || !config.onramper.signingKey) {
-    const demo = new URLSearchParams({
-      invoiceId: invoice.id,
-      fiat,
-      price: invoice.priceUsd,
-      token: invoice.token,
-      chainId: invoice.chainId,
-    });
-    if (displayAmount) demo.set("displayAmount", displayAmount);
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-    sendJson(res, 200, {
-      // Relative so browser uses the same API origin (gateway or Vite proxy).
-      widgetUrl: `/api/public/onramp-demo?${demo.toString()}`,
-      expiresAt,
-      fiat,
-      displayAmount: displayAmount ?? null,
-      demo: true,
-    });
-    return;
-  }
-
-  const resumePath = `/pay?${encodeInvoiceResumeLink(invoice.id)}`;
-  const successRedirectUrl = new URL(resumePath, config.baseUrl).toString();
-
-  if (!displayAmount && fiat !== "USD") {
-    const quote = await fetchOnrampQuote({
-      apiKey: config.onramper.apiKey ?? "",
-      demo: false,
-      widgetOrigin: config.onramper.widgetOrigin,
-      fiat,
-      chainId: invoice.chainId,
-      token: invoice.token,
-      country: invoice.quoteCountry ?? "us",
-      paymentMethod: invoice.quotePaymentMethod ?? "creditcard",
-      direction: "receive",
-      cryptoAmount: invoice.priceUsd,
-      skipCache: true,
-    });
-    displayAmount = quote.fiatAmount;
-  }
-
-  const session = buildOnrampWidgetSession({
-    apiKey: config.onramper.apiKey ?? "",
-    signingKeyPem: config.onramper.signingKey,
-    widgetOrigin: config.onramper.widgetOrigin,
-    invoiceId: invoice.id,
-    invoiceAddress: invoice.invoiceAddress,
-    chainId: invoice.chainId,
-    token: invoice.token,
-    priceUsd: invoice.priceUsd,
-    fiat,
-    displayAmount,
-    defaultPaymentMethod: invoice.quotePaymentMethod,
-    onlyOnramps: invoice.quoteProvider,
-    theme,
-    lockFiat: invoice.paymentMode === "fiat" || Boolean(lockedFiat),
-    successRedirectUrl,
-    failureRedirectUrl: successRedirectUrl,
-  });
-
-  sendJson(res, 200, {
-    widgetUrl: session.widgetUrl,
-    expiresAt: session.expiresAt,
-    fiat,
-    displayAmount: displayAmount ?? null,
-    quoteProvider: invoice.quoteProvider,
-    quoteSlippageBps: invoice.quoteSlippageBps,
-  });
-}
-
 function assertPaymentModeAllowed(
   paymentMode: PaymentMode,
   fields: PayLinkFields,
   config: AppConfig
 ): void {
   if (paymentMode === "crypto") return;
-  if (!config.onramper.enabled) {
+  if (!config.metamaskOnramp.enabled) {
     throw Object.assign(new Error("Card and bank payments are not enabled on this instance"), {
       statusCode: 400,
     });
   }
-  if (paymentMode === "fiat") {
-    const hasOnrampPair = fields.chains.some((chainId) =>
-      fields.tokens.some((token) => onramperSupportedPair(chainId, token))
-    );
-    if (!hasOnrampPair) {
-      throw Object.assign(
-        new Error("Fiat invoices require at least one Onramper-supported chain and token"),
-        { statusCode: 400 }
-      );
+  if (paymentModeAllowsFiat(paymentMode)) {
+    const hasBaseUsdc =
+      fields.chains.some((chainId) => String(chainId) === PAY_IN_CHAIN_ID) &&
+      fields.tokens.some((token) => token.toUpperCase() === PAY_IN_TOKEN);
+    if (!hasBaseUsdc) {
+      throw Object.assign(new Error("Fiat invoices settle as USDC on Base"), { statusCode: 400 });
     }
-    const needsEvm = fields.chains.some((id) => chainKind(id) === "evm");
-    const needsTron = fields.chains.some((id) => chainKind(id) === "tron");
-    if (needsEvm && !fields.to.some((a) => /^0x[0-9a-fA-F]{40}$/i.test(a))) {
-      throw Object.assign(new Error("Fiat invoices with EVM networks require an EVM merchant address"), {
-        statusCode: 400,
-      });
-    }
-    if (needsTron && !fields.to.some((a) => looksLikeTronAddress(a))) {
-      throw Object.assign(new Error("Fiat invoices with Tron networks require a Tron merchant address"), {
-        statusCode: 400,
-      });
+    if (!fields.to.some((a) => /^0x[0-9a-fA-F]{40}$/i.test(a))) {
+      throw Object.assign(new Error("Fiat invoices require an EVM merchant address"), { statusCode: 400 });
     }
   }
 }
@@ -1422,76 +1006,6 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   const raw = await readRawBody(req);
   if (raw.length === 0) return {};
   return JSON.parse(raw.toString("utf8")) as Record<string, unknown>;
-}
-
-async function handleOnrampWebhook(
-  req: IncomingMessage,
-  res: ServerResponse,
-  { config }: RouteContext
-): Promise<void> {
-  const secret = config.onramper.webhookSecret;
-  if (!secret) {
-    throw Object.assign(new Error("Onramper webhooks are not configured"), { statusCode: 503 });
-  }
-  const raw = await readRawBody(req);
-  const signature = String(
-    req.headers["x-onramper-webhook-signature"] ?? req.headers["x-onramper-signature"] ?? ""
-  );
-  if (!verifyOnramperWebhookSignature(secret, signature, raw.toString("utf8"))) {
-    throw Object.assign(new Error("Invalid Onramper webhook signature"), { statusCode: 401 });
-  }
-  sendJson(res, 200, { received: true });
-}
-
-function sendOnrampDemoHtml(res: ServerResponse, url: URL): void {
-  const fiat = escapeHtmlAttr(url.searchParams.get("fiat") ?? "USD");
-  const price = escapeHtmlAttr(url.searchParams.get("price") ?? "");
-  const token = escapeHtmlAttr(url.searchParams.get("token") ?? "USDC");
-  const chainId = escapeHtmlAttr(url.searchParams.get("chainId") ?? "");
-  const invoiceId = escapeHtmlAttr(url.searchParams.get("invoiceId") ?? "");
-  const walletAddress = escapeHtmlAttr(url.searchParams.get("walletAddress") ?? "");
-  const mode = escapeHtmlAttr(url.searchParams.get("mode") ?? "buy");
-  const isWallet = Boolean(walletAddress);
-  const title = mode === "sell" ? "Sandbox cash-out" : "Sandbox card checkout";
-  const headline = mode === "sell" ? "Sell crypto to bank or card" : "Card or bank checkout";
-  const destLine = isWallet
-    ? `<p>Funds go to wallet <code>${walletAddress}</code> (no invoice sweep).</p>`
-    : `<p>Invoice <code>${invoiceId}</code></p>`;
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${title}</title>
-  <style>
-    :root { color-scheme: light; font-family: system-ui, sans-serif; }
-    body { margin: 0; padding: 1.5rem; background: #f6f9fc; color: #0a2540; }
-    .panel { background: #fff; border: 1px solid #e3e8ee; border-radius: 12px; padding: 1.25rem 1.35rem; max-width: 28rem; }
-    h1 { font-size: 1.15rem; margin: 0 0 0.5rem; }
-    p { margin: 0.4rem 0; line-height: 1.45; color: #425466; font-size: 0.95rem; }
-    .amount { font-size: 1.5rem; font-weight: 650; color: #0a2540; margin: 0.75rem 0; }
-    .badge { display: inline-block; background: #eef3ff; color: #0a6cff; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 999px; }
-    code { font-size: 0.8rem; word-break: break-all; }
-  </style>
-</head>
-<body>
-  <div class="panel">
-    <span class="badge">Sandbox demo</span>
-    <h1>${headline}</h1>
-    ${price ? `<p class="amount">$${price} · ${fiat}</p>` : `<p class="amount">${fiat}</p>`}
-    <p>Stablecoins <strong>${token}</strong> on chain(s) <code>${chainId}</code>.</p>
-    <p>This is a local stub — no real card charge and no on-chain funding. On mainnet, set Onramper API + signing keys to load the live widget.</p>
-    ${destLine}
-  </div>
-</body>
-</html>`;
-  res.writeHead(200, {
-    "content-type": "text/html; charset=utf-8",
-    "cache-control": "no-store",
-    "x-frame-options": "SAMEORIGIN",
-    "content-security-policy": "frame-ancestors 'self'",
-  });
-  res.end(html);
 }
 
 function escapeHtmlAttr(value: string): string {

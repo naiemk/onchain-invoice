@@ -10,10 +10,15 @@ import {
 } from "../../../commerce/shared/advanced-wallet.js";
 import type { WalletEntityKeyRecord } from "../../../commerce/shared/wallet.js";
 import { credentialIdsMatch } from "./credential-id.js";
-import { signUserOpHashPersonal } from "./eoa-connector.js";
+import { signUserOpTypedData } from "./eoa-connector.js";
 import { fetchWalletConfig, getWalletAccount, listDevices, primaryChain } from "./wallet-api.js";
 import { fetchAdvancedPolicy, listWalletEntities } from "./wallet-advanced-api.js";
-import { loadWalletSession, saveWalletSession, listWalletRegistry, type WalletSession } from "./wallet-session.js";
+import {
+  loadWalletSession,
+  saveWalletSessionIfActive,
+  listWalletRegistry,
+  type WalletSession,
+} from "./wallet-session.js";
 import { signUserOpHash } from "./webauthn.js";
 import { encodedWebAuthnMatchResult } from "./webauthn-p256.js";
 import { selectPubkeyForCredential } from "./wallet-passkey-bind.js";
@@ -42,6 +47,7 @@ export type WalletPasskeyPath =
 
 export type CurrentWalletPasskey = {
   address: string;
+  chainId?: string;
   credentialId: string;
   qx: string;
   qy: string;
@@ -213,7 +219,7 @@ export function persistCurrentWalletPasskey(
     keyType: passkey.keyType ?? base.keyType,
     eoa: passkey.eoa ?? base.eoa,
   };
-  saveWalletSession(next);
+  saveWalletSessionIfActive(next);
   return next;
 }
 
@@ -316,6 +322,7 @@ export async function resolveCurrentWalletPasskey(
     }
     const passkey: CurrentWalletPasskey = {
       address,
+      chainId: session.chainId,
       credentialId,
       qx: pub.qx,
       qy: pub.qy,
@@ -429,6 +436,7 @@ export async function resolveCurrentWalletPasskey(
 
   const passkey: CurrentWalletPasskey = {
     address,
+    chainId: session.chainId,
     credentialId,
     qx: localQx,
     qy: localQy,
@@ -584,7 +592,13 @@ export async function signWithCurrentWalletPasskey(
   });
 
   if (passkey.keyType === KEY_EOA && passkey.eoa) {
-    const inner = await signUserOpHashPersonal(userOpHash);
+    const chainId = BigInt(passkey.chainId || "0");
+    if (!chainId) throw new Error(t("wallet.superWalletNoSigningKey"));
+    const inner = await signUserOpTypedData({
+      wallet: passkey.address,
+      userOpHash,
+      chainId,
+    });
     if (!passkey.advanced || opts?.innerOnly) return inner;
     if (!passkey.keyId) throw new Error(t("wallet.superWalletNoSigningKey"));
     return encodeAdvancedSignature([{ keyId: passkey.keyId, sig: inner }]);

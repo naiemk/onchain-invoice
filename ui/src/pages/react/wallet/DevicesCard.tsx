@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { KeyRound, Loader2, Smartphone, Wallet } from "lucide-react";
+import { ChevronRight, KeyRound, Loader2, Smartphone, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,7 +13,7 @@ import {
   listDevices,
   waitForUserOp,
 } from "@/shared/wallet-api.js";
-import { formatKeyFingerprint, shortKey } from "@/shared/wallet-ui.js";
+import { formatDeviceFingerprint, shortKey } from "@/shared/wallet-ui.js";
 import { createSecurityKey, isYubiKeyPinRequiredError } from "@/shared/webauthn.js";
 import { loadWalletSession, upsertWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 import { buildSignedRemoveOwnerUserOp, submitSignedUserOp } from "@/shared/userop-client.js";
@@ -141,6 +141,36 @@ export function DevicesCard({
     }
   };
 
+  const addActions = [
+    {
+      id: "pair",
+      icon: Smartphone,
+      title: t("wallet.addDevice"),
+      body: t("wallet.pairStep1"),
+      busy: false,
+      disabled: yubiBusy || eoaBusy,
+      onClick: () => setPairOpen(true),
+    },
+    {
+      id: "yubi",
+      icon: KeyRound,
+      title: t("wallet.addSecurityKey"),
+      body: t("wallet.addSecurityKeyHint"),
+      busy: yubiBusy,
+      disabled: yubiBusy || eoaBusy,
+      onClick: () => void addYubiKey(),
+    },
+    {
+      id: "eoa",
+      icon: Wallet,
+      title: t("wallet.superWalletConnectWallet"),
+      body: t("wallet.superWalletConnectWalletHint"),
+      busy: eoaBusy,
+      disabled: yubiBusy || eoaBusy,
+      onClick: () => void addEoa(),
+    },
+  ] as const;
+
   return (
     <PageCard className="space-y-6" id="devices" data-testid="devices-card">
       <div>
@@ -187,7 +217,7 @@ export function DevicesCard({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{d.label}</p>
                     <p className="font-mono text-xs text-muted-foreground">
-                      {formatKeyFingerprint(d.ownerQx, d.ownerQy)}
+                      {formatDeviceFingerprint(d)}
                     </p>
                   </div>
                   {advanced ? null : (
@@ -215,21 +245,28 @@ export function DevicesCard({
             {t("wallet.identityBackupHint")}
           </p>
         ) : null}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="button" onClick={() => setPairOpen(true)}>
-            <Smartphone className="h-4 w-4" />
-            {t("wallet.addDevice")}
-          </Button>
-          <Button type="button" variant="outline" disabled={yubiBusy} onClick={() => void addYubiKey()}>
-            {yubiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-            {t("wallet.addSecurityKey")}
-          </Button>
-          <Button type="button" variant="outline" disabled={eoaBusy} onClick={() => void addEoa()}>
-            {eoaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-            {t("wallet.superWalletConnectWallet")}
-          </Button>
+        <div className="space-y-2">
+          {addActions.map(({ id, icon: Icon, title, body, busy, disabled, onClick }) => (
+            <button
+              key={id}
+              type="button"
+              disabled={disabled}
+              className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-60"
+              onClick={onClick}
+            >
+              {busy ? (
+                <Loader2 className="h-5 w-5 shrink-0 animate-spin text-emphasis" aria-hidden />
+              ) : (
+                <Icon className="h-5 w-5 shrink-0 text-emphasis" aria-hidden />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{title}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">{body}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          ))}
         </div>
-        <p className="text-xs text-muted-foreground">{t("wallet.addSecurityKeyHint")}</p>
       </div>
 
       {yubiHelp ? (

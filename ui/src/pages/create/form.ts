@@ -10,7 +10,6 @@ import {
   type ChainKind,
 } from "../../shared/networks.js";
 import type { PayLinkFields, PaymentMode } from "../../shared/types.js";
-import { deploymentMode } from "../../shared/networks.js";
 
 export function onrampSupportedSet(root: HTMLElement): Set<string> {
   const raw = root.dataset.onrampPairs;
@@ -28,14 +27,13 @@ export function chainHasOnrampSupport(root: HTMLElement, chainId: string): boole
   return supported.has(`${chainId}:USDC`) || supported.has(`${chainId}:USDT`);
 }
 
-/** Locked minimum rails for fiat: Eth+Base+Tron (mainnet) or Sepolia+Nile (testnet). */
+/** Locked rail for fiat: Base USDC (MetaMask pay-in). */
 export function fiatMinimumChainIds(): string[] {
-  return deploymentMode() === "testnet" ? ["11155111", "nile"] : ["1", "8453", "tron"];
+  return ["8453"];
 }
 
-export function fiatMinimumTokenForChain(chainId: string): string {
-  const kind = networkKind(chainId);
-  return kind === "tron" ? "USDT" : "USDC";
+export function fiatMinimumTokenForChain(_chainId: string): string {
+  return "USDC";
 }
 
 export function selectedOnrampPairs(root: HTMLElement): Array<{ chainId: string; token: string }> {
@@ -273,12 +271,6 @@ export function validateStep(root: HTMLElement, step: WizardStep): void {
   // step 3
   const price = fieldValue(root, "price");
   if (!price) throw new Error(t("errors.missingPrice"));
-  const mode = selectedPaymentMode(root);
-  if (mode === "fiat") {
-    if (!root.dataset.quotedSettlement || root.dataset.quotedSettlement === "0") {
-      throw new Error(t("create.quoteError"));
-    }
-  }
 }
 
 export function readForm(root: HTMLElement): PayLinkFields {
@@ -302,7 +294,7 @@ export function readForm(root: HTMLElement): PayLinkFields {
   const includeFiat = mode === "fiat" || mode === "crypto_or_fiat";
 
   return {
-    price: mode === "fiat" ? root.dataset.quotedSettlement || "0" : price,
+    price,
     to,
     chains,
     tokens,
@@ -316,22 +308,9 @@ export function readForm(root: HTMLElement): PayLinkFields {
     ...(fieldValue(root, "lang") ? { lang: fieldValue(root, "lang") } : {}),
     ...(includeFiat
       ? {
-          displayFiat: fieldValue(root, "displayFiat") || root.dataset.quotedDisplayFiat || undefined,
-          displayAmount:
-            mode === "fiat"
-              ? price || root.dataset.quotedDisplayAmount
-              : root.dataset.quotedDisplayAmount || undefined,
-          quoteCountry: fieldValue(root, "quoteCountry") || "us",
-          quotePaymentMethod: fieldValue(root, "quotePaymentMethod") || undefined,
-          quoteProvider: fieldValue(root, "quoteProvider") || root.dataset.quotedProvider || undefined,
-          quoteSlippageBps: (() => {
-            const pct = Number(fieldValue(root, "quoteSlippagePct") || "1");
-            if (!Number.isFinite(pct) || pct < 0) return 100;
-            return Math.round(pct * 100);
-          })(),
-          ...(mode === "fiat"
-            ? { price: root.dataset.quotedSettlement || "0", displayAmount: price || root.dataset.quotedDisplayAmount }
-            : {}),
+          displayFiat: fieldValue(root, "displayFiat") || undefined,
+          displayAmount: fieldValue(root, "displayFiat") ? price || undefined : undefined,
+          quoteCountry: fieldValue(root, "quoteCountry") || undefined,
         }
       : {}),
   };

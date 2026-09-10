@@ -403,7 +403,8 @@ export const hi = {
     paymentModeFiatTitle: "केवल कार्ड या बैंक",
     paymentModeFiatHint: "ग्राहक क्रिप्टो पता नहीं देखता। फिर भी एक नेटवर्क पर USDC/USDT के रूप में सेटल होता है।",
     settlementNetworkLabel: "सेटलमेंट नेटवर्क",
-    settlementNetworkHint: "कार्ड/बैंक के लिए Ethereum, Base और Tron आवश्यक हैं (Revolut Pay और अधिक सक्षम करते हैं)। आप अन्य Onramper-समर्थित रेल जोड़ सकते हैं।",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "शुल्क ~{amount} {fiat}",
     settlePreview: "आप पाते हैं ~{amount} {token}",
     fiatPayLabel: "ग्राहक चुकाता है",
@@ -501,7 +502,8 @@ export const hi = {
 
   pay: {
     faucetTitle: "टेस्टनेट फ़ॉसेट",
-    faucetHint: "Onramper सैंडबॉक्स टेस्टनेट पतों को फंड नहीं करता। सेटलमेंट राशि ऑन-चेन भेजने के लिए ऑपरेटर फ़ॉसेट सीक्रेट दर्ज करें ताकि स्वीपर भुगतान पूरा कर सके।",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "फ़ॉसेट सीक्रेट",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "इनवॉइस फंड करें (टेस्टनेट)",
@@ -787,4 +789,4 @@ export const hi = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

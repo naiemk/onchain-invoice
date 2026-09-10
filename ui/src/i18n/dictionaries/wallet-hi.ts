@@ -175,6 +175,24 @@ export const walletHi = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "इस डिवाइस पर आपके वॉलेट",
   chooseWalletLede: "खोलने के लिए एक वॉलेट चुनें। प्रत्येक इस ब्राउज़र पर पासकी से बनाया गया था।",
   balanceLoading: "…",
@@ -286,8 +304,8 @@ export const walletHi = {
     "कार्ड या बैंक ट्रांसफ़र से USDC या USDT खरीदें। क्रिप्टो सीधे आपके वॉलेट में जाता है — कोई इनवॉइस स्वीप नहीं।",
   depositFiatLabel: "आप भुगतान करते हैं",
   depositContinue: "चेकआउट जारी रखें",
-  depositHint:
-    "Onramper आपके क्षेत्र के लिए सबसे अच्छा प्रदाता चुनता है। समर्थित स्टेबल: जहाँ उपलब्ध हों USDC और USDT।",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "सैंडबॉक्स मोड — कोई वास्तविक शुल्क नहीं और कोई ऑन-चेन फंडिंग नहीं।",
   depositLoading: "चेकआउट लोड हो रहा है…",
   depositIframeTitle: "जमा चेकआउट",
@@ -296,13 +314,13 @@ export const walletHi = {
   depositFailed: "जमा चेकआउट शुरू नहीं हो सका",
   withdrawCta: "बैंक / कार्ड पर",
   withdrawTitle: "बैंक या कार्ड पर नकद निकालें",
-  withdrawLede:
-    "अपने वॉलेट से USDC या USDT बेचें। Onramper तैयार होने पर आप passkey से भेजने की पुष्टि करेंगे।",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "नकद निकालें",
   withdrawContinue: "नकद निकालना जारी रखें",
   withdrawHint: "प्रदाता चुनने के बाद हम इस वॉलेट से क्रिप्टो भेजने की पुष्टि माँगेंगे।",
-  withdrawSandboxNote:
-    "सैंडबॉक्स मोड — Onramper कुंजियाँ कॉन्फ़िगर होने तक बिक्री प्रवाह स्थानीय स्टब है।",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "नकद निकासी लोड हो रही है…",
   withdrawIframeTitle: "नकद निकासी चेकआउट",
   withdrawUnavailable: "इस इंस्टेंस पर कार्ड और बैंक नकद निकासी सक्षम नहीं है।",

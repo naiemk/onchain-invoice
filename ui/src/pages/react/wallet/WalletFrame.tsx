@@ -25,6 +25,7 @@ import {
   loadWalletSession,
   setActiveWallet,
   shortAddress,
+  walletSessionsEquivalent,
   WALLET_SESSION_EVENT,
   type WalletSession,
 } from "@/shared/wallet-session.js";
@@ -112,12 +113,12 @@ function WalletAccountChip({
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col items-start gap-1.5">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-8 gap-2 px-2">
             <WalletIdenticon session={session} />
-            <span className="max-w-[8rem] truncate text-sm">{session.label}</span>
+            <span className="max-w-[12rem] truncate text-sm">{session.label}</span>
             <ChevronDown className="h-3.5 w-3.5 opacity-60" />
           </Button>
         </DropdownMenuTrigger>
@@ -139,7 +140,7 @@ function WalletAccountChip({
         </DropdownMenuContent>
       </DropdownMenu>
       <div className="inline-flex items-center gap-0.5">
-        <Button type="button" variant="outline" size="sm" className="font-mono text-[10px]" onClick={() => void copyAddress()}>
+        <Button type="button" variant="outline" size="sm" className="h-8 font-mono text-[10px]" onClick={() => void copyAddress()}>
           {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           {shortAddress(session.address)}
         </Button>
@@ -160,10 +161,10 @@ function WalletAccountChip({
             <TooltipContent>{t("wallet.superWalletShieldTooltip")}</TooltipContent>
           </Tooltip>
         )}
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t("wallet.lock")} onClick={lock}>
+          <Lock className="h-3.5 w-3.5" />
+        </Button>
       </div>
-      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t("wallet.lock")} onClick={lock}>
-        <Lock className="h-3.5 w-3.5" />
-      </Button>
     </div>
   );
 }
@@ -271,10 +272,16 @@ export function WalletFrame({
   const mode = deploymentMode();
   const registry = useMemo(
     () => listWalletRegistryForDeployment(isTestnet, mode === "testnet"),
-    [session]
+    [session?.address]
   );
 
-  const refreshSession = useCallback(() => setSession(loadWalletSession()), []);
+  const refreshSession = useCallback(() => {
+    setSession((prev) => {
+      const next = loadWalletSession();
+      if (!prev || !next) return next;
+      return walletSessionsEquivalent(prev, next) ? prev : next;
+    });
+  }, []);
 
   useEffect(() => {
     refreshSession();
@@ -307,7 +314,7 @@ export function WalletFrame({
           <AlertDescription className="font-medium">{t("wallet.testnetAddressWarning")}</AlertDescription>
         </Alert>
       )}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <WalletAccountChip
           session={session}
           registry={registry}

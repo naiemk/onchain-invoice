@@ -5,8 +5,10 @@ import { fetchAdvancedPolicy } from "./wallet-advanced-api.js";
 import { resolveCurrentWalletPasskey } from "./current-wallet-passkey.js";
 import { ensureSessionCredential } from "./webauthn.js";
 import {
+  isActiveWalletAddress,
   listWalletRegistry,
   saveWalletSession,
+  saveWalletSessionIfActive,
   type WalletSession,
 } from "./wallet-session.js";
 
@@ -37,7 +39,8 @@ export async function healWalletSession(
 
   let needsSuperWalletEmail = false;
   try {
-    const passkey = await resolveCurrentWalletPasskey(next, "heal", { persist: options?.persist !== false });
+    const persist = options?.persist !== false && isActiveWalletAddress(next.address);
+    const passkey = await resolveCurrentWalletPasskey(next, "heal", { persist });
     next = {
       ...next,
       qx: passkey.qx,
@@ -60,7 +63,7 @@ export async function healWalletSession(
     next.qx !== session.qx ||
     next.qy !== session.qy;
 
-  if (changed && options?.persist !== false) saveWalletSession(next);
+  if (changed && options?.persist !== false) saveWalletSessionIfActive(next);
 
   return { session: next, needsSuperWalletEmail: Boolean(needsSuperWalletEmail && !next.entityId) };
 }

@@ -112,7 +112,7 @@ export function resolveRateLimit(
   if (m === "PATCH" && /^\/api\/wallet\/accounts\/[^/]+\/deployed$/.test(pathname)) return null;
 
   // Quote (paid upstream)
-  if (pathname === "/api/public/onramp-quote" || pathname === "/api/public/onramp-methods") {
+  if (pathname.startsWith("/api/public/pay-in/")) {
     return quote;
   }
 

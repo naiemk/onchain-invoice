@@ -173,6 +173,24 @@ export const walletVi = {
     "Pair this browser by scanning the QR on your other device, or recover a wallet you already have.",
   pairWithAnotherDevice: "Pair with another device",
   recoverExistingOnDevice: "Recover existing wallets on this device",
+  relinkThisDevice: "Relink this device",
+  recoverTabWithEmail: "With email",
+  recoverTabWithoutEmail: "Without email",
+  recoverSelectWallets: "Select at least one wallet.",
+  recoverNoWalletsForEmail: "No wallets are attached to this email.",
+  recoverAlreadyActive: "Recovery already in progress",
+  recoverSignerTitle: "New key",
+  recoverSignerPasskey: "Passkey (WebAuthn)",
+  recoverSignerPasskeyBody: "Create a passkey on this device as the recovered owner.",
+  recoverSignerYubiKey: "Security key (YubiKey)",
+  recoverSignerYubiKeyBody: "Tap a hardware security key to enroll it as the recovered owner.",
+  recoverSignerEoa: "Crypto wallet",
+  recoverSignerEoaBody:
+    "Sign with a connected wallet to prove this address. If it is already an owner, you can add a new passkey immediately.",
+  recoverExistingOwnerDone: "This address is already an owner. A new passkey was added — you can open the wallet on this device.",
+  recoverFromOtherTitle: "Recover from another device",
+  recoverFromOtherBody: "Start recovery if you lost the device that holds your passkey.",
+  backToWallets: "Back to wallets",
   chooseWallet: "Ví của bạn trên thiết bị này",
   chooseWalletLede: "Chọn ví để mở. Mỗi ví được tạo bằng passkey trên trình duyệt này.",
   balanceLoading: "…",
@@ -283,8 +301,8 @@ export const walletVi = {
     "Mua USDC hoặc USDT bằng thẻ hoặc chuyển khoản. Crypto được gửi thẳng tới ví — không quét hóa đơn.",
   depositFiatLabel: "Bạn thanh toán bằng",
   depositContinue: "Tiếp tục tới checkout",
-  depositHint:
-    "Onramper chọn nhà cung cấp tốt nhất cho khu vực của bạn. Stablecoin hỗ trợ: USDC và USDT khi có.",
+    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+
   depositSandboxNote: "Chế độ sandbox — không trừ tiền thật và không nạp on-chain.",
   depositLoading: "Đang tải checkout…",
   depositIframeTitle: "Checkout nạp tiền",
@@ -293,14 +311,14 @@ export const walletVi = {
   depositFailed: "Không thể bắt đầu checkout nạp tiền",
   withdrawCta: "Về ngân hàng / thẻ",
   withdrawTitle: "Rút về ngân hàng hoặc thẻ",
-  withdrawLede:
-    "Bán USDC hoặc USDT từ ví. Bạn sẽ xác nhận gửi bằng passkey khi Onramper sẵn sàng.",
+    withdrawLede: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawFiatLabel: "Rút về",
   withdrawContinue: "Tiếp tục rút tiền",
   withdrawHint:
     "Sau khi bạn chọn nhà cung cấp, chúng tôi sẽ yêu cầu xác nhận gửi crypto từ ví này.",
-  withdrawSandboxNote:
-    "Chế độ sandbox — luồng bán là stub cục bộ cho đến khi cấu hình khóa Onramper.",
+    withdrawSandboxNote: "Card cash-out is not available. Send USDC on-chain instead.",
+
   withdrawLoading: "Đang tải rút tiền…",
   withdrawIframeTitle: "Checkout rút tiền",
   withdrawUnavailable: "Rút thẻ và ngân hàng chưa được bật trên instance này.",

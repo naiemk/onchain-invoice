@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SendScanButton } from "@/components/SendScanDialog";
 import { ExplorerLink } from "@/components/ExplorerLink";
 import {
@@ -31,7 +32,7 @@ import {
 import { subscribePageVisible } from "@/shared/page-visibility.js";
 import { fetchAdvancedPolicy } from "@/shared/wallet-advanced-api.js";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
-import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
+import { loadWalletSession, walletSessionsEquivalent, type WalletSession } from "@/shared/wallet-session.js";
 import { buildSignedAdvancedSendUserOp } from "@/shared/advanced-userop-client.js";
 import { buildSignedSendUserOp, submitSignedUserOp } from "@/shared/userop-client.js";
 import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
@@ -43,7 +44,15 @@ import { useWalletPolicy } from "./wallet-policy";
 import { TxHistory } from "./TxHistory";
 
 export function SendPage() {
-  const { isSuperWallet } = useWalletPolicy();
+  const { t } = useLocale();
+  const { isSuperWallet, loading } = useWalletPolicy();
+  if (loading) {
+    return (
+      <WalletFrame current="send" title={t("wallet.sendPageTitle")} lede={t("wallet.sendPageLede")}>
+        <Skeleton className="h-64 w-full" />
+      </WalletFrame>
+    );
+  }
   if (isSuperWallet) {
     return <SuperPayPage />;
   }
@@ -57,7 +66,7 @@ function SimpleSendPage() {
   const [config, setConfig] = useState<WalletPublicConfig | null>(null);
   const [balanceUsd, setBalanceUsd] = useState("0.00");
   const [tokenBalances, setTokenBalances] = useState<Record<string, bigint>>({});
-  const [deployed, setDeployed] = useState(false);
+  const [deployed, setDeployed] = useState<boolean | null>(null);
   const [funded, setFunded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [recipient, setRecipient] = useState("");
@@ -92,18 +101,24 @@ function SimpleSendPage() {
     }
     let cancelled = false;
     void (async () => {
-      const healed = await healWalletSession(session);
-      if (cancelled) return;
-      if (healed.session !== session) setSession(healed.session);
-      const active = healed.session;
       const cfg = await fetchWalletConfig();
       if (cancelled) return;
-      if (active.entityId) setAdvancedEntityId(active.entityId);
+      if (session.entityId) setAdvancedEntityId(session.entityId);
       setConfig(cfg);
       try {
-        await loadActivation(active, cfg);
+        await loadActivation(session, cfg);
       } catch {
         /* keep last known status */
+      }
+    })();
+    void (async () => {
+      try {
+        const healed = await healWalletSession(session);
+        if (cancelled) return;
+        if (healed.session.entityId) setAdvancedEntityId(healed.session.entityId);
+        if (!walletSessionsEquivalent(healed.session, session)) setSession(healed.session);
+      } catch {
+        /* ignore */
       }
     })();
     return () => {
@@ -119,7 +134,7 @@ function SimpleSendPage() {
   }, [session, config, loadActivation]);
 
   useEffect(() => {
-    if (!session || !config || deployed || !funded) return;
+    if (!session || !config || deployed !== false || !funded) return;
     const id = window.setInterval(() => {
       void loadActivation(session, config).catch(() => undefined);
     }, 3_000);
@@ -299,6 +314,8 @@ function SimpleSendPage() {
 
   if (!session) return null;
 
+  const canSend = deployed === true;
+
   return (
     <WalletFrame
       current="send"
@@ -307,7 +324,7 @@ function SimpleSendPage() {
     >
       <PageSplit>
         <PageCard>
-          {!deployed && (
+          {deployed === false && (
             <Alert variant="warn" className="mb-4">
               <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span>{funded ? t("wallet.userOpAccountNotDeployed") : t("wallet.sendNotDeployed")}</span>
@@ -334,16 +351,16 @@ function SimpleSendPage() {
                   className="font-mono"
                   placeholder="0x…"
                   value={recipient}
-                  disabled={!deployed || busy}
+                  disabled={!canSend || busy}
                   onChange={(e) => setRecipient(e.target.value)}
                 />
-                <SendScanButton onScan={handleScan} tokenDecimals={tokenDecimals} disabled={!deployed || busy} />
+                <SendScanButton onScan={handleScan} tokenDecimals={tokenDecimals} disabled={!canSend || busy} />
               </div>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="send-amount">{t("wallet.sendAmount")}</Label>
-                <Select value={selectedTokenSymbol} onValueChange={setSelectedTokenSymbol} disabled={!deployed || busy || tokenOptions.length <= 1}>
+                <Select value={selectedTokenSymbol} onValueChange={setSelectedTokenSymbol} disabled={!canSend || busy || tokenOptions.length <= 1}>
                   <SelectTrigger id="send-token" className="h-9 w-28">
                     <SelectValue />
                   </SelectTrigger>
@@ -361,7 +378,7 @@ function SimpleSendPage() {
                 inputMode="decimal"
                 placeholder="0.00"
                 value={amount}
-                disabled={!deployed || busy}
+                disabled={!canSend || busy}
                 onChange={(e) => setAmount(e.target.value)}
               />
               <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -371,7 +388,7 @@ function SimpleSendPage() {
                   variant="ghost"
                   size="sm"
                   className="h-7 px-2 text-xs"
-                  disabled={!deployed || busy || maxSendAtoms <= 0n}
+                  disabled={!canSend || busy || maxSendAtoms <= 0n}
                   onClick={() => setAmount(formatUnits(maxSendAtoms, tokenDecimals))}
                 >
                   {t("wallet.max")}
@@ -384,11 +401,11 @@ function SimpleSendPage() {
                 id="send-note"
                 placeholder={t("wallet.sendNotePlaceholder")}
                 value={note}
-                disabled={!deployed || busy}
+                disabled={!canSend || busy}
                 onChange={(e) => setNote(e.target.value)}
               />
             </div>
-            <Button type="button" disabled={!deployed || busy} onClick={openReview}>
+            <Button type="button" disabled={!canSend || busy} onClick={openReview}>
               {t("wallet.sendReview")}
               <ArrowUpRight className="h-3.5 w-3.5" />
             </Button>

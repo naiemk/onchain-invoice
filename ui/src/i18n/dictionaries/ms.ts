@@ -412,7 +412,8 @@ export const ms = {
     paymentModeFiatTitle: "Kad atau bank sahaja",
     paymentModeFiatHint: "Pelanggan tidak pernah melihat alamat kripto. Tetap diselesaikan sebagai USDC/USDT pada satu rangkaian.",
     settlementNetworkLabel: "Rangkaian penyelesaian",
-    settlementNetworkHint: "Ethereum, Base dan Tron wajib untuk kad/bank (mengaktifkan Revolut Pay dan lagi). Anda boleh menambah rel lain yang disokong Onramper.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "Caj ~{amount} {fiat}",
     settlePreview: "Anda menerima ~{amount} {token}",
     fiatPayLabel: "Pelanggan membayar",
@@ -512,7 +513,8 @@ export const ms = {
 
   pay: {
     faucetTitle: "Faucet rangkaian ujian",
-    faucetHint: "Sandbox Onramper tidak membiayai alamat rangkaian ujian. Masukkan rahsia faucet operator untuk menghantar jumlah penyelesaian on-chain supaya sweeper dapat menyelesaikan bayaran.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "Rahsia faucet",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "Biayai invois (rangkaian ujian)",
@@ -801,4 +803,4 @@ export const ms = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

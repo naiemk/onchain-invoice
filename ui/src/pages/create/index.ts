@@ -1,18 +1,17 @@
 import { encodePayLink, payPath } from "../../shared/invoice.js";
 import { withPayChrome, type PayChrome } from "../../shared/pay-chrome.js";
 import { copyText, escapeHtml } from "../../shared/dom.js";
-import { localizeError, localizeOnrampQuoteError } from "../../i18n/errors.js";
+import { localizeError } from "../../i18n/errors.js";
 import { t } from "../../i18n/t.js";
 import { createCounterfactualWallet } from "../../shared/wallet-create.js";
 import { loadWalletSession } from "../../shared/webauthn.js";
 import {
   deploymentMode,
   networkKind,
-  networkShort,
   networksForDeployment,
 } from "../../shared/networks.js";
 import { apiUrl } from "../../shared/site.js";
-import { AUTO_VALUE, ruleFor, type FiatField } from "./fiat-rules.js";
+import { type FiatField } from "./fiat-rules.js";
 import {
   chainHasOnrampSupport,
   checked,
@@ -23,7 +22,6 @@ import {
   readForm,
   readFormLoose,
   renderTokenOptions,
-  selectedOnrampPairs,
   selectedPaymentMode,
   setWalletField,
   validateStep,
@@ -37,25 +35,12 @@ import { stepAmountHtml } from "./step-amount.js";
 import { stepDetailsHtml } from "./step-details.js";
 import { stepNetworkHtml } from "./step-network.js";
 
-interface OnrampPublicConfig {
-  enabled: boolean;
-  sandbox?: boolean;
-  fiats: string[];
-  supportedPairs: Array<{ chainId: string; token: string }>;
-}
-
-interface OnrampQuoteResponse {
-  fiatAmount: string;
-  cryptoAmount: string;
-  fiat: string;
-  demo?: boolean;
-  quotes?: Array<{ provider: string; paymentMethod: string; fiatAmount: string; cryptoAmount: string }>;
-  recommended?: { provider: string; paymentMethod: string; fiatAmount: string; cryptoAmount: string };
+interface PayInPublicConfig {
+  enabled?: boolean;
   chainId?: string;
   token?: string;
 }
 
-let fiatQuoteTimer: ReturnType<typeof setTimeout> | undefined;
 let currentStep: WizardStep = 1;
 
 export function renderCreate(root: HTMLElement): void {
@@ -573,73 +558,19 @@ function bindAddressValidation(root: HTMLElement): void {
 }
 
 function bindFiatCascade(root: HTMLElement, refresh: () => void): void {
-  const run = (field: FiatField) => {
-    const mode = selectedPaymentMode(root);
-    if (mode !== "fiat" && mode !== "crypto_or_fiat") return;
-    const rule = ruleFor(field);
-    const exec = async () => {
-      for (const action of rule.actions) {
-        if (action === "none") continue;
-        if (action === "refetchMethods") await loadQuotePaymentMethods(root);
-        if (action === "refetchProviders") await refreshFiatQuote(root);
-        if (action === "reselectProvider") reselectProvider(root);
-      }
-      persistPrefs(root);
-      refresh();
-    };
-    if (rule.debounceMs) {
-      clearTimeout(fiatQuoteTimer);
-      fiatQuoteTimer = setTimeout(() => void exec(), rule.debounceMs);
-    } else {
-      void exec();
-    }
+  const run = () => {
+    persistPrefs(root);
+    refresh();
   };
 
   const map: Array<[string, FiatField]> = [
     ["displayFiat", "currency"],
     ["quoteCountry", "country"],
-    ["quotePaymentMethod", "paymentMethod"],
-    ["quoteProvider", "provider"],
-    ["quoteSlippagePct", "drift"],
     ["price", "amount"],
   ];
-  for (const [id, field] of map) {
-    root.querySelector(`#${id}`)?.addEventListener("change", () => run(field));
-    root.querySelector(`#${id}`)?.addEventListener("input", () => {
-      if (field === "amount" || field === "country") run(field);
-    });
-  }
-  root.querySelector("#chains")?.addEventListener("change", () => run("pairs"));
-  root.querySelector("#tokens")?.addEventListener("change", () => run("pairs"));
-}
-
-function reselectProvider(root: HTMLElement): void {
-  const providerSelect = root.querySelector<HTMLSelectElement>("#quoteProvider");
-  const preview = root.querySelector<HTMLElement>("#fiat-charge-preview");
-  if (!providerSelect || !preview) return;
-  const activeProvider = providerSelect.value;
-  const quotesRaw = root.dataset.quotedQuotes;
-  if (!quotesRaw) return;
-  try {
-    const quotes = JSON.parse(quotesRaw) as Array<{
-      provider: string;
-      fiatAmount: string;
-      cryptoAmount: string;
-    }>;
-    const active =
-      quotes.find((q) => q.provider === activeProvider) ??
-      quotes[0];
-    if (!active) return;
-    const settleToken = root.dataset.quotedToken ?? "USDC";
-    const settleChain = root.dataset.quotedChainId ? ` · ${networkShort(root.dataset.quotedChainId)}` : "";
-    preview.textContent =
-      t("create.settlePreview", { amount: active.cryptoAmount, token: settleToken }) + settleChain;
-    preview.hidden = false;
-    root.dataset.quotedSettlement = active.cryptoAmount;
-    root.dataset.quotedDisplayAmount = active.fiatAmount;
-    root.dataset.quotedProvider = active.provider;
-  } catch {
-    /* ignore */
+  for (const [id] of map) {
+    root.querySelector(`#${id}`)?.addEventListener("change", run);
+    root.querySelector(`#${id}`)?.addEventListener("input", run);
   }
 }
 
@@ -647,27 +578,30 @@ async function loadOnrampConfig(root: HTMLElement): Promise<void> {
   const field = root.querySelector<HTMLElement>("#payment-mode-field");
   if (!field) return;
   try {
-    const res = await fetch(apiUrl("/api/public/onramp"));
+    const res = await fetch(apiUrl("/api/public/pay-in/config"));
     if (!res.ok) {
       field.hidden = true;
       return;
     }
-    const body = (await res.json()) as OnrampPublicConfig;
-    field.hidden = !body.enabled;
-    root.dataset.onrampEnabled = body.enabled ? "1" : "0";
-    root.dataset.onrampSandbox = body.sandbox ? "1" : "0";
-    root.dataset.onrampPairs = JSON.stringify(body.supportedPairs ?? []);
+    const body = (await res.json()) as PayInPublicConfig;
+    const chainId = body.chainId ?? "8453";
+    const token = (body.token ?? "USDC").toUpperCase();
+    const enabled =
+      Boolean(body.enabled) && networksForDeployment().some((n) => n.id === chainId);
+    field.hidden = !enabled;
+    root.dataset.onrampEnabled = enabled ? "1" : "0";
+    root.dataset.onrampSandbox = "0";
+    root.dataset.onrampPairs = JSON.stringify(enabled ? [{ chainId, token }] : []);
     const prefs = loadCreatePrefs();
-    if (body.enabled && body.fiats.length > 0) {
+    const fiats = ["USD", "EUR", "GBP", "SEK"];
+    if (enabled) {
       const select = root.querySelector<HTMLSelectElement>("#displayFiat");
       if (select) {
-        select.innerHTML = body.fiats
+        select.innerHTML = fiats
           .map((code) => `<option value="${escapeHtml(code)}">${escapeHtml(code)}</option>`)
           .join("");
-        select.value = pickRemembered(body.fiats, prefs.displayFiat, body.fiats.includes("SEK") ? "SEK" : body.fiats[0]!);
+        select.value = pickRemembered(fiats, prefs.displayFiat, fiats.includes("SEK") ? "SEK" : fiats[0]!);
       }
-    }
-    if (body.enabled) {
       const remembered = prefs.paymentMode;
       const target =
         remembered === "crypto" || remembered === "crypto_or_fiat" || remembered === "fiat"
@@ -685,154 +619,6 @@ async function loadOnrampConfig(root: HTMLElement): Promise<void> {
   }
 }
 
-async function loadQuotePaymentMethods(root: HTMLElement): Promise<void> {
-  const mode = selectedPaymentMode(root);
-  if (mode !== "fiat" && mode !== "crypto_or_fiat") return;
-  const pairs = selectedOnrampPairs(root);
-  const fiat = root.querySelector<HTMLSelectElement>("#displayFiat")?.value ?? "SEK";
-  const country = root.querySelector<HTMLInputElement>("#quoteCountry")?.value.trim().toLowerCase() ?? "us";
-  if (pairs.length === 0) return;
-  const select = root.querySelector<HTMLSelectElement>("#quotePaymentMethod");
-  if (!select) return;
-  const prefs = loadCreatePrefs();
-  try {
-    const params = new URLSearchParams({ fiat, country, expand: "1" });
-    params.set("pairs", pairs.map((p) => `${p.chainId}:${p.token}`).join(","));
-    const res = await fetch(apiUrl(`/api/public/onramp-methods?${params}`));
-    if (!res.ok) return;
-    const body = (await res.json()) as { methods?: Array<{ id: string; name: string }> };
-    const methods = body.methods ?? [];
-    const ids = methods.map((m) => m.id);
-    const remembered = pickRemembered(ids, prefs.quotePaymentMethod, AUTO_VALUE);
-    select.innerHTML =
-      `<option value="${AUTO_VALUE}">${escapeHtml(t("create.quoteMethodAuto"))}</option>` +
-      methods
-        .map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`)
-        .join("");
-    select.value = remembered;
-  } catch {
-    /* keep defaults */
-  }
-}
-
-async function refreshFiatQuote(root: HTMLElement): Promise<void> {
-  const mode = selectedPaymentMode(root);
-  if (mode !== "fiat" && mode !== "crypto_or_fiat") return;
-  const preview = root.querySelector<HTMLElement>("#fiat-charge-preview");
-  const status = root.querySelector<HTMLElement>("#fiat-quote-status");
-  const limits = root.querySelector<HTMLElement>("#amount-limits");
-  const providerSelect = root.querySelector<HTMLSelectElement>("#quoteProvider");
-  const pairs = selectedOnrampPairs(root);
-  const fiatAmount = root.querySelector<HTMLInputElement>("#price")?.value.trim();
-  const fiat = root.querySelector<HTMLSelectElement>("#displayFiat")?.value ?? "SEK";
-  const country = root.querySelector<HTMLInputElement>("#quoteCountry")?.value.trim().toLowerCase() ?? "us";
-  const paymentMethod = root.querySelector<HTMLSelectElement>("#quotePaymentMethod")?.value || undefined;
-  const preferredProvider = providerSelect?.value.trim() || undefined;
-  if (!preview || pairs.length === 0 || !fiatAmount) return;
-
-  // For crypto_or_fiat, amount is USD settlement — quote direction=receive
-  const direction = mode === "fiat" ? "pay" : "receive";
-  if (status) status.textContent = t("create.quoteLoading");
-  preview.hidden = true;
-  if (limits) limits.hidden = true;
-  try {
-    const params = new URLSearchParams({
-      fiat,
-      country,
-      direction,
-      pairs: pairs.map((p) => `${p.chainId}:${p.token}`).join(","),
-    });
-    if (paymentMethod) params.set("paymentMethod", paymentMethod);
-    if (preferredProvider) params.set("provider", preferredProvider);
-    if (direction === "pay") params.set("fiatAmount", fiatAmount);
-    else params.set("cryptoAmount", fiatAmount);
-    const slippagePct = Number(fieldValue(root, "quoteSlippagePct") || "1");
-    if (Number.isFinite(slippagePct) && slippagePct >= 0) {
-      params.set("slippageBps", String(Math.round(slippagePct * 100)));
-    }
-    const res = await fetch(apiUrl(`/api/public/onramp-quote?${params}`));
-    const body = (await res.json()) as OnrampQuoteResponse & {
-      error?: string;
-      code?: string;
-      fiat?: string;
-      minAmount?: number;
-      maxAmount?: number;
-      demo?: boolean;
-    };
-    if (!res.ok) {
-      if (
-        (body.code === "onramp_limit_mismatch" || body.minAmount != null || body.maxAmount != null) &&
-        limits
-      ) {
-        limits.hidden = false;
-        limits.textContent = t("create.amountLimits", {
-          min: String(body.minAmount ?? "—"),
-          max: String(body.maxAmount ?? "—"),
-          fiat: body.fiat ?? fiat,
-        });
-      }
-      const localized = localizeOnrampQuoteError(body);
-      throw new Error(localized ?? body.error ?? t("create.quoteError"));
-    }
-    const settleToken = body.token ?? "USDC";
-    const recommended = body.recommended ?? {
-      provider: body.quotes?.[0]?.provider ?? "demo",
-      paymentMethod: paymentMethod || "creditcard",
-      fiatAmount: body.fiatAmount,
-      cryptoAmount: body.cryptoAmount,
-    };
-    const prefs = loadCreatePrefs();
-    if (providerSelect && body.quotes?.length) {
-      const ids = body.quotes.map((q) => q.provider);
-      const previous = pickRemembered(
-        ids,
-        preferredProvider || prefs.quoteProvider,
-        AUTO_VALUE
-      );
-      providerSelect.innerHTML =
-        `<option value="${AUTO_VALUE}">${escapeHtml(t("create.quoteProviderAuto"))}</option>` +
-        body.quotes
-          .map(
-            (q) =>
-              `<option value="${escapeHtml(q.provider)}">${escapeHtml(
-                `${q.provider} · ${q.cryptoAmount} ${settleToken}`
-              )}</option>`
-          )
-          .join("");
-      providerSelect.value = previous === AUTO_VALUE ? AUTO_VALUE : previous;
-      if (previous !== AUTO_VALUE && !ids.includes(previous)) {
-        providerSelect.value = AUTO_VALUE;
-      } else if (previous !== AUTO_VALUE) {
-        providerSelect.value = previous;
-      }
-    }
-    const activeProvider =
-      (providerSelect?.value && providerSelect.value !== AUTO_VALUE
-        ? providerSelect.value
-        : recommended.provider) || recommended.provider;
-    const active = body.quotes?.find((q) => q.provider === activeProvider) ?? recommended;
-    const settleChain = body.chainId ? ` · ${networkShort(body.chainId)}` : "";
-    preview.textContent =
-      t("create.settlePreview", { amount: active.cryptoAmount, token: settleToken }) + settleChain;
-    preview.hidden = false;
-    if (status) status.textContent = body.demo ? "Demo quote (no live Onramper keys)" : "";
-    root.dataset.quotedDisplayAmount = active.fiatAmount;
-    root.dataset.quotedDisplayFiat = body.fiat;
-    root.dataset.quotedSettlement = active.cryptoAmount;
-    root.dataset.quotedProvider = active.provider ?? activeProvider;
-    root.dataset.quotedQuotes = JSON.stringify(body.quotes ?? [active]);
-    if (body.chainId) root.dataset.quotedChainId = body.chainId;
-    if (body.token) root.dataset.quotedToken = body.token;
-  } catch (error) {
-    if (status) {
-      status.textContent = error instanceof Error ? localizeError(error) : t("create.quoteError");
-    }
-    delete root.dataset.quotedDisplayAmount;
-    delete root.dataset.quotedSettlement;
-    delete root.dataset.quotedProvider;
-  }
-}
-
 function applyPaymentModeUi(root: HTMLElement): void {
   const mode = selectedPaymentMode(root);
   for (const card of root.querySelectorAll<HTMLElement>(".choice-card")) {
@@ -845,14 +631,14 @@ function applyPaymentModeUi(root: HTMLElement): void {
   const lockedHint = root.querySelector<HTMLElement>("#fiat-networks-locked-hint");
   if (networksLabel) {
     networksLabel.innerHTML =
-      mode === "fiat"
+      mode !== "crypto"
         ? `${t("create.settlementNetworkLabel")} <span class="required">${t("common.required")}</span>`
         : `${t("create.networksLabel")} <span class="required">${t("common.required")}</span>`;
   }
   if (networksHint) {
-    networksHint.textContent = mode === "fiat" ? t("create.settlementNetworkHint") : t("create.networksHint");
+    networksHint.textContent = mode !== "crypto" ? t("create.settlementNetworkHint") : t("create.networksHint");
   }
-  if (lockedHint) lockedHint.hidden = mode !== "fiat";
+  if (lockedHint) lockedHint.hidden = mode === "crypto";
 
   const priceLabel = root.querySelector<HTMLElement>("#price-label");
   const priceHint = root.querySelector<HTMLElement>("#price-hint");
@@ -868,15 +654,10 @@ function applyPaymentModeUi(root: HTMLElement): void {
     priceHint.textContent = mode === "fiat" ? t("create.fiatPayHint") : t("create.amountHint");
   }
   if (allowPartial) allowPartial.hidden = mode === "fiat";
-  if (fiatQuoteField) {
-    fiatQuoteField.hidden = mode === "crypto";
-    if (mode !== "crypto") {
-      void loadQuotePaymentMethods(root).then(() => void refreshFiatQuote(root));
-    }
-  }
+  if (fiatQuoteField) fiatQuoteField.hidden = mode === "crypto";
 
   const chainInputs = [...root.querySelectorAll<HTMLInputElement>('input[name="chains"]')];
-  if (mode === "fiat") {
+  if (mode === "fiat" || mode === "crypto_or_fiat") {
     const minimum = new Set(
       fiatMinimumChainIds().filter((id) => chainInputs.some((el) => el.value === id && chainHasOnrampSupport(root, id)))
     );
@@ -926,10 +707,8 @@ async function submitFiatInvoice(root: HTMLElement): Promise<void> {
       note.textContent = t("pay.creatingAddress");
       note.classList.remove("danger");
     }
-    await refreshFiatQuote(root);
     const fields = readForm(root);
-    if (!fields.displayAmount || !fields.displayFiat) throw new Error(t("create.quoteError"));
-    if (!fields.price || fields.price === "0") throw new Error(t("create.quoteError"));
+    if (!fields.price || fields.price === "0") throw new Error(t("errors.missingPrice"));
     const chrome = (root.querySelector<HTMLSelectElement>("#pay-chrome")?.value ?? "full") as PayChrome;
     const link = `${location.origin}${withPayChrome(payPath(fields), chrome)}`;
     window.open(link, "_blank", "noopener,noreferrer");

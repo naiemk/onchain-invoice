@@ -407,7 +407,8 @@ export const uk = {
     paymentModeFiatTitle: "Лише картка або банк",
     paymentModeFiatHint: "Клієнт не бачить криптоадреси. Розрахунок усе одно в USDC/USDT в одній мережі.",
     settlementNetworkLabel: "Мережі розрахунку",
-    settlementNetworkHint: "Ethereum, Base і Tron обов’язкові для картки/банку (вмикають Revolut Pay та інші). Можна додати інші рейки Onramper.",
+    settlementNetworkHint:
+      "Card and bank checkout settles as USDC on Base. Crypto-only invoices can use other networks.",
     chargePreview: "До сплати ~{amount} {fiat}",
     settlePreview: "Ви отримаєте ~{amount} {token}",
     fiatPayLabel: "Клієнт платить",
@@ -506,7 +507,8 @@ export const uk = {
 
   pay: {
     faucetTitle: "Кран тестової мережі",
-    faucetHint: "Пісочниця Onramper не поповнює адреси тестової мережі. Введіть секрет операторського крана, щоб надіслати суму розрахунку on-chain — sweeper завершить оплату.",
+    faucetHint:
+      "This faucet only funds Sepolia and Nile testnet invoices. Fiat invoices settle as USDC on Base (mainnet) and cannot be fauceted.",
     faucetSecretLabel: "Секрет крана",
     faucetSecretPlaceholder: "FAUCET_SECRET",
     faucetButton: "Поповнити рахунок (тестова мережа)",
@@ -795,4 +797,4 @@ export const uk = {
     lastUpdated: "Last updated",
     englishNotice: "These documents are provided in English and apply regardless of your selected UI language.",
   },
-} satisfies Messages;
+} satisfies Omit<Messages, "buy">;

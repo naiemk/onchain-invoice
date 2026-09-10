@@ -7,9 +7,11 @@ import { join } from "node:path";
 import { createApp } from "../commerce/server/app.js";
 import { loadConfig } from "../commerce/server/config.js";
 import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
-import { clearLastDevOtp, getLastDevOtp } from "../commerce/server/email.js";
+import { clearLastDevNotify, clearLastDevOtp, getLastDevNotify, getLastDevOtp } from "../commerce/server/email.js";
 import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
 import { guardianLoginMessage } from "../commerce/server/wallet-hosted-recovery.js";
+import { recoveryNewOwnerMessage } from "../commerce/shared/wallet.js";
+import { signEoaRecover } from "../commerce/shared/wallet-eip712.js";
 
 const FACTORY = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
 const IMPL = "0xe024cE8ed1878dBdd3ca8E73B1e586c4E46dC85C";
@@ -32,6 +34,7 @@ const BASE_ENV = {
   TURNSTILE_SECRET: "",
   TURNSTILE_SITE_KEY: "",
   RESEND_API_KEY: "",
+  WALLET_RECOVERY_NOTIFY_EMAIL: "ops@example.com",
   RATE_LIMIT_PUBLIC_PER_SECOND: "100",
   RATE_LIMIT_CREATE_PER_SECOND: "100",
 } as const;
@@ -42,6 +45,7 @@ async function withApp(
 ): Promise<void> {
   resetRateLimitBuckets();
   clearLastDevOtp();
+  clearLastDevNotify();
   const dir = await mkdtemp(join(tmpdir(), "commerce-hosted-recovery-"));
   const config = loadConfig({
     ...process.env,
@@ -99,6 +103,47 @@ async function registerWallet(
     }),
   });
   return address;
+}
+
+async function attachVerifiedEmail(
+  baseUrl: string,
+  pk: PasskeyFixture,
+  wallet: string,
+  email: string
+): Promise<void> {
+  const ch = await (
+    await fetch(`${baseUrl}/api/wallet/recovery/challenges`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ purpose: "attach", walletAddress: wallet }),
+    })
+  ).json() as { challengeId: string; challenge: string };
+  await fetch(`${baseUrl}/api/wallet/email`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      walletAddress: wallet,
+      email,
+      challengeId: ch.challengeId,
+      ownerQx: pk.qx,
+      ownerQy: pk.qy,
+      assertion: signAssertion({
+        privateKeyPem: pk.privateKeyPem,
+        challengeBase64Url: ch.challenge,
+        origin: "http://localhost",
+        rpId: "localhost",
+      }),
+    }),
+  });
+  await fetch(`${baseUrl}/api/wallet/email/verify`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      walletAddress: wallet,
+      email,
+      code: getLastDevOtp()!.code,
+    }),
+  });
 }
 
 describe("commerce hosted wallet recovery", function () {
@@ -519,6 +564,204 @@ describe("commerce hosted wallet recovery", function () {
       expect(cancel.status).to.equal(200);
       const cancelled = (await cancel.json()) as { request: { status: string } };
       expect(cancelled.request.status).to.equal("cancelled");
+    });
+  });
+
+  it("email-first lookup lists every wallet and does not enumerate unknown emails", async function () {
+    await withApp(async (baseUrl) => {
+      const a = createPasskeyFixture();
+      const b = createPasskeyFixture();
+      const walletA = await registerWallet(baseUrl, a);
+      const walletB = await registerWallet(baseUrl, b);
+      await attachVerifiedEmail(baseUrl, a, walletA, "multi@example.com");
+      await attachVerifiedEmail(baseUrl, b, walletB, "multi@example.com");
+
+      clearLastDevOtp();
+      const unknown = await fetch(`${baseUrl}/api/wallet/recovery/email/start`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "nobody@example.com" }),
+      });
+      expect(unknown.status).to.equal(200);
+      expect(getLastDevOtp()).to.equal(null);
+
+      const start = await fetch(`${baseUrl}/api/wallet/recovery/email/start`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "multi@example.com" }),
+      });
+      expect(start.status).to.equal(200);
+      const otp = getLastDevOtp();
+      expect(otp?.to).to.equal("multi@example.com");
+
+      const verify = await fetch(`${baseUrl}/api/wallet/recovery/email/verify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "multi@example.com", code: otp!.code }),
+      });
+      expect(verify.status).to.equal(200);
+      const verified = (await verify.json()) as { emailSession: string };
+      expect(verified.emailSession).to.be.a("string");
+
+      const listed = await fetch(`${baseUrl}/api/wallet/recovery/email/wallets`, {
+        headers: { authorization: `Bearer ${verified.emailSession}` },
+      });
+      expect(listed.status).to.equal(200);
+      const listBody = (await listed.json()) as { wallets: Array<{ address: string }> };
+      expect(listBody.wallets.map((w) => w.address.toLowerCase()).sort()).to.deep.equal(
+        [walletA, walletB].map((w) => w.toLowerCase()).sort()
+      );
+
+      const newDevice = createPasskeyFixture();
+      const ch = await (
+        await fetch(`${baseUrl}/api/wallet/recovery/challenges`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ purpose: "recover", walletAddress: walletA }),
+        })
+      ).json() as { challengeId: string; challenge: string };
+      const create = await fetch(`${baseUrl}/api/wallet/recovery/requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          walletAddresses: [walletA, walletB],
+          emailSession: verified.emailSession,
+          challengeId: ch.challengeId,
+          ownerQx: newDevice.qx,
+          ownerQy: newDevice.qy,
+          credentialId: newDevice.credentialId,
+          assertion: signAssertion({
+            privateKeyPem: newDevice.privateKeyPem,
+            challengeBase64Url: ch.challenge,
+            origin: "http://localhost",
+            rpId: "localhost",
+          }),
+        }),
+      });
+      expect(create.status).to.equal(201);
+      const created = (await create.json()) as {
+        requests: Array<{ status: string; walletAddress: string }>;
+        otpSent: boolean;
+      };
+      expect(created.otpSent).to.equal(false);
+      expect(created.requests).to.have.length(2);
+      expect(created.requests.every((r) => r.status === "awaiting_guardian")).to.equal(true);
+
+      const notify = getLastDevNotify();
+      expect(notify?.subject).to.equal("recovery requested");
+      expect(notify?.text).to.include(walletA.toLowerCase());
+      expect(notify?.text).to.include(walletB.toLowerCase());
+    });
+  });
+
+  it("creates recovery without email and accepts an EIP-712 EOA signature", async function () {
+    await withApp(async (baseUrl) => {
+      const owner = createPasskeyFixture();
+      const wallet = await registerWallet(baseUrl, owner);
+      const eoa = Wallet.createRandom();
+      const ch = await (
+        await fetch(`${baseUrl}/api/wallet/recovery/challenges`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ purpose: "recover", walletAddress: wallet }),
+        })
+      ).json() as { challengeId: string; challenge: string };
+      const signature = await signEoaRecover(eoa.privateKey, wallet, ch.challenge, eoa.address, 11155111);
+      const create = await fetch(`${baseUrl}/api/wallet/recovery/requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: wallet,
+          challengeId: ch.challengeId,
+          ownerKind: "eoa",
+          eoaAddress: eoa.address,
+          eoaSignature: signature,
+          chainId: "11155111",
+        }),
+      });
+      expect(create.status).to.equal(201);
+      const created = (await create.json()) as {
+        request: { status: string; newOwnerKind: string; newEoa: string; email: string };
+        otpSent: boolean;
+        existingOwner: boolean;
+      };
+      expect(created.otpSent).to.equal(false);
+      expect(created.existingOwner).to.equal(false);
+      expect(created.request.status).to.equal("awaiting_guardian");
+      expect(created.request.newOwnerKind).to.equal("eoa");
+      expect(created.request.newEoa?.toLowerCase()).to.equal(eoa.address.toLowerCase());
+      expect(created.request.email).to.equal("");
+      expect(getLastDevNotify()?.subject).to.equal("recovery requested");
+    });
+  });
+
+  it("rejects personal_sign leftover recovery messages", async function () {
+    await withApp(async (baseUrl) => {
+      const owner = createPasskeyFixture();
+      const wallet = await registerWallet(baseUrl, owner);
+      const eoa = Wallet.createRandom();
+      const ch = await (
+        await fetch(`${baseUrl}/api/wallet/recovery/challenges`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ purpose: "recover", walletAddress: wallet }),
+        })
+      ).json() as { challengeId: string; challenge: string };
+      const signature = await eoa.signMessage(recoveryNewOwnerMessage(ch.challenge));
+      const create = await fetch(`${baseUrl}/api/wallet/recovery/requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: wallet,
+          challengeId: ch.challengeId,
+          ownerKind: "eoa",
+          eoaAddress: eoa.address,
+          eoaSignature: signature,
+          chainId: "11155111",
+        }),
+      });
+      expect(create.status).to.equal(400);
+      const body = (await create.json()) as { error: string };
+      expect(body.error).to.equal("eoa_personal_sign_rejected");
+    });
+  });
+
+  it("creates Super Wallet EOA recovery with the same request shape", async function () {
+    await withApp(async (baseUrl, app) => {
+      const owner = createPasskeyFixture();
+      const wallet = await registerWallet(baseUrl, owner);
+      const entityId = "0x" + "aa".repeat(32);
+      app.db.upsertWalletEntity({ walletAddress: wallet, entityId, label: "Admin" });
+      const eoa = Wallet.createRandom();
+      const ch = await (
+        await fetch(`${baseUrl}/api/wallet/recovery/challenges`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ purpose: "recover", walletAddress: wallet }),
+        })
+      ).json() as { challengeId: string; challenge: string };
+      const signature = await signEoaRecover(eoa.privateKey, wallet, ch.challenge, eoa.address, 11155111);
+      const create = await fetch(`${baseUrl}/api/wallet/recovery/requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: wallet,
+          challengeId: ch.challengeId,
+          ownerKind: "eoa",
+          eoaAddress: eoa.address,
+          eoaSignature: signature,
+          chainId: "11155111",
+        }),
+      });
+      expect(create.status).to.equal(201);
+      const created = (await create.json()) as {
+        request: { status: string; newOwnerKind: string; newEoa: string };
+        otpSent: boolean;
+      };
+      expect(created.otpSent).to.equal(false);
+      expect(created.request.status).to.equal("awaiting_guardian");
+      expect(created.request.newOwnerKind).to.equal("eoa");
+      expect(created.request.newEoa?.toLowerCase()).to.equal(eoa.address.toLowerCase());
     });
   });
 });

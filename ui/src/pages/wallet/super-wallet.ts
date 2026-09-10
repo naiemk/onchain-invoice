@@ -29,15 +29,17 @@ import {
 } from "../../../../commerce/shared/advanced-wallet.js";
 import {
   buildSignedAddEntityUserOp,
+  buildSignedAddKeyEoaUserOp,
   buildSignedAddKeyUserOp,
   buildSignedEnableAdvancedUserOp,
   buildSignedSetThresholdUserOp,
   passkeyToKeyFields,
 } from "../../shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "../../shared/userop-client.js";
+import { eoaCredentialId } from "../../../../commerce/shared/wallet-eip712.js";
 import { resolveCurrentWalletPasskey } from "../../shared/current-wallet-passkey.js";
 import { isAdvancedMode } from "../../shared/wallet-mode.js";
-import { connectEoaWallet, initEoaConnector } from "../../shared/eoa-connector.js";
+import { connectEoaWallet, initEoaConnector, signAddKeyTypedData } from "../../shared/eoa-connector.js";
 import type {
   WalletEntityKeyRecord,
   WalletEntityRecord,
@@ -541,6 +543,12 @@ function bindKeyActions(
           qx: zeroPadValue("0x00", 32),
           qy: zeroPadValue("0x00", 32),
           eoa,
+          bindSignature: await signAddKeyTypedData({
+            wallet: session.address,
+            entityId,
+            owner: eoa,
+            chainId: BigInt(session.chainId),
+          }),
         });
         await renderWalletSuperWallet(root, opts);
       } catch (error) {
@@ -560,20 +568,31 @@ async function submitAddKey(input: {
   qy: string;
   eoa: string;
   credentialId?: string;
+  bindSignature?: string;
 }): Promise<void> {
   const fee = BigInt(input.config.bundlerFeeUsdc || "0");
   const keyId = computeKeyId(input.targetEntityId, input.keyType, input.qx, input.qy, input.eoa);
   const passkey = await resolveCurrentWalletPasskey(input.session, "add-key");
-  const { userOp, userOpHash } = await buildSignedAddKeyUserOp({
-    config: input.config,
-    passkey,
-    targetEntityId: input.targetEntityId,
-    keyType: input.keyType,
-    qx: input.qx,
-    qy: input.qy,
-    eoa: input.eoa,
-    feeAmount: fee,
-  });
+  const { userOp, userOpHash } =
+    input.keyType === KEY_EOA
+      ? await buildSignedAddKeyEoaUserOp({
+          config: input.config,
+          passkey,
+          targetEntityId: input.targetEntityId,
+          eoa: input.eoa,
+          bindSignature: input.bindSignature ?? "0x",
+          feeAmount: fee,
+        })
+      : await buildSignedAddKeyUserOp({
+          config: input.config,
+          passkey,
+          targetEntityId: input.targetEntityId,
+          keyType: input.keyType,
+          qx: input.qx,
+          qy: input.qy,
+          eoa: input.eoa,
+          feeAmount: fee,
+        });
   await submitSignedUserOp({
     config: input.config,
     userOp,
@@ -590,6 +609,6 @@ async function submitAddKey(input: {
     qx: input.qx,
     qy: input.qy,
     eoa: input.keyType === KEY_EOA ? input.eoa : null,
-    credentialId: input.credentialId ?? null,
+    credentialId: input.credentialId ?? (input.keyType === KEY_EOA ? eoaCredentialId(input.eoa) : null),
   });
 }

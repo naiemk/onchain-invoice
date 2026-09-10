@@ -5,7 +5,7 @@ import {
   normalizeMerchantAddress,
   type CommerceInvoiceParams,
 } from "onchain-invoice";
-import { parsePaymentMode, type PaymentMode } from "./onramper.js";
+import { parsePaymentMode, type PaymentMode } from "./payment-mode.js";
 import type { PayLinkFields } from "./types.js";
 
 const DEFAULT_CHAIN = "11155111";

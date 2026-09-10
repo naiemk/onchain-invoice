@@ -80,8 +80,8 @@ export function localizeError(error: unknown): string {
       max: limitBetween[3]!,
     });
   }
-  if (message.startsWith("No Onramper quotes available")) return t("errors.onrampQuoteUnavailable");
-  if (message.startsWith("Onramper provider ")) return t("errors.onrampProviderUnavailable");
+  if (message.startsWith("No quotes available")) return t("errors.onrampQuoteUnavailable");
+  if (message.startsWith("Provider ")) return t("errors.onrampProviderUnavailable");
 
   return message;
 }

@@ -3,9 +3,7 @@ import { ArrowUpRight, Banknote, FileText, Lock, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHero } from "@/components/PageHero";
 import { PageCard } from "@/components/PageSplit";
-import { Money } from "@/components/Money";
 import { useLocale } from "@/providers/LocaleProvider";
-import { deploymentMode } from "@/shared/networks.js";
 import { saveWalletMode } from "@/shared/wallet-mode.js";
 import { SITE } from "@/shared/site.js";
 import { cn } from "@/lib/utils";
@@ -13,7 +11,6 @@ import { cn } from "@/lib/utils";
 export function HomePage() {
   const { t } = useLocale();
   const navigate = useNavigate();
-  const mode = deploymentMode();
 
   const loop = [
     {
@@ -52,8 +49,8 @@ export function HomePage() {
           />
           <div className="flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link to="/wallet/create">
-                {t("home.ctaCreateWallet")}
+              <Link to="/wallet">
+                {t("home.ctaOpenWallet")}
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -65,21 +62,12 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-brand-panel p-6 text-brand-panel-foreground shadow-sm">
-          <div className="flex items-center justify-between gap-2">
-            <span className="rounded-full bg-brand-panel-foreground/10 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
-              {t("home.heroWalletPill", { mode: mode === "testnet" ? t("common.testnet") : t("common.mainnet") })}
-            </span>
-          </div>
-          <p className="mt-4 text-xs text-brand-panel-foreground/70">{t("home.heroBalanceLabel")}</p>
-          <div className="mt-1">
-            <Money amount="12,840.60" className="text-brand-panel-foreground" size="lg" />
-          </div>
-          <p className="mt-1 text-sm text-brand-panel-foreground/70">{t("home.heroBalanceNetwork")}</p>
-          <p className="mt-6 flex items-center gap-1.5 text-sm text-brand-panel-foreground/80">
-            <ArrowUpRight className="h-4 w-4 text-ok" />
-            {t("home.heroSettledMonth")}
-          </p>
+        <div className="overflow-hidden rounded-2xl bg-brand-panel shadow-sm">
+          <img
+            src="/home-hero-get-paid.png"
+            alt={t("home.heroImageAlt")}
+            className="h-full w-full object-cover"
+          />
         </div>
       </section>
 
