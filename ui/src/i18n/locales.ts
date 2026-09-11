@@ -10,6 +10,8 @@ export const LOCALES = [
   "ru",
   "ja",
   "de",
+  "sv",
+  "nb",
   "fr",
   "id",
   "ko",
@@ -32,6 +34,37 @@ export const DEFAULT_LOCALE: Locale = "en";
 
 export const RTL_LOCALES = new Set<Locale>(["ar", "fa", "he", "ur"]);
 
+/** Representative flag for the compact language switcher (emoji; not a political claim). */
+export const LOCALE_FLAGS: Record<Locale, string> = {
+  en: "🇺🇸",
+  "zh-Hans": "🇨🇳",
+  "zh-Hant": "🇹🇼",
+  es: "🇪🇸",
+  ar: "🇸🇦",
+  hi: "🇮🇳",
+  "pt-BR": "🇧🇷",
+  bn: "🇧🇩",
+  ru: "🇷🇺",
+  ja: "🇯🇵",
+  de: "🇩🇪",
+  sv: "🇸🇪",
+  nb: "🇳🇴",
+  fr: "🇫🇷",
+  id: "🇮🇩",
+  ko: "🇰🇷",
+  tr: "🇹🇷",
+  it: "🇮🇹",
+  vi: "🇻🇳",
+  th: "🇹🇭",
+  pl: "🇵🇱",
+  nl: "🇳🇱",
+  uk: "🇺🇦",
+  fa: "🇮🇷",
+  ms: "🇲🇾",
+  he: "🇮🇱",
+  ur: "🇵🇰",
+};
+
 /** Native endonym shown in the language switcher (not translated). */
 export const LOCALE_NATIVE_NAMES: Record<Locale, string> = {
   en: "English",
@@ -45,6 +78,8 @@ export const LOCALE_NATIVE_NAMES: Record<Locale, string> = {
   ru: "Русский",
   ja: "日本語",
   de: "Deutsch",
+  sv: "Svenska",
+  nb: "Norsk bokmål",
   fr: "Français",
   id: "Bahasa Indonesia",
   ko: "한국어",
@@ -74,6 +109,8 @@ export const LOCALE_BCP47: Record<Locale, string> = {
   ru: "ru",
   ja: "ja",
   de: "de",
+  sv: "sv",
+  nb: "nb",
   fr: "fr",
   id: "id",
   ko: "ko",

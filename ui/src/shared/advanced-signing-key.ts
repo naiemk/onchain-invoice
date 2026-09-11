@@ -23,25 +23,37 @@ export type ResolvedSigningKey = {
   passkey?: CurrentWalletPasskey;
 };
 
+function sessionLooksLikeEoa(session: WalletSession): boolean {
+  return session.keyType === KEY_EOA && !session.credentialId?.trim();
+}
+
 /** Match this browser's session to an on-chain entity key used for UserOp signatures. */
 export async function resolveSessionSigningKey(
   session: WalletSession,
   options?: { connectEoa?: boolean }
 ): Promise<ResolvedSigningKey | null> {
-  try {
-    const passkey = await resolveCurrentWalletPasskey(session, "unknown");
-    const next = persistCurrentWalletPasskey(passkey, session);
-    return { session: next, key: passkeyToEntityKey(passkey), passkey };
-  } catch {
-    /* fall through to EOA */
+  const allowEoaPrompt = options?.connectEoa === true || sessionLooksLikeEoa(session);
+
+  if (!sessionLooksLikeEoa(session)) {
+    try {
+      const passkey = await resolveCurrentWalletPasskey(session, "unknown");
+      if (passkey.keyType !== KEY_EOA) {
+        const next = persistCurrentWalletPasskey(passkey, session);
+        return { session: next, key: passkeyToEntityKey(passkey), passkey };
+      }
+    } catch (error) {
+      if (!allowEoaPrompt) throw error;
+    }
   }
-  if (options?.connectEoa === false) return null;
+
   const roster = await listWalletEntities(session.address).catch(() => ({
     entities: [],
     keys: [] as WalletEntityKeyRecord[],
   }));
   let connected = await getConnectedEoaAddress();
-  if (!connected) connected = await connectEoaWallet().catch(() => null);
+  if (!connected && allowEoaPrompt) {
+    connected = await connectEoaWallet().catch(() => null);
+  }
   if (!connected) return null;
   const key =
     roster.keys.find((k) => k.keyType === KEY_EOA && k.eoa?.toLowerCase() === connected.toLowerCase()) ?? null;

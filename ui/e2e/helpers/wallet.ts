@@ -256,7 +256,7 @@ export async function addSuperEntity(host: DeviceSession, email: string): Promis
   const dialog = host.page.getByRole("dialog");
   await dialog.locator("#entity-email-dialog").fill(email);
   await withWorkerTicks(["bundler"], async () => {
-    await dialog.getByRole("button", { name: "Add entity" }).click();
+    await dialog.getByRole("button", { name: "Add team member" }).click();
     await expect(host.page.getByText(email, { exact: true })).toBeVisible({ timeout: 30_000 });
   });
 }

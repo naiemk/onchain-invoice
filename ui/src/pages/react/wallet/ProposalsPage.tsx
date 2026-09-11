@@ -356,17 +356,24 @@ export function ProposalsPage() {
                 threshold: String(policy.threshold),
               })}
             </p>
-            <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <DialogFooter className="flex-col gap-2 sm:flex-col">
               <Button
                 id="sign-proposal"
                 type="button"
                 variant="outline"
+                className="w-full"
                 disabled={busy !== null}
                 onClick={() => void signCurrent()}
               >
                 {t("wallet.proposalsSign")}
               </Button>
-              <Button id="execute-proposal" type="button" disabled={busy !== null} onClick={() => void executeCurrent()}>
+              <Button
+                id="execute-proposal"
+                type="button"
+                className="w-full"
+                disabled={busy !== null}
+                onClick={() => void executeCurrent()}
+              >
                 {t("wallet.proposalsExecute")}
               </Button>
             </DialogFooter>

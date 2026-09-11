@@ -4,6 +4,8 @@ export const overlayFillChrome = assemble({
   footer: {
     settlementLine: {
       de: "Abrechnung an Ihre Händler-Wallet gebunden",
+      sv: "Avräkning knuten till din handlarplånbok",
+      nb: "Oppgjør knyttet til selgerlommeboken din",
       fr: "Règlement lié à votre portefeuille marchand",
       es: "Liquidación vinculada a tu cartera de comercio",
       it: "Regolamento vincolato al portafoglio esercente",
@@ -30,6 +32,8 @@ export const overlayFillChrome = assemble({
     },
     legal: {
       de: "Rechtliches",
+      sv: "Juridik",
+      nb: "Juridisk",
       fr: "Mentions légales",
       es: "Legal",
       it: "Note legali",
@@ -56,6 +60,8 @@ export const overlayFillChrome = assemble({
     },
     terms: {
       de: "Nutzungsbedingungen",
+      sv: "Villkor",
+      nb: "Vilkår",
       fr: "Conditions",
       es: "Términos",
       it: "Termini",
@@ -82,6 +88,8 @@ export const overlayFillChrome = assemble({
     },
     privacy: {
       de: "Datenschutz",
+      sv: "Integritet",
+      nb: "Personvern",
       fr: "Confidentialité",
       es: "Privacidad",
       it: "Privacy",
@@ -108,6 +116,8 @@ export const overlayFillChrome = assemble({
     },
     cookies: {
       de: "Cookies",
+      sv: "Cookies",
+      nb: "Informasjonskapsler",
       fr: "Cookies",
       es: "Cookies",
       it: "Cookie",
@@ -134,6 +144,8 @@ export const overlayFillChrome = assemble({
     },
     risks: {
       de: "Risiken",
+      sv: "Risker",
+      nb: "Risikoer",
       fr: "Risques",
       es: "Riesgos",
       it: "Rischi",
@@ -160,6 +172,8 @@ export const overlayFillChrome = assemble({
     },
     securityChecks: {
       de: "Sicherheitsprüfungen",
+      sv: "Säkerhetskontroller",
+      nb: "Sikkerhetskontroller",
       fr: "Contrôles de sécurité",
       es: "Comprobaciones de seguridad",
       it: "Controlli di sicurezza",
@@ -188,6 +202,8 @@ export const overlayFillChrome = assemble({
   legal: {
     breadcrumb: {
       de: "Rechtliches",
+      sv: "Juridik",
+      nb: "Juridisk",
       fr: "Mentions légales",
       es: "Legal",
       it: "Note legali",
@@ -214,6 +230,8 @@ export const overlayFillChrome = assemble({
     },
     hubTitle: {
       de: "Rechtliche Dokumente",
+      sv: "Juridiska dokument",
+      nb: "Juridiske dokumenter",
       fr: "Documents juridiques",
       es: "Documentos legales",
       it: "Documenti legali",
@@ -240,6 +258,8 @@ export const overlayFillChrome = assemble({
     },
     hubLede: {
       de: "Nutzungsbedingungen, Datenschutz und Sicherheitsinformationen zu Trustless Commerce.",
+      sv: "Villkor, integritet och säkerhetsinformation för Trustless Commerce.",
+      nb: "Vilkår, personvern og sikkerhetsinformasjon for Trustless Commerce.",
       fr: "Conditions, confidentialité et informations de sécurité pour Trustless Commerce.",
       es: "Términos, privacidad e información de seguridad de Trustless Commerce.",
       it: "Termini, privacy e informazioni di sicurezza per Trustless Commerce.",
@@ -266,6 +286,8 @@ export const overlayFillChrome = assemble({
     },
     hubLink: {
       de: "← Alle rechtlichen Dokumente",
+      sv: "← Alla juridiska dokument",
+      nb: "← Alle juridiske dokumenter",
       fr: "← Tous les documents juridiques",
       es: "← Todos los documentos legales",
       it: "← Tutti i documenti legali",
@@ -292,6 +314,8 @@ export const overlayFillChrome = assemble({
     },
     lastUpdated: {
       de: "Zuletzt aktualisiert",
+      sv: "Senast uppdaterad",
+      nb: "Sist oppdatert",
       fr: "Dernière mise à jour",
       es: "Última actualización",
       it: "Ultimo aggiornamento",
@@ -318,6 +342,8 @@ export const overlayFillChrome = assemble({
     },
     englishNotice: {
       de: "Diese Dokumente liegen auf Englisch vor und gelten unabhängig von der gewählten UI-Sprache.",
+      sv: "Dokumenten tillhandahålls på engelska och gäller oavsett valt gränssnittsspråk.",
+      nb: "Dokumentene er på engelsk og gjelder uavhengig av valgt grensesnittspråk.",
       fr: "Ces documents sont fournis en anglais et s’appliquent quelle que soit la langue de l’interface.",
       es: "Estos documentos se proporcionan en inglés y se aplican independientemente del idioma de la interfaz.",
       it: "Questi documenti sono in inglese e valgono indipendentemente dalla lingua dell’interfaccia.",
@@ -346,6 +372,8 @@ export const overlayFillChrome = assemble({
   home: {
     h1Emphasis: {
       de: "Geschäft führen.",
+      sv: "verksamheten från.",
+      nb: "virksomheten fra.",
       fr: "gérez votre activité.",
       es: "operas tu negocio.",
       it: "gestisci la tua attività.",

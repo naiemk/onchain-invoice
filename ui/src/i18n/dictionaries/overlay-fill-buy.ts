@@ -4,6 +4,8 @@ export const overlayFillBuy = assemble({
   buy: {
     breadcrumb: {
       de: "Kaufen",
+      sv: "Köp",
+      nb: "Kjøp",
       fr: "Acheter",
       es: "Comprar",
       it: "Acquista",
@@ -30,6 +32,8 @@ export const overlayFillBuy = assemble({
     },
     title: {
       de: "USDC per Karte oder Bank kaufen",
+      sv: "Köp USDC med kort eller bank",
+      nb: "Kjøp USDC med kort eller bank",
       fr: "Acheter USDC par carte ou virement",
       es: "Compra USDC con tarjeta o banco",
       it: "Acquista USDC con carta o banca",
@@ -56,6 +60,8 @@ export const overlayFillBuy = assemble({
     },
     lede: {
       de: "Angebote von MetaMask. Das Guthaben wird als USDC auf Base an die von Ihnen festgelegte Adresse ausgezahlt.",
+      sv: "Offerter från MetaMask. Medlen avräknas som USDC på Base till adressen du anger.",
+      nb: "Tilbud fra MetaMask. Midlene gjøres opp som USDC på Base til adressen du oppgir.",
       fr: "Devis via MetaMask. Les fonds sont réglés en USDC sur Base à l’adresse que vous indiquez.",
       es: "Cotizaciones de MetaMask. Los fondos se liquidan como USDC en Base a la dirección que indiques.",
       it: "Preventivi da MetaMask. I fondi si regolano come USDC su Base all’indirizzo che imposti.",
@@ -82,6 +88,8 @@ export const overlayFillBuy = assemble({
     },
     metaTitle: {
       de: "USDC kaufen · Trustless Commerce",
+      sv: "Köp USDC · Trustless Commerce",
+      nb: "Kjøp USDC · Trustless Commerce",
       fr: "Acheter USDC · Trustless Commerce",
       es: "Comprar USDC · Trustless Commerce",
       it: "Acquista USDC · Trustless Commerce",
@@ -108,6 +116,8 @@ export const overlayFillBuy = assemble({
     },
     metaDescription: {
       de: "USDC auf Base per Karte oder Bank über MetaMask-On-Ramp-Angebote kaufen.",
+      sv: "Köp USDC på Base med kort eller bank via MetaMasks on-ramp-offerter.",
+      nb: "Kjøp USDC på Base med kort eller bank via MetaMasks on-ramp-tilbud.",
       fr: "Achetez USDC sur Base par carte ou virement via les devis on-ramp MetaMask.",
       es: "Compra USDC en Base con tarjeta o banco a través de cotizaciones on-ramp de MetaMask.",
       it: "Acquista USDC su Base con carta o banca tramite i preventivi on-ramp di MetaMask.",
@@ -134,6 +144,8 @@ export const overlayFillBuy = assemble({
     },
     countryLabel: {
       de: "Land",
+      sv: "Land",
+      nb: "Land",
       fr: "Pays",
       es: "País",
       it: "Paese",
@@ -160,6 +172,8 @@ export const overlayFillBuy = assemble({
     },
     currencyLabel: {
       de: "Währung",
+      sv: "Valuta",
+      nb: "Valuta",
       fr: "Devise",
       es: "Moneda",
       it: "Valuta",
@@ -186,6 +200,8 @@ export const overlayFillBuy = assemble({
     },
     amountLabel: {
       de: "Ausgabebetrag",
+      sv: "Belopp att betala",
+      nb: "Beløp å betale",
       fr: "Montant à dépenser",
       es: "Importe a gastar",
       it: "Importo da spendere",
@@ -212,6 +228,8 @@ export const overlayFillBuy = assemble({
     },
     youPay: {
       de: "Sie zahlen",
+      sv: "Du betalar",
+      nb: "Du betaler",
       fr: "Vous payez",
       es: "Pagas",
       it: "Paghi",
@@ -238,6 +256,8 @@ export const overlayFillBuy = assemble({
     },
     youGet: {
       de: "Sie erhalten",
+      sv: "Du får",
+      nb: "Du får",
       fr: "Vous recevez",
       es: "Recibes",
       it: "Ricevi",
@@ -264,6 +284,8 @@ export const overlayFillBuy = assemble({
     },
     addressLabel: {
       de: "Ziel-Wallet",
+      sv: "Destinationsplånbok",
+      nb: "Destinasjonslommebok",
       fr: "Portefeuille de destination",
       es: "Cartera de destino",
       it: "Portafoglio di destinazione",
@@ -290,6 +312,8 @@ export const overlayFillBuy = assemble({
     },
     addressHint: {
       de: "USDC auf Base wird an diese Adresse gesendet.",
+      sv: "USDC på Base skickas till den här adressen.",
+      nb: "USDC på Base sendes til denne adressen.",
       fr: "USDC sur Base est envoyé à cette adresse.",
       es: "USDC en Base se envía a esta dirección.",
       it: "USDC su Base viene inviato a questo indirizzo.",
@@ -316,6 +340,8 @@ export const overlayFillBuy = assemble({
     },
     quotesTitle: {
       de: "Verfügbare Angebote",
+      sv: "Tillgängliga offerter",
+      nb: "Tilgjengelige tilbud",
       fr: "Devis disponibles",
       es: "Cotizaciones disponibles",
       it: "Preventivi disponibili",
@@ -342,6 +368,8 @@ export const overlayFillBuy = assemble({
     },
     quotesEmpty: {
       de: "Noch keine Angebote. Land, Währung und Betrag festlegen.",
+      sv: "Inga offerter ännu. Ange land, valuta och belopp.",
+      nb: "Ingen tilbud ennå. Angi land, valuta og beløp.",
       fr: "Aucun devis pour le moment. Indiquez le pays, la devise et le montant.",
       es: "Aún no hay cotizaciones. Indica país, moneda e importe.",
       it: "Nessun preventivo ancora. Imposta paese, valuta e importo.",
@@ -368,6 +396,8 @@ export const overlayFillBuy = assemble({
     },
     quoteProvider: {
       de: "Anbieter",
+      sv: "Leverantör",
+      nb: "Tilbyder",
       fr: "Prestataire",
       es: "Proveedor",
       it: "Fornitore",
@@ -394,6 +424,8 @@ export const overlayFillBuy = assemble({
     },
     quoteMethod: {
       de: "Zahlung",
+      sv: "Betalning",
+      nb: "Betaling",
       fr: "Paiement",
       es: "Pago",
       it: "Pagamento",
@@ -420,6 +452,8 @@ export const overlayFillBuy = assemble({
     },
     quoteYouGet: {
       de: "Sie erhalten",
+      sv: "Du får",
+      nb: "Du får",
       fr: "Vous recevez",
       es: "Recibes",
       it: "Ricevi",
@@ -446,6 +480,8 @@ export const overlayFillBuy = assemble({
     },
     quoteFees: {
       de: "Gebühren",
+      sv: "Avgifter",
+      nb: "Gebyrer",
       fr: "Frais",
       es: "Comisiones",
       it: "Commissioni",
@@ -472,6 +508,8 @@ export const overlayFillBuy = assemble({
     },
     continue: {
       de: "Weiter",
+      sv: "Fortsätt",
+      nb: "Fortsett",
       fr: "Continuer",
       es: "Continuar",
       it: "Continua",
@@ -498,6 +536,8 @@ export const overlayFillBuy = assemble({
     },
     continueHint: {
       de: "Öffnet die Kartenkasse in einem neuen Tab. USDC wird an die Ziel-Wallet gesendet.",
+      sv: "Öppnar kortkassan i en ny flik. USDC skickas till destinationsplånboken.",
+      nb: "Åpner kortkassen i en ny fane. USDC sendes til destinasjonslommeboken.",
       fr: "Ouvre le paiement par carte dans un nouvel onglet. USDC est envoyé au portefeuille de destination.",
       es: "Abre el checkout con tarjeta en una pestaña nueva. USDC se envía a la cartera de destino.",
       it: "Apre il checkout con carta in una nuova scheda. USDC viene inviato al portafoglio di destinazione.",
@@ -524,6 +564,8 @@ export const overlayFillBuy = assemble({
     },
     leaveSiteTitle: {
       de: "Wir öffnen die Zahlungsseite",
+      sv: "Vi öppnar betalsidan",
+      nb: "Vi åpner betalingssiden",
       fr: "Nous ouvrons le site de paiement",
       es: "Abriremos el sitio de pago",
       it: "Apriremo il sito di pagamento",
@@ -550,6 +592,8 @@ export const overlayFillBuy = assemble({
     },
     leaveSiteBody: {
       de: "Die nächste Seite wird vom Zahlungsanbieter betrieben. Dort werden Ihre Angaben geprüft. Nach Abschluss der Zahlung schließen Sie diese Seite und kehren hierher zurück.",
+      sv: "Nästa sida sköts av betalleverantören. De verifierar dina uppgifter. När betalningen är klar stänger du den sidan och kommer tillbaka hit.",
+      nb: "Neste side drives av betalingsleverandøren. De verifiserer opplysningene dine. Når betalingen er ferdig, lukker du den siden og kommer tilbake hit.",
       fr: "La page suivante est gérée par le prestataire de paiement. Il vérifiera vos informations. Une fois le paiement terminé, fermez cette page et revenez ici.",
       es: "La página siguiente la gestiona el proveedor de pago. Verificarán tus datos. Cuando el pago esté completo, cierra esa página y vuelve aquí.",
       it: "La pagina successiva è gestita dal fornitore di pagamento. Verificheranno i tuoi dati. A pagamento completato, chiudi quella pagina e torna qui.",
@@ -576,6 +620,8 @@ export const overlayFillBuy = assemble({
     },
     leaveSiteContinue: {
       de: "Weiter zur Zahlung",
+      sv: "Fortsätt till betalning",
+      nb: "Fortsett til betaling",
       fr: "Passer au paiement",
       es: "Continuar al pago",
       it: "Vai al pagamento",
@@ -602,6 +648,8 @@ export const overlayFillBuy = assemble({
     },
     leaveSiteCancel: {
       de: "Nicht jetzt",
+      sv: "Inte nu",
+      nb: "Ikke nå",
       fr: "Pas maintenant",
       es: "Ahora no",
       it: "Non ora",
@@ -628,6 +676,8 @@ export const overlayFillBuy = assemble({
     },
     opened: {
       de: "Kasse in neuem Tab geöffnet.",
+      sv: "Kassan öppnades i en ny flik.",
+      nb: "Kassen ble åpnet i en ny fane.",
       fr: "Page de paiement ouverte dans un nouvel onglet.",
       es: "Abrimos la página de pago en una pestaña nueva.",
       it: "Checkout aperto in una nuova scheda.",
@@ -654,6 +704,8 @@ export const overlayFillBuy = assemble({
     },
     popupBlocked: {
       de: "Pop-up blockiert. Nutzen Sie den Kassen-Link unten, oder erlauben Sie Pop-ups und versuchen Sie es erneut.",
+      sv: "Popup blockerades. Använd kassalänken nedan, eller tillåt popup-fönster och försök igen.",
+      nb: "Popup ble blokkert. Bruk kasselenken nedenfor, eller tillat popup-vinduer og prøv igjen.",
       fr: "Fenêtre contextuelle bloquée. Utilisez le lien de paiement ci-dessous, ou autorisez les pop-ups et réessayez.",
       es: "Ventana emergente bloqueada. Usa el enlace de checkout de abajo, o permite las ventanas emergentes e inténtalo de nuevo.",
       it: "Pop-up bloccato. Usa il link al checkout qui sotto, oppure consenti i pop-up e riprova.",
@@ -680,6 +732,8 @@ export const overlayFillBuy = assemble({
     },
     openCheckout: {
       de: "Kasse öffnen",
+      sv: "Öppna kassan",
+      nb: "Åpne kassen",
       fr: "Ouvrir la page de paiement",
       es: "Abrir la página de pago",
       it: "Apri il checkout",
@@ -706,6 +760,8 @@ export const overlayFillBuy = assemble({
     },
     loadingCountries: {
       de: "Länder werden geladen…",
+      sv: "Laddar länder…",
+      nb: "Laster land…",
       fr: "Chargement des pays…",
       es: "Cargando países…",
       it: "Caricamento dei paesi…",
@@ -732,6 +788,8 @@ export const overlayFillBuy = assemble({
     },
     loadingQuotes: {
       de: "Angebote werden abgerufen…",
+      sv: "Hämtar offerter…",
+      nb: "Henter tilbud…",
       fr: "Récupération des devis…",
       es: "Obteniendo cotizaciones…",
       it: "Recupero dei preventivi…",
@@ -758,6 +816,8 @@ export const overlayFillBuy = assemble({
     },
     loadingWidget: {
       de: "Kasse wird geöffnet…",
+      sv: "Öppnar kassan…",
+      nb: "Åpner kassen…",
       fr: "Ouverture du checkout…",
       es: "Abriendo el checkout…",
       it: "Apertura del checkout…",
@@ -784,6 +844,8 @@ export const overlayFillBuy = assemble({
     },
     unavailable: {
       de: "Karten- und Bankkauf ist auf dieser Instanz nicht aktiviert.",
+      sv: "Köp med kort och bank är inte aktiverat på den här instansen.",
+      nb: "Kjøp med kort og bank er ikke slått på i denne instansen.",
       fr: "L’achat par carte et virement n’est pas activé sur cette instance.",
       es: "La compra con tarjeta y banco no está habilitada en esta instancia.",
       it: "L’acquisto con carta e banca non è abilitato su questa istanza.",
@@ -810,6 +872,8 @@ export const overlayFillBuy = assemble({
     },
     networkLine: {
       de: "Wird als {token} auf {network} abgerechnet",
+      sv: "Avräknas som {token} på {network}",
+      nb: "Gjøres opp som {token} på {network}",
       fr: "Réglé en {token} sur {network}",
       es: "Se liquida como {token} en {network}",
       it: "Si regola come {token} su {network}",
@@ -836,6 +900,8 @@ export const overlayFillBuy = assemble({
     },
     feeLine: {
       de: "Netzwerk {network} · Anbieter {provider} · extra {extra}",
+      sv: "Nätverk {network} · leverantör {provider} · extra {extra}",
+      nb: "Nettverk {network} · tilbyder {provider} · ekstra {extra}",
       fr: "Réseau {network} · prestataire {provider} · extra {extra}",
       es: "Red {network} · proveedor {provider} · extra {extra}",
       it: "Rete {network} · fornitore {provider} · extra {extra}",
@@ -862,6 +928,8 @@ export const overlayFillBuy = assemble({
     },
     selectQuote: {
       de: "Zahlungsmethode wählen",
+      sv: "Välj betalsätt",
+      nb: "Velg betalingsmåte",
       fr: "Choisir un moyen de paiement",
       es: "Selecciona un método de pago",
       it: "Seleziona un metodo di pagamento",
@@ -888,6 +956,8 @@ export const overlayFillBuy = assemble({
     },
     invalidAddress: {
       de: "Gültige EVM-Adresse eingeben.",
+      sv: "Ange en giltig EVM-adress.",
+      nb: "Skriv inn en gyldig EVM-adresse.",
       fr: "Saisissez une adresse EVM valide.",
       es: "Introduce una dirección EVM válida.",
       it: "Inserisci un indirizzo EVM valido.",
@@ -914,6 +984,8 @@ export const overlayFillBuy = assemble({
     },
     iframeTitle: {
       de: "Kasse: USDC kaufen",
+      sv: "Köp USDC – kassa",
+      nb: "Kjøp USDC – kasse",
       fr: "Paiement USDC",
       es: "Checkout de USDC",
       it: "Checkout USDC",
@@ -940,6 +1012,8 @@ export const overlayFillBuy = assemble({
     },
     checkoutTitle: {
       de: "Kauf abschließen",
+      sv: "Slutför köpet",
+      nb: "Fullfør kjøpet",
       fr: "Finalisez votre achat",
       es: "Completa tu compra",
       it: "Completa l’acquisto",
@@ -966,6 +1040,8 @@ export const overlayFillBuy = assemble({
     },
     checkoutLede: {
       de: "Mit Karte oder Bank bezahlen. Das Guthaben wird als USDC auf Base an diese Wallet ausgezahlt.",
+      sv: "Betala med kort eller bank. Medlen avräknas som USDC på Base till den här plånboken.",
+      nb: "Betal med kort eller bank. Midlene gjøres opp som USDC på Base til denne lommeboken.",
       fr: "Payez par carte ou virement. Les fonds sont réglés en USDC sur Base vers ce portefeuille.",
       es: "Paga con tarjeta o banco. Los fondos se liquidan como USDC en Base a esta cartera.",
       it: "Paga con carta o banca. I fondi si regolano come USDC su Base su questo portafoglio.",
@@ -992,6 +1068,8 @@ export const overlayFillBuy = assemble({
     },
     backToQuotes: {
       de: "Zurück",
+      sv: "Tillbaka",
+      nb: "Tilbake",
       fr: "Retour",
       es: "Atrás",
       it: "Indietro",
@@ -1018,6 +1096,8 @@ export const overlayFillBuy = assemble({
     },
     destinationLabel: {
       de: "Senden an",
+      sv: "Skickas till",
+      nb: "Sendes til",
       fr: "Envoi vers",
       es: "Enviando a",
       it: "Invio a",
@@ -1044,6 +1124,8 @@ export const overlayFillBuy = assemble({
     },
     embedNote: {
       de: "In der Kassen-Registerkarte abschließen, dann diese Wallet prüfen.",
+      sv: "Slutför i kassafliken och kontrollera sedan den här plånboken.",
+      nb: "Fullfør i kassefanen, og sjekk deretter denne lommeboken.",
       fr: "Terminez dans l’onglet de paiement, puis vérifiez ce portefeuille.",
       es: "Termina en la pestaña de checkout y luego revisa esta cartera.",
       it: "Completa nella scheda del checkout, poi controlla questo portafoglio.",
@@ -1070,6 +1152,8 @@ export const overlayFillBuy = assemble({
     },
     embedBlocked: {
       de: "Dieser Anbieter lässt sich hier nicht öffnen. Anderes Angebot wählen.",
+      sv: "Den här leverantören kan inte öppnas här. Välj en annan offert.",
+      nb: "Denne tilbyderen kan ikke åpnes her. Velg et annet tilbud.",
       fr: "Ce prestataire ne peut pas s’ouvrir ici. Choisissez un autre devis.",
       es: "Este proveedor no se puede abrir aquí. Elige otra cotización.",
       it: "Questo fornitore non può essere aperto qui. Scegli un altro preventivo.",
@@ -1096,6 +1180,8 @@ export const overlayFillBuy = assemble({
     },
     widgetFailed: {
       de: "Kasse konnte nicht gestartet werden",
+      sv: "Kunde inte starta kassan",
+      nb: "Kunne ikke starte kassen",
       fr: "Impossible de démarrer le checkout",
       es: "No se pudo iniciar el checkout",
       it: "Impossibile avviare il checkout",
@@ -1122,6 +1208,8 @@ export const overlayFillBuy = assemble({
     },
     paymentMethodsTitle: {
       de: "Zahlungsmethoden",
+      sv: "Betalsätt",
+      nb: "Betalingsmåter",
       fr: "Moyens de paiement",
       es: "Métodos de pago",
       it: "Metodi di pagamento",
@@ -1148,6 +1236,8 @@ export const overlayFillBuy = assemble({
     },
     selectProvider: {
       de: "Anbieter wählen",
+      sv: "Välj leverantör",
+      nb: "Velg tilbyder",
       fr: "Choisir un prestataire",
       es: "Seleccionar proveedor",
       it: "Seleziona fornitore",
@@ -1174,6 +1264,8 @@ export const overlayFillBuy = assemble({
     },
     allProviders: {
       de: "Alle Anbieter",
+      sv: "Alla leverantörer",
+      nb: "Alle tilbydere",
       fr: "Tous les prestataires",
       es: "Todos los proveedores",
       it: "Tutti i fornitori",
@@ -1200,6 +1292,8 @@ export const overlayFillBuy = assemble({
     },
     withProvider: {
       de: "mit {provider}",
+      sv: "med {provider}",
+      nb: "med {provider}",
       fr: "avec {provider}",
       es: "con {provider}",
       it: "con {provider}",
@@ -1226,6 +1320,8 @@ export const overlayFillBuy = assemble({
     },
     payingInvoice: {
       de: "Rechnung {id} wird bezahlt…",
+      sv: "Betalar faktura {id}…",
+      nb: "Betaler faktura {id}…",
       fr: "Paiement de la facture {id}…",
       es: "Pagando la factura {id}…",
       it: "Pagamento della fattura {id}…",
@@ -1252,6 +1348,8 @@ export const overlayFillBuy = assemble({
     },
     invoiceCover: {
       de: "Die Rechnung benötigt {amount} {token} auf Base.",
+      sv: "Fakturan behöver {amount} {token} på Base.",
+      nb: "Fakturaen trenger {amount} {token} på Base.",
       fr: "La facture requiert {amount} {token} sur Base.",
       es: "La factura necesita {amount} {token} en Base.",
       it: "La fattura richiede {amount} {token} su Base.",
@@ -1278,6 +1376,8 @@ export const overlayFillBuy = assemble({
     },
     invoiceShortfall: {
       de: "Dieses Angebot liegt unter dem Rechnungsbetrag. Erhöhen Sie den Zahlungsbetrag oder wählen Sie einen anderen Anbieter.",
+      sv: "Den här offerten ligger under fakturabeloppet. Höj beloppet du betalar, eller välj en annan leverantör.",
+      nb: "Dette tilbudet ligger under fakturabeløpet. Øk det du betaler, eller velg en annen tilbyder.",
       fr: "Ce devis est inférieur au montant de la facture. Augmentez ce que vous payez, ou choisissez un autre prestataire.",
       es: "Esta cotización está por debajo del importe de la factura. Sube lo que pagas, o elige otro proveedor.",
       it: "Questo preventivo è inferiore all’importo della fattura. Aumenta quanto paghi, oppure scegli un altro fornitore.",

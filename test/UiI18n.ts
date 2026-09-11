@@ -26,6 +26,10 @@ describe("UI i18n", function () {
     expect(matchLocale("fa-IR")).to.equal("fa");
     expect(matchLocale("he-IL")).to.equal("he");
     expect(matchLocale("ur-PK")).to.equal("ur");
+    expect(matchLocale("sv-SE")).to.equal("sv");
+    expect(matchLocale("nb-NO")).to.equal("nb");
+    expect(matchLocale("no")).to.equal("nb");
+    expect(matchLocale("nn-NO")).to.equal("nb");
     expect(matchLocale(["fr-CA", "es"])).to.equal("fr");
     expect(matchLocale("xx-YY")).to.equal("en");
   });

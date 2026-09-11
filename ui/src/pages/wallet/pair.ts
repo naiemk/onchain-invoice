@@ -10,6 +10,8 @@ import {
 } from "../../shared/wallet-api.js";
 import { createPasskey, saveWalletSession } from "../../shared/webauthn.js";
 import { inferDeviceLabel } from "../../shared/passkey-name.js";
+import { credentialIdsMatch } from "../../shared/credential-id.js";
+import { listWalletEntities } from "../../shared/wallet-advanced-api.js";
 import {
   paintWalletPage,
   setButtonLoading,
@@ -192,6 +194,27 @@ async function runPair(root: HTMLElement): Promise<void> {
           credentialId: owner.credentialId,
         });
 
+        let entityId: string | undefined;
+        let keyId: string | undefined;
+        let keyType: number | undefined;
+        try {
+          const roster = await listWalletEntities(account.address);
+          const mine =
+            roster.keys.find(
+              (k) => k.credentialId && credentialIdsMatch(k.credentialId, owner.credentialId)
+            ) ??
+            roster.keys.find(
+              (k) =>
+                k.qx?.toLowerCase() === owner.qx.toLowerCase() &&
+                k.qy?.toLowerCase() === owner.qy.toLowerCase()
+            );
+          entityId = mine?.entityId;
+          keyId = mine?.keyId;
+          keyType = mine?.keyType;
+        } catch {
+          /* home heal retries from roster / on-chain */
+        }
+
         saveWalletSession({
           address: account.address,
           chainId: payload.chainId,
@@ -201,6 +224,9 @@ async function runPair(root: HTMLElement): Promise<void> {
           credentialId: owner.credentialId,
           rawId: owner.rawId,
           label,
+          entityId,
+          keyId,
+          keyType,
         });
 
         location.href = "/wallet";

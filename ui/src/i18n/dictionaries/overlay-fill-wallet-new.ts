@@ -4,6 +4,8 @@ export const overlayFillWalletNew = assemble({
   wallet: {
     emailWizardTitle: {
       de: "Wiederherstellungs-E-Mail hinzufügen",
+      sv: "Lägg till en återställnings-e-post",
+      nb: "Legg til en gjenopprettings-e-post",
       fr: "Ajouter un e-mail de récupération",
       es: "Añadir un correo de recuperación",
       it: "Aggiungi un’e-mail di recupero",
@@ -30,6 +32,8 @@ export const overlayFillWalletNew = assemble({
     },
     emailWizardLede: {
       de: "Wenn Sie dieses Gerät verlieren, können wir einen Code an diese E-Mail senden, damit Sie wieder Zugang erhalten. Sie können das überspringen und später hinzufügen.",
+      sv: "Om du tappar den här enheten kan vi skicka en kod till den här e-postadressen så att du kommer in igen. Du kan hoppa över det här och lägga till det senare.",
+      nb: "Hvis du mister denne enheten, kan vi sende en kode til denne e-postadressen slik at du kommer inn igjen. Du kan hoppe over dette og legge det til senere.",
       fr: "Si vous perdez cet appareil, nous pouvons envoyer un code à cet e-mail pour que vous puissiez retrouver l’accès. Vous pouvez passer cette étape et l’ajouter plus tard.",
       es: "Si pierde este dispositivo, podemos enviar un código a este correo para que pueda volver a entrar. Puede omitirlo y añadirlo más tarde.",
       it: "Se perdi questo dispositivo, possiamo inviare un codice a questa e-mail per farti rientrare. Puoi saltare e aggiungerla dopo.",
@@ -56,6 +60,8 @@ export const overlayFillWalletNew = assemble({
     },
     emailWizardSend: {
       de: "Code senden",
+      sv: "Skicka kod",
+      nb: "Send kode",
       fr: "Envoyer le code",
       es: "Enviar código",
       it: "Invia codice",
@@ -82,6 +88,8 @@ export const overlayFillWalletNew = assemble({
     },
     emailWizardCodeLede: {
       de: "Geben Sie den 6-stelligen Code ein, den wir an {email} gesendet haben.",
+      sv: "Ange den 6-siffriga koden vi skickade till {email}.",
+      nb: "Skriv inn den 6-sifrede koden vi sendte til {email}.",
       fr: "Saisissez le code à 6 chiffres que nous avons envoyé à {email}.",
       es: "Introduzca el código de 6 dígitos que enviamos a {email}.",
       it: "Inserisci il codice a 6 cifre inviato a {email}.",
@@ -108,6 +116,8 @@ export const overlayFillWalletNew = assemble({
     },
     emailWizardSkip: {
       de: "Vorerst überspringen",
+      sv: "Hoppa över tills vidare",
+      nb: "Hopp over for nå",
       fr: "Passer pour l’instant",
       es: "Omitir por ahora",
       it: "Salta per ora",
@@ -134,6 +144,8 @@ export const overlayFillWalletNew = assemble({
     },
     createOtherOptions: {
       de: "Weitere Optionen",
+      sv: "Andra alternativ",
+      nb: "Andre alternativer",
       fr: "Autres options",
       es: "Otras opciones",
       it: "Altre opzioni",
@@ -160,6 +172,8 @@ export const overlayFillWalletNew = assemble({
     },
     createRecoverByEmail: {
       de: "Per E-Mail wiederherstellen",
+      sv: "Återställ via e-post",
+      nb: "Gjenopprett med e-post",
       fr: "Récupérer par e-mail",
       es: "Recuperar por correo",
       it: "Recupera via e-mail",
@@ -186,6 +200,8 @@ export const overlayFillWalletNew = assemble({
     },
     recoverMenuEmailTitle: {
       de: "Wiederherstellungs-E-Mail hinzufügen oder aktualisieren",
+      sv: "Lägg till eller uppdatera återställnings-e-post",
+      nb: "Legg til eller oppdater gjenopprettings-e-post",
       fr: "Ajouter ou mettre à jour l’e-mail de récupération",
       es: "Añadir o actualizar el correo de recuperación",
       it: "Aggiungi o aggiorna l’e-mail di recupero",
@@ -212,6 +228,8 @@ export const overlayFillWalletNew = assemble({
     },
     recoverMenuEmailBody: {
       de: "Speichern Sie eine E-Mail, damit Sie wieder Zugang erhalten, wenn Sie dieses Gerät verlieren.",
+      sv: "Spara en e-postadress så att du kan komma in igen om du förlorar den här enheten.",
+      nb: "Lagre en e-postadresse slik at du kan komme inn igjen hvis du mister denne enheten.",
       fr: "Enregistrez un e-mail pour retrouver l’accès si vous perdez cet appareil.",
       es: "Guarde un correo para poder volver a entrar si pierde este dispositivo.",
       it: "Salva un’e-mail per rientrare se perdi questo dispositivo.",
@@ -238,6 +256,8 @@ export const overlayFillWalletNew = assemble({
     },
     recoverMenuLostTitle: {
       de: "Ich habe dieses Gerät verloren",
+      sv: "Jag har tappat den här enheten",
+      nb: "Jeg har mistet denne enheten",
       fr: "J’ai perdu cet appareil",
       es: "He perdido este dispositivo",
       it: "Ho perso questo dispositivo",
@@ -264,6 +284,8 @@ export const overlayFillWalletNew = assemble({
     },
     recoverMenuLostBody: {
       de: "Starten Sie die Wiederherstellung mit einem neuen Passkey und Ihrer Wiederherstellungs-E-Mail.",
+      sv: "Starta återställning med en ny passkey och din återställnings-e-post.",
+      nb: "Start gjenoppretting med en ny passkey og gjenopprettings-e-posten din.",
       fr: "Lancez la récupération avec une nouvelle passkey et votre e-mail de récupération.",
       es: "Inicie la recuperación con una passkey nueva y su correo de recuperación.",
       it: "Avvia il recupero con una nuova passkey e l’e-mail di recupero.",
@@ -290,6 +312,8 @@ export const overlayFillWalletNew = assemble({
     },
     recoverMenuCancelTitle: {
       de: "Wiederherstellungsanfrage abbrechen",
+      sv: "Avbryt en återställningsbegäran",
+      nb: "Avbryt en gjenopprettingsforespørsel",
       fr: "Annuler une demande de récupération",
       es: "Cancelar una solicitud de recuperación",
       it: "Annulla una richiesta di recupero",
@@ -316,6 +340,8 @@ export const overlayFillWalletNew = assemble({
     },
     recoverMenuCancelBody: {
       de: "Stoppen Sie eine laufende Wiederherstellung mit dem Passkey, den Sie noch haben.",
+      sv: "Stoppa en pågående återställning med passkeyn du fortfarande har.",
+      nb: "Stopp en pågående gjenoppretting med passkeyen du fortsatt har.",
       fr: "Arrêtez une récupération en cours avec la passkey que vous avez encore.",
       es: "Detenga una recuperación en curso con la passkey que aún tiene.",
       it: "Interrompi un recupero in corso con la passkey che hai ancora.",

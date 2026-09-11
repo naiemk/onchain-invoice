@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TurnstileWidget, type TurnstileControl } from "@/components/TurnstileWidget";
+import { TurnstileWidget, readCaptchaToken, type TurnstileControl } from "@/components/TurnstileWidget";
 import { useLocale } from "@/providers/LocaleProvider";
 import {
   attachWalletEmail,
@@ -78,7 +78,7 @@ export function EmailAttachWizard({
     setBusy(true);
     setError(null);
     try {
-      const captchaToken = captchaRef.current?.getToken() ?? null;
+      const captchaToken = readCaptchaToken(captchaRef);
       if (siteKey && !captchaToken) {
         setError(t("wallet.recoverCaptchaRequired"));
         return;
@@ -116,7 +116,7 @@ export function EmailAttachWizard({
     setBusy(true);
     setError(null);
     try {
-      const captchaToken = captchaRef.current?.getToken() ?? null;
+      const captchaToken = readCaptchaToken(captchaRef);
       if (siteKey && !captchaToken) {
         setError(t("wallet.recoverCaptchaRequired"));
         return;
@@ -143,7 +143,7 @@ export function EmailAttachWizard({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md overflow-visible">
         <DialogHeader>
           <DialogTitle>{t("wallet.emailWizardTitle")}</DialogTitle>
           <DialogDescription>

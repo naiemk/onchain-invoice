@@ -271,7 +271,7 @@ test.describe("Super Wallet UI", () => {
     await expect(page.locator("#enable-advanced")).toHaveCount(0);
   });
 
-  test("shows entity key enrollment controls on Access after Super Wallet is active", async ({ page }) => {
+  test("shows entity key enrollment controls on Team after Super Wallet is active", async ({ page }) => {
     await seedSimpleWalletSession(page);
     await mockSuperWalletActiveApis(page);
     await page.goto("/wallet/access");
@@ -279,7 +279,7 @@ test.describe("Super Wallet UI", () => {
     await expect(page.locator("#add-entity")).toBeVisible();
   });
 
-  test("blocks last-key and below-threshold identity removal on Access", async ({ page }) => {
+  test("blocks last-key and below-threshold identity removal on Team", async ({ page }) => {
     const adminEntityId = `0x${"aa".repeat(32)}`;
     const teammateEntityId = `0x${"bb".repeat(32)}`;
     const adminKeyId = `0x${"11".repeat(32)}`;
@@ -345,7 +345,7 @@ test.describe("Super Wallet UI", () => {
     await page.goto("/wallet");
     await expect(page.getByTestId("super-wallet-shield")).toBeVisible();
     await expect(page.getByTestId("super-wallet-home-summary")).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Wallet navigation" })).toContainText("Access");
+    await expect(page.getByRole("navigation", { name: "Wallet navigation" })).toContainText("Team");
     await expect(page.getByRole("navigation", { name: "Wallet navigation" })).toContainText("Security");
     await expect(page.getByRole("navigation", { name: "Wallet navigation" })).not.toContainText("Super Wallet");
     await expect(page.getByRole("group", { name: "Wallet mode" })).toHaveCount(0);
@@ -366,6 +366,7 @@ test.describe("Super Wallet UI", () => {
     await expect(page).toHaveURL(/\/wallet\/recover/);
     await expect(page.getByRole("tab", { name: "With email" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Without email" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start recovery" })).toBeDisabled();
 
     await page.goto("/wallet/send");
     await expect(page.getByTestId("super-wallet-pay")).toBeVisible();

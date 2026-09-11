@@ -1,17 +1,12 @@
-/**
- * English source of truth for Trustless Commerce UI copy.
- *
- * Do not translate: brand “Trustless Commerce”, USDC/USDT, chain ids, addresses,
- * tx/invoice ids, JSON API examples. Keep placeholders like `{price}` intact.
- */
-import { walletEn } from "./wallet-en.js";
+import type { Messages } from "./en.js";
+import { walletSv } from "./wallet-sv.js";
 import { createPasskeyEn } from "./create-passkey-en.js";
 import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
 import { payFaucetEn } from "./pay-faucet-en.js";
 import { buyEn } from "./buy-en.js";
 
-export const en = {
+export const sv = {
   brand: "Trustless Commerce",
 
   nav: {
@@ -762,7 +757,5 @@ export const en = {
 
   buy: buyEn,
 
-  wallet: walletEn,
-};
-
-export type Messages = typeof en;
+  wallet: walletSv,
+} satisfies Messages;

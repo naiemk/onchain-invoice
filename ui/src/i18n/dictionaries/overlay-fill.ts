@@ -12,8 +12,38 @@ import { overlayFillWalletSuper } from "./overlay-fill-wallet-super.js";
 
 const overlayFillHome = assemble({
   nav: {
+    home: {
+      de: "Start",
+      sv: "Hem",
+      nb: "Hjem",
+      fr: "Accueil",
+      es: "Inicio",
+      it: "Home",
+      "pt-BR": "Início",
+      nl: "Home",
+      pl: "Start",
+      ru: "Главная",
+      uk: "Головна",
+      tr: "Ana sayfa",
+      ja: "ホーム",
+      ko: "홈",
+      "zh-Hans": "首页",
+      "zh-Hant": "首頁",
+      ar: "الرئيسية",
+      fa: "خانه",
+      he: "בית",
+      ur: "ہوم",
+      hi: "होम",
+      bn: "হোম",
+      id: "Beranda",
+      ms: "Laman utama",
+      th: "หน้าแรก",
+      vi: "Trang chủ",
+    },
     developers: {
       de: "Entwickler",
+      sv: "Utvecklare",
+      nb: "Utviklere",
       fr: "Développeurs",
       es: "Desarrolladores",
       it: "Sviluppatori",
@@ -42,6 +72,8 @@ const overlayFillHome = assemble({
   home: {
     heroImageAlt: {
       de: "Eine Person empfängt am Schreibtisch eine Kundenzahlung",
+      sv: "En person som tar emot en kundbetalning vid sitt skrivbord",
+      nb: "En person som tar imot en kundebetaling ved skrivebordet sitt",
       fr: "Une personne reçoit un paiement client à son bureau",
       es: "Una persona recibe el pago de un cliente en su escritorio",
       it: "Una persona riceve il pagamento di un cliente alla scrivania",
@@ -68,6 +100,8 @@ const overlayFillHome = assemble({
     },
     ctaCreateWallet: {
       de: "Wallet erstellen",
+      sv: "Skapa en plånbok",
+      nb: "Opprett en lommebok",
       fr: "Créer un portefeuille",
       es: "Crear una cartera",
       it: "Crea un portafoglio",
@@ -94,6 +128,8 @@ const overlayFillHome = assemble({
     },
     ctaFieldGuide: {
       de: "Leitfaden lesen",
+      sv: "Läs guiden",
+      nb: "Les guiden",
       fr: "Lire le guide",
       es: "Leer la guía",
       it: "Leggi la guida",
@@ -120,6 +156,8 @@ const overlayFillHome = assemble({
     },
     ctaOpenWallet: {
       de: "Wallet öffnen",
+      sv: "Öppna plånbok",
+      nb: "Åpne lommebok",
       fr: "Ouvrir le portefeuille",
       es: "Abrir la cartera",
       it: "Apri il portafoglio",
@@ -146,6 +184,8 @@ const overlayFillHome = assemble({
     },
     loopEyebrow: {
       de: "Der Ablauf",
+      sv: "Driftsloopen",
+      nb: "Driftsløkken",
       fr: "Le cycle",
       es: "El ciclo",
       it: "Il ciclo",
@@ -172,6 +212,8 @@ const overlayFillHome = assemble({
     },
     loopStablecoinsTitle: {
       de: "Stablecoins rein",
+      sv: "Stablecoins in",
+      nb: "Stablecoins inn",
       fr: "Stablecoins entrants",
       es: "Entrada de stablecoins",
       it: "Stablecoin in entrata",
@@ -198,6 +240,8 @@ const overlayFillHome = assemble({
     },
     loopStablecoinsBody: {
       de: "Empfangen Sie USDC und USDT auf den Netzwerken, die Sie wählen.",
+      sv: "Ta emot USDC och USDT till din handelsplånbok på de kedjor du väljer.",
+      nb: "Motta USDC og USDT til handelslommeboken din på kjedene du velger.",
       fr: "Recevez de l’USDC et de l’USDT sur les réseaux que vous choisissez.",
       es: "Recibe USDC y USDT en las redes que elijas.",
       it: "Ricevi USDC e USDT sulle reti che scegli.",
@@ -224,6 +268,8 @@ const overlayFillHome = assemble({
     },
     loopInvoicesTitle: {
       de: "Rechnungen raus",
+      sv: "Fakturor ut",
+      nb: "Fakturaer ut",
       fr: "Factures sortantes",
       es: "Facturas de salida",
       it: "Fatture in uscita",
@@ -250,6 +296,8 @@ const overlayFillHome = assemble({
     },
     loopInvoicesBody: {
       de: "Senden Sie Zahlungslinks, die direkt bei Ihnen ankommen — ohne Zwischenbuch.",
+      sv: "Skicka betallänkar som hamnar rakt i din plånbok — utan mellanliggande huvudbok.",
+      nb: "Send betalingslenker som havner rett i lommeboken din — uten mellomliggende hovedbok.",
       fr: "Envoyez des liens de paiement qui arrivent directement chez vous — sans registre intermédiaire.",
       es: "Envía enlaces de pago que llegan directo a ti, sin un libro de otra empresa.",
       it: "Invia link di pagamento che arrivano direttamente a te — senza un registro intermedio.",
@@ -276,6 +324,8 @@ const overlayFillHome = assemble({
     },
     loopCashTitle: {
       de: "Bargeld zur Bank",
+      sv: "Pengar till banken",
+      nb: "Penger til banken",
       fr: "Cash vers la banque",
       es: "Efectivo al banco",
       it: "Contanti in banca",
@@ -302,6 +352,8 @@ const overlayFillHome = assemble({
     },
     loopCashBody: {
       de: "Bewegen Sie Wert zwischen Ihrem Konto und dem Bankkonto, das das Geschäft am Laufen hält.",
+      sv: "Flytta värde mellan din plånbok och bankkontot som håller verksamheten igång.",
+      nb: "Flytt verdi mellom lommeboken din og bankkontoen som holder virksomheten i gang.",
       fr: "Déplacez de la valeur entre votre compte et le compte bancaire qui fait tourner l’activité.",
       es: "Mueve valor entre tu cuenta y la cuenta bancaria que mantiene el negocio.",
       it: "Sposta valore tra il tuo conto e il conto bancario che fa girare l’attività.",
@@ -328,6 +380,8 @@ const overlayFillHome = assemble({
     },
     heroBalanceNetwork: {
       de: "USDC auf Base",
+      sv: "USDC på Base",
+      nb: "USDC på Base",
       fr: "USDC sur Base",
       es: "USDC en Base",
       it: "USDC su Base",
@@ -354,6 +408,8 @@ const overlayFillHome = assemble({
     },
     heroWalletPill: {
       de: "Händlerkonto · {mode}",
+      sv: "Handelsplånbok · {mode}",
+      nb: "Handelslommebok · {mode}",
       fr: "Compte marchand · {mode}",
       es: "Cuenta de comercio · {mode}",
       it: "Conto commerciante · {mode}",
@@ -380,6 +436,8 @@ const overlayFillHome = assemble({
     },
     heroSettledMonth: {
       de: "$4,210.00 diesen Monat abgerechnet",
+      sv: "$4,210.00 avräknat den här månaden",
+      nb: "$4,210.00 gjort opp denne måneden",
       fr: "$4,210.00 réglés ce mois-ci",
       es: "$4,210.00 cobrados este mes",
       it: "$4,210.00 regolati questo mese",

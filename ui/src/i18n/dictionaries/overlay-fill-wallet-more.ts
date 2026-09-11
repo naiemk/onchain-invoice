@@ -4,6 +4,8 @@ export const overlayFillWalletMore = assemble({
   "wallet": {
     details: {
       "de": "Details",
+      "sv": "Detaljer",
+      "nb": "Detaljer",
       "fr": "Détails",
       "es": "Detalles",
       "it": "Dettagli",
@@ -30,6 +32,8 @@ export const overlayFillWalletMore = assemble({
     },
     withdrawSandboxNote: {
       "de": "Karten-Auszahlung ist nicht verfügbar. Senden Sie stattdessen USDC on-chain.",
+      "sv": "Uttag till kort är inte tillgängligt. Skicka USDC on-chain i stället.",
+      "nb": "Uttak til kort er ikke tilgjengelig. Send USDC on-chain i stedet.",
       "fr": "Le retrait par carte n’est pas disponible. Envoyez plutôt des USDC on-chain.",
       "es": "El cobro a tarjeta no está disponible. Envíe USDC on-chain en su lugar.",
       "it": "Il prelievo su carta non è disponibile. Invia invece USDC on-chain.",
@@ -56,6 +60,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendSuccessShort: {
       "de": "Erfolgreich gesendet.",
+      "sv": "Skickades.",
+      "nb": "Sendt.",
       "fr": "Envoi réussi.",
       "es": "Enviado correctamente.",
       "it": "Invio riuscito.",
@@ -82,6 +88,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendSuccessTitle: {
       "de": "Zahlung gesendet",
+      "sv": "Betalning skickad",
+      "nb": "Betaling sendt",
       "fr": "Paiement envoyé",
       "es": "Pago enviado",
       "it": "Pagamento inviato",
@@ -108,6 +116,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendSuccessBody: {
       "de": "Ihre Transaktion wurde übermittelt und on-chain bestätigt.",
+      "sv": "Din transaktion skickades in och bekräftades on-chain.",
+      "nb": "Transaksjonen din ble sendt inn og bekreftet on-chain.",
       "fr": "Votre transaction a été soumise et confirmée on-chain.",
       "es": "Su transacción se envió y se confirmó on-chain.",
       "it": "La transazione è stata inviata e confermata on-chain.",
@@ -134,6 +144,8 @@ export const overlayFillWalletMore = assemble({
     },
     transactionId: {
       "de": "Transaktions-ID",
+      "sv": "Transaktions-ID",
+      "nb": "Transaksjons-ID",
       "fr": "ID de transaction",
       "es": "ID de transacción",
       "it": "ID transazione",
@@ -160,6 +172,8 @@ export const overlayFillWalletMore = assemble({
     },
     userOpPrefundFailed: {
       "de": "Das EntryPoint-Gas-Guthaben konnte nicht aufgefüllt werden. Versuchen Sie es gleich erneut.",
+      "sv": "Kunde inte finansiera gasdepositionen i EntryPoint. Försök igen om en stund.",
+      "nb": "Kunne ikke finansiere gas-innskuddet i EntryPoint. Prøv igjen om et øyeblikk.",
       "fr": "Impossible d’alimenter le dépôt de gaz EntryPoint. Réessayez dans un instant.",
       "es": "No se pudo financiar el depósito de gas de EntryPoint. Inténtelo de nuevo en un momento.",
       "it": "Impossibile finanziare il deposito gas di EntryPoint. Riprova tra un attimo.",
@@ -186,6 +200,8 @@ export const overlayFillWalletMore = assemble({
     },
     userOpAccountNotDeployed: {
       "de": "Ihre Wallet ist finanziert, wird aber noch on-chain aktiviert. Warten Sie kurz, aktualisieren Sie und versuchen Sie es erneut.",
+      "sv": "Plånboken har saldo men aktiveras fortfarande on-chain. Vänta en stund, uppdatera och försök igen.",
+      "nb": "Lommeboken har saldo, men aktiveres fortsatt on-chain. Vent et øyeblikk, oppdater og prøv igjen.",
       "fr": "Votre portefeuille est alimenté mais encore en cours d’activation on-chain. Attendez un instant, actualisez, puis réessayez.",
       "es": "Su cartera está fondeada pero aún se está activando on-chain. Espere, actualice e inténtelo de nuevo.",
       "it": "Il portafoglio è finanziato ma si sta ancora attivando on-chain. Attendi, aggiorna e riprova.",
@@ -212,6 +228,8 @@ export const overlayFillWalletMore = assemble({
     },
     advancedDevicesBodySuper: {
       "de": "{count} Gerät(e) — weiteres koppeln oder Sicherheitsschlüssel hinzufügen",
+      "sv": "{count} enhet(er) — para en till eller lägg till en säkerhetsnyckel",
+      "nb": "{count} enhet(er) — par en til eller legg til en sikkerhetsnøkkel",
       "fr": "{count} appareil(s) — associer un autre ou ajouter une clé de sécurité",
       "es": "{count} dispositivo(s) — emparejar otro o añadir una llave de seguridad",
       "it": "{count} dispositivo/i — associa un altro o aggiungi una chiave di sicurezza",
@@ -238,6 +256,8 @@ export const overlayFillWalletMore = assemble({
     },
     txHistoryTitle: {
       "de": "Aktivität",
+      "sv": "Aktivitet",
+      "nb": "Aktivitet",
       "fr": "Activité",
       "es": "Actividad",
       "it": "Attività",
@@ -264,6 +284,8 @@ export const overlayFillWalletMore = assemble({
     },
     txHistoryEmpty: {
       "de": "Noch keine Überweisungen.",
+      "sv": "Inga överföringar ännu.",
+      "nb": "Ingen overføringer ennå.",
       "fr": "Aucun transfert pour le moment.",
       "es": "Aún no hay transferencias.",
       "it": "Nessun trasferimento ancora.",
@@ -290,6 +312,8 @@ export const overlayFillWalletMore = assemble({
     },
     txHistoryIn: {
       "de": "Empfangen",
+      "sv": "Mottaget",
+      "nb": "Mottatt",
       "fr": "Reçu",
       "es": "Recibido",
       "it": "Ricevuto",
@@ -316,6 +340,8 @@ export const overlayFillWalletMore = assemble({
     },
     txHistoryOut: {
       "de": "Gesendet",
+      "sv": "Skickat",
+      "nb": "Sendt",
       "fr": "Envoyé",
       "es": "Enviado",
       "it": "Inviato",
@@ -342,6 +368,8 @@ export const overlayFillWalletMore = assemble({
     },
     txHistoryLoading: {
       "de": "Aktivität wird geladen…",
+      "sv": "Laddar aktivitet…",
+      "nb": "Laster aktivitet…",
       "fr": "Chargement de l’activité…",
       "es": "Cargando actividad…",
       "it": "Caricamento attività…",
@@ -368,6 +396,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeyNotOnChain: {
       "de": "Dieser Passkey ist nicht auf der Wallet registriert. Sperren Sie und öffnen Sie erneut mit dem Passkey, mit dem Sie dieses Gerät erstellt oder gekoppelt haben.",
+      "sv": "Den här passkey är inte registrerad på plånboken. Lås och öppna igen med den passkey du använde för att skapa eller para den här enheten.",
+      "nb": "Denne passkeyen er ikke registrert på lommeboken. Lås og åpne på nytt med passkeyen du brukte til å opprette eller pare denne enheten.",
       "fr": "Cette passkey n’est pas enregistrée sur le portefeuille. Verrouillez puis rouvrez avec la passkey utilisée pour créer ou associer cet appareil.",
       "es": "Esta passkey no está registrada en la cartera. Bloquee y vuelva a abrir con la passkey con la que creó o emparejó este dispositivo.",
       "it": "Questa passkey non è registrata sul portafoglio. Blocca e riapri con la passkey usata per creare o associare questo dispositivo.",
@@ -394,6 +424,8 @@ export const overlayFillWalletMore = assemble({
     },
     userOpAlreadySubmitted: {
       "de": "Diese Transaktion läuft bereits.",
+      "sv": "Den här transaktionen pågår redan.",
+      "nb": "Denne transaksjonen er allerede i gang.",
       "fr": "Cette transaction est déjà en cours.",
       "es": "Esta transacción ya está en curso.",
       "it": "Questa transazione è già in corso.",
@@ -420,6 +452,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeyMissingOnDevice: {
       "de": "Auf diesem Gerät ist Ihr Wallet-Passkey nicht geladen. Öffnen Sie die Wallet vom Startbildschirm oder koppeln Sie zuerst dieses Gerät.",
+      "sv": "Den här enheten har inte din plånboks-passkey inläst. Öppna plånboken från startskärmen eller para enheten först.",
+      "nb": "Denne enheten har ikke lommebokens passkey lastet. Åpne lommeboken fra startskjermen, eller par enheten først.",
       "fr": "La passkey de votre portefeuille n’est pas chargée sur cet appareil. Ouvrez le portefeuille depuis l’accueil ou associez d’abord cet appareil.",
       "es": "Este dispositivo no tiene cargada la passkey de su cartera. Ábrala desde inicio o empareje primero este dispositivo.",
       "it": "Questo dispositivo non ha la passkey del portafoglio. Aprilo dalla home o associa prima questo dispositivo.",
@@ -446,6 +480,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeyCancelled: {
       "de": "Passkey-Bestätigung wurde abgebrochen.",
+      "sv": "Passkey-bekräftelsen avbröts.",
+      "nb": "Passkey-bekreftelsen ble avbrutt.",
       "fr": "La confirmation passkey a été annulée.",
       "es": "Se canceló la confirmación de passkey.",
       "it": "La conferma passkey è stata annullata.",
@@ -472,6 +508,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeyAuthenticatorBusy: {
       "de": "Der Passkey dieses Geräts ist beschäftigt. Warten Sie kurz und versuchen Sie es erneut.",
+      "sv": "Enhetens passkey är upptagen. Vänta en stund och försök igen.",
+      "nb": "Enhetens passkey er opptatt. Vent et øyeblikk og prøv igjen.",
       "fr": "La passkey de cet appareil est occupée. Attendez un instant, puis réessayez.",
       "es": "La passkey de este dispositivo está ocupada. Espere un momento e inténtelo de nuevo.",
       "it": "La passkey di questo dispositivo è occupata. Attendi un attimo e riprova.",
@@ -498,6 +536,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeyNotSupported: {
       "de": "Passkeys werden in diesem Browser nicht unterstützt.",
+      "sv": "Passkeys stöds inte i den här webbläsaren.",
+      "nb": "Passkeys støttes ikke i denne nettleseren.",
       "fr": "Les passkeys ne sont pas prises en charge dans ce navigateur.",
       "es": "Este navegador no admite passkeys.",
       "it": "Le passkey non sono supportate in questo browser.",
@@ -524,6 +564,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeySecurityBlocked: {
       "de": "Passkeys sind auf dieser Seite blockiert. Prüfen Sie die Site-Berechtigungen und versuchen Sie es erneut.",
+      "sv": "Passkeys är blockerade på den här sidan. Kontrollera webbplatsbehörigheter och försök igen.",
+      "nb": "Passkeys er blokkert på denne siden. Sjekk nettstedstillatelser og prøv igjen.",
       "fr": "Les passkeys sont bloquées sur cette page. Vérifiez les autorisations du site, puis réessayez.",
       "es": "Las passkeys están bloqueadas en esta página. Revise los permisos del sitio e inténtelo de nuevo.",
       "it": "Le passkey sono bloccate in questa pagina. Controlla i permessi del sito e riprova.",
@@ -550,6 +592,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeyTimeout: {
       "de": "Passkey-Bestätigung ist abgelaufen. Versuchen Sie es erneut.",
+      "sv": "Passkey-bekräftelsen tog för lång tid. Försök igen.",
+      "nb": "Passkey-bekreftelsen tok for lang tid. Prøv igjen.",
       "fr": "La confirmation passkey a expiré. Réessayez.",
       "es": "La confirmación de passkey ha caducado. Inténtelo de nuevo.",
       "it": "La conferma passkey è scaduta. Riprova.",
@@ -576,6 +620,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeyCreationCancelled: {
       "de": "Passkey-Erstellung wurde abgebrochen.",
+      "sv": "Skapandet av passkey avbröts.",
+      "nb": "Oppretting av passkey ble avbrutt.",
       "fr": "La création de la passkey a été annulée.",
       "es": "Se canceló la creación de la passkey.",
       "it": "La creazione della passkey è stata annullata.",
@@ -602,6 +648,8 @@ export const overlayFillWalletMore = assemble({
     },
     passkeySigningCancelled: {
       "de": "Passkey-Signatur wurde abgebrochen.",
+      "sv": "Passkey-signeringen avbröts.",
+      "nb": "Passkey-signeringen ble avbrutt.",
       "fr": "La signature passkey a été annulée.",
       "es": "Se canceló la firma con passkey.",
       "it": "La firma passkey è stata annullata.",
@@ -628,6 +676,8 @@ export const overlayFillWalletMore = assemble({
     },
     unlockWrongWallet: {
       "de": "Dieser Passkey gehört zu einer anderen Wallet. Wählen Sie die passende Wallet oder einen anderen Passkey.",
+      "sv": "Den passkey tillhör en annan plånbok. Välj rätt plånbok eller prova en annan passkey.",
+      "nb": "Den passkeyen tilhører en annen lommebok. Velg riktig lommebok, eller prøv en annen passkey.",
       "fr": "Cette passkey appartient à un autre portefeuille. Choisissez le portefeuille correspondant ou une autre passkey.",
       "es": "Esa passkey pertenece a otra cartera. Elija la cartera coincidente u otra passkey.",
       "it": "Questa passkey appartiene a un altro portafoglio. Scegli quello corrispondente o un’altra passkey.",
@@ -654,6 +704,8 @@ export const overlayFillWalletMore = assemble({
     },
     openWalletFailed: {
       "de": "Diese Wallet konnte nicht geöffnet werden. Versuchen Sie stattdessen „Mit Passkey entsperren“.",
+      "sv": "Kunde inte öppna den plånboken. Prova «Lås upp med passkey» i stället.",
+      "nb": "Kunne ikke åpne den lommeboken. Prøv «Lås opp med passkey» i stedet.",
       "fr": "Impossible d’ouvrir ce portefeuille. Essayez « Déverrouiller avec passkey ».",
       "es": "No se pudo abrir esa cartera. Pruebe «Desbloquear con passkey».",
       "it": "Impossibile aprire quel portafoglio. Prova «Sblocca con passkey».",
@@ -680,6 +732,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendAmountUsdc: {
       "de": "Betrag · USDC",
+      "sv": "Belopp · USDC",
+      "nb": "Beløp · USDC",
       "fr": "Montant · USDC",
       "es": "Importe · USDC",
       "it": "Importo · USDC",
@@ -706,6 +760,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendNoteOptional: {
       "de": "Notiz (optional)",
+      "sv": "Anteckning (valfritt)",
+      "nb": "Merknad (valgfritt)",
       "fr": "Note (facultatif)",
       "es": "Nota (opcional)",
       "it": "Nota (facoltativa)",
@@ -732,6 +788,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendReview: {
       "de": "Zahlung prüfen",
+      "sv": "Granska betalning",
+      "nb": "Se over betaling",
       "fr": "Vérifier le paiement",
       "es": "Revisar el pago",
       "it": "Rivedi il pagamento",
@@ -758,6 +816,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendReviewTitle: {
       "de": "Zahlung prüfen",
+      "sv": "Granska betalning",
+      "nb": "Se over betaling",
       "fr": "Vérifier le paiement",
       "es": "Revisar el pago",
       "it": "Rivedi il pagamento",
@@ -784,6 +844,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendPauseTitle: {
       "de": "Eine bewusste Pause",
+      "sv": "En medveten paus",
+      "nb": "En bevisst pause",
       "fr": "Une pause volontaire",
       "es": "Una pausa deliberada",
       "it": "Una pausa deliberata",
@@ -810,6 +872,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendPauseBody: {
       "de": "Wir zeigen Empfänger, Betrag und Netzwerkgebühr, bevor etwas Ihre Wallet verlässt.",
+      "sv": "Vi visar mottagare, belopp och nätverksavgift innan något lämnar din plånbok.",
+      "nb": "Vi viser mottaker, beløp og nettverksgebyr før noe forlater lommeboken din.",
       "fr": "Nous affichons le destinataire, le montant et les frais réseau avant que rien ne quitte votre portefeuille.",
       "es": "Mostramos el destinatario, el importe y la comisión de red antes de que salga nada de su cartera.",
       "it": "Mostriamo destinatario, importo e commissione di rete prima che qualcosa lasci il portafoglio.",
@@ -836,6 +900,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendNetworkFeeLine: {
       "de": "Base-Netzwerk · geschätzte Gebühr {fee}",
+      "sv": "Base-nätverket · uppskattad avgift {fee}",
+      "nb": "Base-nettverket · estimert gebyr {fee}",
       "fr": "Réseau Base · frais estimés {fee}",
       "es": "Red Base · comisión estimada {fee}",
       "it": "Rete Base · commissione stimata {fee}",
@@ -862,6 +928,8 @@ export const overlayFillWalletMore = assemble({
     },
     receiveAddressLabel: {
       "de": "Ihre Händler-Wallet-Adresse",
+      "sv": "Din merchant-plånboksadress",
+      "nb": "Adressen til merchant-lommeboken din",
       "fr": "Adresse de votre portefeuille marchand",
       "es": "Dirección de su cartera de comercio",
       "it": "Indirizzo del portafoglio merchant",
@@ -888,6 +956,8 @@ export const overlayFillWalletMore = assemble({
     },
     shareAddress: {
       "de": "Adresse teilen",
+      "sv": "Dela adress",
+      "nb": "Del adresse",
       "fr": "Partager l’adresse",
       "es": "Compartir dirección",
       "it": "Condividi indirizzo",
@@ -914,6 +984,8 @@ export const overlayFillWalletMore = assemble({
     },
     requestAmountLabel: {
       "de": "Einen bestimmten Betrag anfordern",
+      "sv": "Begär ett specifikt belopp",
+      "nb": "Be om et bestemt beløp",
       "fr": "Demander un montant précis",
       "es": "Solicitar un importe concreto",
       "it": "Richiedi un importo specifico",
@@ -940,6 +1012,8 @@ export const overlayFillWalletMore = assemble({
     },
     merchantWalletPill: {
       "de": "Händler-Wallet · {mode}",
+      "sv": "Merchant-plånbok · {mode}",
+      "nb": "Merchant-lommebok · {mode}",
       "fr": "Portefeuille marchand · {mode}",
       "es": "Cartera de comercio · {mode}",
       "it": "Portafoglio merchant · {mode}",
@@ -966,6 +1040,8 @@ export const overlayFillWalletMore = assemble({
     },
     cashPageTitle: {
       "de": "Stablecoins zu Betriebskapital.",
+      "sv": "Stablecoins till rörelsekassa.",
+      "nb": "Stablecoins til driftskasse.",
       "fr": "Des stablecoins vers la trésorerie.",
       "es": "De stablecoins a efectivo operativo.",
       "it": "Dagli stablecoin alla cassa operativa.",
@@ -992,6 +1068,8 @@ export const overlayFillWalletMore = assemble({
     },
     cashPageLede: {
       "de": "Bewegen Sie Wert zwischen Ihrer Wallet und dem Bankkonto, das das Geschäft am Laufen hält.",
+      "sv": "Flytta värde mellan plånboken och bankkontot som håller verksamheten igång.",
+      "nb": "Flytt verdi mellom lommeboken og bankkontoen som holder virksomheten i gang.",
       "fr": "Déplacez de la valeur entre votre portefeuille et le compte bancaire qui fait tourner l’activité.",
       "es": "Mueva valor entre su cartera y la cuenta bancaria que mantiene el negocio.",
       "it": "Sposta valore tra il portafoglio e il conto bancario che tiene in marcia l’attività.",
@@ -1018,6 +1096,8 @@ export const overlayFillWalletMore = assemble({
     },
     cashBankTitle: {
       "de": "Bankkonto",
+      "sv": "Bankkonto",
+      "nb": "Bankkonto",
       "fr": "Compte bancaire",
       "es": "Cuenta bancaria",
       "it": "Conto bancario",
@@ -1044,6 +1124,8 @@ export const overlayFillWalletMore = assemble({
     },
     cashBankDetail: {
       "de": "USD-Giro · verifiziert",
+      "sv": "USD-checkkonto · verifierat",
+      "nb": "USD brukskonto · verifisert",
       "fr": "Compte courant USD · vérifié",
       "es": "Cuenta corriente USD · verificada",
       "it": "Conto corrente USD · verificato",
@@ -1070,6 +1152,8 @@ export const overlayFillWalletMore = assemble({
     },
     manageBankAccounts: {
       "de": "Bankkonten verwalten",
+      "sv": "Hantera bankkonton",
+      "nb": "Administrer bankkontoer",
       "fr": "Gérer les comptes bancaires",
       "es": "Gestionar cuentas bancarias",
       "it": "Gestisci i conti bancari",
@@ -1096,6 +1180,8 @@ export const overlayFillWalletMore = assemble({
     },
     availableToMove: {
       "de": "Verfügbar zum Verschieben",
+      "sv": "Tillgängligt att flytta",
+      "nb": "Tilgjengelig å flytte",
       "fr": "Disponible à déplacer",
       "es": "Disponible para mover",
       "it": "Disponibile da spostare",
@@ -1122,6 +1208,8 @@ export const overlayFillWalletMore = assemble({
     },
     cashSettlementHint: {
       "de": "Auszahlungen kommen in der Regel am nächsten Werktag an. Gebühren vor der Freigabe sichtbar.",
+      "sv": "Uttag avräknas vanligtvis nästa bankdag. Avgifter visas före godkännande.",
+      "nb": "Uttak gjøres vanligvis opp neste virkedag. Gebyrer vises før godkjenning.",
       "fr": "Les retraits arrivent généralement le jour ouvré suivant. Frais affichés avant validation.",
       "es": "El cobro suele liquidarse el siguiente día hábil. Comisiones visibles antes de aprobar.",
       "it": "L’incasso di solito arriva il giorno lavorativo successivo. Commissioni visibili prima dell’approvazione.",
@@ -1148,6 +1236,8 @@ export const overlayFillWalletMore = assemble({
     },
     createBreadcrumb: {
       "de": "NEUE WALLET / {mode}",
+      "sv": "NY PLÅNBOK / {mode}",
+      "nb": "NY LOMMEBOK / {mode}",
       "fr": "NOUVEAU PORTEFEUILLE / {mode}",
       "es": "NUEVA CARTERA / {mode}",
       "it": "NUOVO PORTAFOGLIO / {mode}",
@@ -1174,6 +1264,8 @@ export const overlayFillWalletMore = assemble({
     },
     counterfactualShort: {
       "de": "So funktioniert die counterfactual Bereitstellung",
+      "sv": "Så fungerar counterfactual deployment",
+      "nb": "Slik fungerer counterfactual deployment",
       "fr": "Fonctionnement du déploiement counterfactual",
       "es": "Cómo funciona el despliegue counterfactual",
       "it": "Come funziona il deployment counterfactual",
@@ -1200,6 +1292,8 @@ export const overlayFillWalletMore = assemble({
     },
     userOpSimulationRevert: {
       "de": "Die Transaktion würde on-chain fehlschlagen. Prüfen Sie den Saldo und versuchen Sie es erneut.",
+      "sv": "Transaktionen skulle misslyckas on-chain. Kontrollera saldot och försök igen.",
+      "nb": "Transaksjonen ville feilet on-chain. Sjekk saldoen og prøv igjen.",
       "fr": "La transaction échouerait on-chain. Vérifiez le solde et réessayez.",
       "es": "La transacción fallaría on-chain. Revise el saldo e inténtelo de nuevo.",
       "it": "La transazione fallirebbe on-chain. Controlla il saldo e riprova.",
@@ -1226,6 +1320,8 @@ export const overlayFillWalletMore = assemble({
     },
     userOpExecutionReverted: {
       "de": "Die Transaktion wurde gemined, ist aber fehlgeschlagen. Ihre Wallet wurde nicht geändert.",
+      "sv": "Transaktionen minades men lyckades inte. Plånboken ändrades inte.",
+      "nb": "Transaksjonen ble minet, men lyktes ikke. Lommeboken ble ikke endret.",
       "fr": "La transaction a été minée mais n’a pas abouti. Votre portefeuille n’a pas été modifié.",
       "es": "La transacción se minó pero no se completó. Su cartera no cambió.",
       "it": "La transazione è stata minata ma non è riuscita. Il portafoglio non è stato modificato.",
@@ -1252,6 +1348,8 @@ export const overlayFillWalletMore = assemble({
     },
     advancedDevicesBodySimple: {
       "de": "{count} Gerät(e) — koppeln oder entfernen",
+      "sv": "{count} enhet(er) — para eller ta bort",
+      "nb": "{count} enhet(er) — par eller fjern",
       "fr": "{count} appareil(s) — associer ou retirer",
       "es": "{count} dispositivo(s) — emparejar o quitar",
       "it": "{count} dispositivo/i — associa o rimuovi",
@@ -1278,6 +1376,8 @@ export const overlayFillWalletMore = assemble({
     },
     sendTotal: {
       "de": "Gesamt",
+      "sv": "Totalt",
+      "nb": "Totalt",
       "fr": "Total",
       "es": "Total",
       "it": "Totale",
@@ -1304,6 +1404,8 @@ export const overlayFillWalletMore = assemble({
     },
     max: {
       "de": "Max",
+      "sv": "Max",
+      "nb": "Maks",
       "fr": "Max",
       "es": "Máx.",
       "it": "Max",
@@ -1330,6 +1432,8 @@ export const overlayFillWalletMore = assemble({
     },
     homeTitle: {
       "de": "Wallet",
+      "sv": "Plånbok",
+      "nb": "Lommebok",
       "fr": "Portefeuille",
       "es": "Cartera",
       "it": "Portafoglio",
@@ -1356,6 +1460,8 @@ export const overlayFillWalletMore = assemble({
     },
     localRecoveryChain: {
       "de": "Chain",
+      "sv": "Kedja",
+      "nb": "Kjede",
       "fr": "Chaîne",
       "es": "Cadena",
       "it": "Catena",
@@ -1382,6 +1488,8 @@ export const overlayFillWalletMore = assemble({
     },
     modeSimple: {
       "de": "Einfach",
+      "sv": "Enkel",
+      "nb": "Enkel",
       "fr": "Simple",
       "es": "Simple",
       "it": "Semplice",
@@ -1408,6 +1516,8 @@ export const overlayFillWalletMore = assemble({
     },
     homeTab: {
       "de": "Start",
+      "sv": "Hem",
+      "nb": "Hjem",
       "fr": "Accueil",
       "es": "Inicio",
       "it": "Home",
@@ -1434,6 +1544,8 @@ export const overlayFillWalletMore = assemble({
     },
     cashTab: {
       "de": "Cash",
+      "sv": "Kassa",
+      "nb": "Kasse",
       "fr": "Cash",
       "es": "Efectivo",
       "it": "Cassa",
@@ -1460,6 +1572,8 @@ export const overlayFillWalletMore = assemble({
     },
     cashTitle: {
       "de": "Cash",
+      "sv": "Kassa",
+      "nb": "Kasse",
       "fr": "Cash",
       "es": "Efectivo",
       "it": "Cassa",
@@ -1486,6 +1600,8 @@ export const overlayFillWalletMore = assemble({
     },
     createDisclaimerStep1Title: {
       "de": "Nicht verwahrte Wallet",
+      "sv": "Icke-kustodial plånbok",
+      "nb": "Ikke-kustodial lommebok",
       "fr": "Portefeuille non-custodial",
       "es": "Cartera no custodial",
       "it": "Portafoglio non custodial",
@@ -1512,6 +1628,8 @@ export const overlayFillWalletMore = assemble({
     },
     userOpInsufficientBalance: {
       "de": "Nicht genug Guthaben in dieser Wallet für Betrag und Netzwerkgebühr.",
+      "sv": "Otillräckliga medel i den här plånboken för belopp och nätverksavgift.",
+      "nb": "Ikke nok midler i denne lommeboken til å dekke beløpet og nettverksgebyret.",
       "fr": "Fonds insuffisants dans ce portefeuille pour le montant et les frais réseau.",
       "es": "Fondos insuficientes en esta cartera para el importe y la comisión de red.",
       "it": "Fondi insufficienti in questo portafoglio per importo e commissione di rete.",
@@ -1538,6 +1656,8 @@ export const overlayFillWalletMore = assemble({
     },
     userOpSignatureInvalid: {
       "de": "Die Wallet hat diese Signatur abgelehnt. Face ID / Touch ID bestätigt nur, dass der Browser einen Passkey entsperrt hat — nicht, dass der Super Wallet-Vertrag ihn akzeptiert hat.",
+      "sv": "Plånboken avvisade den här signaturen. Att Face ID / Touch ID lyckas visar bara att webbläsaren låste upp en passkey — inte att Super Wallet-kontraktet accepterade den.",
+      "nb": "Lommeboken avviste denne signaturen. At Face ID / Touch ID lykkes, viser bare at nettleseren låste opp en passkey — ikke at Super Wallet-kontraktet godtok den.",
       "fr": "Le portefeuille a rejeté cette signature. Face ID / Touch ID prouve seulement que le navigateur a déverrouillé une passkey — pas que le contrat Super Wallet l’a acceptée.",
       "es": "La cartera rechazó esta firma. Face ID / Touch ID solo prueba que el navegador desbloqueó una passkey, no que el contrato Super Wallet la aceptó.",
       "it": "Il portafoglio ha rifiutato questa firma. Face ID / Touch ID prova solo che il browser ha sbloccato una passkey, non che il contratto Super Wallet l’abbia accettata.",

@@ -38,6 +38,7 @@ import {
 import { submitSignedUserOp } from "../../shared/userop-client.js";
 import { eoaCredentialId } from "../../../../commerce/shared/wallet-eip712.js";
 import { resolveCurrentWalletPasskey } from "../../shared/current-wallet-passkey.js";
+import { persistSessionAfterUpgrade, registerAdminEntityPasskeys } from "../react/wallet/super-wallet-helpers.js";
 import { isAdvancedMode } from "../../shared/wallet-mode.js";
 import { connectEoaWallet, initEoaConnector, signAddKeyTypedData } from "../../shared/eoa-connector.js";
 import type {
@@ -365,15 +366,19 @@ function bindUpgrade(
       const confirmed = await resolveAdvancedPolicy(session.address, true);
       if (!confirmed.advanced) throw new Error(t("wallet.superWalletUpgradeFailed"));
       await registerWalletEntity({ walletAddress: session.address, entityId: adminEntityId, label: email });
-      await registerWalletEntityKey({
+      await registerAdminEntityPasskeys({
         walletAddress: session.address,
-        entityId: adminEntityId,
-        keyId: computeKeyId(adminEntityId, KEY_WEBAUTHN, session.qx, session.qy, zeroPadValue("0x00", 20)),
-        keyType: KEY_WEBAUTHN,
-        qx: session.qx,
-        qy: session.qy,
-        credentialId: session.credentialId ?? null,
+        chainId: config.chainId,
+        adminEntityId,
+        qx: passkey.qx,
+        qy: passkey.qy,
+        credentialId: passkey.credentialId ?? null,
       });
+      persistSessionAfterUpgrade(
+        { ...session, qx: passkey.qx, qy: passkey.qy, credentialId: passkey.credentialId },
+        adminEntityId,
+        email
+      );
       await renderWalletSuperWallet(root, opts);
     } catch (error) {
       showStatus(status, error instanceof Error ? error.message : String(error), "error");
