@@ -6,8 +6,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageCard } from "@/components/PageSplit";
-import { TurnstileWidget, type TurnstileControl } from "@/components/TurnstileWidget";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { TurnstileWidget, readCaptchaToken, type TurnstileControl } from "@/components/TurnstileWidget";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletConfig } from "@/shared/wallet-api.js";
 import {
@@ -33,13 +41,14 @@ import { enrollPasskeyWithExistingEoa } from "@/shared/wallet-add-signer.js";
 import { WalletFrame } from "./WalletFrame";
 
 type SignerKind = "webauthn" | "yubikey" | "eoa";
-type EmailStep = "email" | "otp" | "wallets" | "done";
+type EmailStep = "email" | "otp" | "passkey" | "done";
 
 export function RecoverPage() {
   const { t } = useLocale();
   const [siteKey, setSiteKey] = useState<string | null>(null);
   const [timelockHours, setTimelockHours] = useState(24);
   const [chainId, setChainId] = useState("11155111");
+  const [emailOpen, setEmailOpen] = useState(false);
 
   useEffect(() => {
     void fetchWalletConfig()
@@ -60,31 +69,96 @@ export function RecoverPage() {
       title={t("wallet.recoverPageTitle")}
       lede={t("wallet.recoverPageLede")}
     >
-      <PageCard className="mx-auto max-w-lg">
-        <p className="mb-4 text-xs text-muted-foreground">{t("wallet.recoveryTimelock", { hours: timelockHours })}</p>
-        <Tabs defaultValue="email">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="email">{t("wallet.recoverTabWithEmail")}</TabsTrigger>
-            <TabsTrigger value="address">{t("wallet.recoverTabWithoutEmail")}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="email" className="mt-4">
-            <EmailRecoverTab siteKey={siteKey} chainId={chainId} />
-          </TabsContent>
-          <TabsContent value="address" className="mt-4">
-            <AddressRecoverTab siteKey={siteKey} chainId={chainId} />
-          </TabsContent>
-        </Tabs>
-        <p className="mt-6 text-xs text-muted-foreground">
-          <Link to="/wallet" className="underline underline-offset-2">
-            {t("wallet.backToWallets")}
-          </Link>
-        </p>
-      </PageCard>
+      <p className="mb-4 text-xs text-muted-foreground">{t("wallet.recoveryTimelock", { hours: timelockHours })}</p>
+      <Tabs defaultValue="email" className="w-full">
+        <TabsList>
+          <TabsTrigger value="email">{t("wallet.recoverTabWithEmail")}</TabsTrigger>
+          <TabsTrigger value="address">{t("wallet.recoverTabWithoutEmail")}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="email" className="mt-4 space-y-4">
+          <EmailRecoverIntro hours={timelockHours} onStart={() => setEmailOpen(true)} />
+        </TabsContent>
+        <TabsContent value="address" className="mt-4 space-y-4">
+          <AddressRecoverIntro hours={timelockHours} />
+          <AddressRecoverTab siteKey={siteKey} chainId={chainId} />
+        </TabsContent>
+      </Tabs>
+      <EmailRecoverDialog
+        open={emailOpen}
+        onOpenChange={setEmailOpen}
+        siteKey={siteKey}
+        chainId={chainId}
+      />
+      <p className="mt-6 text-xs text-muted-foreground">
+        <Link to="/wallet" className="underline underline-offset-2">
+          {t("wallet.backToWallets")}
+        </Link>
+      </p>
     </WalletFrame>
   );
 }
 
-function EmailRecoverTab({ siteKey, chainId }: { siteKey: string | null; chainId: string }) {
+function EmailRecoverIntro({ hours, onStart }: { hours: number; onStart: () => void }) {
+  const { t } = useLocale();
+  const [acked, setAcked] = useState(false);
+  return (
+    <div className="space-y-4 rounded-xl border border-border p-4">
+      <p className="text-sm text-muted-foreground">
+        {t("wallet.recoverEmailCardPairHint")}{" "}
+        <Link to="/wallet/pair" className="font-medium text-foreground underline underline-offset-2">
+          {t("wallet.recoverEmailCardPairCta")}
+        </Link>
+      </p>
+      <Alert variant="warn">
+        <AlertDescription>{t("wallet.recoverEmailCardDisableWarn")}</AlertDescription>
+      </Alert>
+      <ul className="list-disc space-y-2 pl-5 text-sm">
+        <li>{t("wallet.recoverEmailStepVerify")}</li>
+        <li>{t("wallet.recoverEmailStepStart")}</li>
+        <li>{t("wallet.recoverEmailStepCancel", { hours })}</li>
+      </ul>
+      <div className="flex items-start gap-3">
+        <Checkbox
+          id="recover-ack-no-device"
+          checked={acked}
+          onCheckedChange={(checked) => setAcked(checked === true)}
+        />
+        <Label htmlFor="recover-ack-no-device" className="text-sm font-normal leading-snug">
+          {t("wallet.recoverEmailAckNoDevice")}
+        </Label>
+      </div>
+      <Button type="button" className="w-full" disabled={!acked} onClick={onStart}>
+        {t("wallet.recoverEmailStart")}
+      </Button>
+    </div>
+  );
+}
+
+function AddressRecoverIntro({ hours }: { hours: number }) {
+  const { t } = useLocale();
+  return (
+    <div className="space-y-2 rounded-xl border border-border p-4">
+      <p className="text-sm font-medium">{t("wallet.recoverAddressCardTitle")}</p>
+      <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+        <li>{t("wallet.recoverAddressStepEnter")}</li>
+        <li>{t("wallet.recoverAddressStepProve")}</li>
+        <li>{t("wallet.recoverAddressStepCancel", { hours })}</li>
+      </ul>
+    </div>
+  );
+}
+
+function EmailRecoverDialog({
+  open,
+  onOpenChange,
+  siteKey,
+  chainId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  siteKey: string | null;
+  chainId: string;
+}) {
   const { t } = useLocale();
   const captchaRef = useRef<TurnstileControl | null>(null);
   const [step, setStep] = useState<EmailStep>("email");
@@ -92,20 +166,32 @@ function EmailRecoverTab({ siteKey, chainId }: { siteKey: string | null; chainId
   const [otp, setOtp] = useState("");
   const [emailSession, setEmailSession] = useState("");
   const [wallets, setWallets] = useState<RecoveryEmailWallet[]>([]);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [signer, setSigner] = useState<SignerKind>("webauthn");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<RecoveryRequestPublic[]>([]);
   const [enrolled, setEnrolled] = useState<RecoveryExistingOwner[]>([]);
 
-  const requireCaptcha = (): string | null => {
-    const token = captchaRef.current?.getToken() ?? null;
-    if (siteKey && !token) {
-      setError(t("wallet.recoverCaptchaRequired"));
-      return null;
-    }
-    return token;
+  const reset = () => {
+    setStep("email");
+    setEmail("");
+    setOtp("");
+    setEmailSession("");
+    setWallets([]);
+    setBusy(false);
+    setError(null);
+    setCreated([]);
+    setEnrolled([]);
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (busy) return;
+    if (!next) reset();
+    onOpenChange(next);
+  };
+
+  const fail = (err: unknown) => {
+    const msg = formatPasskeyError(err);
+    setError(msg === "threshold_not_one" ? t("wallet.superWalletPairNeedsOneSigner") : msg);
   };
 
   const sendCode = async () => {
@@ -113,151 +199,199 @@ function EmailRecoverTab({ siteKey, chainId }: { siteKey: string | null; chainId
       setError(t("wallet.recoverInvalidEmail"));
       return;
     }
-    const captchaToken = requireCaptcha();
-    if (siteKey && captchaToken === null) return;
+    const captchaToken = readCaptchaToken(captchaRef);
+    if (siteKey && !captchaToken) {
+      setError(t("wallet.recoverCaptchaRequired"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await startRecoveryEmailLookup({ email: email.trim(), captchaToken });
       setStep("otp");
-      captchaRef.current?.reset();
     } catch (err) {
-      const msg = formatPasskeyError(err);
-      setError(msg === "threshold_not_one" ? t("wallet.superWalletPairNeedsOneSigner") : msg);
+      fail(err);
     } finally {
       setBusy(false);
     }
   };
 
   const verify = async () => {
-    const captchaToken = requireCaptcha();
-    if (siteKey && captchaToken === null) return;
     setBusy(true);
     setError(null);
     try {
       const result = await verifyRecoveryEmailLookup({
         email: email.trim(),
         code: otp.trim(),
-        captchaToken,
       });
       setEmailSession(result.emailSession);
       const listed = await listRecoveryEmailWallets(result.emailSession);
-      setWallets(listed.wallets);
-      setSelected(Object.fromEntries(listed.wallets.filter((w) => !w.activeRecovery).map((w) => [w.address, true])));
-      setStep("wallets");
-      captchaRef.current?.reset();
+      setWallets(listed.wallets.filter((w) => !w.activeRecovery));
+      setStep("passkey");
     } catch (err) {
-      const msg = formatPasskeyError(err);
-      setError(msg === "threshold_not_one" ? t("wallet.superWalletPairNeedsOneSigner") : msg);
+      fail(err);
     } finally {
       setBusy(false);
     }
   };
 
-  const initiate = async () => {
-    const addresses = wallets.filter((w) => selected[w.address]).map((w) => w.address);
-    if (!addresses.length) {
-      setError(t("wallet.recoverSelectWallets"));
+  const createPasskeyAndSubmit = async () => {
+    if (!wallets.length) {
+      setError(t("wallet.recoverNoWalletsForEmail"));
       return;
     }
-    const captchaToken = requireCaptcha();
-    if (siteKey && captchaToken === null) return;
     setBusy(true);
     setError(null);
     try {
       const result = await signAndCreate({
-        signer,
-        walletAddresses: addresses,
+        signer: "webauthn",
+        walletAddresses: wallets.map((w) => w.address),
         emailSession,
-        captchaToken,
         chainId,
       });
       setCreated(result.requests);
       setEnrolled(result.existingOwners);
       setStep("done");
     } catch (err) {
-      const msg = formatPasskeyError(err);
-      setError(msg === "threshold_not_one" ? t("wallet.superWalletPairNeedsOneSigner") : msg);
+      fail(err);
     } finally {
       setBusy(false);
     }
   };
 
-  if (step === "done") {
-    return <DoneState requests={created} enrolled={enrolled} />;
-  }
+  const title =
+    step === "otp"
+      ? t("wallet.recoverOtpLabel")
+      : step === "passkey"
+        ? t("wallet.recoverOnThisDeviceTitle")
+        : step === "done"
+          ? t("wallet.recoverEmailStartedTitle")
+          : t("wallet.recoverEmailModalTitle");
+  const lede =
+    step === "otp"
+      ? t("wallet.recoverOtpSent")
+      : step === "passkey"
+        ? t("wallet.recoverOnThisDeviceLede")
+        : step === "done"
+          ? t("wallet.recoverEmailStarted")
+          : t("wallet.recoverEmailModalLede");
 
   return (
-    <div className="space-y-4">
-      {step === "email" && (
-        <div className="space-y-2">
-          <Label htmlFor="recover-email">{t("wallet.recoverLostEmailLabel")}</Label>
-          <Input
-            id="recover-email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-          />
-        </div>
-      )}
-      {step === "otp" && (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">{t("wallet.recoverOtpSent")}</p>
-          <Label htmlFor="recover-otp">{t("wallet.recoverOtpLabel")}</Label>
-          <Input
-            id="recover-otp"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
-          />
-        </div>
-      )}
-      {step === "wallets" && (
-        <div className="space-y-3">
-          {wallets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("wallet.recoverNoWalletsForEmail")}</p>
-          ) : (
-            wallets.map((w) => (
-              <label key={w.address} className="flex items-start gap-3 rounded-xl border border-border px-3 py-3">
-                <Checkbox
-                  checked={Boolean(selected[w.address])}
-                  disabled={w.activeRecovery}
-                  onCheckedChange={(v) => setSelected((prev) => ({ ...prev, [w.address]: v === true }))}
-                />
-                <span className="min-w-0">
-                  <span className="block font-mono text-sm">{shortAddress(w.address)}</span>
-                  {w.activeRecovery ? (
-                    <span className="text-xs text-muted-foreground">{t("wallet.recoverAlreadyActive")}</span>
-                  ) : null}
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-md overflow-visible" data-testid="email-recover-dialog">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{lede}</DialogDescription>
+        </DialogHeader>
+
+        {step === "email" ? (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="recover-email">{t("wallet.recoverLostEmailLabel")}</Label>
+              <Input
+                id="recover-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+            <TurnstileWidget siteKey={siteKey} controlRef={captchaRef} className="flex min-h-[65px] justify-center py-2" />
+          </div>
+        ) : null}
+
+        {step === "otp" ? (
+          <div className="space-y-2">
+            <Label htmlFor="recover-otp">{t("wallet.recoverOtpLabel")}</Label>
+            <Input
+              id="recover-otp"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+            />
+          </div>
+        ) : null}
+
+        {step === "passkey" ? (
+          <div className="space-y-3">
+            {wallets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("wallet.recoverNoWalletsForEmail")}</p>
+            ) : (
+              <div className="flex items-start gap-3 rounded-xl border border-border px-4 py-3">
+                <Fingerprint className="mt-0.5 h-5 w-5 shrink-0 text-emphasis" aria-hidden />
+                <span>
+                  <span className="block text-sm font-medium">{t("wallet.recoverSignerPasskey")}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {t("wallet.recoverSignerPasskeyBody")}
+                  </span>
                 </span>
-              </label>
-            ))
-          )}
-          <SignerPicker value={signer} onChange={setSigner} />
-        </div>
-      )}
-      <TurnstileWidget siteKey={siteKey} controlRef={captchaRef} />
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {step === "email" && (
-        <Button type="button" disabled={busy} onClick={() => void sendCode()}>
-          {t("wallet.emailWizardSend")}
-        </Button>
-      )}
-      {step === "otp" && (
-        <Button type="button" disabled={busy || otp.trim().length < 6} onClick={() => void verify()}>
-          {t("wallet.recoverVerifyOtp")}
-        </Button>
-      )}
-      {step === "wallets" && wallets.length > 0 && (
-        <Button type="button" disabled={busy} onClick={() => void initiate()}>
-          {t("wallet.recoverStart")}
-        </Button>
-      )}
-    </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {step === "done" ? (
+          <div className="space-y-3">
+            {enrolled.length > 0 ? <p className="text-sm">{t("wallet.recoverExistingOwnerDone")}</p> : null}
+            {enrolled.length > 0 ? (
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                {enrolled.map((r) => (
+                  <li key={r.address} className="font-mono">
+                    {shortAddress(r.address)}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {created.length > 0 ? (
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                {created.map((r) => (
+                  <li key={r.id} className="font-mono">
+                    {shortAddress(r.walletAddress)}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {error ? (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <DialogFooter>
+          {step === "email" ? (
+            <Button type="button" className="w-full sm:w-auto" disabled={busy} onClick={() => void sendCode()}>
+              {t("wallet.createDisclaimerNext")}
+            </Button>
+          ) : null}
+          {step === "otp" ? (
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              disabled={busy || otp.trim().length < 6}
+              onClick={() => void verify()}
+            >
+              {t("wallet.createDisclaimerNext")}
+            </Button>
+          ) : null}
+          {step === "passkey" && wallets.length > 0 ? (
+            <Button type="button" className="w-full sm:w-auto" disabled={busy} onClick={() => void createPasskeyAndSubmit()}>
+              {t("wallet.recoverOnThisDeviceCta")}
+            </Button>
+          ) : null}
+          {step === "done" ? (
+            <Button asChild className="w-full sm:w-auto">
+              <Link to="/wallet">{t("wallet.backToWallets")}</Link>
+            </Button>
+          ) : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -276,7 +410,7 @@ function AddressRecoverTab({ siteKey, chainId }: { siteKey: string | null; chain
       setError(t("wallet.localRecoveryNeedAddress"));
       return;
     }
-    const captchaToken = captchaRef.current?.getToken() ?? null;
+    const captchaToken = readCaptchaToken(captchaRef);
     if (siteKey && !captchaToken) {
       setError(t("wallet.recoverCaptchaRequired"));
       return;
@@ -309,9 +443,9 @@ function AddressRecoverTab({ siteKey, chainId }: { siteKey: string | null; chain
         <Input id="recover-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x…" />
       </div>
       <SignerPicker value={signer} onChange={setSigner} />
-      <TurnstileWidget siteKey={siteKey} controlRef={captchaRef} />
+      <TurnstileWidget siteKey={siteKey} controlRef={captchaRef} className="flex justify-center py-2" />
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="button" disabled={busy} onClick={() => void initiate()}>
+      <Button type="button" className="w-full" disabled={busy} onClick={() => void initiate()}>
         {t("wallet.recoverStart")}
       </Button>
     </div>
@@ -368,7 +502,7 @@ function DoneState({
           ))}
         </ul>
       ) : null}
-      {requests.length > 0 ? <p className="text-sm">{t("wallet.recoverSubmitted")}</p> : null}
+      {requests.length > 0 ? <p className="text-sm">{t("wallet.recoverEmailStarted")}</p> : null}
       {requests.length > 0 ? (
         <ul className="space-y-1 text-sm text-muted-foreground">
           {requests.map((r) => (

@@ -1,19 +1,36 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { Check, Home, Menu, Moon, Sun } from "lucide-react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useLocale } from "@/providers/LocaleProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { LOCALES, LOCALE_NATIVE_NAMES, type Locale } from "@/i18n/locales.js";
+import { LOCALES, LOCALE_FLAGS, LOCALE_NATIVE_NAMES } from "@/i18n/locales.js";
 import { SITE } from "@/shared/site.js";
 import type { PayChrome } from "@/shared/pay-chrome.js";
 import { deploymentMode } from "@/shared/networks.js";
 import { cn } from "@/lib/utils";
 
+export type AppChrome = PayChrome | "app";
+
+type WalletAppMenuApi = {
+  mobileOpen: boolean;
+  setMobileOpen: (open: boolean) => void;
+};
+
+const WalletAppMenuContext = createContext<WalletAppMenuApi | null>(null);
+
+export function useWalletAppMenu(): WalletAppMenuApi | null {
+  return useContext(WalletAppMenuContext);
+}
+
 const NAV_LINKS = [
-  { href: "/wallet", labelKey: "nav.wallet" as const },
   { href: "/get-paid", labelKey: "nav.getPaid" as const },
   { href: "/integrations", labelKey: "nav.integrations" as const },
   { href: "/developers", labelKey: "nav.developers" as const },
@@ -25,7 +42,6 @@ function isActive(pathname: string, href: string): boolean {
   if (href !== "/" && pathname.startsWith(href)) return true;
   if (href === "/get-paid" && (pathname.startsWith("/create") || pathname.startsWith("/merchant"))) return true;
   if (href === "/developers" && pathname.startsWith("/developers")) return true;
-  if (href === "/wallet" && pathname.startsWith("/wallet")) return true;
   return false;
 }
 
@@ -75,30 +91,49 @@ function ThemeToggle() {
   );
 }
 
-function LocaleSelect() {
-  const { locale, setLocaleAndApply, t } = useLocale();
+function OpenWalletButton({ onNavigate, className }: { onNavigate?: () => void; className?: string }) {
+  const { t } = useLocale();
   return (
-    <Select value={locale} onValueChange={(v) => setLocaleAndApply(v as Locale)}>
-      <SelectTrigger className="h-9 w-[130px]" aria-label={t("locale.label")}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {LOCALES.map((loc) => (
-          <SelectItem key={loc} value={loc}>
-            {LOCALE_NATIVE_NAMES[loc]}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Button asChild className={className}>
+      <Link to="/wallet" onClick={onNavigate}>
+        {t("home.ctaOpenWallet")}
+      </Link>
+    </Button>
   );
 }
 
-function BrandLink() {
+export function LocaleSelect() {
+  const { locale, setLocaleAndApply, t } = useLocale();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={t("locale.label")} title={LOCALE_NATIVE_NAMES[locale]}>
+          <span className="text-base leading-none" aria-hidden>
+            {LOCALE_FLAGS[locale]}
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
+        {LOCALES.map((loc) => (
+          <DropdownMenuItem key={loc} onClick={() => setLocaleAndApply(loc)}>
+            <span className="text-base leading-none" aria-hidden>
+              {LOCALE_FLAGS[loc]}
+            </span>
+            <span className="flex-1">{LOCALE_NATIVE_NAMES[loc]}</span>
+            {loc === locale ? <Check className="ms-auto h-4 w-4" /> : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function BrandLink({ compactName }: { compactName?: boolean } = {}) {
   const { t } = useLocale();
   return (
     <Link to="/" className="flex items-center gap-2.5 font-semibold text-foreground no-underline hover:no-underline">
       <img src="/logo.svg" alt="" width={32} height={32} className="rounded-md" />
-      <span>{t("brand")}</span>
+      <span className={compactName ? "max-sm:!hidden" : undefined}>{t("brand")}</span>
     </Link>
   );
 }
@@ -188,13 +223,56 @@ function FullFooter() {
   );
 }
 
-export function AppShell({ chrome, children }: { chrome: PayChrome; children: React.ReactNode }) {
+export function AppShell({ chrome, children }: { chrome: AppChrome; children: React.ReactNode }) {
   const location = useLocation();
   const { t } = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const walletMenu = useMemo<WalletAppMenuApi>(() => ({ mobileOpen, setMobileOpen }), [mobileOpen]);
 
   if (chrome === "none") {
     return <main className="min-h-screen">{children}</main>;
+  }
+
+  if (chrome === "app") {
+    return (
+      <WalletAppMenuContext.Provider value={walletMenu}>
+        <div className="flex min-h-screen flex-col">
+          <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur-md">
+            <div className="flex h-14 items-center gap-2 px-4 md:px-6">
+              <BrandLink compactName />
+              <Button asChild variant="ghost" size="sm" className="gap-1.5 px-2">
+                <Link to="/" aria-label={t("nav.home")}>
+                  <Home className="h-4 w-4" />
+                  <span className="max-sm:!hidden">{t("nav.home")}</span>
+                </Link>
+              </Button>
+              <div className="ml-auto flex items-center gap-1">
+                <div className="flex items-center gap-1 max-md:!hidden">
+                  <LocaleSelect />
+                  <ThemeToggle />
+                </div>
+                <div className="flex items-center gap-2 md:!hidden">
+                  <ThemeToggle />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Menu"
+                    aria-expanded={mobileOpen}
+                    onClick={() => setMobileOpen(true)}
+                  >
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </header>
+          <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
+            {children}
+          </main>
+        </div>
+      </WalletAppMenuContext.Provider>
+    );
   }
 
   const minimal = chrome === "minimal";
@@ -214,11 +292,12 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
               >
                 <NavLinks pathname={location.pathname} t={t} />
               </div>
-              <div data-app-nav className="flex items-center gap-2 max-md:!hidden">
+              <div data-app-nav className="flex items-center gap-1 max-md:!hidden">
+                <OpenWalletButton />
                 <LocaleSelect />
                 <ThemeToggle />
               </div>
-              <div data-app-nav-mobile className="ml-auto flex items-center gap-2 md:!hidden">
+              <div data-app-nav-mobile className="ml-auto flex items-center gap-1 md:!hidden">
                 <ThemeToggle />
                 <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                   <SheetTrigger asChild>
@@ -230,10 +309,13 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
                     <SheetHeader>
                       <SheetTitle>{t("brand")}</SheetTitle>
                     </SheetHeader>
+                    <div className="mt-6">
+                      <OpenWalletButton className="w-full" onNavigate={() => setMobileOpen(false)} />
+                    </div>
                     <div role="navigation" className="mt-6 flex flex-col gap-4">
                       <NavLinks pathname={location.pathname} t={t} onNavigate={() => setMobileOpen(false)} />
                     </div>
-                    <div className="mt-6 space-y-4">
+                    <div className="mt-6 flex items-center gap-2">
                       <LocaleSelect />
                     </div>
                   </SheetContent>
@@ -242,7 +324,7 @@ export function AppShell({ chrome, children }: { chrome: PayChrome; children: Re
             </>
           )}
           {minimal && (
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-1">
               <LocaleSelect />
               <ThemeToggle />
             </div>

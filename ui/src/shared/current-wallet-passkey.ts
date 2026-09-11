@@ -1,4 +1,4 @@
-import { Contract, JsonRpcProvider, ZeroAddress, ZeroHash, getAddress, zeroPadValue } from "ethers";
+import { Contract, JsonRpcProvider, ZeroAddress, ZeroHash } from "ethers";
 import { t } from "../i18n/t.js";
 import {
   WALLET_ADVANCED_ABI,
@@ -21,7 +21,7 @@ import {
 } from "./wallet-session.js";
 import { signUserOpHash } from "./webauthn.js";
 import { encodedWebAuthnMatchResult } from "./webauthn-p256.js";
-import { selectPubkeyForCredential } from "./wallet-passkey-bind.js";
+import { selectPubkeyForCredential, collectRosterEntityIds, passkeyKeyIdCandidates } from "./wallet-passkey-bind.js";
 
 const SIMPLE_OWNER_ABI = [
   "function isOwner(bytes32 qx, bytes32 qy) view returns (bool)",
@@ -81,6 +81,32 @@ function isZeroBytes32(value: string | undefined | null): boolean {
   return /^0x0+$/i.test(value);
 }
 
+/** Resolve threw because Super Wallet metadata (entityId) is missing, not because the passkey is gone. */
+export const SUPER_WALLET_NO_ENTITY = "super_wallet_no_entity";
+
+function candidatePasskeyKeyIds(input: {
+  preferredKeyId?: string;
+  entityId?: string;
+  entityIds: string[];
+  keyType?: number;
+  qx: string;
+  qy: string;
+}): string[] {
+  const ids: string[] = [];
+  if (input.preferredKeyId) ids.push(input.preferredKeyId);
+  const entityIds = input.entityId
+    ? [input.entityId, ...input.entityIds.filter((id) => !sameHex(id, input.entityId))]
+    : input.entityIds;
+  for (const c of passkeyKeyIdCandidates(entityIds, input.qx, input.qy, input.keyType ?? KEY_WEBAUTHN)) {
+    ids.push(c.keyId);
+  }
+  return ids;
+}
+
+function noEntityError(): Error {
+  return Object.assign(new Error(t("wallet.superWalletNoSigningKey")), { code: SUPER_WALLET_NO_ENTITY });
+}
+
 export function logWalletPasskey(event: Record<string, unknown>): void {
   const line = { t: Date.now(), ...event };
   console.info("[wallet-passkey]", line);
@@ -114,6 +140,24 @@ async function readKeyRecord(
     qy: String(rec.qy ?? rec[3] ?? ""),
     eoa: String(rec.eoa ?? rec[4] ?? ZeroAddress),
   };
+}
+
+async function readFirstKeyRecord(
+  walletAddress: string,
+  keyIds: string[]
+): Promise<{ keyId: string; rec: NonNullable<Awaited<ReturnType<typeof readKeyRecord>>> } | null> {
+  const seen = new Set<string>();
+  for (const keyId of keyIds) {
+    if (!keyId || seen.has(keyId.toLowerCase())) continue;
+    seen.add(keyId.toLowerCase());
+    try {
+      const rec = await readKeyRecord(walletAddress, keyId);
+      if (rec) return { keyId, rec };
+    } catch {
+      /* try the next candidate */
+    }
+  }
+  return null;
 }
 
 async function readIsOwner(walletAddress: string, qx: string, qy: string): Promise<boolean | null> {
@@ -276,20 +320,20 @@ export async function resolveCurrentWalletPasskey(
     keys: [] as WalletEntityKeyRecord[],
   }));
   const pub = await pubkeyForCredential(session, credentialId, roster.keys);
-  if (!pub.qx || !pub.qy) {
-    logWalletPasskey({
-      phase: "resolve",
-      path,
-      ok: false,
-      rejectReason: pub.source === "poisoned_device_row" ? "poisoned_device_row" : "no_pubkey",
-      address: fp(address),
-      credentialFp: credFp(credentialId),
-      pubSource: pub.source,
-    });
-    throw new Error(t("wallet.passkeyNotOnChain"));
-  }
 
   if (!advanced) {
+    if (!pub.qx || !pub.qy) {
+      logWalletPasskey({
+        phase: "resolve",
+        path,
+        ok: false,
+        rejectReason: pub.source === "poisoned_device_row" ? "poisoned_device_row" : "no_pubkey",
+        address: fp(address),
+        credentialFp: credFp(credentialId),
+        pubSource: pub.source,
+      });
+      throw new Error(t("wallet.passkeyNotOnChain"));
+    }
     let onChainOwner: boolean | null = null;
     try {
       onChainOwner = await readIsOwner(address, pub.qx, pub.qy);
@@ -349,60 +393,53 @@ export async function resolveCurrentWalletPasskey(
     return passkey;
   }
 
+  const coords = {
+    qx: pub.qx || session.qx || "",
+    qy: pub.qy || session.qy || "",
+  };
   const mine =
-    webAuthnRosterKey(roster.keys, credentialId, pub) ??
+    webAuthnRosterKey(roster.keys, credentialId, coords) ??
     (session.keyId ? roster.keys.find((k) => sameHex(k.keyId, session.keyId)) : undefined);
-  const entityId = mine?.entityId || session.entityId;
-  const keyType = mine?.keyType ?? session.keyType ?? KEY_WEBAUTHN;
-  const eoa = mine?.eoa ?? session.eoa ?? ZeroAddress;
-  if (!entityId) {
+  const qx = mine?.qx && !isZeroBytes32(mine.qx) ? mine.qx : coords.qx;
+  const qy = mine?.qy && !isZeroBytes32(mine.qy) ? mine.qy : coords.qy;
+  if (!qx || !qy) {
     logWalletPasskey({
       phase: "resolve",
       path,
       ok: false,
       advanced: true,
-      rejectReason: "no_entity",
+      rejectReason: pub.source === "poisoned_device_row" ? "poisoned_device_row" : "no_pubkey",
       address: fp(address),
       credentialFp: credFp(credentialId),
-      qxFp: fp(pub.qx),
-    });
-    throw new Error(t("wallet.superWalletNoSigningKey"));
-  }
-
-  const qx = mine?.qx && !isZeroBytes32(mine.qx) ? mine.qx : pub.qx;
-  const qy = mine?.qy && !isZeroBytes32(mine.qy) ? mine.qy : pub.qy;
-  const keyId =
-    mine?.keyId && mine.keyType !== KEY_EOA
-      ? mine.keyId
-      : computeKeyId(
-          entityId,
-          keyType,
-          keyType === KEY_EOA ? zeroPadValue("0x00", 32) : qx,
-          keyType === KEY_EOA ? zeroPadValue("0x00", 32) : qy,
-          keyType === KEY_EOA ? getAddress(eoa) : ZeroAddress
-        );
-
-  let onChain: Awaited<ReturnType<typeof readKeyRecord>> = null;
-  try {
-    onChain = await readKeyRecord(address, keyId);
-  } catch (error) {
-    logWalletPasskey({
-      phase: "resolve",
-      path,
-      advanced: true,
-      rejectReason: "getKeyRecord_rpc",
-      address: fp(address),
-      credentialFp: credFp(credentialId),
-      keyFp: fp(keyId),
-      entityFp: fp(entityId),
-      message: error instanceof Error ? error.message : String(error),
+      pubSource: pub.source,
     });
     throw new Error(t("wallet.passkeyNotOnChain"));
   }
 
+  const rosterEntityIds = collectRosterEntityIds(roster.entities, roster.keys);
+  const entityId = mine?.entityId || session.entityId;
+  const keyType = mine?.keyType ?? session.keyType ?? KEY_WEBAUTHN;
+  const keyIds = candidatePasskeyKeyIds({
+    preferredKeyId: mine?.keyId && mine.keyType !== KEY_EOA ? mine.keyId : undefined,
+    entityId,
+    entityIds: rosterEntityIds,
+    keyType,
+    qx,
+    qy,
+  });
+  const found = await readFirstKeyRecord(address, keyIds);
+  const onChain = found?.rec ?? null;
+  const keyId = found?.keyId;
   const localQx = (onChain?.qx && !isZeroBytes32(onChain.qx) ? onChain.qx : qx) ?? qx;
   const localQy = (onChain?.qy && !isZeroBytes32(onChain.qy) ? onChain.qy : qy) ?? qy;
   const qxEqual = sameHex(qx, localQx);
+  const rejectReason = onChain
+    ? qxEqual || onChain.keyType === KEY_EOA
+      ? undefined
+      : "pubkey_mismatch"
+    : entityId || rosterEntityIds.length
+      ? "empty_key_record"
+      : "no_entity";
 
   logWalletPasskey({
     phase: "resolve",
@@ -411,8 +448,8 @@ export async function resolveCurrentWalletPasskey(
     advanced: true,
     address: fp(address),
     credentialFp: credFp(credentialId),
-    qxFp: fp(pub.qx),
-    qyFp: fp(pub.qy),
+    qxFp: fp(qx),
+    qyFp: fp(qy),
     entityFp: fp(onChain?.entityId ?? entityId),
     keyFp: fp(keyId),
     keyType: onChain?.keyType ?? keyType,
@@ -424,10 +461,11 @@ export async function resolveCurrentWalletPasskey(
     deviceFirstOwner: pub.deviceFirstOwner,
     onChainKeyFound: Boolean(onChain),
     localVsOnChainQxEqual: qxEqual,
-    rejectReason: onChain ? (qxEqual ? undefined : "pubkey_mismatch") : "empty_key_record",
+    rejectReason,
   });
 
-  if (!onChain) {
+  if (!onChain || !keyId) {
+    if (rejectReason === "no_entity") throw noEntityError();
     throw new Error(t("wallet.passkeyNotOnChain"));
   }
   if (!qxEqual && onChain.keyType !== KEY_EOA) {

@@ -745,7 +745,7 @@ export function SuperPayPage() {
               <DialogTitle>{t("wallet.proposalsDetail")}</DialogTitle>
               <DialogDescription>{detail.proposal.status}</DialogDescription>
             </DialogHeader>
-            <p className="text-sm">
+            <p className="min-w-0 text-sm">
               <ProposalSummaryLine proposal={detail.proposal} t={t} decimals={decimals} tokens={tokenOptions} />
             </p>
             <p className="text-sm">
@@ -774,11 +774,12 @@ export function SuperPayPage() {
                 {busy === "sign" ? t("wallet.sendSigning") : t("wallet.proposalsExecuting")}
               </p>
             )}
-            <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <DialogFooter className="flex-col gap-2 sm:flex-col">
               <Button
                 id="sign-proposal"
                 type="button"
                 variant="outline"
+                className="w-full"
                 disabled={busy !== null || detail.proposal.status === "executed"}
                 onClick={() => void signCurrent()}
               >
@@ -794,6 +795,7 @@ export function SuperPayPage() {
               <Button
                 id="execute-proposal"
                 type="button"
+                className="w-full"
                 disabled={
                   busy !== null ||
                   detail.proposal.status === "executed" ||

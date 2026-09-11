@@ -2,7 +2,7 @@ import { hashEntityEmail, computeKeyId, KEY_WEBAUTHN } from "../../../commerce/s
 import { zeroPadValue } from "ethers";
 import { getWalletAccount } from "./wallet-api.js";
 import { fetchAdvancedPolicy } from "./wallet-advanced-api.js";
-import { resolveCurrentWalletPasskey } from "./current-wallet-passkey.js";
+import { resolveCurrentWalletPasskey, SUPER_WALLET_NO_ENTITY } from "./current-wallet-passkey.js";
 import { ensureSessionCredential } from "./webauthn.js";
 import {
   isActiveWalletAddress,
@@ -51,9 +51,12 @@ export async function healWalletSession(
       keyType: passkey.keyType ?? next.keyType,
       eoa: passkey.eoa ?? next.eoa,
     };
-  } catch {
+  } catch (error) {
     const policy = await fetchAdvancedPolicy(next.address).catch(() => null);
-    needsSuperWalletEmail = Boolean(policy?.advanced && !next.entityId);
+    const noEntity = Boolean(
+      error && typeof error === "object" && (error as { code?: string }).code === SUPER_WALLET_NO_ENTITY
+    );
+    needsSuperWalletEmail = Boolean(policy?.advanced && !next.entityId && noEntity);
   }
 
   const changed =

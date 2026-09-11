@@ -14,7 +14,7 @@ import { buildSignedAddKeyUserOp, buildSignedRemoveEntityUserOp, buildSignedRemo
 import { asAdvancedKeyType } from "@/shared/advanced-signing-key.js";
 import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
-import { fetchWalletBalance, primaryChain, waitForUserOp, type WalletPublicConfig } from "@/shared/wallet-api.js";
+import { fetchWalletBalance, getWalletAccount, listDevices, primaryChain, waitForUserOp, type WalletPublicConfig } from "@/shared/wallet-api.js";
 import {
   deleteWalletEntity,
   deleteWalletEntityKey,
@@ -23,6 +23,7 @@ import {
   type AdvancedPolicy,
 } from "@/shared/wallet-advanced-api.js";
 import { saveWalletSession, type WalletSession } from "@/shared/wallet-session.js";
+import { isPoisonedDeviceRow } from "@/shared/wallet-passkey-bind.js";
 import { t } from "@/i18n/t.js";
 
 export function keyTypeLabel(keyType: number, t: (k: string) => string): string {
@@ -105,6 +106,45 @@ export function persistSessionAfterUpgrade(
   };
   saveWalletSession(next);
   return next;
+}
+
+/** Record every known passkey under the admin entity after enableAdvanced migrates simple owners. */
+export async function registerAdminEntityPasskeys(input: {
+  walletAddress: string;
+  chainId: string;
+  adminEntityId: string;
+  qx: string;
+  qy: string;
+  credentialId?: string | null;
+}): Promise<void> {
+  const eoa = zeroPadValue("0x00", 20);
+  const seen = new Set<string>();
+  const register = async (qx: string, qy: string, credentialId: string | null) => {
+    if (!qx || !qy) return;
+    const keyId = computeKeyId(input.adminEntityId, KEY_WEBAUTHN, qx, qy, eoa);
+    if (seen.has(keyId.toLowerCase())) return;
+    seen.add(keyId.toLowerCase());
+    await registerWalletEntityKey({
+      walletAddress: input.walletAddress,
+      entityId: input.adminEntityId,
+      keyId,
+      keyType: KEY_WEBAUTHN,
+      qx,
+      qy,
+      credentialId,
+    });
+  };
+  await register(input.qx, input.qy, input.credentialId ?? null);
+  const account = await getWalletAccount(input.walletAddress).catch(() => null);
+  const devices = await listDevices(input.walletAddress, input.chainId).catch(() => []);
+  for (const d of devices) {
+    try {
+      if (account && isPoisonedDeviceRow(d, account)) continue;
+      await register(d.ownerQx, d.ownerQy, d.credentialId);
+    } catch {
+      /* converting key is required; extra devices are best-effort */
+    }
+  }
 }
 
 export async function confirmAdvancedUpgrade(
@@ -214,5 +254,3 @@ export async function submitRemoveKey(input: {
   if (result.status !== "included") throw new Error(result.rejectReason ?? result.status);
   await deleteWalletEntityKey(input.session.address, input.entityId, input.keyId);
 }
-
-export { KEY_EOA, KEY_WEBAUTHN, KEY_YUBIKEY, zeroPadValue };

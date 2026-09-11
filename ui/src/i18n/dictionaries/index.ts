@@ -10,6 +10,8 @@ import { ar } from "./ar.js";
 import { bn } from "./bn.js";
 import { de } from "./de.js";
 import { es } from "./es.js";
+import { nb } from "./nb.js";
+import { sv } from "./sv.js";
 import { fa } from "./fa.js";
 import { fr } from "./fr.js";
 import { he } from "./he.js";
@@ -63,6 +65,8 @@ export const dictionaries: Record<Locale, Messages> = {
   ru: withPasskey("ru", ru),
   ja: withPasskey("ja", ja),
   de: withPasskey("de", de),
+  sv: withPasskey("sv", sv),
+  nb: withPasskey("nb", nb),
   fr: withPasskey("fr", fr),
   id: withPasskey("id", id),
   ko: withPasskey("ko", ko),

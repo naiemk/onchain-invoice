@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, type AppChrome } from "@/components/AppShell";
 import { LocaleProvider, useLocale } from "@/providers/LocaleProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { currentPayChromeFromLocation } from "@/shared/pay-chrome.js";
@@ -116,8 +116,9 @@ function AppRoutes() {
   useFocusMainOnNavigate();
   useHashScroll();
 
-  const chrome =
-    location.pathname === "/pay" || location.pathname === "/buy"
+  const chrome: AppChrome = location.pathname.startsWith("/wallet")
+    ? "app"
+    : location.pathname === "/pay" || location.pathname === "/buy"
       ? currentPayChromeFromLocation()
       : "full";
 

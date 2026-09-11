@@ -30,7 +30,6 @@ import {
   type WalletPublicConfig,
 } from "@/shared/wallet-api.js";
 import { subscribePageVisible } from "@/shared/page-visibility.js";
-import { fetchAdvancedPolicy } from "@/shared/wallet-advanced-api.js";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { loadWalletSession, walletSessionsEquivalent, type WalletSession } from "@/shared/wallet-session.js";
 import { buildSignedAdvancedSendUserOp } from "@/shared/advanced-userop-client.js";
@@ -79,7 +78,6 @@ function SimpleSendPage() {
   const [txCopied, setTxCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [historyKey, setHistoryKey] = useState(0);
-  const [advancedEntityId, setAdvancedEntityId] = useState<string | null>(null);
 
   const loadActivation = useCallback(async (active: WalletSession, cfg: WalletPublicConfig) => {
     const balance = await fetchWalletBalance(active.address);
@@ -103,7 +101,6 @@ function SimpleSendPage() {
     void (async () => {
       const cfg = await fetchWalletConfig();
       if (cancelled) return;
-      if (session.entityId) setAdvancedEntityId(session.entityId);
       setConfig(cfg);
       try {
         await loadActivation(session, cfg);
@@ -115,7 +112,6 @@ function SimpleSendPage() {
       try {
         const healed = await healWalletSession(session);
         if (cancelled) return;
-        if (healed.session.entityId) setAdvancedEntityId(healed.session.entityId);
         if (!walletSessionsEquivalent(healed.session, session)) setSession(healed.session);
       } catch {
         /* ignore */
@@ -242,12 +238,6 @@ function SimpleSendPage() {
     setReviewOpen(false);
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
-      const policy = await fetchAdvancedPolicy(session.address).catch(() => null);
-      if (policy?.advanced && !advancedEntityId) {
-        setStatus({ kind: "error", message: t("wallet.superWalletRestoreEmailHint") });
-        navigate("/wallet/super-wallet");
-        return;
-      }
       if (!chain.rpcUrl) throw new Error("RPC not configured");
       const tokenContract = new Contract(token.address, ERC20_ABI, new JsonRpcProvider(chain.rpcUrl));
       const latestTokenBalance = BigInt(await tokenContract.balanceOf(session.address));
@@ -302,7 +292,7 @@ function SimpleSendPage() {
     } finally {
       setBusy(false);
     }
-  }, [advancedEntityId, amount, config, navigate, recipient, selectedToken, session, t]);
+  }, [amount, config, navigate, recipient, selectedToken, session, t]);
 
   const shortSuccessTx = successTxHash ? `${successTxHash.slice(0, 10)}…${successTxHash.slice(-8)}` : "";
   const copySuccessTx = async () => {

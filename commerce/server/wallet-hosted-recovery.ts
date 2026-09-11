@@ -355,12 +355,6 @@ async function verifyRecoveryEmailLookup(
   handlers: Handlers
 ): Promise<void> {
   const body = await handlers.readJson(req);
-  try {
-    await requireCaptcha(appConfig, body, req);
-  } catch (e) {
-    handlers.sendJson(res, statusOf(e), { error: codeOf(e), message: messageOf(e) });
-    return;
-  }
   const email = str(body.email)?.toLowerCase();
   const code = str(body.code);
   if (!email?.includes("@") || !code) {
@@ -419,17 +413,18 @@ async function createRecoveryRequest(
   handlers: Handlers
 ): Promise<void> {
   const body = await handlers.readJson(req);
-  try {
-    await requireCaptcha(appConfig, body, req);
-  } catch (e) {
-    handlers.sendJson(res, statusOf(e), { error: codeOf(e), message: messageOf(e) });
-    return;
-  }
-
   const sessionEmail = verifyRecoveryEmailSession(
     emailSessionSecret(appConfig),
     readEmailSessionToken(req, body)
   );
+  if (!sessionEmail) {
+    try {
+      await requireCaptcha(appConfig, body, req);
+    } catch (e) {
+      handlers.sendJson(res, statusOf(e), { error: codeOf(e), message: messageOf(e) });
+      return;
+    }
+  }
   const emailInput = str(body.email)?.toLowerCase();
   const fromArray = Array.isArray(body.walletAddresses)
     ? body.walletAddresses.filter((v): v is string => typeof v === "string" && isAddress(v)).map((a) => getAddress(a))

@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageCard } from "@/components/PageSplit";
-import { TurnstileWidget, type TurnstileControl } from "@/components/TurnstileWidget";
+import { TurnstileWidget, readCaptchaToken, type TurnstileControl } from "@/components/TurnstileWidget";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletConfig } from "@/shared/wallet-api.js";
 import { createCounterfactualWallet } from "@/shared/wallet-create.js";
@@ -53,7 +53,7 @@ export function CreatePage() {
 
   const runCreate = async () => {
     const label = deviceName.trim() || t("wallet.defaultDevice");
-    const captchaToken = captchaRef.current?.getToken() ?? null;
+    const captchaToken = readCaptchaToken(captchaRef);
     if (captchaRequired && !captchaToken) {
       setStatus({ kind: "error", message: t("wallet.createCaptchaRequired") });
       return;

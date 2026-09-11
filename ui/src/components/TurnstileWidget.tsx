@@ -7,6 +7,14 @@ export type TurnstileControl = {
   destroy?: () => void;
 };
 
+export function readCaptchaToken(controlRef: MutableRefObject<TurnstileControl | null>): string | null {
+  try {
+    return controlRef.current?.getToken() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function TurnstileWidget({
   siteKey,
   onTokenChange,
@@ -24,27 +32,43 @@ export function TurnstileWidget({
 
   useEffect(() => {
     const notify = (ready: boolean) => onTokenChangeRef.current?.(ready);
-    if (!siteKey || !containerRef.current) {
+    if (!siteKey) {
       notify(true);
       controlRef.current = null;
       return;
     }
-    notify(false);
+
     let cancelled = false;
-    const container = containerRef.current;
-    void mountTurnstile(container, siteKey, {
-      onToken: (token) => {
-        if (!cancelled) notify(Boolean(token));
-      },
-    }).then((ctl) => {
-      if (cancelled) {
-        ctl?.destroy();
+    const abort = new AbortController();
+    let frame = 0;
+
+    // Defer past React Strict Mode's sync mount→cleanup→remount so the first
+    // (discarded) effect never calls turnstile.render.
+    frame = requestAnimationFrame(() => {
+      const container = containerRef.current;
+      if (cancelled || !container) {
+        notify(true);
         return;
       }
-      controlRef.current = ctl;
+      notify(false);
+      void mountTurnstile(container, siteKey, {
+        signal: abort.signal,
+        onToken: (token) => {
+          if (!cancelled) notify(Boolean(token));
+        },
+      }).then((ctl) => {
+        if (cancelled) {
+          ctl?.destroy();
+          return;
+        }
+        controlRef.current = ctl;
+      });
     });
+
     return () => {
       cancelled = true;
+      abort.abort();
+      cancelAnimationFrame(frame);
       controlRef.current?.destroy?.();
       controlRef.current = null;
     };

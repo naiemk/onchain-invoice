@@ -4,6 +4,8 @@ export const overlayFillMisc = assemble({
   "nav": {
     wallet: {
       "de": "Wallet",
+      "sv": "Plånbok",
+      "nb": "Lommebok",
       "fr": "Portefeuille",
       "es": "Cartera",
       "it": "Portafoglio",
@@ -30,6 +32,8 @@ export const overlayFillMisc = assemble({
     },
     support: {
       "de": "Support",
+      "sv": "Support",
+      "nb": "Support",
       "fr": "Assistance",
       "es": "Soporte",
       "it": "Supporto",
@@ -56,6 +60,8 @@ export const overlayFillMisc = assemble({
     },
     product: {
       "de": "Produkt",
+      "sv": "Produkt",
+      "nb": "Produkt",
       "fr": "Produit",
       "es": "Producto",
       "it": "Prodotto",
@@ -84,6 +90,8 @@ export const overlayFillMisc = assemble({
   "guardian": {
     colWallet: {
       "de": "Wallet",
+      "sv": "Plånbok",
+      "nb": "Lommebok",
       "fr": "Portefeuille",
       "es": "Cartera",
       "it": "Portafoglio",
@@ -110,6 +118,8 @@ export const overlayFillMisc = assemble({
     },
     colStatus: {
       "de": "Status",
+      "sv": "Status",
+      "nb": "Status",
       "fr": "Statut",
       "es": "Estado",
       "it": "Stato",
@@ -136,6 +146,8 @@ export const overlayFillMisc = assemble({
     },
     eyebrow: {
       "de": "Guardian",
+      "sv": "Guardian",
+      "nb": "Guardian",
       "fr": "Guardian",
       "es": "Guardian",
       "it": "Guardian",
@@ -162,6 +174,8 @@ export const overlayFillMisc = assemble({
     },
     title: {
       "de": "Wiederherstellungsanfragen",
+      "sv": "Återställningsförfrågningar",
+      "nb": "Gjenopprettingsforespørsler",
       "fr": "Demandes de récupération",
       "es": "Solicitudes de recuperación",
       "it": "Richieste di recupero",
@@ -188,6 +202,8 @@ export const overlayFillMisc = assemble({
     },
     lede: {
       "de": "Melden Sie sich mit der on-chain Guardian-Wallet an, um per E-Mail verifizierte Wiederherstellungsanfragen zu prüfen.",
+      "sv": "Logga in med den on-chain guardian-plånboken för att granska e-postverifierade återställningsförfrågningar.",
+      "nb": "Logg inn med den on-chain guardian-lommeboken for å gjennomgå e-postbekreftede gjenopprettingsforespørsler.",
       "fr": "Connectez-vous avec le portefeuille guardian on-chain pour examiner les demandes de récupération vérifiées par e-mail.",
       "es": "Inicie sesión con la cartera guardian on-chain para revisar solicitudes de recuperación verificadas por correo.",
       "it": "Accedi con il portafoglio guardian on-chain per esaminare le richieste di recupero verificate via e-mail.",
@@ -214,6 +230,8 @@ export const overlayFillMisc = assemble({
     },
     connectHint: {
       "de": "Verbinden Sie MetaMask mit der Guardian-Adresse AdminGuardianRecovery.",
+      "sv": "Anslut MetaMask med guardian-adressen AdminGuardianRecovery.",
+      "nb": "Koble til MetaMask med guardian-adressen AdminGuardianRecovery.",
       "fr": "Connectez MetaMask à l’adresse guardian AdminGuardianRecovery.",
       "es": "Conecte MetaMask con la dirección guardian AdminGuardianRecovery.",
       "it": "Collega MetaMask all’indirizzo guardian AdminGuardianRecovery.",
@@ -240,6 +258,8 @@ export const overlayFillMisc = assemble({
     },
     connect: {
       "de": "MetaMask verbinden",
+      "sv": "Anslut MetaMask",
+      "nb": "Koble til MetaMask",
       "fr": "Connecter MetaMask",
       "es": "Conectar MetaMask",
       "it": "Collega MetaMask",
@@ -266,6 +286,8 @@ export const overlayFillMisc = assemble({
     },
     connecting: {
       "de": "Warten auf Signatur…",
+      "sv": "Väntar på signatur…",
+      "nb": "Venter på signatur…",
       "fr": "En attente de signature…",
       "es": "Esperando firma…",
       "it": "In attesa della firma…",
@@ -292,6 +314,8 @@ export const overlayFillMisc = assemble({
     },
     noMetamask: {
       "de": "MetaMask (oder eine andere injizierte Wallet) nicht gefunden.",
+      "sv": "MetaMask (eller en annan webbläsarplånbok) hittades inte.",
+      "nb": "MetaMask (eller en annen nettleserlommebok) ble ikke funnet.",
       "fr": "MetaMask (ou un autre portefeuille injecté) introuvable.",
       "es": "No se encontró MetaMask (u otra cartera inyectada).",
       "it": "MetaMask (o un altro portafoglio iniettato) non trovato.",
@@ -318,6 +342,8 @@ export const overlayFillMisc = assemble({
     },
     noAccount: {
       "de": "Kein Konto zurückgegeben",
+      "sv": "Inget konto returnerades",
+      "nb": "Ingen konto returnert",
       "fr": "Aucun compte renvoyé",
       "es": "No se devolvió ninguna cuenta",
       "it": "Nessun account restituito",
@@ -344,6 +370,8 @@ export const overlayFillMisc = assemble({
     },
     signedIn: {
       "de": "Angemeldet als {address}",
+      "sv": "Inloggad som {address}",
+      "nb": "Logget inn som {address}",
       "fr": "Connecté en tant que {address}",
       "es": "Sesión iniciada como {address}",
       "it": "Accesso come {address}",
@@ -370,6 +398,8 @@ export const overlayFillMisc = assemble({
     },
     filterAwaiting: {
       "de": "Ausstehend",
+      "sv": "Väntar",
+      "nb": "Venter",
       "fr": "En attente",
       "es": "En espera",
       "it": "In attesa",
@@ -396,6 +426,8 @@ export const overlayFillMisc = assemble({
     },
     filterProgress: {
       "de": "In Bearbeitung",
+      "sv": "Pågår",
+      "nb": "Pågår",
       "fr": "En cours",
       "es": "En curso",
       "it": "In corso",
@@ -422,6 +454,8 @@ export const overlayFillMisc = assemble({
     },
     filterArchive: {
       "de": "Archiv",
+      "sv": "Arkiv",
+      "nb": "Arkiv",
       "fr": "Archive",
       "es": "Archivo",
       "it": "Archivio",
@@ -448,6 +482,8 @@ export const overlayFillMisc = assemble({
     },
     refresh: {
       "de": "Aktualisieren",
+      "sv": "Uppdatera",
+      "nb": "Oppdater",
       "fr": "Actualiser",
       "es": "Actualizar",
       "it": "Aggiorna",
@@ -474,6 +510,8 @@ export const overlayFillMisc = assemble({
     },
     signOut: {
       "de": "Abmelden",
+      "sv": "Logga ut",
+      "nb": "Logg ut",
       "fr": "Se déconnecter",
       "es": "Cerrar sesión",
       "it": "Esci",
@@ -500,6 +538,8 @@ export const overlayFillMisc = assemble({
     },
     empty: {
       "de": "Keine Anfragen in diesem Filter.",
+      "sv": "Inga förfrågningar i det här filtret.",
+      "nb": "Ingen forespørsler i dette filteret.",
       "fr": "Aucune demande dans ce filtre.",
       "es": "No hay solicitudes en este filtro.",
       "it": "Nessuna richiesta in questo filtro.",
@@ -526,6 +566,8 @@ export const overlayFillMisc = assemble({
     },
     colEmail: {
       "de": "E-Mail",
+      "sv": "E-post",
+      "nb": "E-post",
       "fr": "E-mail",
       "es": "Correo",
       "it": "E-mail",
@@ -552,6 +594,8 @@ export const overlayFillMisc = assemble({
     },
     colDevice: {
       "de": "Gerät",
+      "sv": "Enhet",
+      "nb": "Enhet",
       "fr": "Appareil",
       "es": "Dispositivo",
       "it": "Dispositivo",
@@ -578,6 +622,8 @@ export const overlayFillMisc = assemble({
     },
     colCreated: {
       "de": "Erstellt",
+      "sv": "Skapad",
+      "nb": "Opprettet",
       "fr": "Créé",
       "es": "Creado",
       "it": "Creato",
@@ -604,6 +650,8 @@ export const overlayFillMisc = assemble({
     },
     detail: {
       "de": "Detail",
+      "sv": "Detalj",
+      "nb": "Detalj",
       "fr": "Détail",
       "es": "Detalle",
       "it": "Dettaglio",
@@ -630,6 +678,8 @@ export const overlayFillMisc = assemble({
     },
     approve: {
       "de": "Genehmigen",
+      "sv": "Godkänn",
+      "nb": "Godkjenn",
       "fr": "Approuver",
       "es": "Aprobar",
       "it": "Approva",
@@ -656,6 +706,8 @@ export const overlayFillMisc = assemble({
     },
     reject: {
       "de": "Ablehnen",
+      "sv": "Avvisa",
+      "nb": "Avvis",
       "fr": "Refuser",
       "es": "Rechazar",
       "it": "Rifiuta",
@@ -682,6 +734,8 @@ export const overlayFillMisc = assemble({
     },
     rejectConfirm: {
       "de": "Diese Wiederherstellungsanfrage ablehnen?",
+      "sv": "Avvisa den här återställningsförfrågan?",
+      "nb": "Avvis denne gjenopprettingsforespørselen?",
       "fr": "Refuser cette demande de récupération ?",
       "es": "¿Rechazar esta solicitud de recuperación?",
       "it": "Rifiutare questa richiesta di recupero?",
@@ -708,6 +762,8 @@ export const overlayFillMisc = assemble({
     },
     detailTitle: {
       "de": "Anfragedetails",
+      "sv": "Förfrågningsdetaljer",
+      "nb": "Forespørselsdetaljer",
       "fr": "Détail de la demande",
       "es": "Detalle de la solicitud",
       "it": "Dettaglio richiesta",
@@ -736,6 +792,8 @@ export const overlayFillMisc = assemble({
   "merchant": {
     statusLabel: {
       "de": "Status",
+      "sv": "Status",
+      "nb": "Status",
       "fr": "Statut",
       "es": "Estado",
       "it": "Stato",
@@ -762,6 +820,8 @@ export const overlayFillMisc = assemble({
     },
     sortStatus: {
       "de": "Status",
+      "sv": "Status",
+      "nb": "Status",
       "fr": "Statut",
       "es": "Estado",
       "it": "Stato",
@@ -788,6 +848,8 @@ export const overlayFillMisc = assemble({
     },
     colStatus: {
       "de": "Status",
+      "sv": "Status",
+      "nb": "Status",
       "fr": "Statut",
       "es": "Estado",
       "it": "Stato",
@@ -814,6 +876,8 @@ export const overlayFillMisc = assemble({
     },
     token: {
       "de": "Token",
+      "sv": "Token",
+      "nb": "Token",
       "fr": "Jeton",
       "es": "Token",
       "it": "Token",
@@ -840,6 +904,8 @@ export const overlayFillMisc = assemble({
     },
     shownStatus: {
       "de": "· Status {status}",
+      "sv": "· status {status}",
+      "nb": "· status {status}",
       "fr": "· statut {status}",
       "es": "· estado {status}",
       "it": "· stato {status}",
@@ -868,6 +934,8 @@ export const overlayFillMisc = assemble({
   "footer": {
     legal: {
       "de": "Rechtliches",
+      "sv": "Juridik",
+      "nb": "Juridisk",
       "fr": "Mentions légales",
       "es": "Legal",
       "it": "Note legali",
@@ -894,6 +962,8 @@ export const overlayFillMisc = assemble({
     },
     cookies: {
       "de": "Cookies",
+      "sv": "Cookies",
+      "nb": "Informasjonskapsler",
       "fr": "Cookies",
       "es": "Cookies",
       "it": "Cookie",
@@ -920,6 +990,8 @@ export const overlayFillMisc = assemble({
     },
     privacy: {
       "de": "Datenschutz",
+      "sv": "Integritet",
+      "nb": "Personvern",
       "fr": "Confidentialité",
       "es": "Privacidad",
       "it": "Privacy",
@@ -948,6 +1020,8 @@ export const overlayFillMisc = assemble({
   "legal": {
     breadcrumb: {
       "de": "Rechtliches",
+      "sv": "Juridik",
+      "nb": "Juridisk",
       "fr": "Mentions légales",
       "es": "Legal",
       "it": "Note legali",
@@ -976,6 +1050,8 @@ export const overlayFillMisc = assemble({
   "securityPage": {
     contractsTitle: {
       "de": "Verträge",
+      "sv": "Kontrakt",
+      "nb": "Kontrakter",
       "fr": "Contrats",
       "es": "Contratos",
       "it": "Contratti",
@@ -1002,6 +1078,8 @@ export const overlayFillMisc = assemble({
     },
     contractsLede: {
       "de": "Factory und Implementierungen, mit denen dieses Netzwerk Passkey-Wallets anlegt.",
+      "sv": "Factory och implementationer som det här nätverket använder för att skapa passkey-plånböcker.",
+      "nb": "Factory og implementasjoner dette nettverket bruker for å opprette passkey-lommebøker.",
       "fr": "Factory et implémentations utilisées par ce réseau pour créer des portefeuilles passkey.",
       "es": "Factory e implementaciones que esta red usa para crear carteras passkey.",
       "it": "Factory e implementazioni che questa rete usa per creare portafogli passkey.",
@@ -1028,6 +1106,8 @@ export const overlayFillMisc = assemble({
     },
     contractsRecovery: {
       "de": "Wiederherstellung",
+      "sv": "Återställning",
+      "nb": "Gjenoppretting",
       "fr": "Récupération",
       "es": "Recuperación",
       "it": "Recupero",
@@ -1054,6 +1134,8 @@ export const overlayFillMisc = assemble({
     },
     contractsOnChain: {
       "de": "On-chain von der Factory",
+      "sv": "On-chain från Factory",
+      "nb": "On-chain fra Factory",
       "fr": "On-chain depuis la factory",
       "es": "On-chain desde la factory",
       "it": "On-chain dalla factory",
@@ -1080,6 +1162,8 @@ export const overlayFillMisc = assemble({
     },
     contractsMatch: {
       "de": "Stimmt mit der Konfiguration überein",
+      "sv": "Matchar konfigurationen",
+      "nb": "Samsvarer med konfigurasjonen",
       "fr": "Correspond à la config",
       "es": "Coincide con la config",
       "it": "Corrisponde alla config",
@@ -1106,6 +1190,8 @@ export const overlayFillMisc = assemble({
     },
     contractsMismatch: {
       "de": "Weicht von der Konfiguration ab",
+      "sv": "Skiljer sig från konfigurationen",
+      "nb": "Avviker fra konfigurasjonen",
       "fr": "Diffère de la config",
       "es": "Difiere de la config",
       "it": "Differisce dalla config",
@@ -1132,6 +1218,8 @@ export const overlayFillMisc = assemble({
     },
     contractsUnavailable: {
       "de": "Wallet-Verträge sind für diese API nicht konfiguriert.",
+      "sv": "Plånbokskontrakt är inte konfigurerade för det här API:et.",
+      "nb": "Lommebokkontrakter er ikke konfigurert for dette API-et.",
       "fr": "Les contrats de portefeuille ne sont pas configurés pour cette API.",
       "es": "Los contratos de cartera no están configurados para esta API.",
       "it": "I contratti del portafoglio non sono configurati per questa API.",
@@ -1158,6 +1246,8 @@ export const overlayFillMisc = assemble({
     },
     breadcrumb: {
       "de": "Sicherheit",
+      "sv": "Säkerhet",
+      "nb": "Sikkerhet",
       "fr": "Sécurité",
       "es": "Seguridad",
       "it": "Sicurezza",
@@ -1184,6 +1274,8 @@ export const overlayFillMisc = assemble({
     },
     protectedTitle: {
       "de": "Geschützt durch Ihre Geräte",
+      "sv": "Skyddad av dina enheter",
+      "nb": "Beskyttet av enhetene dine",
       "fr": "Protégé par vos appareils",
       "es": "Protegido por sus dispositivos",
       "it": "Protetto dai tuoi dispositivi",
@@ -1210,6 +1302,8 @@ export const overlayFillMisc = assemble({
     },
     protectedBody: {
       "de": "Passkeys auf diesem Gerät autorisieren Sends — keine Seed-Phrase zum Ausdrucken und Verlieren.",
+      "sv": "Passkeys på den här enheten godkänner sändningar — ingen seed phrase att skriva ut och tappa bort.",
+      "nb": "Passkeys på denne enheten autoriserer sendinger — ingen seed phrase å skrive ut og miste.",
       "fr": "Les passkeys de cet appareil autorisent les envois — pas de phrase secrète à imprimer et perdre.",
       "es": "Las passkeys de este dispositivo autorizan los envíos: sin frase semilla que imprimir y perder.",
       "it": "Le passkey di questo dispositivo autorizzano gli invii — nessuna seed phrase da stampare e perdere.",
@@ -1236,6 +1330,8 @@ export const overlayFillMisc = assemble({
     },
     addPasskeyCta: {
       "de": "Passkey hinzufügen",
+      "sv": "Lägg till en passkey",
+      "nb": "Legg til en passkey",
       "fr": "Ajouter une passkey",
       "es": "Añadir una passkey",
       "it": "Aggiungi una passkey",
@@ -1262,6 +1358,8 @@ export const overlayFillMisc = assemble({
     },
     recoveryMapTitle: {
       "de": "Wiederherstellungskarte",
+      "sv": "Återställningskarta",
+      "nb": "Gjenopprettingskart",
       "fr": "Carte de récupération",
       "es": "Mapa de recuperación",
       "it": "Mappa di recupero",
@@ -1288,6 +1386,8 @@ export const overlayFillMisc = assemble({
     },
     mapPasskeys: {
       "de": "Passkeys",
+      "sv": "Passkeys",
+      "nb": "Passkeys",
       "fr": "Passkeys",
       "es": "Passkeys",
       "it": "Passkey",
@@ -1314,6 +1414,8 @@ export const overlayFillMisc = assemble({
     },
     mapEmail: {
       "de": "E-Mail-Wiederherstellung",
+      "sv": "E-poståterställning",
+      "nb": "E-postgjenoppretting",
       "fr": "Récupération par e-mail",
       "es": "Recuperación por correo",
       "it": "Recupero via e-mail",
@@ -1340,6 +1442,8 @@ export const overlayFillMisc = assemble({
     },
     mapGuardian: {
       "de": "Guardian",
+      "sv": "Guardian",
+      "nb": "Guardian",
       "fr": "Guardian",
       "es": "Guardian",
       "it": "Guardian",
@@ -1366,6 +1470,8 @@ export const overlayFillMisc = assemble({
     },
     active: {
       "de": "Aktiv",
+      "sv": "Aktiv",
+      "nb": "Aktiv",
       "fr": "Actif",
       "es": "Activo",
       "it": "Attivo",
@@ -1392,6 +1498,8 @@ export const overlayFillMisc = assemble({
     },
     verified: {
       "de": "Verifiziert",
+      "sv": "Verifierad",
+      "nb": "Verifisert",
       "fr": "Vérifié",
       "es": "Verificado",
       "it": "Verificato",
@@ -1418,6 +1526,8 @@ export const overlayFillMisc = assemble({
     },
     notAdded: {
       "de": "Nicht hinzugefügt",
+      "sv": "Inte tillagd",
+      "nb": "Ikke lagt til",
       "fr": "Non ajouté",
       "es": "No añadido",
       "it": "Non aggiunto",
@@ -1444,6 +1554,8 @@ export const overlayFillMisc = assemble({
     },
     reviewRecoveryCta: {
       "de": "Wiederherstellung prüfen",
+      "sv": "Granska återställning",
+      "nb": "Se over gjenoppretting",
       "fr": "Examiner la récupération",
       "es": "Revisar la recuperación",
       "it": "Rivedi il recupero",
@@ -1470,6 +1582,8 @@ export const overlayFillMisc = assemble({
     },
     transparencyNotice: {
       "de": "Wir zeigen, was den Zugang schützt, wer ihn wiederherstellen kann und welches Gerät zuletzt eine Transaktion signiert hat.",
+      "sv": "Vi visar vad som skyddar åtkomsten, vem som kan återställa den och vilken enhet som senast signerade en transaktion.",
+      "nb": "Vi viser hva som beskytter tilgangen, hvem som kan gjenopprette den, og hvilken enhet som sist signerte en transaksjon.",
       "fr": "Nous montrons ce qui protège l’accès, qui peut le récupérer, et quel appareil a signé en dernier.",
       "es": "Mostramos qué protege el acceso, quién puede recuperarlo y qué dispositivo firmó la última transacción.",
       "it": "Mostriamo cosa protegge l’accesso, chi può recuperarlo e quale dispositivo ha firmato per ultimo.",
@@ -1498,6 +1612,8 @@ export const overlayFillMisc = assemble({
   "create": {
     settlementNetworkHint: {
       "de": "Karten- und Bank-Checkout wird als USDC auf Base abgewickelt. Nur-Krypto-Rechnungen können andere Netzwerke nutzen.",
+      "sv": "Kort- och bankutcheckning avräknas som USDC på Base. Fakturor med enbart krypto kan använda andra nätverk.",
+      "nb": "Kort- og bankutsjekk gjøres opp som USDC på Base. Fakturaer med kun krypto kan bruke andre nettverk.",
       "fr": "Le paiement carte/banque se règle en USDC sur Base. Les factures crypto seules peuvent utiliser d’autres réseaux.",
       "es": "El cobro con tarjeta o banco se liquida como USDC en Base. Las facturas solo cripto pueden usar otras redes.",
       "it": "Il checkout carta/banca si regola in USDC su Base. Le fatture solo crypto possono usare altre reti.",
@@ -1524,6 +1640,8 @@ export const overlayFillMisc = assemble({
     },
     breadcrumb: {
       "de": "Bezahlt werden / Schnellrechnung",
+      "sv": "Få betalt / Snabbfaktura",
+      "nb": "Få betalt / Hurtigfaktura",
       "fr": "Être payé / Facture rapide",
       "es": "Cobrar / Factura rápida",
       "it": "Incassa / Fattura rapida",
@@ -1550,6 +1668,8 @@ export const overlayFillMisc = assemble({
     },
     chromeMinimal: {
       "de": "Minimal",
+      "sv": "Minimal",
+      "nb": "Minimal",
       "fr": "Minimal",
       "es": "Mínimo",
       "it": "Minimale",
@@ -1576,6 +1696,8 @@ export const overlayFillMisc = assemble({
     },
     stepDetails: {
       "de": "Details",
+      "sv": "Uppgifter",
+      "nb": "Detaljer",
       "fr": "Détails",
       "es": "Detalles",
       "it": "Dettagli",
@@ -1602,6 +1724,8 @@ export const overlayFillMisc = assemble({
     },
     descriptionLabel: {
       "de": "Beschreibung",
+      "sv": "Beskrivning",
+      "nb": "Beskrivelse",
       "fr": "Description",
       "es": "Descripción",
       "it": "Descrizione",
@@ -1630,6 +1754,8 @@ export const overlayFillMisc = assemble({
   "home": {
     eyebrow: {
       "de": "Ein ruhigerer Weg, Geld zu führen",
+      "sv": "Ett lugnare sätt att hantera pengar",
+      "nb": "En roligere måte å styre penger på",
       "fr": "Une façon plus calme de gérer l’argent",
       "es": "Una forma más serena de manejar el dinero",
       "it": "Un modo più calmo di gestire i soldi",
@@ -1656,6 +1782,8 @@ export const overlayFillMisc = assemble({
     },
     trustPasskey: {
       "de": "Passkey",
+      "sv": "Passkey",
+      "nb": "Passkey",
       "fr": "Passkey",
       "es": "Passkey",
       "it": "Passkey",
@@ -1682,6 +1810,8 @@ export const overlayFillMisc = assemble({
     },
     chipOneMin: {
       "de": "~1 Min.",
+      "sv": "~1 min",
+      "nb": "~1 min",
       "fr": "~1 min",
       "es": "~1 min",
       "it": "~1 min",
@@ -1708,6 +1838,8 @@ export const overlayFillMisc = assemble({
     },
     shopifyTotal: {
       "de": "Gesamt",
+      "sv": "Totalt",
+      "nb": "Totalt",
       "fr": "Total",
       "es": "Total",
       "it": "Totale",
@@ -1734,6 +1866,8 @@ export const overlayFillMisc = assemble({
     },
     shopifySubtotal: {
       "de": "Zwischensumme",
+      "sv": "Delsumma",
+      "nb": "Delsum",
       "fr": "Sous-total",
       "es": "Subtotal",
       "it": "Subtotale",
@@ -1760,6 +1894,8 @@ export const overlayFillMisc = assemble({
     },
     chipAccount: {
       "de": "Konto",
+      "sv": "Konto",
+      "nb": "Konto",
       "fr": "Compte",
       "es": "Cuenta",
       "it": "Account",
@@ -1786,6 +1922,8 @@ export const overlayFillMisc = assemble({
     },
     trustChainsFallback: {
       "de": "Mehrere Chains",
+      "sv": "Flera kedjor",
+      "nb": "Flere kjeder",
       "fr": "Multi-chaînes",
       "es": "Multicadena",
       "it": "Multi-catena",
@@ -1814,6 +1952,8 @@ export const overlayFillMisc = assemble({
   "getPaid": {
     breadcrumb: {
       "de": "Bezahlt werden",
+      "sv": "Få betalt",
+      "nb": "Få betalt",
       "fr": "Être payé",
       "es": "Cobrar",
       "it": "Incassa",
@@ -1842,6 +1982,8 @@ export const overlayFillMisc = assemble({
   "integrations": {
     breadcrumb: {
       "de": "Integrationen",
+      "sv": "Integrationer",
+      "nb": "Integrasjoner",
       "fr": "Intégrations",
       "es": "Integraciones",
       "it": "Integrazioni",
@@ -1868,6 +2010,8 @@ export const overlayFillMisc = assemble({
     },
     connect: {
       "de": "Verbinden",
+      "sv": "Anslut",
+      "nb": "Koble til",
       "fr": "Connecter",
       "es": "Conectar",
       "it": "Collega",
@@ -1894,6 +2038,8 @@ export const overlayFillMisc = assemble({
     },
     manage: {
       "de": "Verwalten",
+      "sv": "Hantera",
+      "nb": "Administrer",
       "fr": "Gérer",
       "es": "Gestionar",
       "it": "Gestisci",
@@ -1920,6 +2066,8 @@ export const overlayFillMisc = assemble({
     },
     statusConnected: {
       "de": "Verbunden",
+      "sv": "Ansluten",
+      "nb": "Tilkoblet",
       "fr": "Connecté",
       "es": "Conectado",
       "it": "Collegato",
@@ -1946,6 +2094,8 @@ export const overlayFillMisc = assemble({
     },
     docs: {
       "de": "Dokumentation",
+      "sv": "Dokumentation",
+      "nb": "Dokumentasjon",
       "fr": "Documentation",
       "es": "Documentación",
       "it": "Documentazione",
@@ -1974,6 +2124,8 @@ export const overlayFillMisc = assemble({
   "meta": {
     guardianTitle: {
       "de": "Guardian · Trustless Commerce",
+      "sv": "Guardian · Trustless Commerce",
+      "nb": "Guardian · Trustless Commerce",
       "fr": "Guardian · Trustless Commerce",
       "es": "Guardian · Trustless Commerce",
       "it": "Guardian · Trustless Commerce",
@@ -2000,6 +2152,8 @@ export const overlayFillMisc = assemble({
     },
     legalTitle: {
       "de": "Rechtliches · Trustless Commerce",
+      "sv": "Juridik · Trustless Commerce",
+      "nb": "Juridisk · Trustless Commerce",
       "fr": "Mentions légales · Trustless Commerce",
       "es": "Legal · Trustless Commerce",
       "it": "Note legali · Trustless Commerce",
@@ -2026,6 +2180,8 @@ export const overlayFillMisc = assemble({
     },
     legalDescription: {
       "de": "Rechtliche Dokumente für Trustless Commerce.",
+      "sv": "Juridiska dokument för Trustless Commerce.",
+      "nb": "Juridiske dokumenter for Trustless Commerce.",
       "fr": "Documents juridiques pour Trustless Commerce.",
       "es": "Documentos legales de Trustless Commerce.",
       "it": "Documenti legali di Trustless Commerce.",
@@ -2052,6 +2208,8 @@ export const overlayFillMisc = assemble({
     },
     termsTitle: {
       "de": "Nutzungsbedingungen · Trustless Commerce",
+      "sv": "Användarvillkor · Trustless Commerce",
+      "nb": "Bruksvilkår · Trustless Commerce",
       "fr": "Conditions d’utilisation · Trustless Commerce",
       "es": "Términos de uso · Trustless Commerce",
       "it": "Termini d’uso · Trustless Commerce",
@@ -2078,6 +2236,8 @@ export const overlayFillMisc = assemble({
     },
     termsDescription: {
       "de": "Bedingungen für die Nutzung der Software und Dienste von Trustless Commerce.",
+      "sv": "Villkor för användning av programvara och tjänster från Trustless Commerce.",
+      "nb": "Vilkår for bruk av programvare og tjenester fra Trustless Commerce.",
       "fr": "Conditions régissant l’usage des logiciels et services Trustless Commerce.",
       "es": "Términos que rigen el uso del software y los servicios de Trustless Commerce.",
       "it": "Termini che regolano l’uso del software e dei servizi Trustless Commerce.",
@@ -2104,6 +2264,8 @@ export const overlayFillMisc = assemble({
     },
     privacyTitle: {
       "de": "Datenschutz · Trustless Commerce",
+      "sv": "Integritetspolicy · Trustless Commerce",
+      "nb": "Personvernerklæring · Trustless Commerce",
       "fr": "Politique de confidentialité · Trustless Commerce",
       "es": "Política de privacidad · Trustless Commerce",
       "it": "Informativa sulla privacy · Trustless Commerce",
@@ -2130,6 +2292,8 @@ export const overlayFillMisc = assemble({
     },
     privacyDescription: {
       "de": "Wie Trustless Commerce mit Ihren Daten umgeht.",
+      "sv": "Hur Trustless Commerce hanterar din information.",
+      "nb": "Hvordan Trustless Commerce behandler opplysningene dine.",
       "fr": "Comment Trustless Commerce traite vos informations.",
       "es": "Cómo Trustless Commerce trata su información.",
       "it": "Come Trustless Commerce gestisce le tue informazioni.",
@@ -2156,6 +2320,8 @@ export const overlayFillMisc = assemble({
     },
     cookiesTitle: {
       "de": "Cookie-Hinweis · Trustless Commerce",
+      "sv": "Cookieinformation · Trustless Commerce",
+      "nb": "Informasjon om informasjonskapsler · Trustless Commerce",
       "fr": "Avis sur les cookies · Trustless Commerce",
       "es": "Aviso de cookies · Trustless Commerce",
       "it": "Informativa sui cookie · Trustless Commerce",
@@ -2182,6 +2348,8 @@ export const overlayFillMisc = assemble({
     },
     cookiesDescription: {
       "de": "Wie Trustless Commerce Browserspeicher verwendet.",
+      "sv": "Hur Trustless Commerce använder webblagring.",
+      "nb": "Hvordan Trustless Commerce bruker nettleserlagring.",
       "fr": "Comment Trustless Commerce utilise le stockage du navigateur.",
       "es": "Cómo Trustless Commerce usa el almacenamiento del navegador.",
       "it": "Come Trustless Commerce usa l’archiviazione del browser.",
@@ -2208,6 +2376,8 @@ export const overlayFillMisc = assemble({
     },
     risksTitle: {
       "de": "Risikohinweise · Trustless Commerce",
+      "sv": "Riskupplysningar · Trustless Commerce",
+      "nb": "Risikoopplysninger · Trustless Commerce",
       "fr": "Divulgation des risques · Trustless Commerce",
       "es": "Divulgación de riesgos · Trustless Commerce",
       "it": "Informativa sui rischi · Trustless Commerce",
@@ -2234,6 +2404,8 @@ export const overlayFillMisc = assemble({
     },
     risksDescription: {
       "de": "Wichtige Risiken bei nicht verwahrten Krypto-Wallets.",
+      "sv": "Viktiga risker vid användning av icke-förvarade kryptoplånböcker.",
+      "nb": "Viktige risikoer ved bruk av ikke-forvarte kryptolommebøker.",
       "fr": "Risques importants liés aux portefeuilles crypto non-custodial.",
       "es": "Riesgos importantes al usar carteras cripto no custodiales.",
       "it": "Rischi importanti con i portafogli crypto non custodial.",
@@ -2260,6 +2432,8 @@ export const overlayFillMisc = assemble({
     },
     securityChecksTitle: {
       "de": "Sicherheitschecks · Trustless Commerce",
+      "sv": "Säkerhetskontroller · Trustless Commerce",
+      "nb": "Sikkerhetskontroller · Trustless Commerce",
       "fr": "Contrôles de sécurité · Trustless Commerce",
       "es": "Comprobaciones de seguridad · Trustless Commerce",
       "it": "Controlli di sicurezza · Trustless Commerce",
@@ -2286,6 +2460,8 @@ export const overlayFillMisc = assemble({
     },
     securityChecksDescription: {
       "de": "Wie Trustless Commerce Wallets handhabt und was Sie prüfen sollten.",
+      "sv": "Hur Trustless Commerce hanterar plånböcker och vad du bör kontrollera.",
+      "nb": "Hvordan Trustless Commerce håndterer lommebøker og hva du bør verifisere.",
       "fr": "Comment Trustless Commerce gère les portefeuilles et ce qu’il faut vérifier.",
       "es": "Cómo Trustless Commerce trata las carteras y qué debe comprobar.",
       "it": "Come Trustless Commerce gestisce i portafogli e cosa verificare.",
@@ -2312,6 +2488,8 @@ export const overlayFillMisc = assemble({
     },
     adminTitle: {
       "de": "Admin · Trustless Commerce",
+      "sv": "Admin · Trustless Commerce",
+      "nb": "Admin · Trustless Commerce",
       "fr": "Admin · Trustless Commerce",
       "es": "Admin · Trustless Commerce",
       "it": "Admin · Trustless Commerce",
@@ -2340,6 +2518,8 @@ export const overlayFillMisc = assemble({
   "pay": {
     paidAmount: {
       "de": "Bezahlt ${price}",
+      "sv": "Betalt ${price}",
+      "nb": "Betalt ${price}",
       "fr": "Payé ${price}",
       "es": "Pagado ${price}",
       "it": "Pagato ${price}",
@@ -2366,6 +2546,8 @@ export const overlayFillMisc = assemble({
     },
     token: {
       "de": "Token",
+      "sv": "Token",
+      "nb": "Token",
       "fr": "Jeton",
       "es": "Token",
       "it": "Token",
@@ -2394,6 +2576,8 @@ export const overlayFillMisc = assemble({
   "common": {
     mainnet: {
       "de": "Mainnet",
+      "sv": "Mainnet",
+      "nb": "Mainnet",
       "fr": "Mainnet",
       "es": "Mainnet",
       "it": "Mainnet",
@@ -2420,6 +2604,8 @@ export const overlayFillMisc = assemble({
     },
     testnet: {
       "de": "Testnet",
+      "sv": "Testnet",
+      "nb": "Testnet",
       "fr": "Testnet",
       "es": "Testnet",
       "it": "Testnet",
@@ -2448,6 +2634,8 @@ export const overlayFillMisc = assemble({
   "admin": {
     eyebrow: {
       "de": "Admin",
+      "sv": "Admin",
+      "nb": "Admin",
       "fr": "Admin",
       "es": "Admin",
       "it": "Admin",

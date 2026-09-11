@@ -173,13 +173,15 @@ function credentialIdFromRawId(rawId: ArrayBuffer): string {
 
 function platformRequestOptions(
   challenge: BufferSource,
-  allowCredentials?: PublicKeyCredentialDescriptor[]
+  allowCredentials?: PublicKeyCredentialDescriptor[],
+  hint: "client-device" | "security-key" = "client-device"
 ): PublicKeyCredentialRequestOptions {
   return {
     challenge,
     rpId: rpId(),
     userVerification: "required",
-    ...(allowCredentials ? { allowCredentials } : { hints: ["client-device"] as PublicKeyCredentialRequestOptions["hints"] }),
+    hints: [hint] as PublicKeyCredentialRequestOptions["hints"],
+    ...(allowCredentials ? { allowCredentials } : {}),
   };
 }
 
@@ -426,9 +428,11 @@ export async function signUserOpHash(
   assertWebAuthnSupported();
   const hashBytes = hexToBytes(userOpHashHex);
   const boundCredentialId = requireWalletBoundCredentialId(credentialId);
-  const publicKey = platformRequestOptions(hashBytes, [
-    { id: credentialIdToBytesLocal(boundCredentialId), type: "public-key" },
-  ]);
+  const publicKey = platformRequestOptions(
+    hashBytes,
+    [{ id: credentialIdToBytesLocal(boundCredentialId), type: "public-key" }],
+    options?.requireUv ? "security-key" : "client-device"
+  );
 
   let cred: PublicKeyCredential | null;
   try {

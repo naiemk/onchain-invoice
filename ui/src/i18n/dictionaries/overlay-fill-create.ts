@@ -4,6 +4,8 @@ export const overlayFillCreate = assemble({
   create: {
     payLinkReadyTitle: {
       de: "Ihr Zahlungslink ist bereit",
+      sv: "Din betallänk är redo",
+      nb: "Betalingslenken din er klar",
       fr: "Votre lien de paiement est prêt",
       es: "Tu enlace de pago está listo",
       it: "Il tuo link di pagamento è pronto",
@@ -30,6 +32,8 @@ export const overlayFillCreate = assemble({
     },
     payLinkReadyLede: {
       de: "Kopieren oder teilen Sie diesen Link mit Ihrer Kundschaft. Sie öffnet ihn, um Sie zu bezahlen.",
+      sv: "Kopiera eller dela länken med kunden. De öppnar den för att betala dig.",
+      nb: "Kopier eller del lenken med kunden. De åpner den for å betale deg.",
       fr: "Copiez ou partagez ce lien avec votre client. Il l’ouvre pour vous payer.",
       es: "Copia o comparte este enlace con tu cliente. Lo abre para pagarte.",
       it: "Copia o condividi questo link con il cliente. Lo apre per pagarti.",
@@ -56,6 +60,8 @@ export const overlayFillCreate = assemble({
     },
     sharePayLink: {
       de: "Teilen",
+      sv: "Dela",
+      nb: "Del",
       fr: "Partager",
       es: "Compartir",
       it: "Condividi",
@@ -82,6 +88,8 @@ export const overlayFillCreate = assemble({
     },
     payLinkShared: {
       de: "Teilen-Dialog geöffnet.",
+      sv: "Delningsmenyn öppnades.",
+      nb: "Delingsarket ble åpnet.",
       fr: "Feuille de partage ouverte.",
       es: "Se abrió la hoja de compartir.",
       it: "Foglio di condivisione aperto.",
@@ -108,6 +116,8 @@ export const overlayFillCreate = assemble({
     },
     essentialsTitle: {
       de: "Das Wesentliche",
+      sv: "Det väsentliga",
+      nb: "Det viktigste",
       fr: "L’essentiel",
       es: "Lo esencial",
       it: "L’essenziale",
@@ -134,6 +144,8 @@ export const overlayFillCreate = assemble({
     },
     essentialsHint: {
       de: "3 Felder zum Senden",
+      sv: "3 fält för att skicka",
+      nb: "3 felt for å sende",
       fr: "3 champs pour envoyer",
       es: "3 campos para enviar",
       it: "3 campi da inviare",
@@ -160,6 +172,8 @@ export const overlayFillCreate = assemble({
     },
     essentialsMicro: {
       de: "Zuerst das Wesentliche. Die Details sind da, wenn Sie sie brauchen.",
+      sv: "Det väsentliga först. Detaljerna finns där när du behöver dem.",
+      nb: "Det viktigste først. Detaljene er der når du trenger dem.",
       fr: "L’essentiel d’abord. Les détails sont là quand vous en avez besoin.",
       es: "Lo esencial primero. Los detalles están cuando los necesites.",
       it: "Prima l’essenziale. I dettagli ci sono quando servono.",
@@ -186,6 +200,8 @@ export const overlayFillCreate = assemble({
     },
     whoLabel: {
       de: "Wen stellen Sie in Rechnung?",
+      sv: "Vem fakturerar du?",
+      nb: "Hvem fakturerer du?",
       fr: "À qui facturez-vous ?",
       es: "¿A quién facturas?",
       it: "A chi stai fatturando?",
@@ -212,6 +228,8 @@ export const overlayFillCreate = assemble({
     },
     whatLabel: {
       de: "Wofür ist das?",
+      sv: "Vad gäller det?",
+      nb: "Hva gjelder det?",
       fr: "Pour quoi ?",
       es: "¿Para qué es esto?",
       it: "A cosa serve?",
@@ -238,6 +256,8 @@ export const overlayFillCreate = assemble({
     },
     usuallyUnder60: {
       de: "Meist unter 60 Sekunden",
+      sv: "Vanligtvis under 60 sekunder",
+      nb: "Vanligvis under 60 sekunder",
       fr: "En général moins de 60 secondes",
       es: "Suele tardar menos de 60 segundos",
       it: "Di solito meno di 60 secondi",
@@ -264,6 +284,8 @@ export const overlayFillCreate = assemble({
     },
     createPayLink: {
       de: "Zahlungslink erstellen",
+      sv: "Skapa betallänk",
+      nb: "Opprett betalingslenke",
       fr: "Créer un lien de paiement",
       es: "Crear enlace de pago",
       it: "Crea link di pagamento",
@@ -290,6 +312,8 @@ export const overlayFillCreate = assemble({
     },
     previewAmountDue: {
       de: "Fälliger Betrag",
+      sv: "Att betala",
+      nb: "Å betale",
       fr: "Montant dû",
       es: "Importe a pagar",
       it: "Importo dovuto",
@@ -316,6 +340,8 @@ export const overlayFillCreate = assemble({
     },
     previewSettlement: {
       de: "Abrechnung an Ihre Händler-Wallet gebunden",
+      sv: "Avräkning knuten till din handlarplånbok",
+      nb: "Oppgjør knyttet til selgerlommeboken din",
       fr: "Règlement lié à votre portefeuille marchand",
       es: "Liquidación vinculada a tu cartera de comercio",
       it: "Regolamento vincolato al portafoglio esercente",
@@ -342,6 +368,8 @@ export const overlayFillCreate = assemble({
     },
     previewCustomerPays: {
       de: "Die Kundschaft zahlt aus einer beliebigen unterstützten Wallet",
+      sv: "Kunden betalar från valfri stödd plånbok",
+      nb: "Kunden betaler fra en støttet lommebok",
       fr: "Le client paie depuis n’importe quel portefeuille pris en charge",
       es: "El cliente paga desde cualquier cartera compatible",
       it: "Il cliente paga da qualsiasi portafoglio supportato",
@@ -368,6 +396,8 @@ export const overlayFillCreate = assemble({
     },
     addDetails: {
       de: "Details hinzufügen (optional)",
+      sv: "Lägg till detaljer (valfritt)",
+      nb: "Legg til detaljer (valgfritt)",
       fr: "Ajouter des détails (facultatif)",
       es: "Añadir detalles (opcional)",
       it: "Aggiungi dettagli (facoltativo)",
@@ -394,6 +424,8 @@ export const overlayFillCreate = assemble({
     },
     amountDueLabel: {
       de: "Betrag",
+      sv: "Belopp",
+      nb: "Beløp",
       fr: "Montant",
       es: "Importe",
       it: "Importo",
@@ -420,6 +452,8 @@ export const overlayFillCreate = assemble({
     },
     dueLabel: {
       de: "Fällig",
+      sv: "Förfaller",
+      nb: "Forfaller",
       fr: "Échéance",
       es: "Vence",
       it: "Scadenza",
@@ -446,6 +480,8 @@ export const overlayFillCreate = assemble({
     },
     usePasskeyWallet: {
       de: "Meine Passkey-Wallet nutzen",
+      sv: "Använd min passkey-plånbok",
+      nb: "Bruk passkey-lommeboken min",
       fr: "Utiliser mon portefeuille passkey",
       es: "Usar mi cartera passkey",
       it: "Usa il mio portafoglio passkey",
@@ -472,6 +508,8 @@ export const overlayFillCreate = assemble({
     },
     changeWallet: {
       de: "Wallet wechseln",
+      sv: "Byt plånbok",
+      nb: "Bytt lommebok",
       fr: "Changer de portefeuille",
       es: "Cambiar de cartera",
       it: "Cambia portafoglio",
@@ -498,6 +536,8 @@ export const overlayFillCreate = assemble({
     },
     passkeyWalletLinked: {
       de: "Passkey-Wallet: {address}",
+      sv: "Passkey-plånbok: {address}",
+      nb: "Passkey-lommebok: {address}",
       fr: "Portefeuille passkey : {address}",
       es: "Cartera passkey: {address}",
       it: "Portafoglio passkey: {address}",
@@ -524,6 +564,8 @@ export const overlayFillCreate = assemble({
     },
     passkeyWalletFilled: {
       de: "Passkey-Wallet-Adresse eingetragen.",
+      sv: "Passkey-plånbokens adress ifylld.",
+      nb: "Passkey-lommebokens adresse fylt inn.",
       fr: "Adresse du portefeuille passkey renseignée.",
       es: "Dirección de la cartera passkey completada.",
       it: "Indirizzo del portafoglio passkey compilato.",
@@ -550,6 +592,8 @@ export const overlayFillCreate = assemble({
     },
     passkeyWalletCreated: {
       de: "Passkey-Wallet erstellt und Adresse eingetragen.",
+      sv: "Passkey-plånbok skapad och adress ifylld.",
+      nb: "Passkey-lommebok opprettet og adresse fylt inn.",
       fr: "Portefeuille passkey créé et adresse renseignée.",
       es: "Cartera passkey creada y dirección completada.",
       it: "Portafoglio passkey creato e indirizzo compilato.",
@@ -576,6 +620,8 @@ export const overlayFillCreate = assemble({
     },
     passkeyWalletFailed: {
       de: "Passkey-Wallet konnte nicht erstellt werden.",
+      sv: "Kunde inte skapa passkey-plånbok.",
+      nb: "Kunne ikke opprette passkey-lommebok.",
       fr: "Impossible de créer le portefeuille passkey.",
       es: "No se pudo crear la cartera passkey.",
       it: "Impossibile creare il portafoglio passkey.",
@@ -602,6 +648,8 @@ export const overlayFillCreate = assemble({
     },
     passkeyWalletDeviceLabel: {
       de: "Rechnungshändler",
+      sv: "Fakturahandlare",
+      nb: "Fakturaselger",
       fr: "Marchand de la facture",
       es: "Comercio de la factura",
       it: "Esercente della fattura",
@@ -628,6 +676,8 @@ export const overlayFillCreate = assemble({
     },
     stepDetails: {
       de: "Details",
+      sv: "Uppgifter",
+      nb: "Detaljer",
       fr: "Détails",
       es: "Datos",
       it: "Dettagli",
@@ -654,6 +704,8 @@ export const overlayFillCreate = assemble({
     },
     stepNetwork: {
       de: "Guthaben empfangen",
+      sv: "Ta emot medel",
+      nb: "Motta midler",
       fr: "Recevoir les fonds",
       es: "Recibir fondos",
       it: "Ricevi i fondi",
@@ -680,6 +732,8 @@ export const overlayFillCreate = assemble({
     },
     stepAmount: {
       de: "Betrag",
+      sv: "Belopp",
+      nb: "Beløp",
       fr: "Montant",
       es: "Monto",
       it: "Importo",
@@ -706,6 +760,8 @@ export const overlayFillCreate = assemble({
     },
     stepOf: {
       de: "Schritt {current} von {total}",
+      sv: "Steg {current} av {total}",
+      nb: "Steg {current} av {total}",
       fr: "Étape {current} sur {total}",
       es: "Paso {current} de {total}",
       it: "Passaggio {current} di {total}",
@@ -732,6 +788,8 @@ export const overlayFillCreate = assemble({
     },
     next: {
       de: "Weiter",
+      sv: "Nästa",
+      nb: "Neste",
       fr: "Suivant",
       es: "Siguiente",
       it: "Avanti",
@@ -758,6 +816,8 @@ export const overlayFillCreate = assemble({
     },
     back: {
       de: "Zurück",
+      sv: "Tillbaka",
+      nb: "Tilbake",
       fr: "Retour",
       es: "Atrás",
       it: "Indietro",
@@ -784,6 +844,8 @@ export const overlayFillCreate = assemble({
     },
     walletSelectLabel: {
       de: "Händler-Wallet",
+      sv: "Handlarplånbok",
+      nb: "Selgerlommebok",
       fr: "Portefeuille marchand",
       es: "Cartera del comercio",
       it: "Portafoglio esercente",
@@ -810,6 +872,8 @@ export const overlayFillCreate = assemble({
     },
     walletSelectHint: {
       de: "Wählen Sie eine Passkey-Wallet auf diesem Gerät oder geben Sie eine eigene Adresse ein.",
+      sv: "Välj en passkey-plånbok på den här enheten, eller ange en egen adress.",
+      nb: "Velg en passkey-lommebok på denne enheten, eller skriv inn en egen adresse.",
       fr: "Choisissez un portefeuille passkey sur cet appareil, ou saisissez une adresse personnalisée.",
       es: "Elige una cartera passkey en este dispositivo o ingresa una dirección personalizada.",
       it: "Scegli un portafoglio passkey su questo dispositivo, oppure inserisci un indirizzo personalizzato.",
@@ -836,6 +900,8 @@ export const overlayFillCreate = assemble({
     },
     walletCustomOption: {
       de: "Eigene Adresse…",
+      sv: "Egen adress…",
+      nb: "Egen adresse…",
       fr: "Adresse personnalisée…",
       es: "Dirección personalizada…",
       it: "Indirizzo personalizzato…",
@@ -862,6 +928,8 @@ export const overlayFillCreate = assemble({
     },
     walletCreateButton: {
       de: "Passkey-Wallet erstellen",
+      sv: "Skapa en passkey-plånbok",
+      nb: "Opprett en passkey-lommebok",
       fr: "Créer un portefeuille passkey",
       es: "Crear una cartera passkey",
       it: "Crea un portafoglio passkey",
@@ -888,6 +956,8 @@ export const overlayFillCreate = assemble({
     },
     walletNoneHint: {
       de: "Noch keine Passkey-Wallets auf diesem Gerät.",
+      sv: "Inga passkey-plånböcker på den här enheten ännu.",
+      nb: "Ingen passkey-lommebøker på denne enheten ennå.",
       fr: "Aucun portefeuille passkey sur cet appareil pour le moment.",
       es: "Aún no hay carteras passkey en este dispositivo.",
       it: "Nessun portafoglio passkey su questo dispositivo ancora.",
@@ -914,6 +984,8 @@ export const overlayFillCreate = assemble({
     },
     fiatNetworksLockedHint: {
       de: "Karten-/Bankrechnungen werden als USDC auf Base abgerechnet. Dieses Netzwerk wird automatisch ausgewählt.",
+      sv: "Kort-/bankfakturor avräknas som USDC på Base. Det nätverket väljs automatiskt.",
+      nb: "Kort-/bankfakturaer gjøres opp som USDC på Base. Det nettverket velges automatisk.",
       fr: "Les factures carte/banque sont réglées en USDC sur Base. Ce réseau est sélectionné automatiquement.",
       es: "Las facturas de tarjeta/banco se liquidan como USDC en Base. Esa red se selecciona automáticamente.",
       it: "Le fatture carta/banca si regolano come USDC su Base. Quella rete viene selezionata automaticamente.",
@@ -940,6 +1012,8 @@ export const overlayFillCreate = assemble({
     },
     quoteMethodAuto: {
       de: "Auto (empfohlen)",
+      sv: "Auto (rekommenderas)",
+      nb: "Auto (anbefalt)",
       fr: "Auto (recommandé)",
       es: "Auto (recomendado)",
       it: "Auto (consigliato)",
@@ -966,6 +1040,8 @@ export const overlayFillCreate = assemble({
     },
     quoteProviderAuto: {
       de: "Auto (bestes Angebot)",
+      sv: "Auto (bästa offert)",
+      nb: "Auto (beste tilbud)",
       fr: "Auto (meilleur devis)",
       es: "Auto (mejor cotización)",
       it: "Auto (migliore quotazione)",
@@ -992,6 +1068,8 @@ export const overlayFillCreate = assemble({
     },
     countrySearchHint: {
       de: "Ländername oder ISO-Code eingeben (z. B. se, Schweden).",
+      sv: "Skriv ett landsnamn eller ISO-kod (t.ex. se, Sverige).",
+      nb: "Skriv et landsnavn eller ISO-kode (f.eks. se, Sverige).",
       fr: "Saisissez un pays ou un code ISO (ex. se, Suède).",
       es: "Escribe un país o un código ISO (p. ej. se, Suecia).",
       it: "Digita un paese o un codice ISO (es. se, Svezia).",
@@ -1018,6 +1096,8 @@ export const overlayFillCreate = assemble({
     },
     amountLimits: {
       de: "Erlaubter Bereich: {min} – {max} {fiat}",
+      sv: "Tillåtet spann: {min} – {max} {fiat}",
+      nb: "Tillatt område: {min} – {max} {fiat}",
       fr: "Plage autorisée : {min} – {max} {fiat}",
       es: "Rango permitido: {min} – {max} {fiat}",
       it: "Intervallo consentito: {min} – {max} {fiat}",
@@ -1044,6 +1124,8 @@ export const overlayFillCreate = assemble({
     },
     invoiceTypeLabel: {
       de: "Rechnungstyp",
+      sv: "Fakturatyp",
+      nb: "Fakturatype",
       fr: "Type de facture",
       es: "Tipo de factura",
       it: "Tipo di fattura",
@@ -1070,6 +1152,8 @@ export const overlayFillCreate = assemble({
     },
     invoiceTypeHint: {
       de: "Krypto ist nur on-chain. Kombiniert lässt den Zahler wählen. Fiat ist nur Karte/Bank.",
+      sv: "Krypto är endast on-chain. Kombinerat låter betalaren välja. Fiat är endast kort/bank.",
+      nb: "Krypto er kun on-chain. Kombinert lar betaleren velge. Fiat er kun kort/bank.",
       fr: "La crypto est uniquement on-chain. Combiné laisse le payeur choisir. Le fiat est uniquement carte/banque.",
       es: "Cripto es solo on-chain. Combinado deja elegir al pagador. Fiat es solo tarjeta/banco.",
       it: "La cripto è solo on-chain. Combinato lascia scegliere al pagante. Il fiat è solo carta/banca.",
@@ -1096,6 +1180,8 @@ export const overlayFillCreate = assemble({
     },
     chromeLabel: {
       de: "Checkout-Rahmen",
+      sv: "Kassaramen",
+      nb: "Kasseramme",
       fr: "Habillage du checkout",
       es: "Marco del checkout",
       it: "Cornice del checkout",
@@ -1122,6 +1208,8 @@ export const overlayFillCreate = assemble({
     },
     chromeHint: {
       de: "Steuert Kopf- und Fußzeile der Bezahlseite. Nutzen Sie none für iframes.",
+      sv: "Styr sidhuvud och sidfot på betalsidan. Använd none för iframes.",
+      nb: "Styrer topp og bunn på betalingssiden. Bruk none for iframes.",
       fr: "Contrôle l’en-tête et le pied de la page de paiement. Utilisez none pour les iframes.",
       es: "Controla el encabezado y el pie de la página de pago. Usa none para iframes.",
       it: "Controlla intestazione e piè di pagina della pagina di pagamento. Usa none per gli iframe.",
@@ -1148,6 +1236,8 @@ export const overlayFillCreate = assemble({
     },
     chromeFull: {
       de: "Voll",
+      sv: "Full",
+      nb: "Full",
       fr: "Complet",
       es: "Completo",
       it: "Completo",
@@ -1174,6 +1264,8 @@ export const overlayFillCreate = assemble({
     },
     chromeMinimal: {
       de: "Minimal",
+      sv: "Minimal",
+      nb: "Minimal",
       fr: "Minimaliste",
       es: "Mínimo",
       it: "Minimale",
@@ -1200,6 +1292,8 @@ export const overlayFillCreate = assemble({
     },
     chromeNone: {
       de: "Keine",
+      sv: "Ingen",
+      nb: "Ingen",
       fr: "Aucun",
       es: "Ninguno",
       it: "Nessuno",
@@ -1226,6 +1320,8 @@ export const overlayFillCreate = assemble({
     },
     iframeLabel: {
       de: "iframe-HTML einbetten",
+      sv: "Bädda in iframe-HTML",
+      nb: "Bygg inn iframe-HTML",
       fr: "HTML de l’iframe à intégrer",
       es: "HTML del iframe para insertar",
       it: "HTML dell’iframe da incorporare",
@@ -1252,6 +1348,8 @@ export const overlayFillCreate = assemble({
     },
     iframeHint: {
       de: "Einbettbare Kasse (ohne Seitenkopf/-fuß). Enthält header=none.",
+      sv: "Inbäddningsbar kassa (inget sidhuvud/sidfot). Inkluderar header=none.",
+      nb: "Innebyggbar kasse (ingen topp/bunn). Inkluderer header=none.",
       fr: "Checkout intégrable (sans en-tête/pied du site). Inclut header=none.",
       es: "Checkout insertable (sin encabezado/pie del sitio). Incluye header=none.",
       it: "Checkout incorporabile (senza intestazione/piè del sito). Include header=none.",
@@ -1278,6 +1376,8 @@ export const overlayFillCreate = assemble({
     },
     iframeCopied: {
       de: "iframe-HTML kopiert.",
+      sv: "Iframe-HTML kopierad.",
+      nb: "Iframe-HTML kopiert.",
       fr: "HTML de l’iframe copié.",
       es: "HTML del iframe copiado.",
       it: "HTML dell’iframe copiato.",
@@ -1306,6 +1406,8 @@ export const overlayFillCreate = assemble({
   errors: {
     onrampLimitMismatch: {
       de: "Der Betrag muss zwischen {min} und {max} {fiat} liegen.",
+      sv: "Beloppet måste vara mellan {min} och {max} {fiat}.",
+      nb: "Beløpet må være mellom {min} og {max} {fiat}.",
       fr: "Le montant doit être compris entre {min} et {max} {fiat}.",
       es: "El monto debe estar entre {min} y {max} {fiat}.",
       it: "L’importo deve essere compreso tra {min} e {max} {fiat}.",
@@ -1332,6 +1434,8 @@ export const overlayFillCreate = assemble({
     },
     onrampLimitMin: {
       de: "Mindestbetrag ist {min} {fiat}.",
+      sv: "Minsta belopp är {min} {fiat}.",
+      nb: "Minste beløp er {min} {fiat}.",
       fr: "Le montant minimum est {min} {fiat}.",
       es: "El monto mínimo es {min} {fiat}.",
       it: "L’importo minimo è {min} {fiat}.",
@@ -1358,6 +1462,8 @@ export const overlayFillCreate = assemble({
     },
     onrampLimitMax: {
       de: "Höchstbetrag ist {max} {fiat}.",
+      sv: "Högsta belopp är {max} {fiat}.",
+      nb: "Høyeste beløp er {max} {fiat}.",
       fr: "Le montant maximum est {max} {fiat}.",
       es: "El monto máximo es {max} {fiat}.",
       it: "L’importo massimo è {max} {fiat}.",
@@ -1384,6 +1490,8 @@ export const overlayFillCreate = assemble({
     },
     onrampNoPaymentMethod: {
       de: "Keine Zahlungsmethoden für {fiat} in diesem Land verfügbar.",
+      sv: "Inga betalsätt tillgängliga för {fiat} i det här landet.",
+      nb: "Ingen betalingsmåter tilgjengelig for {fiat} i dette landet.",
       fr: "Aucun moyen de paiement disponible pour {fiat} dans ce pays.",
       es: "No hay métodos de pago disponibles para {fiat} en este país.",
       it: "Nessun metodo di pagamento disponibile per {fiat} in questo paese.",
@@ -1410,6 +1518,8 @@ export const overlayFillCreate = assemble({
     },
     onrampQuoteUnavailable: {
       de: "Keine Karten-/Bankangebote für diesen Betrag und dieses Netzwerk verfügbar.",
+      sv: "Inga kort-/bankofferter för det här beloppet och nätverket.",
+      nb: "Ingen kort-/banktilbud for dette beløpet og nettverket.",
       fr: "Aucun devis carte/banque disponible pour ce montant et ce réseau.",
       es: "No hay cotizaciones de tarjeta/banco para este monto y esta red.",
       it: "Nessuna quotazione carta/banca disponibile per questo importo e questa rete.",
@@ -1436,6 +1546,8 @@ export const overlayFillCreate = assemble({
     },
     onrampProviderUnavailable: {
       de: "Der gewählte Anbieter ist für dieses Angebot nicht verfügbar.",
+      sv: "Vald leverantör är inte tillgänglig för den här offerten.",
+      nb: "Valgt tilbyder er ikke tilgjengelig for dette tilbudet.",
       fr: "Le prestataire sélectionné n’est pas disponible pour ce devis.",
       es: "El proveedor seleccionado no está disponible para esta cotización.",
       it: "Il fornitore selezionato non è disponibile per questa quotazione.",
@@ -1464,6 +1576,8 @@ export const overlayFillCreate = assemble({
   pay: {
     faucetTitle: {
       de: "Testnetz-Faucet",
+      sv: "Testnät-faucet",
+      nb: "Testnett-faucet",
       fr: "Faucet testnet",
       es: "Faucet de testnet",
       it: "Faucet testnet",
@@ -1490,6 +1604,8 @@ export const overlayFillCreate = assemble({
     },
     faucetHint: {
       de: "Dieser Faucet füllt nur Sepolia- und Nile-Testnetz-Rechnungen. Fiat-Rechnungen werden als USDC auf Base (Mainnet) abgerechnet und können nicht gefaucetet werden.",
+      sv: "Den här faucet fyller bara Sepolia- och Nile-testnätsfakturor. Fiatfakturor avräknas som USDC på Base (mainnet) och kan inte fyllas via faucet.",
+      nb: "Denne faucet fyller bare Sepolia- og Nile-testnettfakturaer. Fiatfakturaer gjøres opp som USDC på Base (mainnet) og kan ikke fylles via faucet.",
       fr: "Ce faucet alimente uniquement les factures testnet Sepolia et Nile. Les factures fiat sont réglées en USDC sur Base (mainnet) et ne peuvent pas être alimentées par le faucet.",
       es: "Este faucet solo fondea facturas de testnet en Sepolia y Nile. Las facturas fiat se liquidan como USDC en Base (mainnet) y no se pueden fondear.",
       it: "Questo faucet finanzia solo fatture testnet su Sepolia e Nile. Le fatture fiat si regolano come USDC su Base (mainnet) e non possono essere finanziate.",
@@ -1516,6 +1632,8 @@ export const overlayFillCreate = assemble({
     },
     faucetSecretLabel: {
       de: "Faucet-Geheimnis",
+      sv: "Faucet-hemlighet",
+      nb: "Faucet-hemmelighet",
       fr: "Secret du faucet",
       es: "Secreto del faucet",
       it: "Segreto del faucet",
@@ -1542,6 +1660,8 @@ export const overlayFillCreate = assemble({
     },
     faucetButton: {
       de: "Rechnung finanzieren (Testnet)",
+      sv: "Fyll faktura (testnät)",
+      nb: "Fyll faktura (testnett)",
       fr: "Financer la facture (testnet)",
       es: "Fondear factura (testnet)",
       it: "Finanzia la fattura (testnet)",
@@ -1568,6 +1688,8 @@ export const overlayFillCreate = assemble({
     },
     faucetFunding: {
       de: "Testnet-Guthaben wird gesendet…",
+      sv: "Skickar testnätsmedel…",
+      nb: "Sender testnettmidler…",
       fr: "Envoi des fonds testnet…",
       es: "Enviando fondos de testnet…",
       it: "Invio dei fondi testnet…",
@@ -1594,6 +1716,8 @@ export const overlayFillCreate = assemble({
     },
     faucetSuccess: {
       de: "Finanziert — warte auf Sweeper-Bestätigung…",
+      sv: "Fylld — väntar på sweeper-bekräftelse…",
+      nb: "Fylt — venter på sweeper-bekreftelse…",
       fr: "Financée — en attente de la confirmation du reversement…",
       es: "Fondeada — esperando la confirmación del barrido…",
       it: "Finanziata — in attesa della conferma del trasferimento…",
@@ -1620,6 +1744,8 @@ export const overlayFillCreate = assemble({
     },
     faucetFailed: {
       de: "Faucet-Finanzierung fehlgeschlagen",
+      sv: "Faucet-påfyllning misslyckades",
+      nb: "Faucet-fylling mislyktes",
       fr: "Échec du financement faucet",
       es: "Falló el fondeo del faucet",
       it: "Finanziamento faucet non riuscito",
@@ -1646,6 +1772,8 @@ export const overlayFillCreate = assemble({
     },
     faucetNeedSecret: {
       de: "Faucet-Geheimnis eingeben",
+      sv: "Ange faucet-hemligheten",
+      nb: "Skriv inn faucet-hemmeligheten",
       fr: "Saisissez le secret du faucet",
       es: "Ingresa el secreto del faucet",
       it: "Inserisci il segreto del faucet",

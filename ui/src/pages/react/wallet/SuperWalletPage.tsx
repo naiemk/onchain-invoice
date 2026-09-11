@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { zeroPadValue } from "ethers";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,11 +20,10 @@ import { fetchWalletBalance, fetchWalletConfig, waitForUserOp, walletChainIsFund
 import { subscribePageVisible } from "@/shared/page-visibility.js";
 import {
   registerWalletEntity,
-  registerWalletEntityKey,
   resolveAdvancedPolicy,
   type AdvancedPolicy,
 } from "@/shared/wallet-advanced-api.js";
-import { hashEntityEmail, computeKeyId, KEY_WEBAUTHN } from "../../../../../commerce/shared/advanced-wallet.js";
+import { hashEntityEmail } from "../../../../../commerce/shared/advanced-wallet.js";
 import { buildSignedEnableAdvancedUserOp } from "@/shared/advanced-userop-client.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
 import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
@@ -41,6 +39,7 @@ import {
   confirmAdvancedUpgrade,
   formatUserOpRejectReason,
   persistSessionAfterUpgrade,
+  registerAdminEntityPasskeys,
 } from "./super-wallet-helpers";
 
 type StatusKind = "info" | "error" | "success";
@@ -185,11 +184,10 @@ export function SuperWalletPage() {
       }
       await confirmAdvancedUpgrade(session.address);
       await registerWalletEntity({ walletAddress: session.address, entityId: adminEntityId, label: email });
-      await registerWalletEntityKey({
+      await registerAdminEntityPasskeys({
         walletAddress: signingSession.address,
-        entityId: adminEntityId,
-        keyId: computeKeyId(adminEntityId, KEY_WEBAUTHN, signingSession.qx, signingSession.qy, zeroPadValue("0x00", 20)),
-        keyType: KEY_WEBAUTHN,
+        chainId: config.chainId,
+        adminEntityId,
         qx: signingSession.qx,
         qy: signingSession.qy,
         credentialId: signingSession.credentialId ?? null,

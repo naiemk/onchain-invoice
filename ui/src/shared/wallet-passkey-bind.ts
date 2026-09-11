@@ -1,4 +1,6 @@
 import { credentialIdsMatch } from "./credential-id.js";
+import { computeKeyId, KEY_WEBAUTHN, KEY_YUBIKEY } from "../../../commerce/shared/advanced-wallet.js";
+import { ZeroAddress } from "ethers";
 
 export type PasskeyCoords = { qx: string; qy: string };
 
@@ -114,4 +116,46 @@ export function selectPubkeyForCredential(input: PubkeyBindInput): {
   }
 
   return { qx: "", qy: "", source: device ? "poisoned_device_row" : "none" };
+}
+
+function isZeroBytes32(value: string | undefined | null): boolean {
+  if (!value) return true;
+  return /^0x0+$/i.test(value);
+}
+
+export function collectRosterEntityIds(
+  entities: { entityId: string }[],
+  keys: { entityId: string }[]
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const id of [...entities.map((e) => e.entityId), ...keys.map((k) => k.entityId)]) {
+    if (!id || isZeroBytes32(id)) continue;
+    const n = id.toLowerCase();
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(id);
+  }
+  return out;
+}
+
+export function passkeyKeyIdCandidates(
+  entityIds: string[],
+  qx: string,
+  qy: string,
+  preferredType = KEY_WEBAUTHN
+): { entityId: string; keyType: number; keyId: string }[] {
+  const types =
+    preferredType === KEY_YUBIKEY ? [KEY_YUBIKEY, KEY_WEBAUTHN] : [KEY_WEBAUTHN, KEY_YUBIKEY];
+  const out: { entityId: string; keyType: number; keyId: string }[] = [];
+  for (const entityId of entityIds) {
+    for (const keyType of types) {
+      out.push({
+        entityId,
+        keyType,
+        keyId: computeKeyId(entityId, keyType, qx, qy, ZeroAddress),
+      });
+    }
+  }
+  return out;
 }

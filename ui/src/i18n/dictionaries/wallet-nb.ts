@@ -1,5 +1,5 @@
-/** Wallet UI strings (English). Other locales use wallet-<locale>.ts. */
-export const walletEn = {
+/** Wallet UI strings (Norwegian Bokmål). Overlays replace leftover English. */
+export const walletNb = {
   eyebrow: "Business wallet",
   navLabel: "Wallet navigation",
   homeTitle: "Wallet",
