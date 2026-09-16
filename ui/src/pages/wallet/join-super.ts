@@ -152,6 +152,8 @@ export async function renderWalletJoinSuper(root: HTMLElement, opts?: WalletRend
           const passkey = await createPasskey(email || t("wallet.joinSuperPasskeyLabel"), {
             attachment: "platform",
             walletLabel: email || undefined,
+            purpose: "join-super",
+            email: email || undefined,
           });
           const fields = passkeyToKeyFields(passkey);
           await enroll(KEY_WEBAUTHN, {
@@ -176,6 +178,8 @@ export async function renderWalletJoinSuper(root: HTMLElement, opts?: WalletRend
           const email = (r.querySelector<HTMLInputElement>("#join-email")?.value ?? "").trim();
           const passkey = await createSecurityKey(email || t("wallet.joinSuperYubiKeyLabel"), {
             walletLabel: email || undefined,
+            purpose: "join-super",
+            email: email || undefined,
           });
           const fields = passkeyToKeyFields(passkey);
           await enroll(KEY_YUBIKEY, {

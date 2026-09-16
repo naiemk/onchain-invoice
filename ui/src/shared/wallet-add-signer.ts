@@ -10,7 +10,7 @@ import { buildSignedAddOwnerEoaUserOp, buildSignedAddOwnerUserOp, submitSignedUs
 import { fetchWalletConfig, getWalletAccount, registerDevice, waitForUserOp } from "./wallet-api.js";
 import { inferDeviceLabel } from "./passkey-name.js";
 import { loadWalletSession, saveWalletSession, shortAddress, type WalletSession } from "./wallet-session.js";
-import { createPasskey, ensureSessionCredential } from "./webauthn.js";
+import { clearPendingPasskey, createPasskey, ensureSessionCredential } from "./webauthn.js";
 import { connectEoaWallet, signAddKeyTypedData, signAddOwnerTypedData } from "./eoa-connector.js";
 
 export async function addPasskeySigner(input: {
@@ -184,7 +184,11 @@ export async function enrollPasskeyWithExistingEoa(input: {
     throw new Error(t("wallet.superWalletPairNeedsOneSigner"));
   }
   const label = inferDeviceLabel();
-  const passkey = await createPasskey(label, { walletLabel: shortAddress(walletAddress), deviceLabel: label });
+  const passkey = await createPasskey(label, {
+    walletLabel: shortAddress(walletAddress),
+    deviceLabel: label,
+    purpose: "add-signer",
+  });
   const signer: CurrentWalletPasskey = {
     address: walletAddress,
     chainId,
@@ -248,6 +252,7 @@ export async function enrollPasskeyWithExistingEoa(input: {
     label,
     credentialId: passkey.credentialId,
   });
+  clearPendingPasskey(passkey.credentialId);
   const account = await getWalletAccount(walletAddress);
   saveWalletSession({
     address: walletAddress,

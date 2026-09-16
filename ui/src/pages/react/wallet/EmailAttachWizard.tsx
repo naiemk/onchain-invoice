@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TurnstileWidget, readCaptchaToken, type TurnstileControl } from "@/components/TurnstileWidget";
+import { EmailOtpFields } from "./EmailOtpFields";
+import { readCaptchaToken, type TurnstileControl } from "@/components/TurnstileWidget";
 import { useLocale } from "@/providers/LocaleProvider";
 import {
   attachWalletEmail,
@@ -154,35 +153,28 @@ export function EmailAttachWizard({
         </DialogHeader>
 
         {step === "email" ? (
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="email-wizard-email">{t("wallet.recoverEmailLabel")}</Label>
-              <Input
-                id="email-wizard-email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@company.com"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-            </div>
-            <TurnstileWidget siteKey={siteKey} controlRef={captchaRef} />
-          </div>
+          <EmailOtpFields
+            step="email"
+            email={draft}
+            onEmailChange={setDraft}
+            otp={otp}
+            onOtpChange={setOtp}
+            siteKey={siteKey}
+            captchaRef={captchaRef}
+            emailId="email-wizard-email"
+            autoCompleteEmail="email"
+          />
         ) : (
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="email-wizard-otp">{t("wallet.recoverOtpLabel")}</Label>
-              <Input
-                id="email-wizard-otp"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-              />
-            </div>
-            <TurnstileWidget siteKey={siteKey} controlRef={captchaRef} />
-          </div>
+          <EmailOtpFields
+            step="code"
+            email={pendingEmail || draft}
+            onEmailChange={setDraft}
+            otp={otp}
+            onOtpChange={setOtp}
+            siteKey={siteKey}
+            captchaRef={captchaRef}
+            otpId="email-wizard-otp"
+          />
         )}
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

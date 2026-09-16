@@ -1,22 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ChevronDown, Mail, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NoticeCarousel, type NoticeItem } from "@/components/NoticeCarousel";
-import { ExplorerLink } from "@/components/ExplorerLink";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchWalletBalance, listDevices, walletChainIsFunded } from "@/shared/wallet-api.js";
+import { formatPasskeyError } from "@/shared/webauthn.js";
+import { unlockRegistryWallet } from "@/shared/wallet-unlock.js";
+import { WalletAuthCard } from "./WalletAuthCard";
 import { subscribePageVisible } from "@/shared/page-visibility.js";
-import { fetchWalletEmail, fetchWalletRecovery } from "@/shared/wallet-recovery-api.js";
+import { fetchWalletRecovery } from "@/shared/wallet-recovery-api.js";
 import { resolveAdvancedPolicy, listWalletEntities, listProposals } from "@/shared/wallet-advanced-api.js";
 import { deploymentMode, isTestnet } from "@/shared/networks.js";
 import {
@@ -24,59 +19,18 @@ import {
   listWalletRegistryForDeployment,
   loadWalletSession,
   isActiveWalletAddress,
-  shortAddress,
   walletSessionsEquivalent,
   WALLET_SESSION_EVENT,
   type WalletSession,
 } from "@/shared/wallet-session.js";
-import { formatPasskeyError, webAuthnSupported } from "@/shared/webauthn.js";
-import { addWalletFromPasskey, unlockRegistryWallet, unlockWalletWithPasskey } from "@/shared/wallet-unlock.js";
-import { LocalRecoverySheet, isUnlockRecoveryError } from "@/components/LocalRecoverySheet";
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { isAdvancedMode } from "@/shared/wallet-mode.js";
-import type { WalletBalanceChain, WalletProposalRecord } from "../../../../../commerce/shared/wallet.js";
+import { ChainBalanceList, WalletBalancePreview } from "./WalletBalancePreview";
 import { WalletFrame } from "./WalletFrame";
 import { useWalletPolicy } from "./wallet-policy";
 import { isClosedProposal, isFullySigned, ProposalSummaryLine } from "./proposal-display";
 import { StatusBadge } from "@/components/StatusBadge";
-
-function ChainBalanceList({ chains, t }: { chains: WalletBalanceChain[]; t: (k: string, v?: Record<string, string | number>) => string }) {
-  if (!chains.length) {
-    return <p className="text-sm text-muted-foreground">{t("wallet.noChains")}</p>;
-  }
-  return (
-    <ul className="divide-y rounded-lg border">
-      {chains.map((c) => (
-        <li key={c.chainId} className="flex items-center justify-between gap-4 px-4 py-3">
-          <div>
-            <strong className="text-sm">{c.networkLabel}</strong>
-            <p className="text-xs text-muted-foreground">
-              {c.deployed ? t("wallet.chainActive") : t("wallet.chainPending")}
-            </p>
-          </div>
-          <span className="font-mono text-sm">
-            {c.balanceUsd} {c.feeTokenSymbol}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function EmailAttachCard() {
-  const { t } = useLocale();
-  return (
-    <Alert className="border-primary/30 bg-primary/5">
-      <Mail className="h-4 w-4" />
-      <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <span>{t("wallet.emailAttachHint")}</span>
-        <Button asChild size="sm" variant="secondary">
-          <Link to="/wallet/security#recovery">{t("wallet.emailAttachCta")}</Link>
-        </Button>
-      </AlertDescription>
-    </Alert>
-  );
-}
+import type { WalletBalanceChain, WalletProposalRecord } from "../../../../../commerce/shared/wallet.js";
 
 function WalletDashboard({ session: initialSession }: { session: WalletSession }) {
   const { t } = useLocale();
@@ -89,7 +43,6 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
   const [loading, setLoading] = useState(true);
   const [balanceError, setBalanceError] = useState(false);
   const [pendingRecovery, setPendingRecovery] = useState(false);
-  const [showEmailCard, setShowEmailCard] = useState(false);
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [entityLabel, setEntityLabel] = useState<string | null>(null);
   const [openProposals, setOpenProposals] = useState<WalletProposalRecord[]>([]);
@@ -107,7 +60,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
         if (cancelled) return;
         if (!isActiveWalletAddress(target.address)) return;
         setSession(healed.session);
-        if (healed.needsSuperWalletEmail) {
+        if (healed.needsSuperWalletEmail && !target.identityId) {
           setHealNotice(t("wallet.superWalletRestoreEmailHint"));
         }
       } catch {
@@ -148,7 +101,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
   }, [activating, loadBalance]);
 
   useEffect(() => {
-    if (isSuperWallet) {
+    if (session.identityId || isSuperWallet) {
       setPendingRecovery(false);
       return;
     }
@@ -163,21 +116,10 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
   }, [isSuperWallet, session.address]);
 
   useEffect(() => {
-    if (advanced) return;
-    void (async () => {
-      try {
-        const policy = await resolveAdvancedPolicy(session.address, false);
-        if (policy.advanced) return;
-        const email = await fetchWalletEmail(session.address);
-        if (!email.hasEmail && !email.verified) setShowEmailCard(true);
-      } catch {
-        /* ignore */
-      }
-    })();
-  }, [advanced, session.address]);
-
-  useEffect(() => {
-    if (!advanced) return;
+    if (!advanced || session.identityId) {
+      setNotices([]);
+      return;
+    }
     void (async () => {
       let deviceCount = 1;
       let onChainAdvanced = false;
@@ -247,7 +189,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
 
       setNotices(items);
     })();
-  }, [advanced, session.address, session.chainId, t]);
+  }, [advanced, session.address, session.chainId, session.identityId, t]);
 
   useEffect(() => {
     if (!isSuperWallet) {
@@ -308,7 +250,6 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
             </Button>
           </div>
         </div>
-        {!advanced && showEmailCard && <EmailAttachCard />}
         {healNotice && (
           <Alert variant="warn">
             <AlertDescription>
@@ -404,42 +345,12 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
             {balanceError ? (
               <p className="text-sm text-destructive">{t("wallet.balanceError")}</p>
             ) : (
-              <ChainBalanceList chains={chains} t={t} />
+              <ChainBalanceList chains={chains} />
             )}
           </section>
         )}
       </div>
     </WalletFrame>
-  );
-}
-
-function AnotherWalletMenu({
-  disabled,
-  onRelink,
-}: {
-  disabled?: boolean;
-  onRelink: () => void;
-}) {
-  const { t } = useLocale();
-  const navigate = useNavigate();
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" disabled={disabled} className="gap-2">
-          {t("wallet.otherWalletOptions")}
-          <ChevronDown className="h-4 w-4 opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[16rem]">
-        <DropdownMenuItem onClick={() => navigate("/wallet/pair")}>
-          {t("wallet.pairWithAnotherDevice")}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate("/wallet/recover")}>
-          {t("wallet.recoverExistingOnDevice")}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onRelink}>{t("wallet.relinkThisDevice")}</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -453,12 +364,7 @@ function WalletPicker({
   const { t } = useLocale();
   const [balances, setBalances] = useState<Record<string, string | null>>({});
   const [status, setStatus] = useState<string | null>(null);
-  const [statusOk, setStatusOk] = useState(false);
-  const [recoveryEntry, setRecoveryEntry] = useState<WalletSession | null>(null);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
-
   const [openingAddress, setOpeningAddress] = useState<string | null>(null);
-  const [addingPasskey, setAddingPasskey] = useState(false);
 
   useEffect(() => {
     void Promise.all(
@@ -475,183 +381,49 @@ function WalletPicker({
     });
   }, [registry]);
 
-  const openRecovery = (entry?: WalletSession) => {
-    setRecoveryEntry(entry ?? null);
-    setRecoveryOpen(true);
-  };
-
   const openWallet = async (entry: WalletSession) => {
     setOpeningAddress(entry.address);
-    setStatusOk(false);
     setStatus(t("wallet.sendSigning"));
     try {
       await unlockRegistryWallet(entry);
       onOpened();
     } catch (error) {
-      if (isUnlockRecoveryError(error)) {
-        openRecovery(entry);
-        setStatus(null);
-      } else {
-        setStatus(formatPasskeyError(error));
-      }
+      setStatus(formatPasskeyError(error));
     } finally {
       setOpeningAddress(null);
     }
   };
 
-  const addFromPasskey = async () => {
-    setAddingPasskey(true);
-    setStatusOk(false);
-    setStatus(t("wallet.sendSigning"));
-    try {
-      await addWalletFromPasskey();
-      setStatusOk(true);
-      setStatus(t("wallet.addWalletFromPasskeyDone"));
-      onOpened();
-    } catch (error) {
-      if (isUnlockRecoveryError(error)) {
-        openRecovery();
-        setStatus(null);
-      } else {
-        setStatus(formatPasskeyError(error));
-      }
-    } finally {
-      setAddingPasskey(false);
-    }
-  };
-
   return (
-    <>
     <WalletFrame
       current="home"
       showChrome={false}
       title={t("wallet.chooseWallet")}
       lede={t("wallet.chooseWalletLede")}
     >
-      <div className="space-y-3">
-        {registry.map((w) => (
-          <button
-            key={w.address}
-            type="button"
-            disabled={Boolean(openingAddress) || addingPasskey}
-            onClick={() => void openWallet(w)}
-            className="flex w-full items-center justify-between gap-4 rounded-lg border p-4 text-left transition-colors hover:border-primary/40 disabled:opacity-60"
-          >
-            <div>
-              <h3 className="font-medium">{w.label}</h3>
-              <p className="flex items-center gap-1 font-mono text-sm text-muted-foreground">
-                {shortAddress(w.address)}
-                <ExplorerLink chainId={w.chainId} value={w.address} />
-              </p>
-              {balances[w.address] != null && Number(balances[w.address]) > 0 && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t("wallet.fundsSafeAtAddress", { address: shortAddress(w.address) })}
-                </p>
-              )}
-            </div>
-            <div className="text-right">
-              <p className="text-sm">
-                {balances[w.address] != null
-                  ? `${balances[w.address]} ${t("wallet.usd")}`
-                  : t("wallet.balanceUnavailableShort")}
-              </p>
-              <span className="text-xs text-primary">
-                {openingAddress === w.address ? t("wallet.sendSigning") : t("wallet.signIn")}
-              </span>
-            </div>
-          </button>
-        ))}
-      </div>
+      <WalletBalancePreview
+        wallets={registry.map((w) => ({
+          address: w.address,
+          label: w.label,
+          chainId: w.chainId,
+          balanceUsd: balances[w.address],
+        }))}
+        interactive
+        onSelect={(address) => {
+          const entry = registry.find((w) => w.address.toLowerCase() === address.toLowerCase());
+          if (entry) void openWallet(entry);
+        }}
+      />
       <div className="mt-6 flex flex-wrap gap-3">
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={Boolean(openingAddress) || addingPasskey}
-          onClick={() => void addFromPasskey()}
-        >
-          {addingPasskey ? t("wallet.sendSigning") : t("wallet.addWalletFromPasskey")}
-        </Button>
         <Button asChild variant="outline">
           <Link to="/wallet/create">{t("wallet.createAnother")}</Link>
         </Button>
-        <AnotherWalletMenu disabled={Boolean(openingAddress) || addingPasskey} onRelink={() => openRecovery()} />
       </div>
-      <p className="mt-4 text-sm text-muted-foreground">{t("wallet.addWalletFromPasskeyHint")}</p>
-      {status && (
-        <p className={`mt-2 text-sm ${statusOk ? "text-muted-foreground" : "text-destructive"}`}>{status}</p>
-      )}
+      {status && <p className="mt-2 text-sm text-destructive">{status}</p>}
     </WalletFrame>
-    <LocalRecoverySheet
-      open={recoveryOpen}
-      onOpenChange={setRecoveryOpen}
-      initialEntry={recoveryEntry}
-      onRecovered={onOpened}
-    />
-    </>
   );
 }
 
-function WalletEmpty({ onOpened }: { onOpened: () => void }) {
-  const { t } = useLocale();
-  const supported = webAuthnSupported();
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-
-  const unlock = async () => {
-    setBusy(true);
-    setStatus(t("wallet.sendSigning"));
-    try {
-      await unlockWalletWithPasskey();
-      onOpened();
-    } catch (error) {
-      if (isUnlockRecoveryError(error)) {
-        setRecoveryOpen(true);
-        setStatus(null);
-      } else {
-        setStatus(formatPasskeyError(error));
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-    <WalletFrame current="home" showChrome={false} title={t("wallet.homeTitle")} lede={t("wallet.homeLede")}>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t("wallet.createEmptyTitle")}</CardTitle>
-            <CardDescription>{t("wallet.createEmptyBody")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-xs text-muted-foreground">{supported ? t("wallet.webauthnOk") : t("wallet.webauthnNo")}</p>
-            <Button asChild>
-              <Link to="/wallet/create">{t("wallet.create")}</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t("wallet.unlockSectionTitle")}</CardTitle>
-            <CardDescription>{t("wallet.unlockHint")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button type="button" disabled={!supported || busy} onClick={() => void unlock()}>
-              {busy ? t("wallet.sendSigning") : t("wallet.unlock")}
-            </Button>
-            <p className="text-xs text-muted-foreground">{t("wallet.pairFromOtherHint")}</p>
-            <AnotherWalletMenu disabled={busy} onRelink={() => setRecoveryOpen(true)} />
-          </CardContent>
-        </Card>
-      </div>
-      {status && <p className="mt-4 text-sm text-destructive">{status}</p>}
-    </WalletFrame>
-    <LocalRecoverySheet open={recoveryOpen} onOpenChange={setRecoveryOpen} onRecovered={onOpened} />
-    </>
-  );
-}
 
 function WalletNetworkMismatch({ count, deploymentIsTestnet }: { count: number; deploymentIsTestnet: boolean }) {
   const { t } = useLocale();
@@ -705,5 +477,5 @@ export function HomePage() {
   if (allRegistry.length > 0) {
     return <WalletNetworkMismatch count={allRegistry.length} deploymentIsTestnet={deploymentIsTestnet} />;
   }
-  return <WalletEmpty onOpened={refresh} />;
+  return <WalletAuthCard onOpened={refresh} />;
 }

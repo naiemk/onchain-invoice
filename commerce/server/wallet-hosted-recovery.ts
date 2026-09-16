@@ -2,6 +2,7 @@ import { randomBytes, createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Contract, JsonRpcProvider, ZeroHash, getAddress, isAddress, verifyMessage } from "ethers";
 import type { AppConfig } from "./config.js";
+import { readIdentityRestoreEnabled } from "./identity-onchain.js";
 import type { CommerceDb } from "./db.js";
 import { verifyCaptcha } from "./captcha.js";
 import { generateOtpCode, hashOtpCode, maskEmail, sendOtpEmail, sendRecoveryRequestedEmail } from "./email.js";
@@ -153,6 +154,58 @@ async function requireCaptcha(
   if (!ok) {
     throw Object.assign(new Error("Captcha required"), { statusCode: 400, code: "captcha_failed" });
   }
+}
+
+async function requireEmailRestoreEnabled(
+  db: CommerceDb,
+  appConfig: AppConfig,
+  email: string
+): Promise<void> {
+  const identity = db.getIdentityByEmail(email);
+  if (!identity) return;
+  const restoreEnabled = await readIdentityRestoreEnabled(appConfig.identity, identity.identityId);
+  if (!restoreEnabled) {
+    throw Object.assign(new Error("restore_disabled"), { statusCode: 403, code: "restore_disabled" });
+  }
+}
+
+async function requireWalletRestoreEnabled(
+  db: CommerceDb,
+  appConfig: AppConfig,
+  walletAddress: string
+): Promise<void> {
+  const account = db.getWalletAccount(walletAddress);
+  if (!account?.identityId) return;
+  const restoreEnabled = await readIdentityRestoreEnabled(appConfig.identity, account.identityId);
+  if (!restoreEnabled) {
+    throw Object.assign(new Error("restore_disabled"), { statusCode: 403, code: "restore_disabled" });
+  }
+}
+
+function walletsForRecoveryEmail(db: CommerceDb, email: string) {
+  const seen = new Set<string>();
+  const wallets: { address: string; createdAt: string; activeRecovery: boolean }[] = [];
+  const push = (address: string, createdAt: string) => {
+    const key = address.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    wallets.push({
+      address,
+      createdAt,
+      activeRecovery: Boolean(db.getActiveWalletRecoveryRequest(address)),
+    });
+  };
+  for (const row of db.listWalletsByVerifiedEmail(email)) {
+    const account = db.getWalletAccount(row.walletAddress);
+    push(row.walletAddress, account?.createdAt ?? row.createdAt);
+  }
+  const identity = db.getIdentityByEmail(email);
+  if (identity) {
+    for (const account of db.listWalletAccountsByIdentityId(identity.identityId)) {
+      push(account.address, account.createdAt);
+    }
+  }
+  return wallets;
 }
 
 function hostedRpId(appConfig: AppConfig): string {
@@ -328,7 +381,13 @@ async function startRecoveryEmailLookup(
     handlers.sendJson(res, 400, { error: "invalid_email" });
     return;
   }
-  const wallets = db.listWalletsByVerifiedEmail(email);
+  try {
+    await requireEmailRestoreEnabled(db, appConfig, email);
+  } catch (e) {
+    handlers.sendJson(res, statusOf(e), { error: codeOf(e), message: messageOf(e) });
+    return;
+  }
+  const wallets = walletsForRecoveryEmail(db, email);
   if (wallets.length) {
     const code = generateOtpCode();
     db.createWalletEmailOtp({
@@ -392,16 +451,7 @@ async function listRecoveryEmailWallets(
     handlers.sendJson(res, 401, { error: "invalid_email_session" });
     return;
   }
-  const records = db.listWalletsByVerifiedEmail(email);
-  const wallets = records.map((row) => {
-    const account = db.getWalletAccount(row.walletAddress);
-    const active = db.getActiveWalletRecoveryRequest(row.walletAddress);
-    return {
-      address: row.walletAddress,
-      createdAt: account?.createdAt ?? row.createdAt,
-      activeRecovery: Boolean(active),
-    };
-  });
+  const wallets = walletsForRecoveryEmail(db, email);
   handlers.sendJson(res, 200, { wallets });
 }
 
@@ -441,6 +491,15 @@ async function createRecoveryRequest(
       : [];
   if (!walletAddresses.length) {
     handlers.sendJson(res, 400, { error: "walletAddress or walletAddresses required" });
+    return;
+  }
+  try {
+    if (sessionEmail) await requireEmailRestoreEnabled(db, appConfig, sessionEmail);
+    for (const address of walletAddresses) {
+      await requireWalletRestoreEnabled(db, appConfig, address);
+    }
+  } catch (e) {
+    handlers.sendJson(res, statusOf(e), { error: codeOf(e), message: messageOf(e) });
     return;
   }
 

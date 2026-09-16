@@ -28,6 +28,7 @@ import {
   createPasskey,
   createSecurityKey,
   isYubiKeyPinRequiredError,
+  clearPendingPasskey,
 } from "@/shared/webauthn.js";
 import { connectEoaWallet, initEoaConnector } from "@/shared/eoa-connector.js";
 import { WalletFrame } from "./WalletFrame";
@@ -238,6 +239,8 @@ export function JoinSuperPage() {
                     const passkey = await createPasskey(email.trim() || t("wallet.joinSuperPasskeyLabel"), {
                       attachment: "platform",
                       walletLabel: email.trim() || undefined,
+                      purpose: "join-super",
+                      email: email.trim() || undefined,
                     });
                     const fields = passkeyToKeyFields(passkey);
                     await enroll(KEY_WEBAUTHN, {
@@ -247,6 +250,7 @@ export function JoinSuperPage() {
                       credentialId: fields.credentialId,
                       rawId: passkey.rawId,
                     });
+                    clearPendingPasskey(passkey.credentialId);
                   } catch (error) {
                     setStatus({
                       kind: "error",
@@ -269,6 +273,8 @@ export function JoinSuperPage() {
                   try {
                     const passkey = await createSecurityKey(email.trim() || t("wallet.joinSuperYubiKeyLabel"), {
                       walletLabel: email.trim() || undefined,
+                      purpose: "join-super",
+                      email: email.trim() || undefined,
                     });
                     const fields = passkeyToKeyFields(passkey);
                     await enroll(KEY_YUBIKEY, {
@@ -278,6 +284,7 @@ export function JoinSuperPage() {
                       credentialId: fields.credentialId,
                       rawId: passkey.rawId,
                     });
+                    clearPendingPasskey(passkey.credentialId);
                   } catch (error) {
                     if (isYubiKeyPinRequiredError(error)) {
                       setShowYubiHelp(true);

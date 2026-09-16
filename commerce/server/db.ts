@@ -42,6 +42,8 @@ import type {
   WalletTransferDirection,
   WalletTransferSource,
 } from "../shared/wallet.js";
+import type { IdentityMethodKind, IdentityMethodRecord, IdentityRecord } from "../shared/identity.js";
+import { randomIdentityId } from "../shared/identity-store.js";
 import type { PackedUserOperationJson, UserOpStatus, WalletUserOpRecord } from "../shared/userop.js";
 import type { TransferDraft } from "../shared/wallet-transfers.js";
 import { parsePaymentMode } from "../shared/payment-mode.js";
@@ -121,6 +123,8 @@ interface WalletAccountRow {
   owner_qy: string;
   credential_id: string | null;
   webauthn_attestation: string | null;
+  identity_id: string | null;
+  label: string | null;
   deployed_chains: string;
   activation_priority_at: string | null;
   activation_next_check_at: string | null;
@@ -130,6 +134,24 @@ interface WalletAccountRow {
   activation_error: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface IdentityRow {
+  identity_id: string;
+  email: string;
+  google_sub: string | null;
+  created_at: string;
+}
+
+interface IdentityMethodRow {
+  id: string;
+  identity_id: string;
+  kind: IdentityMethodKind;
+  credential_id: string | null;
+  qx: string | null;
+  qy: string | null;
+  eoa: string | null;
+  created_at: string;
 }
 
 interface WalletPairingRow {
@@ -1005,6 +1027,8 @@ export class CommerceDb {
         owner_qy TEXT NOT NULL,
         credential_id TEXT,
         webauthn_attestation TEXT,
+        identity_id TEXT,
+        label TEXT,
         deployed_chains TEXT NOT NULL DEFAULT '[]',
         activation_priority_at TEXT,
         activation_next_check_at TEXT,
@@ -1015,6 +1039,29 @@ export class CommerceDb {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS identities (
+        identity_id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        google_sub TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_identities_google_sub ON identities(google_sub);
+
+      CREATE TABLE IF NOT EXISTS identity_methods (
+        id TEXT PRIMARY KEY,
+        identity_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('webauthn','yubikey','eoa')),
+        credential_id TEXT,
+        qx TEXT,
+        qy TEXT,
+        eoa TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_identity_methods_identity ON identity_methods(identity_id);
+      CREATE INDEX IF NOT EXISTS idx_identity_methods_credential ON identity_methods(credential_id);
 
       CREATE TABLE IF NOT EXISTS wallet_user_ops (
         id TEXT PRIMARY KEY,
@@ -1136,7 +1183,7 @@ export class CommerceDb {
         id TEXT PRIMARY KEY,
         wallet_address TEXT NOT NULL,
         email TEXT NOT NULL,
-        purpose TEXT NOT NULL CHECK (purpose IN ('attach','recover')),
+        purpose TEXT NOT NULL CHECK (purpose IN ('attach','recover','login')),
         code_hash TEXT NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 0,
         expires_at TEXT NOT NULL,
@@ -1325,11 +1372,15 @@ export class CommerceDb {
     this.ensureColumn("wallet_pairings", "new_owner_credential_id", "TEXT");
     this.ensureColumn("wallet_recovery_requests", "new_owner_kind", "TEXT NOT NULL DEFAULT 'webauthn'");
     this.ensureColumn("wallet_recovery_requests", "new_eoa", "TEXT");
+    this.ensureColumn("wallet_accounts", "identity_id", "TEXT");
+    this.ensureColumn("wallet_accounts", "label", "TEXT");
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_wallet_accounts_activation
         ON wallet_accounts(activation_priority_at, activation_status, activation_next_check_at);
+      CREATE INDEX IF NOT EXISTS idx_wallet_accounts_identity ON wallet_accounts(identity_id);
     `);
     this.migrateHostedChallengesRecordPurpose();
+    this.migrateWalletEmailOtpLoginPurpose();
   }
 
   private migrateHostedChallengesRecordPurpose(): void {
@@ -1359,6 +1410,35 @@ export class CommerceDb {
     `);
   }
 
+  private migrateWalletEmailOtpLoginPurpose(): void {
+    const row = this.db
+      .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'wallet_email_otps'`)
+      .get() as { sql: string } | undefined;
+    if (!row?.sql || row.sql.includes("'login'")) return;
+    this.db.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE wallet_email_otps_new (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        email TEXT NOT NULL,
+        purpose TEXT NOT NULL CHECK (purpose IN ('attach','recover','login')),
+        code_hash TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO wallet_email_otps_new
+        SELECT id, wallet_address, email, purpose, code_hash, attempts, expires_at, consumed_at, created_at
+        FROM wallet_email_otps;
+      DROP TABLE wallet_email_otps;
+      ALTER TABLE wallet_email_otps_new RENAME TO wallet_email_otps;
+      CREATE INDEX IF NOT EXISTS idx_wallet_email_otps_wallet
+        ON wallet_email_otps(wallet_address, purpose, expires_at);
+      PRAGMA foreign_keys = ON;
+    `);
+  }
+
   upsertWalletAccount(input: {
     address: string;
     salt: string;
@@ -1366,16 +1446,19 @@ export class CommerceDb {
     ownerQy: string;
     credentialId: string | null;
     webauthnAttestation: string | null;
+    identityId?: string | null;
+    label?: string | null;
   }): WalletAccountRecord {
     const now = new Date().toISOString();
     const addr = input.address.toLowerCase();
     const existed = this.getWalletAccount(addr);
+    const label = input.label?.trim() || existed?.label || null;
     this.db
       .prepare(
         `INSERT INTO wallet_accounts (
-           address, salt, owner_qx, owner_qy, credential_id, webauthn_attestation,
+           address, salt, owner_qx, owner_qy, credential_id, webauthn_attestation, identity_id, label,
            deployed_chains, created_at, updated_at
-         ) VALUES (@address, @salt, @ownerQx, @ownerQy, @credentialId, @webauthnAttestation, '[]', @now, @now)
+         ) VALUES (@address, @salt, @ownerQx, @ownerQy, @credentialId, @webauthnAttestation, @identityId, @label, '[]', @now, @now)
          ON CONFLICT(address) DO UPDATE SET
            credential_id = CASE
              WHEN excluded.credential_id IS NULL OR excluded.credential_id = '' THEN credential_id
@@ -1384,6 +1467,14 @@ export class CommerceDb {
              ELSE credential_id
            END,
            webauthn_attestation = COALESCE(excluded.webauthn_attestation, webauthn_attestation),
+           identity_id = CASE
+             WHEN excluded.identity_id IS NULL OR excluded.identity_id = '' THEN identity_id
+             ELSE excluded.identity_id
+           END,
+           label = CASE
+             WHEN excluded.label IS NULL OR excluded.label = '' THEN label
+             ELSE excluded.label
+           END,
            updated_at = @now`
       )
       .run({
@@ -1393,6 +1484,8 @@ export class CommerceDb {
         ownerQy: input.ownerQy,
         credentialId: input.credentialId,
         webauthnAttestation: input.webauthnAttestation,
+        identityId: input.identityId ?? existed?.identityId ?? null,
+        label,
         now,
       });
     if (!existed) {
@@ -1402,6 +1495,12 @@ export class CommerceDb {
         ownerQx: input.ownerQx,
         ownerQy: input.ownerQy,
         credentialId: input.credentialId,
+        identityId: input.identityId ?? null,
+      });
+    } else if (input.identityId && input.identityId !== existed.identityId) {
+      this.walletPersist("account.identity_updated", {
+        address: addr,
+        identityId: input.identityId,
       });
     } else if (input.credentialId && input.credentialId !== existed.credentialId) {
       this.walletPersist("account.credential_updated", {
@@ -1410,6 +1509,15 @@ export class CommerceDb {
       });
     }
     return this.getWalletAccount(addr)!;
+  }
+
+  setWalletAccountLabel(address: string, label: string): WalletAccountRecord | null {
+    const addr = address.toLowerCase();
+    const trimmed = label.trim().slice(0, 64);
+    if (!trimmed) return this.getWalletAccount(addr);
+    const now = new Date().toISOString();
+    this.db.prepare(`UPDATE wallet_accounts SET label = ?, updated_at = ? WHERE address = ?`).run(trimmed, now, addr);
+    return this.getWalletAccount(addr);
   }
 
   getWalletAccount(address: string): WalletAccountRecord | null {
@@ -1450,7 +1558,207 @@ export class CommerceDb {
     const deviceRow = deviceRows.find((row) => credentialIdsMatch(row.credential_id, credentialId));
     if (deviceRow) return this.getWalletAccount(deviceRow.wallet_address);
 
+    const method = this.getIdentityMethodByCredentialId(credentialId);
+    if (method) {
+      const wallets = this.listWalletAccountsByIdentityId(method.identityId);
+      if (wallets[0]) return wallets[0];
+    }
+
     return null;
+  }
+
+  getIdentityById(identityId: string): IdentityRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM identities WHERE identity_id = ?`)
+      .get(identityId) as IdentityRow | undefined;
+    return row ? mapIdentity(row) : null;
+  }
+
+  getIdentityByEmail(email: string): IdentityRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM identities WHERE email = ?`)
+      .get(normalizeEmail(email)) as IdentityRow | undefined;
+    return row ? mapIdentity(row) : null;
+  }
+
+  getIdentityByGoogleSub(sub: string): IdentityRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM identities WHERE google_sub = ?`)
+      .get(sub) as IdentityRow | undefined;
+    return row ? mapIdentity(row) : null;
+  }
+
+  getOrCreateIdentityByEmail(email: string, googleSub?: string | null): IdentityRecord {
+    const existing = this.getIdentityByEmail(email);
+    if (existing) {
+      if (googleSub && !existing.googleSub) this.setIdentityGoogleSub(existing.identityId, googleSub);
+      return this.getIdentityById(existing.identityId)!;
+    }
+    const identityId = randomIdentityId();
+    return this.upsertIdentity({
+      identityId,
+      email,
+      googleSub: googleSub ?? null,
+    });
+  }
+
+  upsertIdentity(input: {
+    identityId: string;
+    email: string;
+    googleSub?: string | null;
+    createdAt?: string;
+  }): IdentityRecord {
+    const existing = this.getIdentityById(input.identityId);
+    const createdAt = input.createdAt ?? existing?.createdAt ?? new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO identities (identity_id, email, google_sub, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(identity_id) DO UPDATE SET
+           email = excluded.email,
+           google_sub = COALESCE(excluded.google_sub, google_sub)`
+      )
+      .run(input.identityId, normalizeEmail(input.email), input.googleSub ?? existing?.googleSub ?? null, createdAt);
+    if (!existing) {
+      this.walletPersist("identity.created", {
+        identityId: input.identityId,
+        email: normalizeEmail(input.email),
+        googleSub: input.googleSub ?? null,
+        createdAt,
+      });
+    }
+    return this.getIdentityById(input.identityId)!;
+  }
+
+  setIdentityGoogleSub(identityId: string, googleSub: string): void {
+    this.db.prepare(`UPDATE identities SET google_sub = ? WHERE identity_id = ?`).run(googleSub, identityId);
+    this.walletPersist("identity.google_sub", { identityId, googleSub });
+  }
+
+  listIdentityMethods(identityId: string): IdentityMethodRecord[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM identity_methods WHERE identity_id = ? ORDER BY created_at ASC`)
+      .all(identityId) as IdentityMethodRow[];
+    return rows.map(mapIdentityMethod);
+  }
+
+  /** Credential ids for YubiKey methods — used to pin WebAuthn allowCredentials during recovery. */
+  listYubikeyCredentialIds(limit = 32): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT credential_id FROM identity_methods
+         WHERE kind = 'yubikey' AND credential_id IS NOT NULL AND credential_id != ''
+         ORDER BY created_at DESC LIMIT ?`
+      )
+      .all(limit) as { credential_id: string }[];
+    const out: string[] = [];
+    for (const row of rows) {
+      const id = row.credential_id?.trim();
+      if (id && !out.includes(id)) out.push(id);
+    }
+    return out;
+  }
+
+  getIdentityMethodByPublicKey(qx: string, qy: string): IdentityMethodRecord | null {
+    const nqx = qx.trim().toLowerCase();
+    const nqy = qy.trim().toLowerCase();
+    if (!nqx.startsWith("0x") || !nqy.startsWith("0x")) return null;
+    const row = this.db
+      .prepare(`SELECT * FROM identity_methods WHERE lower(qx) = ? AND lower(qy) = ? LIMIT 1`)
+      .get(nqx, nqy) as IdentityMethodRow | undefined;
+    return row ? mapIdentityMethod(row) : null;
+  }
+
+  insertIdentityMethod(input: {
+    id: string;
+    identityId: string;
+    kind: IdentityMethodKind;
+    credentialId: string | null;
+    qx: string | null;
+    qy: string | null;
+    eoa: string | null;
+  }): IdentityMethodRecord {
+    const existed = this.db
+      .prepare(`SELECT id FROM identity_methods WHERE id = ?`)
+      .get(input.id) as { id: string } | undefined;
+    const createdAt = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO identity_methods (id, identity_id, kind, credential_id, qx, qy, eoa, created_at)
+         VALUES (@id, @identityId, @kind, @credentialId, @qx, @qy, @eoa, @createdAt)
+         ON CONFLICT(id) DO UPDATE SET
+           credential_id = COALESCE(excluded.credential_id, credential_id)`
+      )
+      .run({
+        id: input.id,
+        identityId: input.identityId,
+        kind: input.kind,
+        credentialId: input.credentialId,
+        qx: input.qx,
+        qy: input.qy,
+        eoa: input.eoa,
+        createdAt,
+      });
+    if (!existed) {
+      this.walletPersist("identity.method_added", {
+        id: input.id,
+        identityId: input.identityId,
+        kind: input.kind,
+        credentialId: input.credentialId,
+        qx: input.qx,
+        qy: input.qy,
+        eoa: input.eoa,
+        createdAt,
+      });
+    }
+    const row = this.db.prepare(`SELECT * FROM identity_methods WHERE id = ?`).get(input.id) as IdentityMethodRow;
+    return mapIdentityMethod(row);
+  }
+
+  deleteIdentityMethod(id: string): IdentityMethodRecord | null {
+    const row = this.db.prepare(`SELECT * FROM identity_methods WHERE id = ?`).get(id) as IdentityMethodRow | undefined;
+    if (!row) return null;
+    this.db.prepare(`DELETE FROM identity_methods WHERE id = ?`).run(id);
+    this.walletPersist("identity.method_removed", {
+      id: row.id,
+      identityId: row.identity_id,
+      kind: row.kind,
+      credentialId: row.credential_id,
+      qx: row.qx,
+      qy: row.qy,
+      eoa: row.eoa,
+    });
+    return mapIdentityMethod(row);
+  }
+
+  getIdentityMethodByCredentialId(credentialId: string): IdentityMethodRecord | null {
+    const variants = credentialIdLookupVariants(credentialId);
+    for (const id of variants) {
+      const row = this.db
+        .prepare(`SELECT * FROM identity_methods WHERE credential_id = ? LIMIT 1`)
+        .get(id) as IdentityMethodRow | undefined;
+      if (row) return mapIdentityMethod(row);
+    }
+    const rows = this.db
+      .prepare(`SELECT * FROM identity_methods WHERE credential_id IS NOT NULL AND credential_id != ''`)
+      .all() as IdentityMethodRow[];
+    const found = rows.find((row) => credentialIdsMatch(row.credential_id, credentialId));
+    return found ? mapIdentityMethod(found) : null;
+  }
+
+  getIdentityMethodByEoa(eoa: string): IdentityMethodRecord | null {
+    const needle = eoa.trim().toLowerCase();
+    if (!needle.startsWith("0x") || needle.length !== 42) return null;
+    const row = this.db
+      .prepare(`SELECT * FROM identity_methods WHERE kind = 'eoa' AND lower(eoa) = ? LIMIT 1`)
+      .get(needle) as IdentityMethodRow | undefined;
+    return row ? mapIdentityMethod(row) : null;
+  }
+
+  listWalletAccountsByIdentityId(identityId: string): WalletAccountRecord[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM wallet_accounts WHERE identity_id = ? ORDER BY created_at ASC`)
+      .all(identityId) as WalletAccountRow[];
+    return rows.map(mapWalletAccount);
   }
 
   getWalletDeviceByCredentialId(
@@ -3566,9 +3874,33 @@ function mapWalletAccount(row: WalletAccountRow): WalletAccountRecord {
     ownerQy: row.owner_qy,
     credentialId: row.credential_id,
     webauthnAttestation: row.webauthn_attestation,
+    identityId: row.identity_id ?? null,
+    label: row.label?.trim() || null,
     deployedChains,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapIdentity(row: IdentityRow): IdentityRecord {
+  return {
+    identityId: row.identity_id,
+    email: row.email,
+    googleSub: row.google_sub,
+    createdAt: row.created_at,
+  };
+}
+
+function mapIdentityMethod(row: IdentityMethodRow): IdentityMethodRecord {
+  return {
+    id: row.id,
+    identityId: row.identity_id,
+    kind: row.kind,
+    credentialId: row.credential_id,
+    qx: row.qx,
+    qy: row.qy,
+    eoa: row.eoa,
+    createdAt: row.created_at,
   };
 }
 

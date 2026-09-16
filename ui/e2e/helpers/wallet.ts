@@ -24,26 +24,49 @@ export async function openDevice(browser: Browser): Promise<DeviceSession> {
 }
 
 export async function createWalletFromUi(page: Page, label: string): Promise<string> {
-  await page.goto("/wallet/create");
-  await page.getByTestId("device-name").fill(label);
-  await page.getByTestId("wallet-accept-terms").click();
-  await page.getByTestId("wallet-accept-security-checks").click();
-  await expect(page.getByTestId("wallet-create-btn")).toBeEnabled({ timeout: 15_000 });
+  const created = await createIdentityWalletFromUi(page, label);
+  return created.address;
+}
+
+export async function createIdentityWalletFromUi(
+  page: Page,
+  label: string
+): Promise<{ address: string; email: string }> {
+  const email = `${label.replace(/\s+/g, "-").toLowerCase()}-${Date.now()}@example.com`;
+  await page.goto("/wallet");
+  await page.locator("#identity-email").fill(email);
+  await page.getByRole("button", { name: /^next$/i }).click();
+  const sendCode = page.getByRole("button", { name: /send code/i });
+  const otpField = page.locator("#identity-otp");
+  await expect(sendCode.or(otpField)).toBeVisible({ timeout: 15_000 });
+  if (await sendCode.isVisible()) {
+    const started = page.waitForResponse(
+      (res) => res.url().includes("/api/identity/email/start") && res.request().method() === "POST"
+    );
+    await sendCode.click();
+    await started;
+  }
+  const otpRes = await fetch(`${apiBase()}/api/identity/email/dev-otp`);
+  const otp = (await otpRes.json()) as { code?: string };
+  if (!otp.code) throw new Error("dev OTP not available");
+  await otpField.fill(otp.code);
+  await page.getByRole("button", { name: /verify code/i }).click();
+  await expect(page.getByRole("button", { name: /create first wallet/i })).toBeVisible({ timeout: 15_000 });
+  await page.locator("#auth-agree-terms").click();
+  await page.locator("#auth-agree-privacy").click();
   const created = page.waitForResponse(
     (res) =>
-      res.url().includes("/api/wallet/accounts") &&
+      res.url().includes("/api/identity/passkey/register") &&
       res.request().method() === "POST" &&
       res.status() === 201
   );
-  await page.getByTestId("wallet-create-btn").click();
-  await page.getByTestId("wallet-create-disclaimer-skip").click();
-  await page.getByTestId("wallet-create-disclaimer-finish").click();
+  await page.getByRole("button", { name: /create first wallet/i }).click();
   const res = await created;
-  const body = (await res.json()) as { account?: { address?: string } };
-  const address = body.account?.address;
+  const body = (await res.json()) as { wallets?: { address?: string }[] };
+  const address = body.wallets?.[0]?.address;
   if (!address) throw new Error("wallet create did not return address");
   await expect(page).toHaveURL(/\/wallet\/?$/, { timeout: 30_000 });
-  return address;
+  return { address, email };
 }
 
 export async function fundUsdc(address: string, amountAtoms: bigint, stack?: LocalStack): Promise<void> {
@@ -160,27 +183,65 @@ export async function waitForUserOpIncluded(userOpHash: string, timeoutMs = 30_0
 }
 
 export async function pairGuestDevice(host: DeviceSession, guest: DeviceSession, deviceName: string): Promise<void> {
-  await host.page.goto("/wallet/security");
-  await expect(host.page.getByTestId("devices-card")).toBeVisible({ timeout: 30_000 });
-  await host.page.getByRole("button", { name: "Pair another device" }).click();
-  await expect(host.page.getByTestId("pair-device-dialog")).toBeVisible();
-  const link = host.page.locator("[data-testid='pair-device-dialog'] code");
-  await expect(link).toHaveAttribute("title", /\/wallet\/pair\?payload=/, { timeout: 30_000 });
-  const deepLink = await link.getAttribute("title");
-  if (!deepLink) throw new Error("pairing dialog had no deep link");
-  await guest.page.goto(deepLink);
+  const identity = await host.page.evaluate(async () => {
+    const res = await fetch("/api/identity/me", { credentials: "include" });
+    if (!res.ok) throw new Error(`identity me ${res.status}`);
+    return (await res.json()) as { identityId: string; email?: string };
+  });
+  const hostAddress = await host.page.evaluate(() => {
+    const active = localStorage.getItem("tc-wallet-active");
+    const registryRaw = localStorage.getItem("tc-wallet-registry");
+    const registry = registryRaw ? (JSON.parse(registryRaw) as Array<{ address?: string }>) : [];
+    if (active) {
+      const found = registry.find((w) => w.address?.toLowerCase() === active.toLowerCase());
+      if (found?.address) return found.address;
+    }
+    const legacy = localStorage.getItem("tc-wallet-session");
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as { address?: string };
+      if (parsed.address) return parsed.address;
+    }
+    return registry[0]?.address ?? null;
+  });
+  if (!identity?.identityId) throw new Error("host has no identity");
+  if (hostAddress) {
+    await fundUsdc(hostAddress, 5_000_000n);
+    await waitForDeployed(hostAddress).catch(() => undefined);
+  }
+
+  const qs = new URLSearchParams({ identityId: identity.identityId });
+  if (identity.email) qs.set("email", identity.email);
+  await guest.page.goto(`/wallet/pair?${qs}`);
   await guest.page.locator("#pair-device-name").fill(deviceName);
   await guest.page.locator("#pair-submit").click();
-  await expect(host.page.getByTestId("pair-confirm")).toBeEnabled({ timeout: 60_000 });
+  await expect(guest.page.locator("#pair-qr")).toBeVisible({ timeout: 20_000 });
+  await guest.page.getByRole("button", { name: "Show full link" }).click();
+  const copy = guest.page.getByTestId("pair-copy-link");
+  await expect(copy).toBeVisible();
+  const pairUrl = await copy.getAttribute("data-url");
+  if (!pairUrl) throw new Error("pairing wizard had no link");
+
+  await host.page.goto("/wallet/security");
+  await expect(host.page.getByTestId("devices-card")).toBeVisible({ timeout: 30_000 });
+  await host.page.getByRole("button", { name: "Scan pairing QR code" }).click();
+  await expect(host.page.getByTestId("pair-device-dialog")).toBeVisible();
+  const paste = host.page.getByTestId("pair-paste-url");
+  await host.page.getByRole("button", { name: "Paste URL instead" }).click({ timeout: 5_000 }).catch(() => undefined);
+  await expect(paste).toBeVisible({ timeout: 10_000 });
+  await paste.fill(pairUrl);
+  await expect(host.page.getByTestId("pair-confirm")).toBeVisible({ timeout: 15_000 });
   await host.page.getByTestId("pair-confirm").click();
-  const paired = host.page.getByText("Device paired.");
-  const pairErr = host.page.locator("[data-testid='pair-device-dialog'] [role='status']");
+  const executed = host.page.getByTestId("pair-tx-executed");
+  const pairErr = host.page.getByTestId("pair-error");
   await withWorkerTicks(["bundler"], async () => {
-    await expect(paired.or(pairErr)).toBeVisible({ timeout: 30_000 });
+    await expect(executed.or(pairErr)).toBeVisible({ timeout: 60_000 });
   });
-  if (await pairErr.isVisible() && !(await paired.isVisible())) {
+  if (await pairErr.isVisible() && !(await executed.isVisible())) {
     throw new Error(`pairing failed: ${(await pairErr.textContent()) ?? "unknown"}`);
   }
+
+  await expect(guest.page.getByText("You are paired.")).toBeVisible({ timeout: 60_000 });
+  await guest.page.getByRole("button", { name: "Log in to wallet" }).click();
   await expect(guest.page).toHaveURL(/\/wallet\/?$/, { timeout: 60_000 });
 }
 

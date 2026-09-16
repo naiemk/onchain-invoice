@@ -318,6 +318,7 @@ async function bindRecoverBody(
         const passkey = await createPasskey(label, {
           walletLabel: session?.label || (walletAddress ? shortAddress(walletAddress) : undefined),
           deviceLabel: label,
+          purpose: "recover",
         });
         const ch = await createRecoveryChallenge("recover", walletAddress);
         const { assertion } = await assertPasskeyChallenge({

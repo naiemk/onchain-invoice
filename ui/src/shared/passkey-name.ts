@@ -31,3 +31,11 @@ export function formatPasskeyName(input: {
   }
   return clipPasskeyName(wallet || device || "Wallet");
 }
+
+/** Pairing-only WebAuthn user.name: email-device, clipped to 64 chars. */
+export function formatPairPasskeyName(email: string | null | undefined, deviceName: string): string {
+  const device = deviceName.trim() || inferDeviceLabel();
+  const mail = email?.trim() ?? "";
+  if (!mail) return clipPasskeyName(device);
+  return clipPasskeyName(`${mail}-${device}`);
+}

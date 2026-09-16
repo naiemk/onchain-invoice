@@ -90,6 +90,8 @@ export interface AppConfig {
   walletAdminGuardian?: string;
   /** HMAC secret for guardian session tokens (defaults to adminApiKey). */
   guardianSessionSecret?: string;
+  /** Hosted identity (email OTP / Google OAuth + IdentityStore). */
+  identity: IdentityConfig;
   /** Etherscan API v2 key for inbound wallet transfer history. */
   etherscanApiKey?: string;
   etherscanApiUrl: string;
@@ -122,6 +124,7 @@ export interface WalletConfig {
   factoryAddress?: string;
   recoveryAddress?: string;
   implementationAddress?: string;
+  storeAddress?: string;
   recoveryTimelockSeconds: number;
   rpcUrl?: string;
   entryPointAddress: string;
@@ -131,6 +134,26 @@ export interface WalletConfig {
   feeTokenSymbol: string;
   feeTokenDecimals: number;
   chains: WalletChainEntry[];
+}
+
+export interface IdentityConfig {
+  sessionSecret: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
+  googleRedirectUri?: string;
+  googleAuthUrl: string;
+  googleTokenUrl: string;
+  skipIdTokenVerify: boolean;
+  storeAddress?: string;
+  walletFactoryAddress?: string;
+  walletImplementation?: string;
+  rpcUrl?: string;
+  deployerPrivateKey?: string;
+  successRedirect: string;
+  /** When true, GET /api/identity/email/dev-otp returns the last OTP (local/e2e). */
+  devOtp: boolean;
+  /** Test/ops override for IdentityStore.restoreEnabled. Unset → read on-chain. */
+  restoreEnabledOverride?: boolean;
 }
 
 export interface WalletChainEntry {
@@ -207,6 +230,7 @@ interface YamlFile {
     factoryAddress?: string;
     recoveryAddress?: string;
     implementationAddress?: string;
+    storeAddress?: string;
     rpcUrl?: string;
     recoveryTimelockSeconds?: number | string;
     entryPointAddress?: string;
@@ -215,6 +239,19 @@ interface YamlFile {
     feeTokenAddress?: string;
     feeTokenSymbol?: string;
     feeTokenDecimals?: number;
+  };
+  identity?: {
+    sessionSecret?: string;
+    googleClientId?: string;
+    googleClientSecret?: string;
+    googleRedirectUri?: string;
+    googleAuthUrl?: string;
+    googleTokenUrl?: string;
+    skipIdTokenVerify?: boolean;
+    storeAddress?: string;
+    walletFactoryAddress?: string;
+    walletImplementation?: string;
+    successRedirect?: string;
   };
 }
 
@@ -294,7 +331,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     }),
     email: {
       resendApiKey: blankToUndefined(expand(env.RESEND_API_KEY ?? file.email?.resendApiKey ?? "")),
-      from: blankToUndefined(expand(env.RESEND_FROM ?? file.email?.from ?? "")) ?? "Trustless Commerce <noreply@trustless-commerce.com>",
+      from:
+        blankToUndefined(expand(env.RESEND_FROM ?? env.RECOVERY_EMAIL_FROM ?? file.email?.from ?? "")) ??
+        "Trustless Commerce <noreply@trustless-commerce.com>",
       notifyTo: blankToUndefined(
         expand(env.WALLET_RECOVERY_NOTIFY_EMAIL ?? file.email?.notifyTo ?? "")
       ),
@@ -305,10 +344,86 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     guardianSessionSecret: blankToUndefined(
       expand(env.GUARDIAN_SESSION_SECRET ?? env.ADMIN_API_KEY ?? file.adminApiKey ?? "")
     ),
+    identity: loadIdentityConfig(env, file.identity, {
+      adminApiKey: expand(env.ADMIN_API_KEY ?? file.adminApiKey ?? ""),
+      baseUrl: expand(env.BASE_URL ?? file.baseUrl ?? `http://localhost:${port}`),
+      rpcUrl: blankToUndefined(expand(env.WALLET_RPC_URL ?? env.EVM_RPC_URL ?? "")),
+      sweeperPrivateKey: blankToUndefined(expand(env.SWEEPER_PRIVATE_KEY ?? file.evm?.sweeperPrivateKey ?? "")),
+      factoryAddress: blankToUndefined(
+        expand(env.IDENTITY_WALLET_FACTORY_ADDRESS ?? env.WALLET_FACTORY_ADDRESS ?? file.wallet?.factoryAddress ?? "")
+      ),
+      implementationAddress: blankToUndefined(
+        expand(
+          env.IDENTITY_WALLET_IMPLEMENTATION ??
+            env.WALLET_IMPLEMENTATION_ADDRESS ??
+            file.wallet?.implementationAddress ??
+            ""
+        )
+      ),
+    }),
     etherscanApiKey: blankToUndefined(expand(env.ETHERSCAN_API_KEY ?? "")),
     etherscanApiUrl: expand(env.ETHERSCAN_API_URL ?? "https://api.etherscan.io/v2/api"),
     walletTransferSyncMinMs: Number(env.WALLET_TRANSFER_SYNC_MIN_MS ?? 45_000),
   };
+}
+
+function loadIdentityConfig(
+  env: NodeJS.ProcessEnv,
+  file: YamlFile["identity"] | undefined,
+  deps: {
+    adminApiKey: string;
+    baseUrl: string;
+    rpcUrl?: string;
+    sweeperPrivateKey?: string;
+    factoryAddress?: string;
+    implementationAddress?: string;
+  }
+): IdentityConfig {
+  const skipRaw = (env.GOOGLE_SKIP_ID_TOKEN_VERIFY ?? "").trim().toLowerCase();
+  const skipIdTokenVerify =
+    skipRaw === "1" || skipRaw === "true" || skipRaw === "yes" || file?.skipIdTokenVerify === true;
+  const base = deps.baseUrl.replace(/\/$/, "");
+  return {
+    sessionSecret:
+      blankToUndefined(expand(env.IDENTITY_SESSION_SECRET ?? file?.sessionSecret ?? "")) ??
+      deps.adminApiKey ??
+      "dev-identity-session",
+    googleClientId: blankToUndefined(expand(env.GOOGLE_CLIENT_ID ?? file?.googleClientId ?? "")),
+    googleClientSecret: blankToUndefined(expand(env.GOOGLE_CLIENT_SECRET ?? file?.googleClientSecret ?? "")),
+    googleRedirectUri:
+      blankToUndefined(expand(env.GOOGLE_REDIRECT_URI ?? file?.googleRedirectUri ?? "")) ??
+      `${base}/api/identity/google/callback`,
+    googleAuthUrl:
+      blankToUndefined(expand(env.GOOGLE_AUTH_URL ?? file?.googleAuthUrl ?? "")) ??
+      "https://accounts.google.com/o/oauth2/v2/auth",
+    googleTokenUrl:
+      blankToUndefined(expand(env.GOOGLE_TOKEN_URL ?? file?.googleTokenUrl ?? "")) ??
+      "https://oauth2.googleapis.com/token",
+    skipIdTokenVerify,
+    storeAddress: blankToUndefined(expand(env.IDENTITY_STORE_ADDRESS ?? file?.storeAddress ?? "")),
+    walletFactoryAddress:
+      blankToUndefined(expand(env.IDENTITY_WALLET_FACTORY_ADDRESS ?? file?.walletFactoryAddress ?? "")) ??
+      deps.factoryAddress,
+    walletImplementation:
+      blankToUndefined(expand(env.IDENTITY_WALLET_IMPLEMENTATION ?? file?.walletImplementation ?? "")) ??
+      deps.implementationAddress,
+    rpcUrl: deps.rpcUrl,
+    deployerPrivateKey: blankToUndefined(
+      expand(env.WALLET_DEPLOYER_PRIVATE_KEY ?? env.WALLET_GUARDIAN_PRIVATE_KEY ?? deps.sweeperPrivateKey ?? "")
+    ),
+    successRedirect: blankToUndefined(expand(env.IDENTITY_SUCCESS_REDIRECT ?? file?.successRedirect ?? "")) ?? "/wallet",
+    devOtp:
+      (env.IDENTITY_DEV_OTP ?? "").trim() === "1" ||
+      (env.IDENTITY_DEV_OTP ?? "").trim().toLowerCase() === "true",
+    restoreEnabledOverride: parseRestoreEnabledOverride(env.IDENTITY_RESTORE_ENABLED),
+  };
+}
+
+function parseRestoreEnabledOverride(raw: string | undefined): boolean | undefined {
+  const value = (raw ?? "").trim().toLowerCase();
+  if (value === "0" || value === "false" || value === "no") return false;
+  if (value === "1" || value === "true" || value === "yes") return true;
+  return undefined;
 }
 
 function loadFaucetConfig(
@@ -359,11 +474,21 @@ function loadWalletConfig(
   const sepoliaImpl = "0x4D19ce70D3D4a63cBa685665B39C133141B5dDC2";
   const sepoliaRecovery = "0xC68914FF4EE1d9A7f263ea550DAf6d89EB801D91";
   const sepoliaBundlerBeneficiary = "0xc2eCF8b48b9D5D1Fd04b8A9c15126011aa1cC3Eb";
-  let factoryAddress = blankToUndefined(expand(env.WALLET_FACTORY_ADDRESS ?? file?.factoryAddress ?? ""));
+  let factoryAddress = blankToUndefined(
+    expand(env.IDENTITY_WALLET_FACTORY_ADDRESS ?? env.WALLET_FACTORY_ADDRESS ?? file?.factoryAddress ?? "")
+  );
   let implementationAddress = blankToUndefined(
-    expand(env.WALLET_IMPLEMENTATION_ADDRESS ?? file?.implementationAddress ?? "")
+    expand(
+      env.IDENTITY_WALLET_IMPLEMENTATION ??
+        env.WALLET_IMPLEMENTATION_ADDRESS ??
+        file?.implementationAddress ??
+        ""
+    )
   );
   let recoveryAddress = blankToUndefined(expand(env.WALLET_RECOVERY_ADDRESS ?? file?.recoveryAddress ?? ""));
+  const storeAddress = blankToUndefined(
+    expand(env.IDENTITY_STORE_ADDRESS ?? file?.storeAddress ?? "")
+  );
   if (chainId === "11155111") {
     factoryAddress ??= sepoliaFactory;
     implementationAddress ??= sepoliaImpl;
@@ -400,6 +525,7 @@ function loadWalletConfig(
     factoryAddress,
     recoveryAddress,
     implementationAddress,
+    storeAddress,
     recoveryTimelockSeconds: Number.isFinite(timelock) ? timelock : 259200,
     rpcUrl,
     entryPointAddress: entryPoint,

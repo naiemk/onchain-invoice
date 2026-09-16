@@ -1,215 +1,67 @@
-import {
-  fetchWalletAccountByCredentialId,
-  fetchWalletConfig,
-  getWalletAccount,
-  listDevices,
-  registerDevice,
-} from "./wallet-api.js";
-import { credentialIdsMatch } from "./credential-id.js";
-import { isPoisonedDeviceRow } from "./wallet-passkey-bind.js";
-import {
-  authenticatePasskey,
-  ensureSessionCredential,
-  listWalletRegistry,
-  saveWalletSession,
-  type WalletSession,
-} from "./webauthn.js";
-import { addWalletToRegistry } from "./wallet-session.js";
-import { healWalletSession, findRegistryEntry } from "./wallet-session-heal.js";
+import { fetchWalletConfig, getWalletAccount } from "./wallet-api.js";
+import { authenticatePasskey, ensureSessionCredential, type WalletSession } from "./webauthn.js";
+import { saveWalletSession } from "./wallet-session.js";
+import { fetchIdentityWallets, loginIdentityPasskey } from "./identity-api.js";
+import { resolveWalletLabel } from "./wallet-label.js";
 import { t } from "../i18n/t.js";
 
-function findRegistryByCredential(credentialId: string): WalletSession | undefined {
-  return listWalletRegistry().find((w) => credentialIdsMatch(w.credentialId, credentialId));
-}
-
-async function rebindDeviceCredential(input: {
-  session: WalletSession;
+async function sessionFromIdentityLogin(input: {
   credentialId: string;
-  chainId: string;
-}): Promise<void> {
-  await registerDevice({
-    walletAddress: input.session.address,
-    chainId: input.chainId,
-    ownerQx: input.session.qx,
-    ownerQy: input.session.qy,
-    label: input.session.label,
-    credentialId: input.credentialId,
+  rawId: string;
+  qx?: string;
+  qy?: string;
+  preferred?: WalletSession;
+}): Promise<WalletSession> {
+  const login = await loginIdentityPasskey(input.credentialId, {
+    qx: input.qx,
+    qy: input.qy,
   });
-}
-
-async function isCredentialAuthorizedForWallet(
-  walletAddress: string,
-  chainId: string,
-  credentialId: string,
-  ownerQx: string,
-  ownerQy: string
-): Promise<boolean> {
-  const account = await getWalletAccount(walletAddress);
-  if (!account) return false;
-  if (credentialIdsMatch(account.credentialId, credentialId)) return true;
-  if (account.ownerQx === ownerQx && account.ownerQy === ownerQy) {
-    if (!account.credentialId?.trim()) return true;
-  }
-  try {
-    const devices = await listDevices(walletAddress, chainId);
-    if (devices.some((d) => credentialIdsMatch(d.credentialId, credentialId))) return true;
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
-
-async function finalizeSession(session: WalletSession): Promise<WalletSession> {
-  saveWalletSession(session);
-  const healed = await healWalletSession(session);
-  return healed.session;
-}
-
-async function buildSessionFromAuth(
-  auth: NonNullable<Awaited<ReturnType<typeof authenticatePasskey>>>,
-  preferred?: WalletSession
-): Promise<WalletSession> {
-  const registryMatch = findRegistryByCredential(auth.credentialId);
-
-  if (preferred) {
-    const entry = findRegistryEntry(preferred.address) ?? preferred;
-    const config = await fetchWalletConfig();
-    const account = await getWalletAccount(entry.address);
-
-    if (!account) {
-      throw Object.assign(new Error(t("wallet.unlockNotFound")), { code: "local_recovery" });
-    }
-
-    const ownerMatch =
-      account.ownerQx === entry.qx &&
-      account.ownerQy === entry.qy;
-
-    const credKnown =
-      credentialIdsMatch(auth.credentialId, account.credentialId) ||
-      credentialIdsMatch(auth.credentialId, entry.credentialId) ||
-      (await isCredentialAuthorizedForWallet(
-        entry.address,
-        config.chainId,
-        auth.credentialId,
-        entry.qx,
-        entry.qy
-      ));
-
-    if (!credKnown && !ownerMatch) {
-      throw Object.assign(new Error(t("wallet.unlockWrongWallet")), { code: "wrong_wallet" });
-    }
-
-    const devices = await listDevices(entry.address, config.chainId).catch(() => []);
-    const byCred = devices.find((d) => d.credentialId && credentialIdsMatch(d.credentialId, auth.credentialId));
-    const deviceOk = byCred && !isPoisonedDeviceRow(byCred, account);
-    const registryMatch = credentialIdsMatch(auth.credentialId, entry.credentialId);
-    const accountMatch = credentialIdsMatch(auth.credentialId, account.credentialId);
-    const qx =
-      (deviceOk ? byCred.ownerQx : "") ||
-      (registryMatch ? entry.qx : "") ||
-      (accountMatch ? account.ownerQx : "") ||
-      auth.qx;
-    const qy =
-      (deviceOk ? byCred.ownerQy : "") ||
-      (registryMatch ? entry.qy : "") ||
-      (accountMatch ? account.ownerQy : "") ||
-      auth.qy;
-    if (!qx || !qy) {
-      throw Object.assign(new Error(t("wallet.passkeyNotOnChain")), { code: "missing_credential_id" });
-    }
-
-    const session: WalletSession = {
-      ...entry,
-      address: account.address,
-      chainId: config.chainId,
-      salt: account.salt,
-      qx,
-      qy,
-      credentialId: auth.credentialId,
-      rawId: auth.rawId || entry.rawId,
-      label: entry.label || t("wallet.defaultDevice"),
-    };
-
-    if (!byCred && (registryMatch || accountMatch)) {
-      await rebindDeviceCredential({
-        session,
-        credentialId: auth.credentialId,
-        chainId: config.chainId,
-      });
-    }
-
-    return session;
-  }
-
-  if (registryMatch) {
-    return {
-      ...registryMatch,
-      credentialId: auth.credentialId,
-      rawId: auth.rawId || registryMatch.rawId,
-      qx: auth.qx || registryMatch.qx,
-      qy: auth.qy || registryMatch.qy,
-    };
-  }
-
-  const found = await fetchWalletAccountByCredentialId(auth.credentialId);
-  if (!found) {
+  const wallets = login.wallets.length ? login.wallets : await fetchIdentityWallets().catch(() => []);
+  if (!wallets.length) {
     throw Object.assign(new Error(t("wallet.unlockNotFound")), { code: "local_recovery" });
   }
-
-  const { account, device } = found;
+  const preferredAddr = input.preferred?.address.toLowerCase();
+  const account =
+    (preferredAddr ? wallets.find((w) => w.address.toLowerCase() === preferredAddr) : undefined) ?? wallets[0]!;
+  if (preferredAddr && account.address.toLowerCase() !== preferredAddr) {
+    throw Object.assign(new Error(t("wallet.unlockWrongWallet")), { code: "wrong_wallet" });
+  }
   const config = await fetchWalletConfig();
-  const deviceOk = device && !isPoisonedDeviceRow(device, account);
-  const accountMatch = credentialIdsMatch(auth.credentialId, account.credentialId);
-  const qx = (deviceOk ? device.ownerQx : "") || (accountMatch ? account.ownerQx : "") || auth.qx;
-  const qy = (deviceOk ? device.ownerQy : "") || (accountMatch ? account.ownerQy : "") || auth.qy;
-  if (!qx || !qy) {
-    throw Object.assign(new Error(t("wallet.passkeyNotOnChain")), { code: "missing_credential_id" });
-  }
-  let label = device?.label || t("wallet.defaultDevice");
-  try {
-    const devices = await listDevices(account.address, config.chainId);
-    const match = devices.find((d) => credentialIdsMatch(d.credentialId, auth.credentialId));
-    if (match?.label) label = match.label;
-  } catch {
-    /* ignore */
-  }
-
+  const server = await getWalletAccount(account.address).catch(() => account);
   return {
     address: account.address,
     chainId: config.chainId,
     salt: account.salt,
-    qx,
-    qy,
-    credentialId: auth.credentialId,
-    rawId: auth.rawId,
-    label,
+    qx: input.qx || account.ownerQx,
+    qy: input.qy || account.ownerQy,
+    credentialId: input.credentialId,
+    rawId: input.rawId || input.credentialId,
+    label: resolveWalletLabel({
+      saved: input.preferred?.label,
+      server: server?.label ?? account.label,
+      fallback: t("wallet.defaultWalletName"),
+    }),
+    identityId: login.identityId,
   };
 }
 
 /**
- * Unlock an existing wallet on this device via discoverable passkey,
- * then restore session from API (credentialId → account).
+ * Unlock via discoverable passkey → identity method → identity wallets.
  */
 export async function unlockWalletWithPasskey(): Promise<WalletSession> {
   const auth = await authenticatePasskey();
   if (!auth) throw new Error(t("wallet.passkeyCancelled"));
-  return finalizeSession(await buildSessionFromAuth(auth));
+  const session = await sessionFromIdentityLogin({
+    credentialId: auth.credentialId,
+    rawId: auth.rawId,
+    qx: auth.qx,
+    qy: auth.qy,
+  });
+  saveWalletSession(session);
+  return session;
 }
 
-/**
- * Sync a wallet from the server into the local list using a passkey on this device.
- * Does not open the wallet — repeat for each passkey to add multiple wallets.
- */
-export async function addWalletFromPasskey(): Promise<WalletSession> {
-  const auth = await authenticatePasskey();
-  if (!auth) throw new Error(t("wallet.passkeyCancelled"));
-  const session = await buildSessionFromAuth(auth);
-  const healed = await healWalletSession(session, { persist: false });
-  addWalletToRegistry(healed.session);
-  return healed.session;
-}
-
-/** Open a saved wallet after verifying the passkey on this device. */
+/** Open a saved identity wallet after verifying this device's passkey. */
 export async function unlockRegistryWallet(entry: WalletSession): Promise<WalletSession> {
   const prepared = await ensureSessionCredential(entry);
   if (!prepared.credentialId?.trim()) {
@@ -217,5 +69,13 @@ export async function unlockRegistryWallet(entry: WalletSession): Promise<Wallet
   }
   const auth = await authenticatePasskey({ credentialId: prepared.credentialId });
   if (!auth) throw new Error(t("wallet.passkeyCancelled"));
-  return finalizeSession(await buildSessionFromAuth(auth, prepared));
+  const session = await sessionFromIdentityLogin({
+    credentialId: auth.credentialId,
+    rawId: auth.rawId || prepared.rawId,
+    qx: auth.qx || prepared.qx,
+    qy: auth.qy || prepared.qy,
+    preferred: prepared,
+  });
+  saveWalletSession(session);
+  return session;
 }

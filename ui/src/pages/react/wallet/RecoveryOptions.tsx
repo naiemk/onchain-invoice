@@ -22,9 +22,11 @@ export function RecoveryOptions() {
       .catch(() => setHasActive(false));
   }, [session?.address, modal]);
 
+  const identity = Boolean(session?.identityId);
+
   return (
     <div className="space-y-2">
-      {session ? (
+      {session && !identity ? (
         <button
           type="button"
           className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/40"

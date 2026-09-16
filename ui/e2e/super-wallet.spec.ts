@@ -354,18 +354,20 @@ test.describe("Super Wallet UI", () => {
     await expect(page).toHaveURL(/\/wallet\/security/);
     await expect(page.getByTestId("super-wallet-policy-card")).toBeVisible();
     await expect(page.getByRole("link", { name: "Details" }).first()).toHaveAttribute("href", "/wallet/access");
-    await expect(page.getByRole("button", { name: "Pair another device" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Scan pairing QR code" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add security key (YubiKey)" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
     await expect(page.getByTestId("identity-email-card")).toBeVisible();
-    await page.getByRole("button", { name: "Pair another device" }).click();
+    await page.getByRole("button", { name: "Scan pairing QR code" }).click();
     await expect(page.getByTestId("pair-device-dialog")).toBeVisible();
-    await expect(page.getByTestId("pair-copy-link")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Paste URL instead" }).or(page.getByTestId("pair-paste-url"))
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "I lost this device" })).toHaveCount(0);
     await page.goto("/wallet/recover");
     await expect(page).toHaveURL(/\/wallet\/recover/);
     await expect(page.getByRole("tab", { name: "With email" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Without email" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Other keys" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Start recovery" })).toBeDisabled();
 
     await page.goto("/wallet/send");
@@ -405,9 +407,11 @@ test.describe("Super Wallet UI", () => {
     });
     await page.goto("/wallet/security");
     await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
+    const hitsBeforeClick = emailHits;
     await page.getByRole("button", { name: "Connect wallet" }).click();
     await expect(page.locator("#enable-advanced")).toHaveCount(0);
-    await expect.poll(() => emailHits).toBe(0);
+    await expect(page.getByTestId("connect-wallet-wizard")).toHaveCount(0);
+    await expect.poll(() => emailHits).toBe(hitsBeforeClick);
   });
 
   test("injected EOA provider is available for wallet connect", async ({ page }) => {

@@ -8,6 +8,7 @@ export type LocalStack = {
   factoryAddress: string;
   implementationAddress: string;
   recoveryAddress: string;
+  storeAddress?: string;
   usdcAddress: string;
   pingAddress: string;
   entryPointAddress: string;

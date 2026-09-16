@@ -52,6 +52,7 @@ async function main(): Promise<void> {
     factoryAddress: stack.factoryAddress,
     implementationAddress: stack.implementationAddress,
     recoveryAddress: stack.recoveryAddress,
+    storeAddress: stack.storeAddress,
     usdcAddress: stack.usdcAddress,
     pingAddress: await ping.getAddress(),
     entryPointAddress: ENTRYPOINT_V09,

@@ -8,6 +8,7 @@ import { createApp } from "../commerce/server/app.js";
 import { loadConfig } from "../commerce/server/config.js";
 import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
 import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
+import { createIdentityWalletViaApi } from "./helpers/identity-commerce.js";
 import { matchRecoveredWalletOwner } from "../commerce/shared/wallet-recover-match.js";
 
 const FACTORY = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
@@ -27,6 +28,8 @@ const BASE_ENV = {
   WALLET_RPC_URL: "",
   EVM_RPC_URL: "",
   TURNSTILE_SECRET: "",
+  IDENTITY_SESSION_SECRET: "identity-wallet-recover",
+  RESEND_API_KEY: "",
 } as const;
 
 function signAssertion(input: {
@@ -130,20 +133,13 @@ describe("matchRecoveredWalletOwner", function () {
 describe("commerce wallet recover-info API", function () {
   it("returns inDb and deployed flags", async function () {
     await withApp(async (baseUrl) => {
-      const salt = deriveWalletSalt(QX, QY);
-      const address = predictWalletAddress(FACTORY, IMPL, salt);
-
-      await fetch(`${baseUrl}/api/wallet/accounts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          address,
-          salt,
-          ownerQx: QX,
-          ownerQy: QY,
-          credentialId: "cred-recover",
-        }),
+      const created = await createIdentityWalletViaApi(baseUrl, {
+        email: "recover@example.com",
+        qx: QX,
+        qy: QY,
+        credentialId: "cred-recover",
       });
+      const address = created.address;
 
       const missing = await fetch(
         `${baseUrl}/api/wallet/accounts/0x0000000000000000000000000000000000000001/recover-info?chainId=11155111`
