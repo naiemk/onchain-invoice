@@ -16,6 +16,8 @@ export interface WalletAccountRecord {
   ownerQy: string;
   credentialId: string | null;
   webauthnAttestation: string | null;
+  identityId: string | null;
+  label: string | null;
   deployedChains: string[];
   createdAt: string;
   updatedAt: string;
@@ -83,6 +85,8 @@ export interface WalletPublicConfig {
   feeTokenSymbol: string;
   feeTokenDecimals: number;
   turnstileSiteKey?: string | null;
+  identityStoreAddress?: string | null;
+  googleAuthEnabled?: boolean;
   chains: WalletChainConfig[];
   /** ABI fragments for advanced entity M-of-N policy (Super Wallet). */
   advancedWalletAbi?: string[];
@@ -263,7 +267,7 @@ export interface WalletEmailRecord {
   updatedAt: string;
 }
 
-export type WalletEmailOtpPurpose = "attach" | "recover";
+export type WalletEmailOtpPurpose = "attach" | "recover" | "login";
 
 export type WalletRecoveryRequestStatus =
   | "awaiting_email"

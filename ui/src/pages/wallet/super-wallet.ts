@@ -482,7 +482,12 @@ function bindKeyActions(
       const status = root.querySelector<HTMLElement>("#super-status");
       try {
         showStatus(status, t("wallet.superWalletEnrollPasskey"));
-        const passkey = await createPasskey(session.label, { attachment: "platform", walletLabel: session.label });
+        const passkey = await createPasskey(session.label, {
+          attachment: "platform",
+          walletLabel: session.label,
+          purpose: "add-signer",
+          identityId: session.identityId,
+        });
         const fields = passkeyToKeyFields(passkey);
         await submitAddKey({
           session,
@@ -508,7 +513,11 @@ function bindKeyActions(
       const status = root.querySelector<HTMLElement>("#super-status");
       try {
         showStatus(status, t("wallet.superWalletEnrollYubiKey"));
-        const passkey = await createSecurityKey(session.label, { walletLabel: session.label });
+        const passkey = await createSecurityKey(session.label, {
+          walletLabel: session.label,
+          purpose: "add-yubikey",
+          identityId: session.identityId,
+        });
         const fields = passkeyToKeyFields(passkey);
         await submitAddKey({
           session,

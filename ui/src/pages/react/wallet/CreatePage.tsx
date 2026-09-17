@@ -1,88 +1,72 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { KeyRound, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageCard } from "@/components/PageSplit";
-import { TurnstileWidget, readCaptchaToken, type TurnstileControl } from "@/components/TurnstileWidget";
 import { useLocale } from "@/providers/LocaleProvider";
-import { fetchWalletConfig } from "@/shared/wallet-api.js";
-import { createCounterfactualWallet } from "@/shared/wallet-create.js";
-import { webAuthnSupported } from "@/shared/webauthn.js";
+import { createAnotherIdentityWallet } from "@/shared/wallet-create.js";
+import { fetchIdentityMe, loginIdentityPasskey } from "@/shared/identity-api.js";
+import { listWalletRegistry, loadWalletSession } from "@/shared/webauthn.js";
 import { copyText } from "@/shared/dom.js";
 import { deploymentMode } from "@/shared/networks.js";
 import { WalletFrame } from "./WalletFrame";
-import { CreateDisclaimerWizard } from "./CreateDisclaimerWizard";
-import { EmailAttachWizard } from "./EmailAttachWizard";
-import type { WalletSession } from "@/shared/wallet-session.js";
 
 export function CreatePage() {
   const { t } = useLocale();
   const navigate = useNavigate();
-  const [deviceName, setDeviceName] = useState("");
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [acceptedSecurityChecks, setAcceptedSecurityChecks] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [emailWizardOpen, setEmailWizardOpen] = useState(false);
-  const [createdSession, setCreatedSession] = useState<WalletSession | null>(null);
+  const [canCreate, setCanCreate] = useState(false);
   const [status, setStatus] = useState<{ kind: "info" | "error" | "success"; message: string } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
-  const [captchaReady, setCaptchaReady] = useState(false);
-  const captchaRef = useRef<TurnstileControl | null>(null);
-  const supported = webAuthnSupported();
   const mode = deploymentMode();
-  const captchaRequired = Boolean(turnstileSiteKey);
-  const canCreate =
-    supported && acceptedTerms && acceptedSecurityChecks && !loading && (!captchaRequired || captchaReady);
+  const session = loadWalletSession();
 
   useEffect(() => {
-    void fetchWalletConfig().then((config) => {
-      const key = config.turnstileSiteKey ?? null;
-      setTurnstileSiteKey(key);
-      if (!key) setCaptchaReady(true);
-    });
-  }, []);
-
-  const handleCaptchaTokenChange = useCallback((ready: boolean) => {
-    setCaptchaReady(ready);
-  }, []);
+    void (async () => {
+      try {
+        const credentialId =
+          loadWalletSession()?.credentialId?.trim() ||
+          listWalletRegistry().find((w) => w.credentialId?.trim())?.credentialId?.trim();
+        if (credentialId) setCanCreate(true);
+        if (credentialId) {
+          await loginIdentityPasskey(credentialId).catch(() => undefined);
+        }
+        const me = await fetchIdentityMe();
+        if (!me && !credentialId) {
+          setStatus({ kind: "error", message: t("wallet.createNeedSignIn") });
+          return;
+        }
+        if (me && me.methods.webauthn < 1) {
+          setStatus({ kind: "error", message: t("wallet.createNeedPasskey") });
+          return;
+        }
+        setCanCreate(true);
+      } catch (error) {
+        setStatus({
+          kind: "error",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+  }, [t]);
 
   const runCreate = async () => {
-    const label = deviceName.trim() || t("wallet.defaultDevice");
-    const captchaToken = readCaptchaToken(captchaRef);
-    if (captchaRequired && !captchaToken) {
-      setStatus({ kind: "error", message: t("wallet.createCaptchaRequired") });
-      return;
-    }
+    const label = name.trim() || t("wallet.defaultWalletName");
     setLoading(true);
-    setStatus({ kind: "info", message: t("wallet.creatingPasskey") });
+    setStatus({ kind: "info", message: t("wallet.creatingWallet") });
     try {
-      const result = await createCounterfactualWallet(label, { captchaToken });
+      const result = await createAnotherIdentityWallet(label);
       setAddress(result.address);
-      setCreatedSession(result.session);
       setStatus({ kind: "success", message: t("wallet.createdCounterfactual") });
-      setEmailWizardOpen(true);
+      navigate("/wallet", { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message === "captcha_failed") {
-        captchaRef.current?.reset();
-        setCaptchaReady(false);
-        setStatus({ kind: "error", message: t("wallet.createCaptchaRequired") });
-      } else {
-        setStatus({ kind: "error", message });
-      }
+      setStatus({ kind: "error", message });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCreateClick = () => {
-    if (!canCreate) return;
-    setWizardOpen(true);
   };
 
   return (
@@ -91,85 +75,22 @@ export function CreatePage() {
       breadcrumb={t("wallet.createBreadcrumb", { mode: mode === "testnet" ? t("common.testnet") : t("common.mainnet") })}
       title={t("wallet.createPageTitle")}
       lede={t("wallet.createPageLede")}
-      showChrome={false}
+      showChrome={Boolean(session)}
     >
       <PageCard className="mx-auto max-w-lg">
-        <ol className="space-y-6">
-          <li className="flex gap-4">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold">1</span>
-            <div className="flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="font-semibold">{t("wallet.createStepPasskey")}</h2>
-                  <p className="text-sm text-muted-foreground">{t("wallet.createStepPasskeyHint")}</p>
-                </div>
-                <KeyRound className="h-5 w-5 text-muted-foreground" aria-hidden />
-              </div>
-            </div>
-          </li>
-          <li className="flex gap-4">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold">2</span>
-            <div className="flex-1 space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="font-semibold">{t("wallet.createStepWorkspace")}</h2>
-                  <p className="text-sm text-muted-foreground">{t("wallet.deviceNameHint")}</p>
-                </div>
-                <Mail className="h-5 w-5 text-muted-foreground" aria-hidden />
-              </div>
-              <Input
-                id="device-name"
-                data-testid="device-name"
-                type="text"
-                placeholder={t("wallet.deviceNamePlaceholder")}
-                value={deviceName}
-                onChange={(e) => setDeviceName(e.target.value)}
-              />
-            </div>
-          </li>
-        </ol>
-
-        <p className="mt-4 text-xs text-muted-foreground">
-          {supported ? t("wallet.webauthnOk") : t("wallet.webauthnNo")}
-        </p>
-
-        <div className="mt-6 space-y-3">
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="accept-terms"
-              data-testid="wallet-accept-terms"
-              checked={acceptedTerms}
-              onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
-            />
-            <Label htmlFor="accept-terms" className="text-sm font-normal leading-snug">
-              {t("wallet.createAcceptTerms")}{" "}
-              <Link to="/terms" className="font-medium text-foreground underline underline-offset-2">
-                Terms of Use
-              </Link>
-            </Label>
-          </div>
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="accept-security-checks"
-              data-testid="wallet-accept-security-checks"
-              checked={acceptedSecurityChecks}
-              onCheckedChange={(checked) => setAcceptedSecurityChecks(checked === true)}
-            />
-            <Label htmlFor="accept-security-checks" className="text-sm font-normal leading-snug">
-              {t("wallet.createAcceptSecurityChecks")}{" "}
-              <Link to="/security-checks" className="font-medium text-foreground underline underline-offset-2">
-                Security checks
-              </Link>
-            </Label>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="device-name">{t("wallet.walletName")}</Label>
+          <p className="text-sm text-muted-foreground">{t("wallet.walletNameHint")}</p>
+          <Input
+            id="device-name"
+            data-testid="device-name"
+            type="text"
+            placeholder={t("wallet.walletNamePlaceholder")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={!canCreate || loading}
+          />
         </div>
-
-        <TurnstileWidget
-          siteKey={turnstileSiteKey}
-          onTokenChange={handleCaptchaTokenChange}
-          controlRef={captchaRef}
-          className="my-6 flex justify-center py-4"
-        />
 
         <Button
           id="wallet-create-btn"
@@ -177,36 +98,16 @@ export function CreatePage() {
           type="button"
           className="mt-6 w-full"
           size="lg"
-          disabled={!canCreate}
-          onClick={handleCreateClick}
+          disabled={!canCreate || loading}
+          onClick={() => void runCreate()}
         >
-          {loading ? t("wallet.creatingPasskey") : t("wallet.createTestnetWallet")}
+          {loading ? t("wallet.creatingWallet") : t("wallet.createWallet")}
         </Button>
 
-        <CreateDisclaimerWizard
-          open={wizardOpen}
-          onOpenChange={setWizardOpen}
-          onComplete={() => void runCreate()}
-        />
-        <EmailAttachWizard
-          open={emailWizardOpen}
-          onOpenChange={(open) => {
-            setEmailWizardOpen(open);
-            if (!open) navigate("/wallet", { replace: true });
-          }}
-          session={createdSession}
-          allowSkip
-          onDone={() => navigate("/wallet", { replace: true })}
-        />
-
-        <details className="mt-4 text-xs text-muted-foreground">
-          <summary className="cursor-pointer">{t("wallet.counterfactualShort")}</summary>
-          <p className="mt-2">{t("wallet.counterfactualCallout")}</p>
-        </details>
         <p className="mt-4 text-xs text-muted-foreground">
           {t("wallet.createOtherOptions")}{" "}
-          <Link to="/wallet/recover" className="underline underline-offset-2">
-            {t("wallet.createRecoverByEmail")}
+          <Link to="/wallet" className="underline underline-offset-2">
+            {t("wallet.cancel")}
           </Link>
         </p>
 

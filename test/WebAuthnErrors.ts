@@ -9,6 +9,12 @@ describe("WebAuthn error mapping", function () {
       "security_blocked"
     );
     expect(mapWebAuthnDomException(new DOMException("timeout", "TimeoutError")).code).to.equal("timeout");
+    expect(mapWebAuthnDomException(new DOMException("nope", "NotSupportedError")).code).to.equal(
+      "not_supported"
+    );
+    expect(mapWebAuthnDomException(new DOMException("constraint", "ConstraintError")).code).to.equal(
+      "not_supported"
+    );
   });
 
   it("preserves existing WebAuthnError instances", function () {

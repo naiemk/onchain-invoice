@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, ChevronDown, Copy, Lock, Plus, Vault } from "lucide-react";
+import { Check, ChevronDown, Copy, Lock, Pencil, Plus, Vault } from "lucide-react";
 import { LocaleSelect, useWalletAppMenu } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHero } from "@/components/PageHero";
 import { ExplorerLink } from "@/components/ExplorerLink";
@@ -22,15 +23,19 @@ import { copyText } from "@/shared/dom.js";
 import { deploymentMode, isTestnet } from "@/shared/networks.js";
 import {
   clearActiveWallet,
+  clearAllWalletLocalState,
   listWalletRegistryForDeployment,
   loadWalletSession,
+  saveWalletSession,
   setActiveWallet,
   shortAddress,
   walletSessionsEquivalent,
   WALLET_SESSION_EVENT,
   type WalletSession,
 } from "@/shared/wallet-session.js";
-import { isAdvancedMode, loadWalletMode, saveWalletMode, type WalletMode } from "@/shared/wallet-mode.js";
+import { logoutIdentity, renameIdentityWallet } from "@/shared/identity-api.js";
+import { abortPendingWebAuthn, markSkipWebAuthnPrompt } from "@/shared/webauthn.js";
+import { loadWalletMode, saveWalletMode, type WalletMode } from "@/shared/wallet-mode.js";
 import type { WalletTab } from "@/shared/wallet-ui.js";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useWalletPolicy } from "./wallet-policy";
@@ -115,7 +120,12 @@ function WalletSwitcher({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9 w-full justify-start gap-2 px-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 w-full justify-start gap-2 px-2"
+          data-testid="wallet-switcher"
+        >
           {session ? (
             <>
               <WalletIdenticon session={session} />
@@ -146,6 +156,21 @@ function WalletSwitcher({
         >
           {t("wallet.allWallets")}
         </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            void (async () => {
+              await abortPendingWebAuthn();
+              markSkipWebAuthnPrompt();
+              clearAllWalletLocalState();
+              onSessionChange();
+              onNavigate?.();
+              await logoutIdentity();
+              navigate("/", { replace: true });
+            })();
+          }}
+        >
+          {t("wallet.logOutIdentity")}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => go("/wallet/create")}>
           <Plus className="h-3.5 w-3.5" />
           {t("wallet.createAnother")}
@@ -167,6 +192,13 @@ function WalletInfoBar({
   const { t } = useLocale();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(session.label);
+
+  useEffect(() => {
+    setDraft(session.label);
+    setEditing(false);
+  }, [session.address, session.label]);
 
   const copyAddress = useCallback(async () => {
     try {
@@ -184,10 +216,57 @@ function WalletInfoBar({
     navigate("/wallet", { replace: true });
   }, [navigate, onSessionChange]);
 
+  const commitName = async () => {
+    const next = draft.trim() || t("wallet.defaultWalletName");
+    setDraft(next);
+    setEditing(false);
+    if (next === session.label) return;
+    saveWalletSession({ ...session, label: next });
+    onSessionChange();
+    await renameIdentityWallet(session.address, next, session.credentialId).catch(() => undefined);
+  };
+
   return (
+    <div data-testid="wallet-info-bar" className="mb-4 space-y-1.5">
+      <div className="flex min-w-0 items-center gap-1">
+        {editing ? (
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => void commitName()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void commitName();
+              }
+              if (e.key === "Escape") {
+                setDraft(session.label);
+                setEditing(false);
+              }
+            }}
+            autoFocus
+            maxLength={64}
+            aria-label={t("wallet.walletName")}
+            className="h-7 max-w-[16rem] px-2 text-sm font-semibold"
+          />
+        ) : (
+          <>
+            <p className="truncate text-sm font-semibold tracking-tight">{session.label}</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+              aria-label={t("wallet.renameWallet")}
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          </>
+        )}
+      </div>
     <div
-      data-testid="wallet-info-bar"
-      className="mb-4 flex flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:thin]"
+      className="flex flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:thin]"
     >
       <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 font-mono text-[10px]" onClick={() => void copyAddress()}>
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -213,6 +292,7 @@ function WalletInfoBar({
       <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={t("wallet.lock")} onClick={lock}>
         <Lock className="h-3.5 w-3.5" />
       </Button>
+    </div>
     </div>
   );
 }
@@ -249,7 +329,7 @@ function WalletModeToggle() {
 function useWalletNavLinks(): Array<{ href: string; key: string; label: string }> {
   const { t } = useLocale();
   const { isSuperWallet } = useWalletPolicy();
-  const advanced = isAdvancedMode();
+  const identity = Boolean(loadWalletSession()?.identityId);
 
   return useMemo(() => {
     const items: Array<{ href: string; key: string; label: string }> = [
@@ -257,21 +337,16 @@ function useWalletNavLinks(): Array<{ href: string; key: string; label: string }
       { href: "/wallet/get-paid", key: "getPaid", label: t("wallet.getPaidTab") },
       { href: "/wallet/send", key: "send", label: t("wallet.payTab") },
       { href: "/wallet/cash", key: "cash", label: t("wallet.cashTab") },
+      { href: "/wallet/security", key: "security", label: t("wallet.securityTab") },
     ];
-    items.push({ href: "/wallet/security", key: "security", label: t("wallet.securityTab") });
-    if (isSuperWallet) {
+    if (isSuperWallet && !identity) {
       items.push(
         { href: "/wallet/access", key: "access", label: t("wallet.accessTab") },
         { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
       );
-    } else if (advanced) {
-      items.push(
-        { href: "/wallet/super-wallet", key: "superWallet", label: t("wallet.superWalletTab") },
-        { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
-      );
     }
     return items;
-  }, [t, advanced, isSuperWallet]);
+  }, [t, isSuperWallet, identity]);
 }
 
 function WalletNavLinks({ current, onNavigate }: { current: WalletTab; onNavigate?: () => void }) {
@@ -323,7 +398,7 @@ function WalletAppMenu({
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <WalletSwitcher session={session} registry={registry} onSessionChange={onSessionChange} onNavigate={onNavigate} />
       <WalletNavLinks current={current} onNavigate={onNavigate} />
-      {!isSuperWallet && (
+      {!isSuperWallet && !session?.identityId && (
         <div className="mt-auto">
           <WalletModeToggle />
         </div>

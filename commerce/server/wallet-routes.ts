@@ -1,4 +1,4 @@
-import { Contract, JsonRpcProvider, getAddress, isAddress } from "ethers";
+import { Contract, JsonRpcProvider, ZeroHash, getAddress, isAddress } from "ethers";
 import type { AppConfig, WalletConfig } from "./config.js";
 import type { WalletDeviceRecord, WalletBalanceResponse } from "../shared/wallet.js";
 import type { PackedUserOperationJson } from "../shared/userop.js";
@@ -10,10 +10,8 @@ import {
   type BundlerFeeConfig,
 } from "../shared/userop.js";
 import { validateUserOpFee } from "../shared/userop-fee.js";
-import { deriveWalletSalt, predictWalletAddress } from "../shared/wallet-address.js";
 import { matchRecoveredWalletOwner } from "../shared/wallet-recover-match.js";
 import type { CommerceDb } from "./db.js";
-import { verifyCaptcha } from "./captcha.js";
 import { registerWalletAdvancedRoutes } from "./wallet-advanced-routes.js";
 import { enqueueWalletTransferSync } from "./wallet-transfer-sync.js";
 import {
@@ -24,6 +22,16 @@ import {
 const WALLET_OWNER_ABI = [
   "function ownerCount() view returns (uint256)",
   "function ownerAt(uint256 index) view returns (bytes32 qx, bytes32 qy)",
+];
+
+const IDENTITY_WALLET_ABI = [
+  "function identityId() view returns (bytes32)",
+  "function store() view returns (address)",
+];
+
+const IDENTITY_STORE_METHODS_ABI = [
+  "function methodIdsOf(bytes32 identityId) view returns (bytes32[])",
+  "function getMethod(bytes32 methodId) view returns (tuple(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bool exists))",
 ];
 
 const PAIRING_TTL_MS = 5 * 60 * 1000;
@@ -124,48 +132,10 @@ export function registerWalletRoutes(
     }
 
     if (req.method === "POST" && url.pathname === "/api/wallet/accounts") {
-      const body = await handlers.readJson(req);
-      if (appConfig.turnstileSecret) {
-        const captchaOk = await verifyCaptcha(appConfig, body.captchaToken, req.socket.remoteAddress);
-        if (!captchaOk) {
-          handlers.sendJson(res, 400, { error: "captcha_failed" });
-          return true;
-        }
-      }
-      const ownerQx = normalizeHex32(str(body.ownerQx));
-      const ownerQy = normalizeHex32(str(body.ownerQy));
-      const salt = normalizeHex32(str(body.salt));
-      if (!ownerQx || !ownerQy) {
-        handlers.sendJson(res, 400, { error: "ownerQx, ownerQy required" });
-        return true;
-      }
-      const derivedSalt = salt ?? deriveWalletSalt(ownerQx, ownerQy);
-      if (!walletConfig.factoryAddress || !walletConfig.implementationAddress) {
-        handlers.sendJson(res, 503, { error: "wallet_factory_not_configured" });
-        return true;
-      }
-      const predicted = predictWalletAddress(
-        walletConfig.factoryAddress,
-        walletConfig.implementationAddress,
-        derivedSalt
-      );
-      const address = str(body.address)?.toLowerCase() ?? predicted.toLowerCase();
-      const existing = isAddress(address) ? db.getWalletAccount(address) : null;
-      if (!existing && address !== predicted.toLowerCase()) {
-        handlers.sendJson(res, 400, { error: "address_mismatch", expected: predicted });
-        return true;
-      }
-      const attestation =
-        body.webauthnAttestation != null ? JSON.stringify(body.webauthnAttestation) : null;
-      const account = db.upsertWalletAccount({
-        address,
-        salt: derivedSalt,
-        ownerQx,
-        ownerQy,
-        credentialId: str(body.credentialId) || null,
-        webauthnAttestation: attestation,
+      handlers.sendJson(res, 410, {
+        error: "use_identity",
+        message: "Use POST /api/identity/passkey/register and POST /api/identity/wallets",
       });
-      handlers.sendJson(res, 201, { account });
       return true;
     }
 
@@ -544,13 +514,40 @@ async function readWalletOwnersOnChain(
   const provider = new JsonRpcProvider(chain.rpcUrl);
   const code = await provider.getCode(walletAddress);
   if (code === "0x") return [];
-  const contract = new Contract(walletAddress, WALLET_OWNER_ABI, provider);
-  const count = Number(await contract.ownerCount());
   const owners: { qx: string; qy: string }[] = [];
   const seen = new Set<string>();
-  for (let i = 0; i < count; i++) {
-    const [qx, qy] = await contract.ownerAt(i);
-    pushOwnerCandidate(owners, seen, String(qx), String(qy));
+
+  const identityWallet = new Contract(walletAddress, IDENTITY_WALLET_ABI, provider);
+  try {
+    const identityId = (await identityWallet.identityId()) as string;
+    if (identityId && identityId !== ZeroHash) {
+      const storeAddress = (await identityWallet.store()) as string;
+      const store = new Contract(storeAddress, IDENTITY_STORE_METHODS_ABI, provider);
+      const methodIds = (await store.methodIdsOf(identityId)) as string[];
+      for (const methodId of methodIds) {
+        const method = (await store.getMethod(methodId)) as {
+          qx: string;
+          qy: string;
+          exists: boolean;
+        };
+        if (!method.exists) continue;
+        pushOwnerCandidate(owners, seen, String(method.qx), String(method.qy));
+      }
+      return owners;
+    }
+  } catch {
+    /* legacy Wallet.sol owners */
+  }
+
+  const contract = new Contract(walletAddress, WALLET_OWNER_ABI, provider);
+  try {
+    const count = Number(await contract.ownerCount());
+    for (let i = 0; i < count; i++) {
+      const [qx, qy] = await contract.ownerAt(i);
+      pushOwnerCandidate(owners, seen, String(qx), String(qy));
+    }
+  } catch {
+    /* identity wallets and unknown ABIs */
   }
   return owners;
 }

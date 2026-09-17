@@ -10,7 +10,7 @@ import { collectPersistEvents } from "../commerce/server/persist-log.js";
 import { replayPersistLogsToDb } from "../commerce/server/persist-replay.js";
 import { replayWalletPersistLogToDb } from "../commerce/server/wallet-persist-replay.js";
 import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
-import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
+import { createIdentityWalletViaApi } from "./helpers/identity-commerce.js";
 
 const FACTORY = "0x06964dE197ed29A4DC2D34F68aD4510Afa25f537";
 const IMPL = "0xe024cE8ed1878dBdd3ca8E73B1e586c4E46dC85C";
@@ -31,6 +31,8 @@ const BASE_ENV = {
   SWEEPER_ADDRESS: SWEEPER,
   FORWARDER_IMPLEMENTATION: FORWARDER,
   TURNSTILE_SECRET: "",
+  IDENTITY_SESSION_SECRET: "identity-persist-log",
+  RESEND_API_KEY: "",
   RATE_LIMIT_CREATE_PER_SECOND: "100",
   RATE_LIMIT_PUBLIC_PER_SECOND: "100",
 } as const;
@@ -66,31 +68,28 @@ describe("commerce persist-log", function () {
 
   it("appends account.created on register and replays into fresh SQLite", async function () {
     await withPersistApp(async ({ baseUrl, logDir, dir }) => {
-      const salt = deriveWalletSalt(QX, QY);
-      const address = predictWalletAddress(FACTORY, IMPL, salt);
-      const res = await fetch(`${baseUrl}/api/wallet/accounts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          address,
-          salt,
-          ownerQx: QX,
-          ownerQy: QY,
-          credentialId: "cred-persist",
-        }),
+      const created = await createIdentityWalletViaApi(baseUrl, {
+        email: "persist@example.com",
+        qx: QX,
+        qy: QY,
+        credentialId: "cred-persist",
       });
-      expect(res.status).to.equal(201);
+      expect(created.address).to.match(/^0x[0-9a-f]{40}$/);
 
       const events = await collectPersistEvents(logDir, "wallet");
       expect(events.some((e) => e.type === "account.created")).to.equal(true);
+      expect(events.some((e) => e.type === "identity.created")).to.equal(true);
+      const createdEvt = events.find((e) => e.type === "account.created");
+      expect(createdEvt?.payload.identityId).to.equal(created.identityId);
 
       const replayDbPath = join(dir, "replayed.db");
       const replayDb = new CommerceDb(replayDbPath);
       await replayWalletPersistLogToDb(replayDb, logDir);
-      const account = replayDb.getWalletAccount(address);
+      const account = replayDb.getWalletAccount(created.address);
       expect(account?.ownerQx).to.equal(QX);
       expect(account?.ownerQy).to.equal(QY);
-      expect(account?.salt).to.equal(salt);
+      expect(account?.salt).to.equal(created.salt);
+      expect(account?.identityId).to.equal(created.identityId);
       replayDb.close();
 
       const wal = await readFile(join(logDir, "wallet", "wal.ndjson"), "utf8");

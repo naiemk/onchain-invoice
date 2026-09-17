@@ -31,6 +31,8 @@ export type WalletTab =
 export interface WalletRenderOptions {
   /** When true, paint only the page body (React WalletFrame supplies chrome). */
   frameless?: boolean;
+  /** Identity to pair onto when there is no identity session cookie. */
+  identityId?: string;
 }
 
 /** Paint wallet page chrome + body, or body-only for React migration. */

@@ -2,7 +2,9 @@ import { encodeWebAuthnSignature } from "../../../commerce/shared/webauthn-signa
 import { credentialIdToBytes, credentialIdsMatch } from "./credential-id.js";
 import { formatPasskeyName, inferDeviceLabel } from "./passkey-name.js";
 import {
+  listRememberedSecurityKeyIds,
   listWalletRegistry,
+  rememberSecurityKeyCredential,
   saveWalletSessionIfActive,
   type WalletSession,
 } from "./wallet-session.js";
@@ -18,6 +20,7 @@ export {
   setActiveWallet,
   clearActiveWallet,
   removeFromRegistry,
+  clearAllWalletLocalState,
   shortAddress,
   migrateWalletSessionStorage,
 } from "./wallet-session.js";
@@ -33,6 +36,131 @@ export interface PasskeyOwner {
   };
 }
 
+export type PendingPasskeyPurpose =
+  | "enroll"
+  | "pair"
+  | "recover"
+  | "add-signer"
+  | "join-super"
+  | "add-yubikey";
+
+export type CreatePasskeyOptions = {
+  attachment?: "platform" | "cross-platform";
+  walletLabel?: string;
+  deviceLabel?: string;
+  purpose?: PendingPasskeyPurpose;
+  identityId?: string;
+  email?: string;
+  /** When false, always run a new WebAuthn create (do not reuse a stored pending key). */
+  reusePending?: boolean;
+};
+
+const PENDING_PASSKEY_KEY = "tc-wallet-pending-passkey";
+const SKIP_WEBAUTHN_PROMPT_KEY = "tc-skip-webauthn-prompt";
+const SKIP_WEBAUTHN_MS = 15_000;
+
+type PendingPasskeyRecord = {
+  purpose: PendingPasskeyPurpose;
+  attachment: "platform" | "cross-platform";
+  identityId?: string;
+  email?: string;
+  owner: PasskeyOwner;
+};
+
+function pendingAttachment(options?: CreatePasskeyOptions): "platform" | "cross-platform" {
+  return options?.attachment === "cross-platform" ? "cross-platform" : "platform";
+}
+
+function pendingPurpose(options?: CreatePasskeyOptions): PendingPasskeyPurpose {
+  if (options?.purpose) return options.purpose;
+  return pendingAttachment(options) === "cross-platform" ? "add-yubikey" : "enroll";
+}
+
+function readPendingPasskeys(): PendingPasskeyRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(PENDING_PASSKEY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as PendingPasskeyRecord[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingPasskeys(rows: PendingPasskeyRecord[]): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PENDING_PASSKEY_KEY, JSON.stringify(rows));
+}
+
+function pendingMatches(
+  row: PendingPasskeyRecord,
+  purpose: PendingPasskeyPurpose,
+  attachment: "platform" | "cross-platform",
+  identityId?: string,
+  email?: string
+): boolean {
+  if (row.purpose !== purpose || row.attachment !== attachment) return false;
+  if (identityId && row.identityId && row.identityId !== identityId) return false;
+  if (email && row.email && row.email.trim().toLowerCase() !== email.trim().toLowerCase()) return false;
+  return Boolean(row.owner?.credentialId && row.owner.qx && row.owner.qy);
+}
+
+export function findPendingPasskey(options?: CreatePasskeyOptions): PasskeyOwner | null {
+  const purpose = pendingPurpose(options);
+  const attachment = pendingAttachment(options);
+  const match = readPendingPasskeys().find((row) =>
+    pendingMatches(row, purpose, attachment, options?.identityId, options?.email)
+  );
+  return match?.owner ?? null;
+}
+
+function storePendingPasskey(owner: PasskeyOwner, options?: CreatePasskeyOptions): void {
+  const purpose = pendingPurpose(options);
+  const attachment = pendingAttachment(options);
+  const next: PendingPasskeyRecord = {
+    purpose,
+    attachment,
+    identityId: options?.identityId,
+    email: options?.email?.trim().toLowerCase(),
+    owner,
+  };
+  const rest = readPendingPasskeys().filter(
+    (row) => !pendingMatches(row, purpose, attachment, options?.identityId, options?.email)
+  );
+  writePendingPasskeys([...rest, next]);
+}
+
+/** Drop a reused draft after it is registered or used to sign in. */
+export function clearPendingPasskey(credentialId?: string | null): void {
+  if (!credentialId?.trim()) return;
+  writePendingPasskeys(
+    readPendingPasskeys().filter((row) => row.owner.credentialId !== credentialId)
+  );
+}
+
+export function markSkipWebAuthnPrompt(): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(SKIP_WEBAUTHN_PROMPT_KEY, String(Date.now()));
+}
+
+export function shouldSkipWebAuthnPrompt(): boolean {
+  if (typeof window === "undefined") return false;
+  const raw = window.sessionStorage.getItem(SKIP_WEBAUTHN_PROMPT_KEY);
+  if (!raw) return false;
+  const at = Number(raw);
+  if (!Number.isFinite(at) || Date.now() - at > SKIP_WEBAUTHN_MS) {
+    window.sessionStorage.removeItem(SKIP_WEBAUTHN_PROMPT_KEY);
+    return false;
+  }
+  return true;
+}
+
+export function clearSkipWebAuthnPrompt(): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(SKIP_WEBAUTHN_PROMPT_KEY);
+}
+
 export type E2eWebAuthnBridge = {
   createPasskey: (
     displayName: string,
@@ -40,11 +168,13 @@ export type E2eWebAuthnBridge = {
   ) => Promise<PasskeyOwner>;
   authenticatePasskey: (input?: {
     credentialId?: string;
+    credentialIds?: string[];
+    hint?: "client-device" | "security-key";
   }) => Promise<(PasskeyOwner & { fromRegistry: boolean }) | null>;
   signUserOpHash: (
     userOpHashHex: string,
     credentialId?: string,
-    options?: { requireUv?: boolean }
+    options?: { requireUv?: boolean; credentialIds?: string[] }
   ) => Promise<string>;
   assertPasskeyChallenge: (input: { challengeBase64Url: string; credentialId?: string }) => Promise<{
     assertion: { authenticatorData: string; clientDataJSON: string; signature: string };
@@ -112,7 +242,7 @@ function messageForWebAuthnCode(code: WebAuthnErrorCode): string {
     case "timeout":
       return t("wallet.passkeyTimeout");
     default:
-      return t("wallet.signInFailed");
+      return t("wallet.passkeyFailed");
   }
 }
 
@@ -168,7 +298,56 @@ export function webAuthnSupported(): boolean {
 }
 
 function credentialIdFromRawId(rawId: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(rawId)));
+  const bytes = new Uint8Array(rawId);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  return btoa(binary);
+}
+
+function credentialIdToBufferSource(credentialId: string): ArrayBuffer {
+  const bytes = credentialIdToBytesLocal(credentialId);
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  return copy;
+}
+
+function securityKeyDescriptor(credentialId: string): PublicKeyCredentialDescriptor {
+  return {
+    type: "public-key",
+    id: credentialIdToBufferSource(credentialId),
+    transports: ["usb", "nfc", "ble"],
+  };
+}
+
+function uniqueCredentialIds(ids: Array<string | null | undefined>): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    const trimmed = id?.trim();
+    if (!trimmed) continue;
+    if (out.some((existing) => credentialIdsMatch(existing, trimmed))) continue;
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function securityKeyAllowCredentials(
+  extra?: string,
+  extras?: string[]
+): PublicKeyCredentialDescriptor[] | undefined {
+  const explicit = uniqueCredentialIds([extra, ...(extras ?? [])]);
+  const ids = explicit.length
+    ? explicit
+    : uniqueCredentialIds([
+        ...listRememberedSecurityKeyIds(),
+        ...listWalletRegistry().map((row) => row.securityKeyCredentialId),
+        ...readPendingPasskeys()
+          .filter((row) => row.attachment === "cross-platform")
+          .map((row) => row.owner.credentialId),
+      ]);
+  const descriptors = ids
+    .map(securityKeyDescriptor)
+    .filter((row) => row.id.byteLength > 0 && row.id.byteLength <= 1023);
+  return descriptors.length ? descriptors : undefined;
 }
 
 function platformRequestOptions(
@@ -181,14 +360,30 @@ function platformRequestOptions(
     rpId: rpId(),
     userVerification: "required",
     hints: [hint] as PublicKeyCredentialRequestOptions["hints"],
-    ...(allowCredentials ? { allowCredentials } : {}),
+    ...(allowCredentials?.length ? { allowCredentials } : {}),
   };
 }
 
 /** Serialize every WebAuthn ceremony so the platform never sees overlapping get/create calls. */
 let webAuthnTail: Promise<void> = Promise.resolve();
+let webAuthnAbort: AbortController | null = null;
+
+function takeWebAuthnSignal(): AbortSignal {
+  webAuthnAbort?.abort();
+  webAuthnAbort = new AbortController();
+  return webAuthnAbort.signal;
+}
+
+/** Abort a pending get/create (including conditional UI) so a new ceremony can start. */
+export async function abortPendingWebAuthn(): Promise<void> {
+  if (!webAuthnAbort) return;
+  webAuthnAbort.abort();
+  webAuthnAbort = null;
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
 
 async function withWebAuthnLock<T>(fn: () => Promise<T>): Promise<T> {
+  await abortPendingWebAuthn();
   const previous = webAuthnTail;
   let release!: () => void;
   webAuthnTail = new Promise<void>((resolve) => {
@@ -216,6 +411,9 @@ export function mapWebAuthnDomException(error: unknown): WebAuthnError {
         return new WebAuthnError("security_blocked", error);
       case "TimeoutError":
         return new WebAuthnError("timeout", error);
+      case "NotSupportedError":
+      case "ConstraintError":
+        return new WebAuthnError("not_supported", error);
       default:
         return new WebAuthnError("unknown", error);
     }
@@ -232,7 +430,10 @@ async function webAuthnGet(
 ): Promise<PublicKeyCredential | null> {
   return withWebAuthnLock(async () => {
     try {
-      return (await navigator.credentials.get({ publicKey: options })) as PublicKeyCredential | null;
+      return (await navigator.credentials.get({
+        publicKey: options,
+        signal: takeWebAuthnSignal(),
+      })) as PublicKeyCredential | null;
     } catch (error) {
       throw mapWebAuthnDomException(error);
     }
@@ -242,7 +443,10 @@ async function webAuthnGet(
 async function webAuthnCreate(options: CredentialCreationOptions): Promise<PublicKeyCredential | null> {
   return withWebAuthnLock(async () => {
     try {
-      return (await navigator.credentials.create(options)) as PublicKeyCredential | null;
+      return (await navigator.credentials.create({
+        ...options,
+        signal: takeWebAuthnSignal(),
+      })) as PublicKeyCredential | null;
     } catch (error) {
       throw mapWebAuthnDomException(error);
     }
@@ -251,16 +455,32 @@ async function webAuthnCreate(options: CredentialCreationOptions): Promise<Publi
 
 export async function createPasskey(
   displayName: string,
-  options?: { attachment?: "platform" | "cross-platform"; walletLabel?: string; deviceLabel?: string }
+  options?: CreatePasskeyOptions
+): Promise<PasskeyOwner> {
+  if (options?.reusePending !== false) {
+    const pending = findPendingPasskey(options);
+    if (pending) return pending;
+  }
+  const created = await createPasskeyFresh(displayName, options);
+  storePendingPasskey(created, options);
+  return created;
+}
+
+async function createPasskeyFresh(
+  displayName: string,
+  options?: CreatePasskeyOptions
 ): Promise<PasskeyOwner> {
   const shim = e2eWebAuthn();
   if (shim) return shim.createPasskey(displayName, options);
   assertWebAuthnSupported();
   const challenge = randomChallenge();
   const authenticatorSelection: AuthenticatorSelectionCriteria = {
-    residentKey: options?.attachment === "cross-platform" ? "discouraged" : "required",
+    residentKey: "required",
     userVerification: "required",
   };
+  if (options?.attachment === "cross-platform") {
+    authenticatorSelection.requireResidentKey = true;
+  }
   if (options?.attachment) {
     authenticatorSelection.authenticatorAttachment = options.attachment;
   }
@@ -285,6 +505,9 @@ export async function createPasskey(
         },
         pubKeyCredParams: [{ alg: -7, type: "public-key" }],
         authenticatorSelection,
+        ...(options?.attachment === "cross-platform"
+          ? { hints: ["security-key"] as PublicKeyCredentialCreationOptions["hints"] }
+          : {}),
       },
     });
   } catch (error) {
@@ -318,12 +541,22 @@ export async function createPasskey(
 /** Enroll a cross-platform security key (YubiKey) with UV/PIN required. */
 export async function createSecurityKey(
   displayName: string,
-  options?: { walletLabel?: string }
+  options?: {
+    walletLabel?: string;
+    purpose?: PendingPasskeyPurpose;
+    identityId?: string;
+    email?: string;
+    reusePending?: boolean;
+  }
 ): Promise<PasskeyOwner> {
   return createPasskey(displayName, {
     attachment: "cross-platform",
     walletLabel: options?.walletLabel ?? displayName,
     deviceLabel: "YubiKey",
+    purpose: options?.purpose ?? "add-yubikey",
+    identityId: options?.identityId,
+    email: options?.email,
+    reusePending: options?.reusePending,
   });
 }
 
@@ -356,22 +589,45 @@ function requireWalletBoundCredentialId(credentialId: string | undefined): strin
 
 /**
  * Discoverable WebAuthn get — returns credentialId from the assertion.
- * When credentialId is provided, pins allowCredentials to that passkey.
+ * Security-key hint pins allowCredentials to remembered YubiKey ids (usb/nfc/ble)
+ * so Chrome does not offer the platform passkey or reject the registered key.
  */
 export async function authenticatePasskey(input?: {
   credentialId?: string;
+  credentialIds?: string[];
+  mediation?: CredentialMediationRequirement;
+  hint?: "client-device" | "security-key";
 }): Promise<(PasskeyOwner & { fromRegistry: boolean }) | null> {
   const shim = e2eWebAuthn();
   if (shim) return shim.authenticatePasskey(input);
   assertWebAuthnSupported();
-  const allowCredentials = input?.credentialId?.trim()
-    ? [{ id: credentialIdToBytesLocal(input.credentialId), type: "public-key" as const }]
-    : undefined;
-  const cred = await getPasskeyAssertion(platformRequestOptions(randomChallenge(), allowCredentials));
+  const hint = input?.hint ?? "client-device";
+  const allowCredentials =
+    hint === "security-key"
+      ? securityKeyAllowCredentials(input?.credentialId, input?.credentialIds)
+      : input?.credentialId?.trim()
+        ? [{ id: credentialIdToBufferSource(input.credentialId), type: "public-key" as const }]
+        : undefined;
+  const request = platformRequestOptions(randomChallenge(), allowCredentials, hint);
+  let cred: PublicKeyCredential | null;
+  try {
+    if (input?.mediation === "conditional") {
+      cred = (await navigator.credentials.get({
+        publicKey: request,
+        mediation: "conditional",
+        signal: takeWebAuthnSignal(),
+      })) as PublicKeyCredential | null;
+    } else {
+      cred = await getPasskeyAssertion(request);
+    }
+  } catch {
+    return null;
+  }
   if (!cred) return null;
   assertCredentialMatchesRequest(input?.credentialId, cred.rawId);
   const credentialId = credentialIdFromRawId(cred.rawId);
   const rawId = bufferToHex(cred.rawId);
+  if (hint === "security-key") rememberSecurityKeyCredential(credentialId);
   const match = listWalletRegistry().find((w) => credentialIdsMatch(w.credentialId, credentialId));
   if (match) {
     return {
@@ -421,19 +677,53 @@ export function syncSessionCredentialId(session: WalletSession, rawId: ArrayBuff
 export async function signUserOpHash(
   userOpHashHex: string,
   credentialId?: string,
-  options?: { requireUv?: boolean; session?: WalletSession }
+  options?: { requireUv?: boolean; session?: WalletSession; credentialIds?: string[] }
 ): Promise<string> {
+  const signed = await signBoundPasskey(userOpHashHex, {
+    credentialId,
+    credentialIds: options?.credentialIds,
+    requireUv: options?.requireUv,
+    session: options?.session,
+  });
+  return signed.inner;
+}
+
+/** One WebAuthn get over `digestHex`; returns the credential that actually signed. */
+export async function signBoundPasskey(
+  digestHex: string,
+  options?: { credentialId?: string; credentialIds?: string[]; requireUv?: boolean; session?: WalletSession }
+): Promise<{ inner: string; credentialId: string }> {
   const shim = e2eWebAuthn();
-  if (shim) return shim.signUserOpHash(userOpHashHex, credentialId, options);
+  if (shim) {
+    const pinned = options?.credentialId?.trim() || options?.credentialIds?.find((id) => id.trim()) || "";
+    const inner = await shim.signUserOpHash(digestHex, pinned || undefined, {
+      requireUv: options?.requireUv,
+      credentialIds: options?.credentialIds,
+    });
+    const credentialId = pinned || options?.credentialId?.trim() || "";
+    if (!credentialId) throw new Error(t("wallet.passkeyMissingOnDevice"));
+    return { inner, credentialId };
+  }
   assertWebAuthnSupported();
-  const hashBytes = hexToBytes(userOpHashHex);
-  const boundCredentialId = requireWalletBoundCredentialId(credentialId);
+  const hashBytes = hexToBytes(digestHex);
+  const allowCredentials = options?.requireUv
+    ? securityKeyAllowCredentials(options.credentialId, options.credentialIds)
+    : options?.credentialId?.trim()
+      ? [
+          {
+            id: credentialIdToBytesLocal(requireWalletBoundCredentialId(options.credentialId)),
+            type: "public-key" as const,
+          },
+        ]
+      : securityKeyAllowCredentials(options?.credentialId, options?.credentialIds);
+  if (!allowCredentials?.length) {
+    throw Object.assign(new Error(t("wallet.passkeyMissingOnDevice")), { code: "missing_credential_id" });
+  }
   const publicKey = platformRequestOptions(
     hashBytes,
-    [{ id: credentialIdToBytesLocal(boundCredentialId), type: "public-key" }],
+    allowCredentials,
     options?.requireUv ? "security-key" : "client-device"
   );
-
   let cred: PublicKeyCredential | null;
   try {
     cred = await webAuthnGet(publicKey);
@@ -444,7 +734,11 @@ export async function signUserOpHash(
     throw error;
   }
   if (!cred) throw new Error(t("wallet.passkeySigningCancelled"));
-  assertCredentialMatchesRequest(boundCredentialId, cred.rawId);
+  const credentialId = credentialIdFromRawId(cred.rawId);
+  const allowed = [options?.credentialId, ...(options?.credentialIds ?? [])].filter(Boolean) as string[];
+  if (allowed.length && !allowed.some((id) => credentialIdsMatch(id, credentialId))) {
+    throw Object.assign(new Error(t("wallet.unlockWrongWallet")), { code: "wrong_wallet" });
+  }
   const response = cred.response as AuthenticatorAssertionResponse;
   if (options?.requireUv) {
     assertAuthenticatorUvSet(response.authenticatorData);
@@ -452,7 +746,7 @@ export async function signUserOpHash(
   if (options?.session) {
     syncSessionCredentialId(options.session, cred.rawId);
   }
-  return encodeWebAuthnSignature(response);
+  return { inner: encodeWebAuthnSignature(response), credentialId };
 }
 
 /** Assert over a server challenge (base64url); returns JSON fields for API posts. */

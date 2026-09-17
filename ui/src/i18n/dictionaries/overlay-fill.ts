@@ -9,6 +9,7 @@ import { overlayFillWalletNew } from "./overlay-fill-wallet-new.js";
 import { overlayFillWalletRecover } from "./overlay-fill-wallet-recover.js";
 import { overlayFillWalletRest } from "./overlay-fill-wallet-rest.js";
 import { overlayFillWalletSuper } from "./overlay-fill-wallet-super.js";
+import { overlayFillIdentity } from "./overlay-fill-identity.js";
 
 const overlayFillHome = assemble({
   nav: {
@@ -476,5 +477,6 @@ export const overlayFill: Partial<Record<Locale, Overlay>> = mergeFillMaps(
   overlayFillWalletRecover,
   overlayFillWalletRest,
   overlayFillWalletMore,
-  overlayFillWalletSuper
+  overlayFillWalletSuper,
+  overlayFillIdentity
 );

@@ -2,7 +2,7 @@ import { createHash, randomInt } from "node:crypto";
 import type { EmailConfig } from "./config.js";
 
 /** Last OTP logged in dev/test when Resend is unset (never exposed over HTTP). */
-let lastDevOtp: { to: string; code: string; purpose: "attach" | "recover" } | null = null;
+let lastDevOtp: { to: string; code: string; purpose: "attach" | "recover" | "login" } | null = null;
 /** Last ops notify logged in dev/test (never exposed over HTTP). */
 let lastDevNotify: { to: string; subject: string; text: string } | null = null;
 
@@ -46,22 +46,24 @@ export function maskEmail(email: string): string {
  */
 export async function sendOtpEmail(
   config: EmailConfig,
-  input: { to: string; code: string; purpose: "attach" | "recover" }
+  input: { to: string; code: string; purpose: "attach" | "recover" | "login"; logCode?: boolean }
 ): Promise<{ delivered: boolean; mode: "resend" | "log" }> {
   const subject =
-    input.purpose === "attach"
-      ? "Verify your Trustless Commerce wallet email"
-      : "Confirm your Trustless Commerce wallet recovery";
+    input.purpose === "login"
+      ? "Your Trustless Commerce sign-in code"
+      : input.purpose === "attach"
+        ? "Verify your Trustless Commerce wallet email"
+        : "Confirm your Trustless Commerce wallet recovery";
   const body = [
     `Your verification code is: ${input.code}`,
     "",
     "It expires in 10 minutes. If you did not request this, ignore this email.",
   ].join("\n");
 
-  if (!config.resendApiKey) {
+  if (!config.resendApiKey || input.logCode) {
     lastDevOtp = { to: input.to, code: input.code, purpose: input.purpose };
     console.error(`[email:dev] OTP to=${input.to} purpose=${input.purpose} code=${input.code}`);
-    return { delivered: true, mode: "log" };
+    if (!config.resendApiKey) return { delivered: true, mode: "log" };
   }
 
   const response = await fetch("https://api.resend.com/emails", {

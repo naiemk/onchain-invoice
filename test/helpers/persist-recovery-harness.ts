@@ -2,15 +2,20 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Contract, JsonRpcProvider, Wallet, ethers as ethersLib, getAddress } from "ethers";
+import { Contract, JsonRpcProvider, Wallet, getAddress } from "ethers";
+import {
+  ENTRYPOINT_V09,
+  ERC7821_BATCH_MODE,
+  encodeBatch,
+  encodeErc20Transfer,
+} from "../../commerce/shared/userop.js";
 import { createApp, type App } from "../../commerce/server/app.js";
 import { loadConfig } from "../../commerce/server/config.js";
 import { resetRateLimitBuckets } from "../../commerce/server/rate-limit.js";
 import { SweeperWorker, type SweeperConfig } from "../../commerce/sweeper/worker.js";
 import { WalletDeployerWorker, type WalletDeployerConfig } from "../../commerce/wallet-deployer/worker.js";
-import { deriveWalletSalt, predictWalletAddress } from "../../commerce/shared/wallet-address.js";
-import { getWalletContractFactory } from "./wallet-factory.js";
-import { ENTRYPOINT_V09, ERC7821_BATCH_MODE, encodeBatch, encodeErc20Transfer } from "../../commerce/shared/userop.js";
+import { createIdentityWalletViaApi } from "./identity-commerce.js";
+import { simulatePasskey } from "./identity-signing.js";
 
 export const HH_DEPLOYER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 export const PRODUCT_CHAIN_ID = "11155111";
@@ -29,6 +34,7 @@ export type PersistRecoveryStack = {
   factoryAddress: string;
   implementationAddress: string;
   recoveryAddress: string;
+  storeAddress: string;
   usdcAddress: string;
   feeRecipient: string;
   owner: Wallet;
@@ -131,17 +137,16 @@ export async function deployPersistRecoveryStack(ethers: {
   const sweeper = await ethers.getContractAt("CommerceInvoiceSweeper", sweeperAddress);
   const forwarderImplementation = await (sweeper as { forwarderImplementation: () => Promise<string> }).forwarderImplementation();
 
-  const WalletImpl = await getWalletContractFactory(ethers, "Wallet");
+  const WalletImpl = await ethers.getContractFactory("IdentityWallet");
   const walletImpl = await WalletImpl.deploy();
   await walletImpl.waitForDeployment?.();
-  const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
-  const recovery = await Recovery.deploy(await owner.getAddress(), await owner.getAddress());
-  await recovery.waitForDeployment?.();
-  const Factory = await ethers.getContractFactory("WalletFactory");
+  const Store = await ethers.getContractFactory("IdentityStore");
+  const store = await Store.deploy(await owner.getAddress(), await owner.getAddress());
+  await store.waitForDeployment?.();
+  const Factory = await ethers.getContractFactory("IdentityWalletFactory");
   const factory = await Factory.deploy(
     await walletImpl.getAddress(),
-    await recovery.getAddress(),
-    3600n,
+    await store.getAddress(),
     await owner.getAddress()
   );
   await factory.waitForDeployment?.();
@@ -157,7 +162,8 @@ export async function deployPersistRecoveryStack(ethers: {
     forwarderImplementation,
     factoryAddress: await factory.getAddress(),
     implementationAddress: await walletImpl.getAddress(),
-    recoveryAddress: await recovery.getAddress(),
+    recoveryAddress: await store.getAddress(),
+    storeAddress: await store.getAddress(),
     usdcAddress,
     feeRecipient: await owner.getAddress(),
     owner: owner as unknown as Wallet,
@@ -197,6 +203,13 @@ export function persistRecoveryApiEnv(input: {
     WALLET_RPC_URL: input.rpcUrl,
     WALLET_CHAIN_ID: PRODUCT_CHAIN_ID,
     WALLET_BUNDLER_FEE_TOKEN: input.stack.usdcAddress,
+    IDENTITY_STORE_ADDRESS: input.stack.storeAddress,
+    IDENTITY_WALLET_FACTORY_ADDRESS: input.stack.factoryAddress,
+    IDENTITY_WALLET_IMPLEMENTATION: input.stack.implementationAddress,
+    IDENTITY_SESSION_SECRET: "identity-persist-recovery",
+    WALLET_DEPLOYER_PRIVATE_KEY: HH_DEPLOYER_KEY,
+    RESEND_API_KEY: "",
+    IDENTITY_DEV_OTP: "1",
     TURNSTILE_SECRET: "",
     RATE_LIMIT_CREATE_PER_SECOND: "500",
     RATE_LIMIT_PUBLIC_PER_SECOND: "500",
@@ -233,26 +246,20 @@ export async function createPasskeyWallet(
   impl: string,
   index: number
 ): Promise<{ address: string; salt: string; ownerQx: string; ownerQy: string; credentialId: string }> {
-  const ownerQx = ethersLib.zeroPadValue(ethersLib.toBeHex(index + 1), 32);
-  const ownerQy = ethersLib.zeroPadValue(ethersLib.toBeHex(index + 101), 32);
-  const salt = deriveWalletSalt(ownerQx, ownerQy);
-  const address = predictWalletAddress(factory, impl, salt);
-  const credentialId = `cred-persist-${index}`;
-  const res = await fetch(`${baseUrl}/api/wallet/accounts`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      address,
-      salt,
-      ownerQx,
-      ownerQy,
-      credentialId,
-    }),
+  const key = simulatePasskey();
+  const created = await createIdentityWalletViaApi(baseUrl, {
+    email: `persist-${index}@example.com`,
+    qx: key.qx,
+    qy: key.qy,
+    credentialId: `cred-persist-${index}`,
   });
-  if (res.status !== 201) {
-    throw new Error(`create wallet failed: ${res.status} ${await res.text()}`);
-  }
-  return { address, salt, ownerQx, ownerQy, credentialId };
+  return {
+    address: created.address,
+    salt: created.salt,
+    ownerQx: created.ownerQx,
+    ownerQy: created.ownerQy,
+    credentialId: created.credentialId,
+  };
 }
 
 export async function createInvoiceForWallet(
@@ -382,8 +389,8 @@ type HardhatEthers = {
 };
 
 /**
- * Execute ERC-20 transfer from a deployed passkey wallet as EntryPoint (Hardhat only).
- * This is the same `Wallet.execute` path a bundler/UserOp uses after recovery.
+ * Execute ERC-20 transfer from a deployed identity wallet as EntryPoint (Hardhat only).
+ * This is the same `IdentityWallet.execute` path a bundler/UserOp uses after recovery.
  */
 export async function sendUsdcFromWalletViaEntryPoint(input: {
   ethers: HardhatEthers;
@@ -397,7 +404,7 @@ export async function sendUsdcFromWalletViaEntryPoint(input: {
   await input.ethers.provider.send("hardhat_impersonateAccount", [ENTRYPOINT_V09]);
   try {
     const epSigner = await input.ethers.getSigner(ENTRYPOINT_V09);
-    const wallet = await input.ethers.getContractAt("Wallet", input.walletAddress);
+    const wallet = await input.ethers.getContractAt("IdentityWallet", input.walletAddress);
     const executionData = encodeBatch([
       { target: input.usdcAddress, value: 0n, data: encodeErc20Transfer(input.collector, input.amount) },
     ]);
@@ -424,7 +431,7 @@ export async function drainWalletsToCollector(input: {
     for (const walletAddress of input.walletAddresses) {
       const amount = await tokenBalance(input.rpcUrl, input.usdcAddress, walletAddress);
       if (amount <= 0n) continue;
-      const wallet = await input.ethers.getContractAt("Wallet", walletAddress);
+      const wallet = await input.ethers.getContractAt("IdentityWallet", walletAddress);
       const executionData = encodeBatch([
         { target: input.usdcAddress, value: 0n, data: encodeErc20Transfer(input.collector, amount) },
       ]);

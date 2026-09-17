@@ -25,6 +25,16 @@ export function deriveWalletSalt(qx: string, qy: string): string {
   return keccak256(coder.encode(["string", "bytes32", "bytes32"], [WALLET_SALT_VERSION, qx, qy]));
 }
 
+const IDENTITY_WALLET_SALT_VERSION = "TC-IDENTITY-WALLET-V1";
+
+/** Deterministic salt for IdentityWalletFactory.createAccount(identityId, salt). */
+export function deriveIdentityWalletSalt(identityId: string, index: number): string {
+  const coder = AbiCoder.defaultAbiCoder();
+  return keccak256(
+    coder.encode(["string", "bytes32", "uint256"], [IDENTITY_WALLET_SALT_VERSION, identityId, index])
+  );
+}
+
 /** Predict counterfactual wallet clone address without RPC. */
 export function predictWalletAddress(factory: string, implementation: string, salt: string): string {
   return getCreate2Address(getAddress(factory), salt, cloneInitCodeHash(implementation));

@@ -238,7 +238,7 @@ export async function renderWalletSecurity(root: HTMLElement, opts?: WalletRende
     setButtonLoading(btn, true);
     try {
       showStatus(status, t("wallet.superWalletEnrollYubiKey"));
-      const key = await createSecurityKey(session.label, { walletLabel: session.label });
+      const key = await createSecurityKey(session.label, { walletLabel: session.label, purpose: "add-yubikey" });
       showStatus(status, t("wallet.sendSigning"));
       await addPasskeySigner({
         session,

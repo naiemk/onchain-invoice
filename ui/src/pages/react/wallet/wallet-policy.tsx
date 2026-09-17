@@ -29,7 +29,7 @@ export function WalletPolicyProvider({ children }: { children: ReactNode }) {
 
   const refreshPolicy = useCallback(async () => {
     const sess = loadWalletSession();
-    if (!sess) {
+    if (!sess || sess.identityId) {
       setPolicy(null);
       setLoading(false);
       return;

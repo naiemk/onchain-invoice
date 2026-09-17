@@ -1,3 +1,6 @@
+import { credentialIdsMatch } from "./credential-id.js";
+import { isInferredDeviceLabel, defaultWalletLabel } from "./wallet-label.js";
+
 export type WalletSessionRole = "owner" | "member";
 
 export interface WalletSession {
@@ -10,19 +13,23 @@ export interface WalletSession {
   rawId: string;
   label: string;
   lastOpenedAt?: string;
+  /** Hosted identity (IdentityStore) this wallet belongs to. */
+  identityId?: string;
   /** Super Wallet member session (entity key holder, not simple-mode owner). */
   role?: WalletSessionRole;
   entityId?: string;
   keyId?: string;
   keyType?: number;
   eoa?: string;
-  /** Simple-wallet YubiKey backup credential (non-discoverable). */
+  /** YubiKey backup credential id (also remembered across lock for recovery). */
   securityKeyCredentialId?: string;
 }
 
 const LEGACY_SESSION_KEY = "tc-wallet-session";
 const REGISTRY_KEY = "tc-wallet-registry";
 const ACTIVE_KEY = "tc-wallet-active";
+const SECURITY_KEY_IDS_KEY = "tc-wallet-security-key-ids";
+const IDENTITY_ONLY_KEY = "tc-wallet-identity-only-v1";
 
 export const WALLET_SESSION_EVENT = "tc-wallet-session";
 
@@ -55,7 +62,8 @@ export function walletSessionsEquivalent(a: WalletSession, b: WalletSession): bo
     normalizeHex(a.keyId) === normalizeHex(b.keyId) &&
     (a.keyType ?? 0) === (b.keyType ?? 0) &&
     normalizeHex(a.eoa) === normalizeHex(b.eoa) &&
-    (a.securityKeyCredentialId ?? "") === (b.securityKeyCredentialId ?? "")
+    (a.securityKeyCredentialId ?? "") === (b.securityKeyCredentialId ?? "") &&
+    normalizeHex(a.identityId) === normalizeHex(b.identityId)
   );
 }
 
@@ -79,6 +87,70 @@ function readRegistryRaw(): WalletSession[] {
 
 function writeRegistry(entries: WalletSession[]): void {
   localStorage.setItem(REGISTRY_KEY, JSON.stringify(entries));
+  for (const row of entries) rememberSecurityKeyCredential(row.securityKeyCredentialId);
+}
+
+/** Keep YubiKey credential ids after lock so recovery can pin WebAuthn allowCredentials. */
+export function rememberSecurityKeyCredential(credentialId?: string | null): void {
+  const id = credentialId?.trim();
+  if (!id || typeof localStorage === "undefined") return;
+  const ids = listRememberedSecurityKeyIds();
+  if (ids.some((existing) => credentialIdsMatch(existing, id))) return;
+  localStorage.setItem(SECURITY_KEY_IDS_KEY, JSON.stringify([...ids, id]));
+}
+
+export function listRememberedSecurityKeyIds(): string[] {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SECURITY_KEY_IDS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((value) => String(value).trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+const LABEL_MIGRATE_KEY = "tc-wallet-label-v2";
+
+function migrateInferredWalletLabels(): void {
+  if (typeof localStorage === "undefined") return;
+  if (localStorage.getItem(LABEL_MIGRATE_KEY) === "1") return;
+  const registry = readRegistryRaw();
+  const next = registry.map((w, i) =>
+    isInferredDeviceLabel(w.label) ? { ...w, label: defaultWalletLabel(i) } : w
+  );
+  if (next.some((w, i) => w.label !== registry[i]?.label)) {
+    writeRegistry(next);
+    const active = localStorage.getItem(ACTIVE_KEY);
+    if (active) {
+      const cur = next.find((w) => normalizeAddress(w.address) === normalizeAddress(active));
+      if (cur) localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(cur));
+    }
+  }
+  localStorage.setItem(LABEL_MIGRATE_KEY, "1");
+}
+
+/** Drop pre-identity sessions. First run of this build clears the messed-up registry. */
+function dropLegacyWalletSessions(): void {
+  if (typeof localStorage === "undefined") return;
+  if (localStorage.getItem(IDENTITY_ONLY_KEY) !== "1") {
+    localStorage.removeItem(ACTIVE_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+    localStorage.removeItem(REGISTRY_KEY);
+    localStorage.setItem(IDENTITY_ONLY_KEY, "1");
+    notifyWalletSessionChange();
+    return;
+  }
+  const registry = readRegistryRaw();
+  const identityOnly = registry.filter((w) => Boolean(w.identityId));
+  if (identityOnly.length !== registry.length) writeRegistry(identityOnly);
+  const active = localStorage.getItem(ACTIVE_KEY);
+  if (active && !identityOnly.some((w) => normalizeAddress(w.address) === normalizeAddress(active))) {
+    localStorage.removeItem(ACTIVE_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+  }
 }
 
 /** One-time migrate legacy single session into registry + active. */
@@ -108,7 +180,11 @@ export function migrateWalletSessionStorage(): void {
 
 export function listWalletRegistry(): WalletSession[] {
   migrateWalletSessionStorage();
-  return readRegistryRaw();
+  migrateInferredWalletLabels();
+  dropLegacyWalletSessions();
+  const rows = readRegistryRaw();
+  for (const row of rows) rememberSecurityKeyCredential(row.securityKeyCredentialId);
+  return rows;
 }
 
 /** Registry entries matching the current deployment (testnet vs mainnet). */
@@ -195,10 +271,13 @@ export function setActiveWallet(address: string): boolean {
 
 export function loadWalletSession(): WalletSession | null {
   migrateWalletSessionStorage();
+  migrateInferredWalletLabels();
+  dropLegacyWalletSessions();
   const active = localStorage.getItem(ACTIVE_KEY);
   if (!active) return null;
   const registry = readRegistryRaw();
-  return registry.find((w) => normalizeAddress(w.address) === normalizeAddress(active)) ?? null;
+  const found = registry.find((w) => normalizeAddress(w.address) === normalizeAddress(active)) ?? null;
+  return found?.identityId ? found : null;
 }
 
 /** Clear active wallet only; keep registry so picker can reopen. */
@@ -226,8 +305,18 @@ export function clearWalletSession(): void {
   clearActiveWallet();
 }
 
+/** Clear registry + active wallet (identity logout). */
+export function clearAllWalletLocalState(): void {
+  if (typeof localStorage === "undefined") return;
+  localStorage.removeItem(ACTIVE_KEY);
+  localStorage.removeItem(LEGACY_SESSION_KEY);
+  localStorage.removeItem(REGISTRY_KEY);
+  notifyWalletSessionChange();
+}
+
 /** Persist session as active + registry entry (create / unlock). */
 export function saveWalletSession(session: WalletSession): void {
+  if (!session.identityId) return;
   upsertWalletSession({ ...session, role: session.role ?? "owner" });
 }
 

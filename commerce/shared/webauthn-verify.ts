@@ -90,7 +90,12 @@ export function originAllowed(origin: string, rpId: string, origins: string[] | 
     return false;
   }
   const rp = rpId.toLowerCase();
+  if (isLoopbackHost(host) && isLoopbackHost(rp)) return true;
   return host === rp || host.endsWith(`.${rp}`);
+}
+
+function isLoopbackHost(host: string): boolean {
+  return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
 }
 
 export function challengeToBase64Url(bytes: Buffer | Uint8Array): string {

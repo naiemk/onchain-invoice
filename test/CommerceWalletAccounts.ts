@@ -8,6 +8,7 @@ import { loadConfig } from "../commerce/server/config.js";
 import { CommerceDb } from "../commerce/server/db.js";
 import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
 import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
+import { createIdentityWalletViaApi } from "./helpers/identity-commerce.js";
 
 const FACTORY = "0x805131afe47723819B7b81dA25256429d77aa12E";
 const IMPL = "0x4D19ce70D3D4a63cBa685665B39C133141B5dDC2";
@@ -24,6 +25,8 @@ const BASE_ENV = {
   WALLET_RPC_URL: "",
   EVM_RPC_URL: "",
   TURNSTILE_SECRET: "",
+  IDENTITY_SESSION_SECRET: "identity-wallet-test",
+  RESEND_API_KEY: "",
 } as const;
 
 async function withApp(
@@ -54,31 +57,20 @@ async function withApp(
 }
 
 describe("commerce wallet accounts API", function () {
-  it("registers counterfactual account and returns deploy status", async function () {
+  it("registers counterfactual identity wallet and returns deploy status", async function () {
     await withApp(async (baseUrl) => {
-      const salt = deriveWalletSalt(QX, QY);
-      const address = predictWalletAddress(FACTORY, IMPL, salt);
-      const res = await fetch(`${baseUrl}/api/wallet/accounts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          address,
-          salt,
-          ownerQx: QX,
-          ownerQy: QY,
-          credentialId: "cred-test",
-          webauthnAttestation: { clientDataJSON: "abc", attestationObject: "def" },
-        }),
+      const created = await createIdentityWalletViaApi(baseUrl, {
+        email: "ada@example.com",
+        qx: QX,
+        qy: QY,
+        credentialId: "cred-test",
       });
-      expect(res.status).to.equal(201);
-      const body = (await res.json()) as { account: { address: string; deployedChains: string[] } };
-      expect(body.account.address).to.equal(address.toLowerCase());
-      expect(body.account.deployedChains).to.deep.equal([]);
+      expect(created.address).to.match(/^0x[0-9a-f]{40}$/);
 
-      const get = await fetch(`${baseUrl}/api/wallet/accounts/${address}`);
+      const get = await fetch(`${baseUrl}/api/wallet/accounts/${created.address}`);
       expect(get.status).to.equal(200);
 
-      const patch = await fetch(`${baseUrl}/api/wallet/accounts/${address}/deployed`, {
+      const patch = await fetch(`${baseUrl}/api/wallet/accounts/${created.address}/deployed`, {
         method: "PATCH",
         headers: { "content-type": "application/json", "x-api-key": "sweeper-wallet-test" },
         body: JSON.stringify({ chainId: "11155111" }),
@@ -92,19 +84,10 @@ describe("commerce wallet accounts API", function () {
   it("requires captcha when TURNSTILE_SECRET is set", async function () {
     await withApp(
       async (baseUrl) => {
-        const salt = deriveWalletSalt(QX, QY);
-        const address = predictWalletAddress(FACTORY, IMPL, salt);
-        const res = await fetch(`${baseUrl}/api/wallet/accounts`, {
+        const res = await fetch(`${baseUrl}/api/identity/email/start`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            address,
-            salt,
-            ownerQx: QX,
-            ownerQy: QY,
-            credentialId: "cred-captcha-test",
-            webauthnAttestation: { clientDataJSON: "abc", attestationObject: "def" },
-          }),
+          body: JSON.stringify({ email: "ada@example.com" }),
         });
         expect(res.status).to.equal(400);
         const body = (await res.json()) as { error?: string };
@@ -156,25 +139,18 @@ describe("commerce wallet accounts API", function () {
 
   it("looks up account by credentialId", async function () {
     await withApp(async (baseUrl) => {
-      const salt = deriveWalletSalt(QX, QY);
-      const address = predictWalletAddress(FACTORY, IMPL, salt);
       const credentialId = "cred-lookup-abc";
-      await fetch(`${baseUrl}/api/wallet/accounts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          address,
-          salt,
-          ownerQx: QX,
-          ownerQy: QY,
-          credentialId,
-        }),
+      const created = await createIdentityWalletViaApi(baseUrl, {
+        email: "lookup@example.com",
+        qx: QX,
+        qy: QY,
+        credentialId,
       });
       await fetch(`${baseUrl}/api/wallet/devices`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          walletAddress: address,
+          walletAddress: created.address,
           chainId: "11155111",
           ownerQx: QX,
           ownerQy: QY,
@@ -191,7 +167,7 @@ describe("commerce wallet accounts API", function () {
         account: { address: string; credentialId: string | null };
         device: { label: string } | null;
       };
-      expect(body.account.address).to.equal(address.toLowerCase());
+      expect(body.account.address).to.equal(created.address);
       expect(body.account.credentialId).to.equal(credentialId);
       expect(body.device?.label).to.equal("Phone");
 
@@ -202,20 +178,13 @@ describe("commerce wallet accounts API", function () {
 
   it("looks up account by credentialId encoding variants", async function () {
     await withApp(async (baseUrl) => {
-      const salt = deriveWalletSalt(QX, QY);
-      const address = predictWalletAddress(FACTORY, IMPL, salt);
       const credentialId = Buffer.from("raw-credential-bytes-xyz").toString("base64");
       const credentialIdUrl = credentialId.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-      await fetch(`${baseUrl}/api/wallet/accounts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          address,
-          salt,
-          ownerQx: QX,
-          ownerQy: QY,
-          credentialId,
-        }),
+      const created = await createIdentityWalletViaApi(baseUrl, {
+        email: "variant@example.com",
+        qx: QX,
+        qy: QY,
+        credentialId,
       });
 
       const found = await fetch(
@@ -223,23 +192,22 @@ describe("commerce wallet accounts API", function () {
       );
       expect(found.status).to.equal(200);
       const body = (await found.json()) as { account: { address: string } };
-      expect(body.account.address).to.equal(address.toLowerCase());
+      expect(body.account.address).to.equal(created.address);
     });
   });
 
   it("balance endpoint returns aggregation shape", async function () {
     await withApp(async (baseUrl) => {
-      const salt = deriveWalletSalt(QX, QY);
-      const address = predictWalletAddress(FACTORY, IMPL, salt);
-      await fetch(`${baseUrl}/api/wallet/accounts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address, salt, ownerQx: QX, ownerQy: QY, credentialId: "c" }),
+      const created = await createIdentityWalletViaApi(baseUrl, {
+        email: "balance@example.com",
+        qx: QX,
+        qy: QY,
+        credentialId: "c",
       });
-      const res = await fetch(`${baseUrl}/api/wallet/balance?wallet=${address}`);
+      const res = await fetch(`${baseUrl}/api/wallet/balance?wallet=${created.address}`);
       expect(res.status).to.equal(200);
       const body = (await res.json()) as { wallet: string; totalUsdc: string; chains: unknown[] };
-      expect(body.wallet.toLowerCase()).to.equal(address.toLowerCase());
+      expect(body.wallet.toLowerCase()).to.equal(created.address);
       expect(body.chains).to.be.an("array");
 
       const queued = await fetch(`${baseUrl}/api/wallet/deployer/accounts?chainId=11155111`, {
@@ -247,7 +215,7 @@ describe("commerce wallet accounts API", function () {
       });
       expect(queued.status).to.equal(200);
       const queueBody = (await queued.json()) as { accounts: { address: string }[] };
-      expect(queueBody.accounts.some((a) => a.address === address.toLowerCase())).to.equal(true);
+      expect(queueBody.accounts.some((a) => a.address === created.address)).to.equal(true);
     });
   });
 });

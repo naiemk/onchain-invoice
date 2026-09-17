@@ -51,6 +51,8 @@ import { requireBundler } from "./bundler-auth.js";
 import { registerWalletRoutes } from "./wallet-routes.js";
 import { registerWalletClientRoutes } from "./wallet-client-routes.js";
 import { registerHostedRecoveryRoutes } from "./wallet-hosted-recovery.js";
+import { registerIdentityRoutes } from "./identity-routes.js";
+import { discoverIdentityStoreAddress } from "./identity-onchain.js";
 import { recordIncludedUserOpTransfers } from "./wallet-transfer-sync.js";
 import { formatUsdFromUsdc } from "../shared/userop.js";
 import type { UserOpStatus } from "../shared/userop.js";
@@ -67,6 +69,10 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
     readJson,
     sweeperApiKey: context.config.sweeperApiKey,
     requireApiKey,
+  });
+  const handleIdentityRoute = registerIdentityRoutes(context.db, context.config, {
+    sendJson,
+    readJson,
   });
   const handleWalletClientRoute = registerWalletClientRoutes(context.db, context.config, {
     sendJson,
@@ -123,6 +129,10 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
         return;
       }
 
+      if (await handleIdentityRoute(req, res, url)) {
+        return;
+      }
+
       if (await handleHostedRecoveryRoute(req, res, url)) {
         return;
       }
@@ -165,6 +175,10 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
 
       if (req.method === "GET" && url.pathname === "/api/public/wallet-config") {
         const w = context.config.wallet;
+        const identityStoreAddress =
+          w.storeAddress ??
+          context.config.identity.storeAddress ??
+          (await discoverIdentityStoreAddress(context.config.identity));
         sendJson(res, 200, {
           chainId: w.chainId,
           factoryAddress: w.factoryAddress ?? null,
@@ -180,6 +194,12 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
           feeTokenSymbol: w.feeTokenSymbol,
           feeTokenDecimals: w.feeTokenDecimals,
           turnstileSiteKey: context.config.turnstileSiteKey ?? null,
+          identityStoreAddress,
+          googleAuthEnabled: Boolean(
+            context.config.identity.googleClientId &&
+              context.config.identity.googleClientSecret &&
+              context.config.identity.googleRedirectUri
+          ),
           advancedWalletAbi: [...WALLET_ADVANCED_ABI],
           chains: w.chains.map((c) => ({
             chainId: c.chainId,
@@ -1021,6 +1041,8 @@ function sendJson(res: ServerResponse, statusCode: number, body: unknown): void 
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
   };
+  const cookie = res.getHeader("set-cookie");
+  if (cookie) headers["set-cookie"] = cookie;
   if (statusCode === 429 && !res.getHeader("Retry-After")) {
     headers["retry-after"] = "1";
   }

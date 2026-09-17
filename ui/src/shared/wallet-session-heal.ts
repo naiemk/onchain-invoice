@@ -1,8 +1,8 @@
 import { hashEntityEmail, computeKeyId, KEY_WEBAUTHN } from "../../../commerce/shared/advanced-wallet.js";
 import { zeroPadValue } from "ethers";
 import { getWalletAccount } from "./wallet-api.js";
-import { fetchAdvancedPolicy } from "./wallet-advanced-api.js";
-import { resolveCurrentWalletPasskey, SUPER_WALLET_NO_ENTITY } from "./current-wallet-passkey.js";
+import { resolveWalletLabel } from "./wallet-label.js";
+import { resolveCurrentWalletPasskey } from "./current-wallet-passkey.js";
 import { ensureSessionCredential } from "./webauthn.js";
 import {
   isActiveWalletAddress,
@@ -14,11 +14,10 @@ import {
 
 export type HealWalletSessionResult = {
   session: WalletSession;
-  /** On-chain Super Wallet is active but this browser lacks entity signing metadata. */
   needsSuperWalletEmail?: boolean;
 };
 
-/** Refresh salt/label; identity (qx/credentialId) only via CurrentWalletPasskey. */
+/** Refresh label/salt and bind this passkey to the identity method. */
 export async function healWalletSession(
   session: WalletSession,
   options?: { persist?: boolean }
@@ -31,13 +30,18 @@ export async function healWalletSession(
       next = {
         ...next,
         salt: account.salt || next.salt,
+        label: resolveWalletLabel({ saved: next.label, server: account.label }),
+        identityId: account.identityId || next.identityId,
       };
     }
   } catch {
     /* offline */
   }
 
-  let needsSuperWalletEmail = false;
+  if (!next.identityId) {
+    return { session: next };
+  }
+
   try {
     const persist = options?.persist !== false && isActiveWalletAddress(next.address);
     const passkey = await resolveCurrentWalletPasskey(next, "heal", { persist });
@@ -46,32 +50,25 @@ export async function healWalletSession(
       qx: passkey.qx,
       qy: passkey.qy,
       credentialId: passkey.credentialId,
-      entityId: passkey.entityId ?? next.entityId,
-      keyId: passkey.keyId ?? next.keyId,
-      keyType: passkey.keyType ?? next.keyType,
-      eoa: passkey.eoa ?? next.eoa,
+      identityId: passkey.identityId,
     };
-  } catch (error) {
-    const policy = await fetchAdvancedPolicy(next.address).catch(() => null);
-    const noEntity = Boolean(
-      error && typeof error === "object" && (error as { code?: string }).code === SUPER_WALLET_NO_ENTITY
-    );
-    needsSuperWalletEmail = Boolean(policy?.advanced && !next.entityId && noEntity);
+  } catch {
+    /* keep session coords */
   }
 
   const changed =
     next.credentialId !== session.credentialId ||
-    next.entityId !== session.entityId ||
-    next.keyId !== session.keyId ||
     next.qx !== session.qx ||
-    next.qy !== session.qy;
+    next.qy !== session.qy ||
+    next.label !== session.label ||
+    next.identityId !== session.identityId;
 
   if (changed && options?.persist !== false) saveWalletSessionIfActive(next);
 
-  return { session: next, needsSuperWalletEmail: Boolean(needsSuperWalletEmail && !next.entityId) };
+  return { session: next };
 }
 
-/** Restore Super Wallet signing after upgrade when API roster is missing entityId. */
+/** Leftover entity Super Wallet helper. Identity wallets do not use this. */
 export function healSuperWalletFromEmail(session: WalletSession, email: string): WalletSession {
   const adminEntityId = hashEntityEmail(email.trim());
   const keyId = computeKeyId(adminEntityId, KEY_WEBAUTHN, session.qx, session.qy, zeroPadValue("0x00", 20));

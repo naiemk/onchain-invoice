@@ -8,7 +8,7 @@ import { createApp } from "../commerce/server/app.js";
 import { loadConfig } from "../commerce/server/config.js";
 import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
 import { clearLastDevNotify, clearLastDevOtp, getLastDevNotify, getLastDevOtp } from "../commerce/server/email.js";
-import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
+import { createIdentityWalletViaApi } from "./helpers/identity-commerce.js";
 import { guardianLoginMessage } from "../commerce/server/wallet-hosted-recovery.js";
 import { recoveryNewOwnerMessage } from "../commerce/shared/wallet.js";
 import { signEoaRecover } from "../commerce/shared/wallet-eip712.js";
@@ -37,6 +37,7 @@ const BASE_ENV = {
   WALLET_RECOVERY_NOTIFY_EMAIL: "ops@example.com",
   RATE_LIMIT_PUBLIC_PER_SECOND: "100",
   RATE_LIMIT_CREATE_PER_SECOND: "100",
+  IDENTITY_SESSION_SECRET: "identity-hosted-recovery",
 } as const;
 
 async function withApp(
@@ -75,26 +76,18 @@ async function registerWallet(
   pk: PasskeyFixture,
   captchaToken?: string
 ): Promise<string> {
-  const salt = deriveWalletSalt(pk.qx, pk.qy);
-  const address = predictWalletAddress(FACTORY, IMPL, salt);
-  const res = await fetch(`${baseUrl}/api/wallet/accounts`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      address,
-      salt,
-      ownerQx: pk.qx,
-      ownerQy: pk.qy,
-      credentialId: pk.credentialId,
-      ...(captchaToken ? { captchaToken } : {}),
-    }),
+  const created = await createIdentityWalletViaApi(baseUrl, {
+    email: `${pk.credentialId.replace(/[^a-z0-9]/gi, "").slice(0, 12) || "pk"}@example.com`,
+    qx: pk.qx,
+    qy: pk.qy,
+    credentialId: pk.credentialId,
+    captchaToken,
   });
-  expect(res.status).to.equal(201);
   await fetch(`${baseUrl}/api/wallet/devices`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      walletAddress: address,
+      walletAddress: created.address,
       chainId: "11155111",
       ownerQx: pk.qx,
       ownerQy: pk.qy,
@@ -102,7 +95,7 @@ async function registerWallet(
       credentialId: pk.credentialId,
     }),
   });
-  return address;
+  return created.address;
 }
 
 async function attachVerifiedEmail(
@@ -690,7 +683,7 @@ describe("commerce hosted wallet recovery", function () {
       expect(created.request.status).to.equal("awaiting_guardian");
       expect(created.request.newOwnerKind).to.equal("eoa");
       expect(created.request.newEoa?.toLowerCase()).to.equal(eoa.address.toLowerCase());
-      expect(created.request.email).to.equal("");
+      expect(created.request.email).to.include("***@");
       expect(getLastDevNotify()?.subject).to.equal("recovery requested");
     });
   });

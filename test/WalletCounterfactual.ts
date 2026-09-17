@@ -1,63 +1,37 @@
 import { expect } from "chai";
 import { network } from "hardhat";
-import { ethers as ethersLib } from "ethers";
-import { deriveWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
-import { getWalletContractFactory } from "./helpers/wallet-factory.js";
+import { deriveIdentityWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
+import { randomIdentityId } from "../commerce/shared/identity-store.js";
+import { simulatePasskey } from "./helpers/identity-signing.js";
 
-describe("Wallet counterfactual address", function () {
-  const QX = ethersLib.zeroPadValue("0x01", 32);
-  const QY = ethersLib.zeroPadValue("0x02", 32);
-
-  it("deriveWalletSalt is deterministic", function () {
-    const a = deriveWalletSalt(QX, QY);
-    const b = deriveWalletSalt(QX, QY);
+describe("IdentityWallet counterfactual address", function () {
+  it("deriveIdentityWalletSalt is deterministic", function () {
+    const id = randomIdentityId();
+    const a = deriveIdentityWalletSalt(id, 0);
+    const b = deriveIdentityWalletSalt(id, 0);
     expect(a).to.equal(b);
+    expect(deriveIdentityWalletSalt(id, 1)).to.not.equal(a);
   });
 
   it("predictWalletAddress matches factory before deploy", async function () {
     const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
     const [owner] = await ethers.getSigners();
-    const WalletImpl = await getWalletContractFactory(ethers, "Wallet");
-    const walletImpl = await WalletImpl.deploy();
-    const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
-    const recovery = await Recovery.deploy(owner.address, owner.address);
-    const Factory = await ethers.getContractFactory("WalletFactory");
-    const factory = await Factory.deploy(
-      await walletImpl.getAddress(),
-      await recovery.getAddress(),
-      3600n,
-      owner.address
-    );
+    const key = simulatePasskey();
+    const identityId = randomIdentityId();
+    const Store = await ethers.getContractFactory("IdentityStore");
+    const store = await Store.deploy(owner.address, owner.address);
+    await store.register(identityId, key.qx, key.qy);
+    const Impl = await ethers.getContractFactory("IdentityWallet");
+    const impl = await Impl.deploy();
+    const Factory = await ethers.getContractFactory("IdentityWalletFactory");
+    const factory = await Factory.deploy(await impl.getAddress(), await store.getAddress(), owner.address);
     const factoryAddr = await factory.getAddress();
-    const implAddr = await walletImpl.getAddress();
-    const salt = deriveWalletSalt(QX, QY);
+    const implAddr = await impl.getAddress();
+    const salt = deriveIdentityWalletSalt(identityId, 0);
     const predictedOffchain = predictWalletAddress(factoryAddr, implAddr, salt);
     const predictedOnchain = await factory.predictAddress(salt);
     expect(predictedOffchain.toLowerCase()).to.equal(predictedOnchain.toLowerCase());
     const code = await ethers.provider.getCode(predictedOffchain);
     expect(code).to.equal("0x");
-  });
-
-  it("createAccount is idempotent", async function () {
-    const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
-    const [owner] = await ethers.getSigners();
-    const WalletImpl = await getWalletContractFactory(ethers, "Wallet");
-    const walletImpl = await WalletImpl.deploy();
-    const Recovery = await ethers.getContractFactory("AdminGuardianRecovery");
-    const recovery = await Recovery.deploy(owner.address, owner.address);
-    const Factory = await ethers.getContractFactory("WalletFactory");
-    const factory = await Factory.deploy(
-      await walletImpl.getAddress(),
-      await recovery.getAddress(),
-      3600n,
-      owner.address
-    );
-    const salt = deriveWalletSalt(QX, QY);
-    const addr1 = await factory.createAccount.staticCall(QX, QY, salt);
-    await factory.createAccount(QX, QY, salt);
-    const addr2 = await factory.createAccount.staticCall(QX, QY, salt);
-    expect(addr1.toLowerCase()).to.equal(addr2.toLowerCase());
-    const code = await ethers.provider.getCode(addr1);
-    expect(code.length).to.be.greaterThan(2);
   });
 });

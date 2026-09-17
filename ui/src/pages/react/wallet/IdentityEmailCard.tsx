@@ -3,6 +3,7 @@ import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLocale } from "@/providers/LocaleProvider";
+import { fetchIdentityMe } from "@/shared/identity-api.js";
 import { fetchWalletEmail } from "@/shared/wallet-recovery-api.js";
 import { listWalletEntities } from "@/shared/wallet-advanced-api.js";
 import { type WalletSession } from "@/shared/wallet-session.js";
@@ -16,12 +17,23 @@ export function IdentityEmailCard({
   advanced: boolean;
 }) {
   const { t } = useLocale();
+  const [ownedIdentity, setOwnedIdentity] = useState(Boolean(session.identityId));
   const [status, setStatus] = useState<"loading" | "none" | "pending" | "verified">("loading");
   const [email, setEmail] = useState<string | null>(null);
   const [superLabel, setSuperLabel] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const reload = useCallback(async () => {
+    if (session.identityId) {
+      setOwnedIdentity(true);
+      return;
+    }
+    const me = await fetchIdentityMe().catch(() => null);
+    if (me?.identityId) {
+      setOwnedIdentity(true);
+      return;
+    }
+    setOwnedIdentity(false);
     try {
       const result = await fetchWalletEmail(session.address);
       if (result.verified && result.email) {
@@ -42,12 +54,13 @@ export function IdentityEmailCard({
       const mine = roster.entities.find((e) => e.entityId === session.entityId) ?? roster.entities[0];
       setSuperLabel(mine?.label ?? null);
     }
-  }, [advanced, session.address, session.entityId]);
+  }, [advanced, session.address, session.entityId, session.identityId]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
+  if (ownedIdentity) return null;
   if (status === "loading") return null;
 
   if (advanced) {

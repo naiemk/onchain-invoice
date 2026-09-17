@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Fingerprint, KeyRound, Wallet } from "lucide-react";
+import { Fingerprint } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -32,15 +32,13 @@ import { inferDeviceLabel } from "@/shared/passkey-name.js";
 import { shortAddress } from "@/shared/wallet-session.js";
 import {
   assertPasskeyChallenge,
+  clearPendingPasskey,
   createPasskey,
-  createSecurityKey,
   formatPasskeyError,
 } from "@/shared/webauthn.js";
-import { signRecoverTypedData } from "@/shared/eoa-connector.js";
-import { enrollPasskeyWithExistingEoa } from "@/shared/wallet-add-signer.js";
 import { WalletFrame } from "./WalletFrame";
+import { OtherKeysRecoverWizard } from "./OtherKeysRecoverWizard";
 
-type SignerKind = "webauthn" | "yubikey" | "eoa";
 type EmailStep = "email" | "otp" | "passkey" | "done";
 
 export function RecoverPage() {
@@ -49,6 +47,9 @@ export function RecoverPage() {
   const [timelockHours, setTimelockHours] = useState(24);
   const [chainId, setChainId] = useState("11155111");
   const [emailOpen, setEmailOpen] = useState(false);
+  const [tab, setTab] = useState("email");
+  const [emailTabVisible, setEmailTabVisible] = useState(true);
+  const otherCaptchaRef = useRef<TurnstileControl | null>(null);
 
   useEffect(() => {
     void fetchWalletConfig()
@@ -70,17 +71,28 @@ export function RecoverPage() {
       lede={t("wallet.recoverPageLede")}
     >
       <p className="mb-4 text-xs text-muted-foreground">{t("wallet.recoveryTimelock", { hours: timelockHours })}</p>
-      <Tabs defaultValue="email" className="w-full">
+      <Tabs value={emailTabVisible ? tab : "address"} onValueChange={setTab} className="w-full">
         <TabsList>
-          <TabsTrigger value="email">{t("wallet.recoverTabWithEmail")}</TabsTrigger>
+          {emailTabVisible ? <TabsTrigger value="email">{t("wallet.recoverTabWithEmail")}</TabsTrigger> : null}
           <TabsTrigger value="address">{t("wallet.recoverTabWithoutEmail")}</TabsTrigger>
         </TabsList>
-        <TabsContent value="email" className="mt-4 space-y-4">
-          <EmailRecoverIntro hours={timelockHours} onStart={() => setEmailOpen(true)} />
-        </TabsContent>
+        {emailTabVisible ? (
+          <TabsContent value="email" className="mt-4 space-y-4">
+            <EmailRecoverIntro hours={timelockHours} onStart={() => setEmailOpen(true)} />
+          </TabsContent>
+        ) : null}
         <TabsContent value="address" className="mt-4 space-y-4">
-          <AddressRecoverIntro hours={timelockHours} />
-          <AddressRecoverTab siteKey={siteKey} chainId={chainId} />
+          <p className="text-sm text-muted-foreground">{t("wallet.recoverOtherTabLede")}</p>
+          <OtherKeysRecoverWizard
+            siteKey={siteKey}
+            captchaRef={otherCaptchaRef}
+            onRestoreEnabled={(enabled) => {
+              if (!enabled) {
+                setEmailTabVisible(false);
+                setTab("address");
+              }
+            }}
+          />
         </TabsContent>
       </Tabs>
       <EmailRecoverDialog
@@ -134,20 +146,6 @@ function EmailRecoverIntro({ hours, onStart }: { hours: number; onStart: () => v
   );
 }
 
-function AddressRecoverIntro({ hours }: { hours: number }) {
-  const { t } = useLocale();
-  return (
-    <div className="space-y-2 rounded-xl border border-border p-4">
-      <p className="text-sm font-medium">{t("wallet.recoverAddressCardTitle")}</p>
-      <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-        <li>{t("wallet.recoverAddressStepEnter")}</li>
-        <li>{t("wallet.recoverAddressStepProve")}</li>
-        <li>{t("wallet.recoverAddressStepCancel", { hours })}</li>
-      </ul>
-    </div>
-  );
-}
-
 function EmailRecoverDialog({
   open,
   onOpenChange,
@@ -191,6 +189,10 @@ function EmailRecoverDialog({
 
   const fail = (err: unknown) => {
     const msg = formatPasskeyError(err);
+    if (msg === "restore_disabled") {
+      setError(t("wallet.recoverRestoreDisabled"));
+      return;
+    }
     setError(msg === "threshold_not_one" ? t("wallet.superWalletPairNeedsOneSigner") : msg);
   };
 
@@ -244,7 +246,6 @@ function EmailRecoverDialog({
     setError(null);
     try {
       const result = await signAndCreate({
-        signer: "webauthn",
         walletAddresses: wallets.map((w) => w.address),
         emailSession,
         chainId,
@@ -395,129 +396,7 @@ function EmailRecoverDialog({
   );
 }
 
-function AddressRecoverTab({ siteKey, chainId }: { siteKey: string | null; chainId: string }) {
-  const { t } = useLocale();
-  const captchaRef = useRef<TurnstileControl | null>(null);
-  const [address, setAddress] = useState("");
-  const [signer, setSigner] = useState<SignerKind>("webauthn");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<RecoveryRequestPublic[] | null>(null);
-  const [enrolled, setEnrolled] = useState<RecoveryExistingOwner[]>([]);
-
-  const initiate = async () => {
-    if (!address.trim()) {
-      setError(t("wallet.localRecoveryNeedAddress"));
-      return;
-    }
-    const captchaToken = readCaptchaToken(captchaRef);
-    if (siteKey && !captchaToken) {
-      setError(t("wallet.recoverCaptchaRequired"));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await signAndCreate({
-        signer,
-        walletAddresses: [address.trim()],
-        captchaToken,
-        chainId,
-      });
-      setCreated(result.requests);
-      setEnrolled(result.existingOwners);
-    } catch (err) {
-      const msg = formatPasskeyError(err);
-      setError(msg === "threshold_not_one" ? t("wallet.superWalletPairNeedsOneSigner") : msg);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (created) return <DoneState requests={created} enrolled={enrolled} />;
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="recover-address">{t("wallet.recoverWalletLabel")}</Label>
-        <Input id="recover-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x…" />
-      </div>
-      <SignerPicker value={signer} onChange={setSigner} />
-      <TurnstileWidget siteKey={siteKey} controlRef={captchaRef} className="flex justify-center py-2" />
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="button" className="w-full" disabled={busy} onClick={() => void initiate()}>
-        {t("wallet.recoverStart")}
-      </Button>
-    </div>
-  );
-}
-
-function SignerPicker({ value, onChange }: { value: SignerKind; onChange: (v: SignerKind) => void }) {
-  const { t } = useLocale();
-  const items: Array<{ id: SignerKind; icon: typeof Fingerprint; title: string; body: string }> = [
-    { id: "webauthn", icon: Fingerprint, title: t("wallet.recoverSignerPasskey"), body: t("wallet.recoverSignerPasskeyBody") },
-    { id: "yubikey", icon: KeyRound, title: t("wallet.recoverSignerYubiKey"), body: t("wallet.recoverSignerYubiKeyBody") },
-    { id: "eoa", icon: Wallet, title: t("wallet.recoverSignerEoa"), body: t("wallet.recoverSignerEoaBody") },
-  ];
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{t("wallet.recoverSignerTitle")}</p>
-      {items.map(({ id, icon: Icon, title, body }) => (
-        <button
-          key={id}
-          type="button"
-          className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left ${
-            value === id ? "border-emphasis bg-muted/40" : "border-border"
-          }`}
-          onClick={() => onChange(id)}
-        >
-          <Icon className="mt-0.5 h-5 w-5 shrink-0 text-emphasis" aria-hidden />
-          <span>
-            <span className="block text-sm font-medium">{title}</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">{body}</span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function DoneState({
-  requests,
-  enrolled,
-}: {
-  requests: RecoveryRequestPublic[];
-  enrolled: RecoveryExistingOwner[];
-}) {
-  const { t } = useLocale();
-  return (
-    <div className="space-y-3">
-      {enrolled.length > 0 ? <p className="text-sm">{t("wallet.recoverExistingOwnerDone")}</p> : null}
-      {enrolled.length > 0 ? (
-        <ul className="space-y-1 text-sm text-muted-foreground">
-          {enrolled.map((r) => (
-            <li key={r.address} className="font-mono">
-              {shortAddress(r.address)}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {requests.length > 0 ? <p className="text-sm">{t("wallet.recoverEmailStarted")}</p> : null}
-      {requests.length > 0 ? (
-        <ul className="space-y-1 text-sm text-muted-foreground">
-          {requests.map((r) => (
-            <li key={r.id} className="font-mono">
-              {shortAddress(r.walletAddress)} · {r.status}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
 async function signAndCreate(input: {
-  signer: SignerKind;
   walletAddresses: string[];
   emailSession?: string;
   captchaToken?: string | null;
@@ -529,49 +408,12 @@ async function signAndCreate(input: {
 }> {
   const label = inferDeviceLabel();
   const first = input.walletAddresses[0];
-  if (input.signer === "eoa") {
-    const requests: RecoveryRequestPublic[] = [];
-    const existingOwners: RecoveryExistingOwner[] = [];
-    for (const wallet of input.walletAddresses) {
-      const ch = await createRecoveryChallenge("recover", wallet);
-      const signed = await signRecoverTypedData({
-        wallet,
-        challenge: ch.challenge,
-        chainId: BigInt(input.chainId),
-      });
-      const result = await createRecoveryRequest({
-        walletAddresses: [wallet],
-        emailSession: input.emailSession,
-        challengeId: ch.challengeId,
-        ownerKind: "eoa",
-        eoaAddress: signed.address,
-        eoaSignature: signed.signature,
-        label,
-        captchaToken: input.captchaToken,
-        chainId: input.chainId,
-      });
-      if (result.existingOwners?.length) {
-        for (const owner of result.existingOwners) {
-          await enrollPasskeyWithExistingEoa({
-            walletAddress: owner.address,
-            chainId: input.chainId,
-            eoa: owner.eoa,
-            advanced: owner.advanced,
-            entityId: owner.entityId,
-            keyId: owner.keyId,
-          });
-          existingOwners.push(owner);
-        }
-      }
-      requests.push(...(result.requests ?? []).filter((r) => r));
-    }
-    return { request: requests[0] ?? null, requests, existingOwners };
-  }
   const ch = await createRecoveryChallenge("recover", first);
-  const passkey =
-    input.signer === "yubikey"
-      ? await createSecurityKey(label, { walletLabel: first ? shortAddress(first) : label })
-      : await createPasskey(label, { walletLabel: first ? shortAddress(first) : label, deviceLabel: label });
+  const passkey = await createPasskey(label, {
+    walletLabel: first ? shortAddress(first) : label,
+    deviceLabel: label,
+    purpose: "recover",
+  });
   const { assertion } = await assertPasskeyChallenge({
     challengeBase64Url: ch.challenge,
     credentialId: passkey.credentialId,
@@ -580,7 +422,7 @@ async function signAndCreate(input: {
     walletAddresses: input.walletAddresses,
     emailSession: input.emailSession,
     challengeId: ch.challengeId,
-    ownerKind: input.signer,
+    ownerKind: "webauthn",
     ownerQx: passkey.qx,
     ownerQy: passkey.qy,
     credentialId: passkey.credentialId,
@@ -589,6 +431,7 @@ async function signAndCreate(input: {
     captchaToken: input.captchaToken,
     chainId: input.chainId,
   });
+  clearPendingPasskey(passkey.credentialId);
   return {
     request: result.request,
     requests: result.requests ?? (result.request ? [result.request] : []),

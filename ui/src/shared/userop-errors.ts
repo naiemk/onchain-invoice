@@ -23,7 +23,10 @@ export function formatSendRejectReason(
     case "rpc_unavailable":
       return t("wallet.bundlerNotConfigured");
     default:
-      if (reason?.startsWith("simulation_revert:")) return t("wallet.userOpSimulationRevert");
+      if (reason?.startsWith("simulation_revert:")) {
+        if (/LastMethod/i.test(reason)) return t("wallet.superWalletRemoveLastKeyBlocked");
+        return t("wallet.userOpSimulationRevert");
+      }
       if (reason && /UNIQUE constraint failed: wallet_user_ops/i.test(reason)) {
         return t("wallet.userOpAlreadySubmitted");
       }

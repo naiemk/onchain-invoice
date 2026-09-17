@@ -87,23 +87,38 @@ async function addVirtualAuthenticator(page: Page): Promise<void> {
 
 async function createPasskeyWallet(page: Page, label: string): Promise<string> {
   await addVirtualAuthenticator(page);
-  await page.goto("/wallet/create");
-  await page.getByTestId("device-name").fill(label);
-  await page.getByTestId("wallet-accept-terms").click();
-  await page.getByTestId("wallet-accept-security-checks").click();
-  await expect(page.getByTestId("wallet-create-btn")).toBeEnabled({ timeout: 15_000 });
+  const email = `persist-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
+  await page.goto("/wallet");
+  await page.locator("#identity-email").fill(email);
+  await page.getByRole("button", { name: /^next$/i }).click();
+  const sendCode = page.getByRole("button", { name: /send code/i });
+  const otpField = page.locator("#identity-otp");
+  await expect(sendCode.or(otpField)).toBeVisible({ timeout: 15_000 });
+  if (await sendCode.isVisible()) {
+    const started = page.waitForResponse(
+      (res) => res.url().includes("/api/identity/email/start") && res.request().method() === "POST"
+    );
+    await sendCode.click();
+    await started;
+  }
+  const otpRes = await fetch(`${API}/api/identity/email/dev-otp`);
+  const otp = (await otpRes.json()) as { code?: string };
+  if (!otp.code) throw new Error("dev OTP not available");
+  await otpField.fill(otp.code);
+  await page.getByRole("button", { name: /verify code/i }).click();
+  await expect(page.getByRole("button", { name: /create first wallet/i })).toBeVisible({ timeout: 15_000 });
+  await page.locator("#auth-agree-terms").click();
+  await page.locator("#auth-agree-privacy").click();
   const created = page.waitForResponse(
     (res) =>
-      res.url().includes("/api/wallet/accounts") &&
+      res.url().includes("/api/identity/passkey/register") &&
       res.request().method() === "POST" &&
       res.status() === 201
   );
-  await page.getByTestId("wallet-create-btn").click();
-  await page.getByTestId("wallet-create-disclaimer-skip").click();
-  await page.getByTestId("wallet-create-disclaimer-finish").click();
+  await page.getByRole("button", { name: /create first wallet/i }).click();
   const res = await created;
-  const body = (await res.json()) as { account?: { address?: string } };
-  const address = body.account?.address;
+  const body = (await res.json()) as { wallets?: { address?: string }[] };
+  const address = body.wallets?.[0]?.address;
   if (!address) throw new Error("wallet create did not return address");
   return address;
 }

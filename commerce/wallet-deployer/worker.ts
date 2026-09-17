@@ -14,7 +14,7 @@ import {
 import type { Server } from "node:http";
 
 const FACTORY_ABI = [
-  "function createAccount(bytes32 qx, bytes32 qy, bytes32 salt) returns (address)",
+  "function createAccount(bytes32 identityId, bytes32 salt) returns (address)",
   "function predictAddress(bytes32 salt) view returns (address)",
 ];
 
@@ -189,8 +189,12 @@ export class WalletDeployerWorker {
           continue;
         }
         await this.trackActivation(account.address, { funded: true });
+        if (!account.identityId) {
+          await this.trackActivation(account.address, { funded: true, error: "missing_identity_id" });
+          continue;
+        }
         try {
-          const tx = await factory.createAccount(account.ownerQx, account.ownerQy, account.salt);
+          const tx = await factory.createAccount(account.identityId, account.salt);
           const receipt = await tx.wait();
           await this.markDeployed(account.address, String(chain.chainId));
           await this.trackActivation(account.address, { deployed: true });
@@ -309,7 +313,10 @@ export class WalletDeployerWorker {
         });
         return;
       }
-      const deployTx = await factory.createAccount(account.ownerQx, account.ownerQy, account.salt);
+      if (!account.identityId) {
+        throw new Error("wallet account missing identityId");
+      }
+      const deployTx = await factory.createAccount(account.identityId, account.salt);
       await deployTx.wait();
       await this.markDeployed(account.address, String(chain.chainId));
     }
