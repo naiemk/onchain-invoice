@@ -18,6 +18,9 @@ abstract contract IdentityErrors {
     error RestoreAlreadyDisabled();
     error NotRecoveryOperator();
     error RestoreOperatorUnset();
+    error RestorePending();
+    error RestoreNotPending();
+    error RestoreNotReady();
     error TooManyMethods();
     error SuperAlreadyEnabled();
     error NotSuperWallet();

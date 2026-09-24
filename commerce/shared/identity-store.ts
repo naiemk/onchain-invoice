@@ -43,6 +43,10 @@ export const IDENTITY_REMOVE_METHOD_TYPES = {
   ],
 };
 
+export const IDENTITY_CANCEL_RESTORE_TYPES = {
+  CancelRestore: [{ name: "identityId", type: "bytes32" }],
+};
+
 export function identityEip712Domain(store: string, chainId: number | bigint) {
   return {
     name: IDENTITY_EIP712_NAME,
@@ -169,6 +173,12 @@ export function hashIdentityRemoveMethod(
   return TypedDataEncoder.hash(identityEip712Domain(store, chainId), IDENTITY_REMOVE_METHOD_TYPES, {
     identityId,
     methodId,
+  });
+}
+
+export function hashIdentityCancelRestore(store: string, chainId: number | bigint, identityId: string): string {
+  return TypedDataEncoder.hash(identityEip712Domain(store, chainId), IDENTITY_CANCEL_RESTORE_TYPES, {
+    identityId,
   });
 }
 

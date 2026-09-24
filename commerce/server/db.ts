@@ -1372,6 +1372,7 @@ export class CommerceDb {
     this.ensureColumn("wallet_pairings", "new_owner_credential_id", "TEXT");
     this.ensureColumn("wallet_recovery_requests", "new_owner_kind", "TEXT NOT NULL DEFAULT 'webauthn'");
     this.ensureColumn("wallet_recovery_requests", "new_eoa", "TEXT");
+    this.ensureColumn("wallet_recovery_requests", "operator_payload", "TEXT");
     this.ensureColumn("wallet_accounts", "identity_id", "TEXT");
     this.ensureColumn("wallet_accounts", "label", "TEXT");
     this.db.exec(`
@@ -1759,6 +1760,24 @@ export class CommerceDb {
       .prepare(`SELECT * FROM wallet_accounts WHERE identity_id = ? ORDER BY created_at ASC`)
       .all(identityId) as WalletAccountRow[];
     return rows.map(mapWalletAccount);
+  }
+
+  listWalletAccountsLinkedToIdentity(identityId: string): WalletAccountRecord[] {
+    const owned = this.listWalletAccountsByIdentityId(identityId);
+    const seen = new Set(owned.map((w) => w.address.toLowerCase()));
+    const linked = this.db
+      .prepare(`SELECT wallet_address FROM wallet_entities WHERE entity_id = ?`)
+      .all(identityId) as Array<{ wallet_address: string }>;
+    const extra: WalletAccountRecord[] = [];
+    for (const row of linked) {
+      const key = row.wallet_address.toLowerCase();
+      if (seen.has(key)) continue;
+      const account = this.getWalletAccount(row.wallet_address);
+      if (!account) continue;
+      seen.add(key);
+      extra.push(account);
+    }
+    return [...owned, ...extra];
   }
 
   getWalletDeviceByCredentialId(
@@ -3430,6 +3449,7 @@ export class CommerceDb {
       guardianAddress?: string | null;
       guardianActedAt?: string | null;
       jobId?: string | null;
+      operatorPayload?: string | null;
     }
   ): WalletRecoveryRequestRecord | null {
     const current = this.getWalletRecoveryRequest(id);
@@ -3443,6 +3463,7 @@ export class CommerceDb {
            guardian_address = COALESCE(@guardianAddress, guardian_address),
            guardian_acted_at = COALESCE(@guardianActedAt, guardian_acted_at),
            job_id = COALESCE(@jobId, job_id),
+           operator_payload = COALESCE(@operatorPayload, operator_payload),
            updated_at = @now
          WHERE id = @id`
       )
@@ -3452,6 +3473,7 @@ export class CommerceDb {
         guardianAddress: patch.guardianAddress ?? null,
         guardianActedAt: patch.guardianActedAt ?? null,
         jobId: patch.jobId ?? null,
+        operatorPayload: patch.operatorPayload ?? null,
         now,
         id,
       });
@@ -3701,6 +3723,7 @@ interface WalletRecoveryRequestRow {
   guardian_acted_at: string | null;
   job_id: string | null;
   chain_id: string;
+  operator_payload: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -3746,6 +3769,7 @@ function mapWalletRecoveryRequest(row: WalletRecoveryRequestRow): WalletRecovery
     guardianActedAt: row.guardian_acted_at,
     jobId: row.job_id,
     chainId: row.chain_id,
+    operatorPayload: row.operator_payload ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

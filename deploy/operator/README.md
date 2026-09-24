@@ -47,7 +47,8 @@ Copy addresses into API / nodes env:
 2. Fill mainnet API `.env` with the two sweeper/forwarder pairs + Tron master secret + `TRON_USDT_ADDRESS=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t` + `TRON_FULL_HOST=https://api.trongrid.io`.
 3. Fill sweeper `.env` / YAML; set `SWEEPER_CHAINS=8453,56,tron` and `TRON_CHAIN_ID=tron`; register the sweeper.
 4. Build/serve UI with `VITE_DEPLOYMENT_MODE=mainnet` (or a hostname without `testnet.`).
-5. Smoke: create invoice per chain → pay a small amount → confirm sweep.
+5. Smoke: `npm run mainnet:invoice-smoke` (bytecode + health). Then create invoice per chain → pay a small amount → confirm sweep (needs VPS keys).
+6. Identity wallets: `npm run wallet:deploy:base` with a funded Base key, copy `IDENTITY_STORE_ADDRESS` / `WALLET_FACTORY_ADDRESS` into tcmain API + nodes env, fund bundler + wallet-deployer, set `recoveryOperator` to the reco 2-of-3 Super Wallet.
 
 Out of scope for the prep PR: live CREATE2, committing real mainnet addresses, Solana mainnet, Ethereum/Arbitrum settlement.
 

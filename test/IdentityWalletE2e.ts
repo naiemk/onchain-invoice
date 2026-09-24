@@ -401,4 +401,64 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     expect(await wallet.exposedValidate(digest, "0x")).to.equal(false);
     expect(await wallet.exposedValidate(digest, encodeSuperIdentityBlobs([blob, blob]))).to.equal(false);
   });
+
+  it("super wallet 2-of-3 initiates a delayed identity restore", async function () {
+    const stack = await deployIdentityStack();
+    await stack.store.setRestoreDelay(1);
+    const alice = randomIdentityId();
+    const reco1 = randomIdentityId();
+    const reco2 = randomIdentityId();
+    const reco3 = randomIdentityId();
+    const pkAlice = simulatePasskey();
+    const pk1 = simulatePasskey();
+    const pk2 = simulatePasskey();
+    const pk3 = simulatePasskey();
+    const recovered = simulatePasskey();
+    await stack.store.register(alice, pkAlice.qx, pkAlice.qy);
+    await stack.store.register(reco1, pk1.qx, pk1.qy);
+    await stack.store.register(reco2, pk2.qx, pk2.qy);
+    await stack.store.register(reco3, pk3.qx, pk3.qy);
+    const { wallet, walletAddress } = await createWallet(stack, reco1, keccak256(toUtf8Bytes("reco-super")));
+    await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
+    await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);
+    const self = await stack.ethers.getSigner(walletAddress);
+    await wallet.connect(self).enableSuper([reco2, reco3], 2);
+    await stack.store.setRecoveryOperator(walletAddress);
+
+    const callData = encodeExecuteCallData([
+      {
+        target: stack.storeAddress,
+        value: 0n,
+        data: stack.store.interface.encodeFunctionData("initiateRestore", [
+          alice,
+          METHOD_WEBAUTHN,
+          recovered.qx,
+          recovered.qy,
+          ZeroAddress,
+        ]),
+      },
+    ]);
+    const nonce = await stack.entryPoint.getNonce(walletAddress, 0);
+    const unsigned = buildPackedUserOperation({ sender: walletAddress, nonce, callData });
+    const userOpHash = await stack.entryPoint.getUserOpHash(userOpToTuple(unsigned));
+    const userOp = buildPackedUserOperation({
+      sender: walletAddress,
+      nonce,
+      callData,
+      signature: encodeSuperIdentityBlobs([
+        identityPasskeyBlob({ identityId: reco1, key: pk1, message: userOpHash }),
+        identityPasskeyBlob({ identityId: reco2, key: pk2, message: userOpHash }),
+      ]),
+    });
+    await stack.entryPoint.handleOps([userOpToTuple(userOp)], stack.owner.address);
+    expect((await stack.store.pendingRestores(alice)).active).to.equal(true);
+    await expectRevert(stack.store.executeRestore.staticCall(alice), "RestoreNotReady");
+    await stack.ethers.provider.send("evm_increaseTime", [2]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await stack.store.executeRestore(alice);
+    const login = keccak256(toUtf8Bytes("alice-restored"));
+    expect(
+      await stack.store.verify(login, identityPasskeyBlob({ identityId: alice, key: recovered, message: login }))
+    ).to.equal(alice);
+  });
 });

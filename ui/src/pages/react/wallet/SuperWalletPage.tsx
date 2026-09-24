@@ -32,6 +32,8 @@ import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { saveWalletMode } from "@/shared/wallet-mode.js";
 import { initEoaConnector } from "@/shared/eoa-connector.js";
 import type { WalletPublicConfig } from "../../../../../commerce/shared/wallet.js";
+import { lookupIdentityEmail } from "@/shared/identity-api.js";
+import { submitEnableSuperUserOp } from "@/shared/identity-recover-userop.js";
 import { WalletFrame } from "./WalletFrame";
 import { useWalletPolicy } from "./wallet-policy";
 import {
@@ -65,7 +67,7 @@ function StatusMessage({ kind, message }: { kind: StatusKind; message: string })
 export function SuperWalletPage() {
   const { t } = useLocale();
   const navigate = useNavigate();
-  const { refreshPolicy } = useWalletPolicy();
+  const { refreshPolicy, isSuperWallet, policy: ctxPolicy } = useWalletPolicy();
   const [session, setSession] = useState<WalletSession | null>(() => loadWalletSession());
   const [config, setConfig] = useState<WalletPublicConfig | null>(null);
   const [policy, setPolicy] = useState<AdvancedPolicy | null>(null);
@@ -73,11 +75,14 @@ export function SuperWalletPage() {
   const [status, setStatus] = useState<{ kind: StatusKind; message: string } | null>(null);
 
   const [adminEmail, setAdminEmail] = useState("");
+  const [extraEmails, setExtraEmails] = useState("");
+  const [threshold, setThreshold] = useState("2");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [emailSpellingChecked, setEmailSpellingChecked] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [onChainReady, setOnChainReady] = useState(false);
   const [funded, setFunded] = useState(false);
+  const identityMode = Boolean(session?.identityId);
 
   const refresh = useCallback(
     async (sess: WalletSession, _cfg: WalletPublicConfig) => {
@@ -85,13 +90,17 @@ export function SuperWalletPage() {
       const deployed = balance?.chains.some((c) => c.deployed) ?? false;
       setOnChainReady(deployed);
       setFunded(balance?.chains.some((c) => walletChainIsFunded(c.balance)) ?? false);
+      if (sess.identityId) {
+        await refreshPolicy();
+        return;
+      }
       const pol = await resolveAdvancedPolicy(sess.address, deployed);
       setPolicy(pol);
       if (pol.advanced) {
         navigate("/wallet", { replace: true });
       }
     },
-    [navigate]
+    [navigate, refreshPolicy]
   );
 
   useEffect(() => {
@@ -150,12 +159,57 @@ export function SuperWalletPage() {
   };
 
   const requestUpgrade = () => {
+    if (session?.identityId) {
+      void runIdentityUpgrade();
+      return;
+    }
     if (!adminEmail.trim()) {
       setStatus({ kind: "error", message: t("wallet.superWalletEmailRequired") });
       return;
     }
     setEmailSpellingChecked(false);
     setConfirmOpen(true);
+  };
+
+  const runIdentityUpgrade = async () => {
+    if (!session || !config) return;
+    setBusy("upgrade");
+    setStatus({ kind: "info", message: t("wallet.sendSigning") });
+    try {
+      await assertUpgradePreflight(session, config);
+      const emails = extraEmails
+        .split(/[\n,]+/)
+        .map((e) => e.trim().toLowerCase())
+        .filter((e) => e.includes("@"));
+      const extraIds: string[] = [];
+      for (const email of emails) {
+        const lookup = await lookupIdentityEmail(email);
+        if (!lookup.identityId) throw new Error(t("wallet.superWalletIdentityMissing", { email }));
+        extraIds.push(lookup.identityId);
+      }
+      const m = Number(threshold);
+      if (!Number.isFinite(m) || m < 1) throw new Error(t("wallet.superWalletThreshold"));
+      await submitEnableSuperUserOp({ session, extraIdentityIds: extraIds, threshold: m });
+      for (const email of emails) {
+        const lookup = await lookupIdentityEmail(email);
+        if (lookup.identityId) {
+          await registerWalletEntity({
+            walletAddress: session.address,
+            entityId: lookup.identityId,
+            label: email,
+          });
+        }
+      }
+      await refreshPolicy();
+      navigate("/wallet", { replace: true });
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(null);
+    }
   };
 
   const runUpgrade = async () => {
@@ -205,9 +259,14 @@ export function SuperWalletPage() {
     }
   };
 
+  useEffect(() => {
+    if (isSuperWallet) navigate("/wallet", { replace: true });
+  }, [isSuperWallet, navigate]);
+
   if (!session) return null;
 
-  const canUpgrade = Boolean(policy?.supportsAdvanced !== false);
+  const livePolicy = session.identityId ? ctxPolicy : policy;
+  const canUpgrade = Boolean(livePolicy?.supportsAdvanced !== false);
 
   return (
     <WalletFrame current="superWallet" title={t("wallet.superWalletPageTitle")} lede={t("wallet.superWalletPageLede")}>
@@ -218,8 +277,21 @@ export function SuperWalletPage() {
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-10 w-40" />
         </div>
-      ) : !policy?.advanced && !canUpgrade ? (
+      ) : !livePolicy?.advanced && !canUpgrade ? (
         <UnsupportedSection t={t} />
+      ) : identityMode ? (
+        <IdentityUpgradeSection
+          t={t}
+          extraEmails={extraEmails}
+          onExtraEmailsChange={setExtraEmails}
+          threshold={threshold}
+          onThresholdChange={setThreshold}
+          onConvert={requestUpgrade}
+          busy={busy === "upgrade"}
+          onChainReady={onChainReady}
+          funded={funded}
+          onRefresh={() => void runRefresh()}
+        />
       ) : (
         <UpgradeSection
           t={t}
@@ -357,6 +429,80 @@ function UpgradeSection({
       </section>
 
       <Button id="enable-advanced" type="button" disabled={busy} onClick={onConvert}>
+        {busy ? t("wallet.sendSigning") : t("wallet.superWalletConvertCta")}
+      </Button>
+    </div>
+  );
+}
+
+function IdentityUpgradeSection({
+  t,
+  extraEmails,
+  onExtraEmailsChange,
+  threshold,
+  onThresholdChange,
+  onConvert,
+  busy,
+  onChainReady,
+  funded,
+  onRefresh,
+}: {
+  t: (k: string, vars?: Record<string, string>) => string;
+  extraEmails: string;
+  onExtraEmailsChange: (v: string) => void;
+  threshold: string;
+  onThresholdChange: (v: string) => void;
+  onConvert: () => void;
+  busy: boolean;
+  onChainReady: boolean;
+  funded: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">{t("wallet.superWalletUpgradeTitle")}</h2>
+        <p className="text-sm text-muted-foreground">{t("wallet.superWalletIdentityLede")}</p>
+      </section>
+      {funded && !onChainReady && (
+        <Alert variant="warn">
+          <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>{t("wallet.userOpAccountNotDeployed")}</span>
+            <Button type="button" size="sm" variant="secondary" className="gap-2 self-start" onClick={onRefresh}>
+              <RefreshCw className="h-4 w-4" />
+              {t("wallet.refresh")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      <div className="space-y-2">
+        <Label htmlFor="super-extra-emails">{t("wallet.superWalletIdentityEmails")}</Label>
+        <textarea
+          id="super-extra-emails"
+          data-testid="super-extra-emails"
+          className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={extraEmails}
+          onChange={(e) => onExtraEmailsChange(e.target.value)}
+          placeholder="reco2@example.com&#10;reco3@example.com"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="super-threshold">{t("wallet.superWalletThreshold")}</Label>
+        <Input
+          id="super-threshold"
+          data-testid="super-threshold"
+          inputMode="numeric"
+          value={threshold}
+          onChange={(e) => onThresholdChange(e.target.value)}
+        />
+      </div>
+      <Button
+        id="enable-identity-super"
+        data-testid="enable-identity-super"
+        type="button"
+        disabled={busy}
+        onClick={onConvert}
+      >
         {busy ? t("wallet.sendSigning") : t("wallet.superWalletConvertCta")}
       </Button>
     </div>

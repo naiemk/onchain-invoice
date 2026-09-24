@@ -18,19 +18,34 @@ contract IdentityStore is Ownable, IdentityErrors {
     bytes32 private constant ADD_METHOD_TYPEHASH =
         keccak256("AddMethod(bytes32 identityId,uint8 kind,bytes32 qx,bytes32 qy,address eoa)");
     bytes32 private constant REMOVE_METHOD_TYPEHASH = keccak256("RemoveMethod(bytes32 identityId,bytes32 methodId)");
+    bytes32 private constant CANCEL_RESTORE_TYPEHASH = keccak256("CancelRestore(bytes32 identityId)");
+
+    struct PendingRestore {
+        uint8 kind;
+        bytes32 qx;
+        bytes32 qy;
+        address eoa;
+        uint64 executeAfter;
+        bool active;
+    }
 
     address public recoveryOperator;
+    uint64 public restoreDelay;
 
     mapping(bytes32 identityId => IdentityTypes.Identity) private _identities;
     mapping(bytes32 methodId => IdentityTypes.Method) private _methods;
     mapping(bytes32 identityId => bytes32[] methodIds) private _methodIds;
+    mapping(bytes32 identityId => PendingRestore) public pendingRestores;
 
     event IdentityRegistered(bytes32 indexed identityId, bytes32 indexed methodId, uint8 kind);
     event MethodAdded(bytes32 indexed identityId, bytes32 indexed methodId, uint8 kind);
     event MethodRemoved(bytes32 indexed identityId, bytes32 indexed methodId);
     event RestoreDisabled(bytes32 indexed identityId, address indexed by);
+    event RestoreInitiated(bytes32 indexed identityId, uint8 kind, uint64 executeAfter);
+    event RestoreCancelled(bytes32 indexed identityId);
     event MethodRestored(bytes32 indexed identityId, bytes32 indexed methodId, uint8 kind);
     event RecoveryOperatorUpdated(address indexed recoveryOperator);
+    event RestoreDelayUpdated(uint64 restoreDelay);
 
     constructor(address recoveryOperator_, address initialOwner) Ownable(initialOwner) {
         recoveryOperator = recoveryOperator_;
@@ -40,6 +55,11 @@ contract IdentityStore is Ownable, IdentityErrors {
     function setRecoveryOperator(address recoveryOperator_) external onlyOwner {
         recoveryOperator = recoveryOperator_;
         emit RecoveryOperatorUpdated(recoveryOperator_);
+    }
+
+    function setRestoreDelay(uint64 restoreDelay_) external onlyOwner {
+        restoreDelay = restoreDelay_;
+        emit RestoreDelayUpdated(restoreDelay_);
     }
 
     function domainSeparator() public view returns (bytes32) {
@@ -67,6 +87,13 @@ contract IdentityStore is Ownable, IdentityErrors {
         return MessageHashUtils.toTypedDataHash(
             domainSeparator(),
             keccak256(abi.encode(REMOVE_METHOD_TYPEHASH, identityId, methodId))
+        );
+    }
+
+    function hashCancelRestore(bytes32 identityId) public view returns (bytes32) {
+        return MessageHashUtils.toTypedDataHash(
+            domainSeparator(),
+            keccak256(abi.encode(CANCEL_RESTORE_TYPEHASH, identityId))
         );
     }
 
@@ -163,10 +190,14 @@ contract IdentityStore is Ownable, IdentityErrors {
         if (idn.eoaCount == 0) revert RestoreRequiresEoa();
         if (!_isIdentityEoa(identityId, msg.sender)) revert NotIdentityEoa();
         idn.restoreEnabled = false;
+        if (pendingRestores[identityId].active) {
+            delete pendingRestores[identityId];
+            emit RestoreCancelled(identityId);
+        }
         emit RestoreDisabled(identityId, msg.sender);
     }
 
-    /// @notice Email-recovery path: operator adds a new passkey only while restore is enabled.
+    /// @notice Email-recovery path: operator starts (and, if delay is 0, finishes) adding a method.
     function restoreAddMethod(
         bytes32 identityId,
         uint8 kind,
@@ -174,13 +205,36 @@ contract IdentityStore is Ownable, IdentityErrors {
         bytes32 qy,
         address eoa
     ) external {
-        if (recoveryOperator == address(0)) revert RestoreOperatorUnset();
-        if (msg.sender != recoveryOperator) revert NotRecoveryOperator();
-        IdentityTypes.Identity storage idn = _identities[identityId];
-        if (!idn.exists) revert IdentityNotFound();
-        if (!idn.restoreEnabled) revert RestoreIsDisabled();
-        bytes32 id = _addMethod(identityId, kind, qx, qy, eoa);
-        emit MethodRestored(identityId, id, kind);
+        _initiateRestore(identityId, kind, qx, qy, eoa);
+        if (restoreDelay == 0) {
+            _executeRestore(identityId);
+        }
+    }
+
+    /// @notice Operator starts a delayed restore. Same as restoreAddMethod when delay is 0 after executeRestore.
+    function initiateRestore(
+        bytes32 identityId,
+        uint8 kind,
+        bytes32 qx,
+        bytes32 qy,
+        address eoa
+    ) external {
+        _initiateRestore(identityId, kind, qx, qy, eoa);
+    }
+
+    /// @notice Existing method cancels a pending restore (old passkey / YubiKey / EOA).
+    function cancelRestore(bytes32 identityId, bytes calldata authorization) external {
+        if (!pendingRestores[identityId].active) revert RestoreNotPending();
+        if (verify(hashCancelRestore(identityId), authorization) != identityId) {
+            revert InvalidSignature();
+        }
+        delete pendingRestores[identityId];
+        emit RestoreCancelled(identityId);
+    }
+
+    /// @notice Anyone may finalize after the delay while restore is still enabled.
+    function executeRestore(bytes32 identityId) external {
+        _executeRestore(identityId);
     }
 
     /// @return identityId when the blob is valid; `bytes32(0)` otherwise (no revert on bad crypto).
@@ -201,6 +255,48 @@ contract IdentityStore is Ownable, IdentityErrors {
         if (!m.exists || m.identityId != identityId || m.kind != kind) return bytes32(0);
         if (!_checkMethodSig(message, m, inner)) return bytes32(0);
         return identityId;
+    }
+
+    function _initiateRestore(
+        bytes32 identityId,
+        uint8 kind,
+        bytes32 qx,
+        bytes32 qy,
+        address eoa
+    ) internal {
+        if (recoveryOperator == address(0)) revert RestoreOperatorUnset();
+        if (msg.sender != recoveryOperator) revert NotRecoveryOperator();
+        IdentityTypes.Identity storage idn = _identities[identityId];
+        if (!idn.exists) revert IdentityNotFound();
+        if (!idn.restoreEnabled) revert RestoreIsDisabled();
+        if (pendingRestores[identityId].active) revert RestorePending();
+        _assertMethodFields(kind, qx, qy, eoa);
+        uint64 executeAfter = uint64(block.timestamp) + restoreDelay;
+        pendingRestores[identityId] = PendingRestore({
+            kind: kind,
+            qx: qx,
+            qy: qy,
+            eoa: eoa,
+            executeAfter: executeAfter,
+            active: true
+        });
+        emit RestoreInitiated(identityId, kind, executeAfter);
+    }
+
+    function _executeRestore(bytes32 identityId) internal {
+        PendingRestore storage pending = pendingRestores[identityId];
+        if (!pending.active) revert RestoreNotPending();
+        if (block.timestamp < pending.executeAfter) revert RestoreNotReady();
+        IdentityTypes.Identity storage idn = _identities[identityId];
+        if (!idn.exists) revert IdentityNotFound();
+        if (!idn.restoreEnabled) revert RestoreIsDisabled();
+        uint8 kind = pending.kind;
+        bytes32 qx = pending.qx;
+        bytes32 qy = pending.qy;
+        address eoa = pending.eoa;
+        delete pendingRestores[identityId];
+        bytes32 id = _addMethod(identityId, kind, qx, qy, eoa);
+        emit MethodRestored(identityId, id, kind);
     }
 
     function _addMethod(

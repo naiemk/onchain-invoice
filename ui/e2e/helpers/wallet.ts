@@ -408,3 +408,119 @@ export async function executeProposalExpectNoSignatures(walletAddress: string, p
     throw new Error(`expected no_signatures, got ${res.status} ${JSON.stringify(body)}`);
   }
 }
+
+export async function signOut(host: DeviceSession): Promise<void> {
+  await host.page.goto("/wallet");
+  await host.page.getByTestId("wallet-switcher").click();
+  await host.page.getByRole("menuitem", { name: "Sign out" }).click();
+  await host.page.goto("/wallet");
+}
+
+export async function setStoreRecoveryOperator(superAddress: string, stack?: LocalStack): Promise<void> {
+  const env = stack ?? (await loadLocalStack());
+  if (!env.storeAddress) throw new Error("local stack missing IdentityStore address");
+  const provider = new JsonRpcProvider(env.rpcUrl);
+  const owner = new Wallet(env.ownerKey, provider);
+  const store = new Contract(env.storeAddress, ["function setRecoveryOperator(address)"], owner);
+  const tx = await store.setRecoveryOperator(superAddress);
+  await tx.wait();
+}
+
+export async function increaseChainTime(seconds: number, stack?: LocalStack): Promise<void> {
+  const env = stack ?? (await loadLocalStack());
+  const provider = new JsonRpcProvider(env.rpcUrl);
+  await provider.send("evm_increaseTime", [seconds]);
+  await provider.send("evm_mine", []);
+}
+
+export async function convertIdentitySuper(
+  host: DeviceSession,
+  extraEmails: string[],
+  threshold = 2
+): Promise<void> {
+  await host.page.goto("/wallet/super-wallet");
+  await expect(host.page.getByTestId("enable-identity-super")).toBeVisible({ timeout: 30_000 });
+  await host.page.locator("#super-extra-emails").fill(extraEmails.join("\n"));
+  await host.page.getByTestId("super-threshold").fill(String(threshold));
+  await withWorkerTicks(["bundler"], async () => {
+    await host.page.getByTestId("enable-identity-super").click();
+    await expect(host.page).toHaveURL(/\/wallet\/?$/, { timeout: 60_000 });
+  });
+  await expect(host.page.getByTestId("super-wallet-shield")).toBeVisible({ timeout: 30_000 });
+}
+
+export async function startEmailRestore(page: Page, email: string): Promise<void> {
+  await page.goto("/wallet/recover");
+  await page.getByRole("tab", { name: "With email" }).click();
+  await page.locator("#recover-ack-no-device").click();
+  await page.getByRole("button", { name: "Start recovery" }).click();
+  await expect(page.getByTestId("email-recover-dialog")).toBeVisible();
+  await page.locator("#recover-email").fill(email);
+  const started = page.waitForResponse(
+    (res) =>
+      res.url().includes("/api/wallet/recovery/email/start") && res.request().method() === "POST" && res.ok()
+  );
+  await page.getByRole("button", { name: "Next" }).click();
+  await started;
+  const otpRes = await fetch(`${apiBase()}/api/identity/email/dev-otp`);
+  const otp = (await otpRes.json()) as { code?: string };
+  if (!otp.code) throw new Error("dev OTP not available");
+  await page.locator("#recover-otp").fill(otp.code);
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByRole("button", { name: "Continue with passkey" })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
+  await expect(page.getByText(/Recovery started|already an owner/i)).toBeVisible({ timeout: 30_000 });
+}
+
+export async function signOperatorRestoreFromUi(host: DeviceSession): Promise<void> {
+  await host.page.goto("/wallet");
+  await expect(host.page.getByTestId("identity-operator-restores")).toBeVisible({ timeout: 30_000 });
+  await withWorkerTicks(["bundler"], async () => {
+    const btn = host.page.getByTestId("sign-identity-restore");
+    await btn.click();
+    await expect
+      .poll(async () => {
+        const err = host.page.locator('[data-testid="identity-operator-restores"] .text-destructive');
+        if (await err.isVisible()) {
+          const text = (await err.textContent())?.trim();
+          if (text) throw new Error(`operator restore sign failed: ${text}`);
+        }
+        const cardGone = (await host.page.getByTestId("identity-operator-restores").count()) === 0;
+        if (cardGone) return true;
+        return btn.isEnabled();
+      }, { timeout: 60_000 })
+      .toBe(true);
+  });
+}
+
+export async function waitForRestoreCompleted(walletAddress: string, timeoutMs = 60_000): Promise<void> {
+  const stack = await loadLocalStack();
+  const deadline = Date.now() + timeoutMs;
+  let last = "unfetched";
+  while (Date.now() < deadline) {
+    await increaseChainTime(2, stack).catch(() => undefined);
+    await triggerWorker("deployer", stack).catch(() => undefined);
+    const res = await fetch(`${apiBase()}/api/wallet/recovery?wallet=${encodeURIComponent(walletAddress)}`);
+    if (res.ok) {
+      const body = (await res.json()) as {
+        request?: { status?: string } | null;
+        pendingOwner?: { active?: boolean } | null;
+      };
+      last = `${body.request?.status ?? "none"} pending=${body.pendingOwner?.active ?? false}`;
+      const active = Boolean(body.request) && !["completed", "archived", "cancelled", "rejected"].includes(body.request?.status ?? "");
+      if (!active && !body.pendingOwner?.active) return;
+    } else {
+      last = `HTTP ${res.status}`;
+    }
+    await sleep(200);
+  }
+  throw new Error(`timed out waiting for restore on ${walletAddress} (last: ${last})`);
+}
+
+export async function loginIdentityFromEmail(page: Page, email: string): Promise<void> {
+  await page.goto("/wallet");
+  if (await page.getByTestId("wallet-switcher").isVisible().catch(() => false)) return;
+  await page.locator("#identity-email").fill(email);
+  await page.getByRole("button", { name: /^next$/i }).click();
+  await expect(page.getByTestId("wallet-switcher")).toBeVisible({ timeout: 30_000 });
+}

@@ -1,8 +1,8 @@
 import { randomBytes, createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { Contract, JsonRpcProvider, ZeroHash, getAddress, isAddress, verifyMessage } from "ethers";
+import { Contract, JsonRpcProvider, ZeroAddress, ZeroHash, getAddress, isAddress, verifyMessage } from "ethers";
 import type { AppConfig } from "./config.js";
-import { readIdentityRestoreEnabled } from "./identity-onchain.js";
+import { readIdentityRestoreEnabled, readPendingIdentityRestore } from "./identity-onchain.js";
 import type { CommerceDb } from "./db.js";
 import { verifyCaptcha } from "./captcha.js";
 import { generateOtpCode, hashOtpCode, maskEmail, sendOtpEmail, sendRecoveryRequestedEmail } from "./email.js";
@@ -24,6 +24,7 @@ import {
   type WalletRecoveryRequestStatus,
 } from "../shared/wallet.js";
 import { KEY_EOA } from "../shared/advanced-wallet.js";
+import { computeIdentityMethodId, METHOD_EOA, METHOD_WEBAUTHN } from "../shared/identity-store.js";
 import {
   eoaOwnerCoords,
   verifyRecoverTypedData,
@@ -976,13 +977,14 @@ async function cancelRecoveryRequest(
     return;
   }
 
-  // If on-chain pending, enqueue cancel job with assertion payload
+  // If on-chain pending, enqueue cancel job with assertion payload (or identity IDS1 blob).
+  const identityAuth = str(body.authorization);
   if (request.status === "on_chain" || request.status === "queued") {
     const job = db.createWalletRecoveryJob({
       walletAddress: request.walletAddress,
       chainId: request.chainId,
       kind: "cancel",
-      cancelSignature: JSON.stringify(assertion),
+      cancelSignature: identityAuth ?? JSON.stringify(assertion),
     });
     db.updateWalletRecoveryRequest(request.id, { status: "cancelled", jobId: job.id });
   } else {
@@ -1015,22 +1017,36 @@ async function getRecoveryStatus(
   } | null = null;
   if (appConfig.wallet.rpcUrl) {
     try {
-      const provider = new JsonRpcProvider(appConfig.wallet.rpcUrl);
-      const contract = new Contract(
-        getAddress(wallet),
-        [
-          "function pendingOwner() view returns (bytes32 qx, bytes32 qy, uint64 executableAt, bytes32 requestId, bool active)",
-        ],
-        provider
-      );
-      const p = await contract.pendingOwner();
-      pendingOwner = {
-        qx: p.qx,
-        qy: p.qy,
-        executableAt: p.executableAt.toString(),
-        requestId: p.requestId,
-        active: Boolean(p.active),
-      };
+      const account = db.getWalletAccount(wallet);
+      if (account?.identityId) {
+        const pending = await readPendingIdentityRestore(appConfig.identity, account.identityId);
+        if (pending) {
+          pendingOwner = {
+            qx: pending.qx,
+            qy: pending.qy,
+            executableAt: pending.executeAfter,
+            requestId: ZeroHash,
+            active: pending.active,
+          };
+        }
+      } else {
+        const provider = new JsonRpcProvider(appConfig.wallet.rpcUrl);
+        const contract = new Contract(
+          getAddress(wallet),
+          [
+            "function pendingOwner() view returns (bytes32 qx, bytes32 qy, uint64 executableAt, bytes32 requestId, bool active)",
+          ],
+          provider
+        );
+        const p = await contract.pendingOwner();
+        pendingOwner = {
+          qx: p.qx,
+          qy: p.qy,
+          executableAt: p.executableAt.toString(),
+          requestId: p.requestId,
+          active: Boolean(p.active),
+        };
+      }
     } catch {
       pendingOwner = null;
     }
@@ -1304,6 +1320,7 @@ export function syncRequestFromJob(
     if (job?.kind === "initiate") {
       db.updateWalletRecoveryRequest(request.id, { status: "on_chain" });
     } else if (job?.kind === "execute") {
+      indexRestoredIdentityMethod(db, request);
       db.updateWalletRecoveryRequest(request.id, { status: "completed" });
       db.updateWalletRecoveryRequest(request.id, { status: "archived" });
     } else if (job?.kind === "cancel") {
@@ -1312,6 +1329,28 @@ export function syncRequestFromJob(
   } else if (jobStatus === "failed" || jobStatus === "rejected") {
     // leave queued/on_chain for retry visibility
   }
+}
+
+function indexRestoredIdentityMethod(db: CommerceDb, request: WalletRecoveryRequestRecord): void {
+  const account = db.getWalletAccount(request.walletAddress);
+  if (!account?.identityId) return;
+  const eoaKind = request.newOwnerKind === "eoa";
+  const kind = eoaKind ? METHOD_EOA : METHOD_WEBAUTHN;
+  const qx = eoaKind ? `0x${"00".repeat(32)}` : request.newQx;
+  const qy = eoaKind ? `0x${"00".repeat(32)}` : request.newQy;
+  const eoa = eoaKind ? request.newEoa ?? ZeroAddress : ZeroAddress;
+  if (!eoaKind && (!request.newQx || !request.newQy || !request.credentialId)) return;
+  if (eoaKind && !request.newEoa) return;
+  const methodId = computeIdentityMethodId(account.identityId, kind, qx, qy, eoa);
+  db.insertIdentityMethod({
+    id: methodId,
+    identityId: account.identityId,
+    kind: eoaKind ? "eoa" : "webauthn",
+    credentialId: request.credentialId,
+    qx: eoaKind ? null : request.newQx,
+    qy: eoaKind ? null : request.newQy,
+    eoa: eoaKind ? eoa : null,
+  });
 }
 
 function publicRequest(r: {

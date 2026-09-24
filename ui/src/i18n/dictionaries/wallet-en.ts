@@ -615,6 +615,13 @@ export const walletEn = {
     "They open the invite link (/wallet/join-super) on their device and enroll a passkey, security key, or connected wallet.",
   superWalletHomeBanner: "Upgrade to entity multisig with team proposals and mixed signing keys.",
   superWalletHomeCta: "Convert to Super Wallet",
+  superWalletIdentityLede:
+    "Add other identities by email. Those identities will sign together as a Super Wallet — used as the email-restore operator.",
+  superWalletIdentityEmails: "Other identity emails (one per line)",
+  superWalletIdentityMissing: "No identity found for {email}.",
+  superWalletRestoreInboxTitle: "Pending email restores",
+  superWalletRestoreInboxHint: "Sign with this identity. When enough signers have signed, the restore starts on-chain.",
+  superWalletRestoreSign: "Sign restore",
   superWalletUpgradeTitle: "Upgrade to Super Wallet",
   superWalletUpgradeWarning:
     "This permanently disables email recovery. You will need M-of-N entity approvals for policy changes.",

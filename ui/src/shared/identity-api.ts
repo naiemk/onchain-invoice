@@ -298,6 +298,69 @@ export async function recoverAddIdentityMethod(input: {
   if (!res.ok) throw new Error(await readError(res));
 }
 
+export async function joinIdentitySuperWallet(address: string): Promise<WalletAccountRecord> {
+  const res = await identityFetch("/api/identity/wallets/join", {
+    method: "POST",
+    body: JSON.stringify({ address }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  const body = (await res.json()) as { account: WalletAccountRecord };
+  return body.account;
+}
+
+export type IdentityOperatorRestore = {
+  id: string;
+  walletAddress: string;
+  email: string;
+  newQx: string;
+  newQy: string;
+  status: string;
+  identityId: string | null;
+  operatorPayload: string | null;
+};
+
+export async function fetchOperatorRestores(): Promise<{
+  operator: string | null;
+  threshold: number;
+  requests: IdentityOperatorRestore[];
+}> {
+  const res = await identityFetch("/api/identity/operator/restores");
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{
+    operator: string | null;
+    threshold: number;
+    requests: IdentityOperatorRestore[];
+  }>;
+}
+
+export async function signOperatorRestore(input: {
+  requestId: string;
+  signature: string;
+  userOpHash?: string;
+  userOp?: unknown;
+}): Promise<{ payload: { userOpHash?: string; userOp?: unknown; blobs?: Record<string, string> } }> {
+  const res = await identityFetch(`/api/identity/operator/restores/${input.requestId}/sign`, {
+    method: "POST",
+    body: JSON.stringify({
+      signature: input.signature,
+      userOpHash: input.userOpHash,
+      userOp: input.userOp,
+    }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{
+    payload: { userOpHash?: string; userOp?: unknown; blobs?: Record<string, string> };
+  }>;
+}
+
+export async function markOperatorRestoreInitiated(requestId: string): Promise<void> {
+  const res = await identityFetch(`/api/identity/operator/restores/${requestId}/initiated`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+}
+
 export type { IdentityPairPayload } from "../../../commerce/shared/identity-pair.js";
 export {
   encodeIdentityPairLink,

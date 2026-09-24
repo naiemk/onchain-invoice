@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { AbiCoder, Contract, JsonRpcProvider, Wallet, getAddress } from "ethers";
+import { AbiCoder, Contract, JsonRpcProvider, Wallet, ZeroAddress, getAddress } from "ethers";
 import type { WalletAccountRecord, WalletRecoveryJobRecord } from "../shared/wallet.js";
 import { encodeWebAuthnSignatureFromJson } from "../shared/webauthn-signature.js";
 import { ERC20_ABI } from "../shared/userop.js";
@@ -27,6 +27,15 @@ const WALLET_ABI = [
   "function pendingOwner() view returns (bytes32 qx, bytes32 qy, uint64 executableAt, bytes32 requestId, bool active)",
   "function cancelPendingOwnerWithSignature(bytes signature)",
   "function paused() view returns (bool)",
+];
+
+const IDENTITY_STORE_ABI = [
+  "function restoreDelay() view returns (uint64)",
+  "function recoveryOperator() view returns (address)",
+  "function pendingRestores(bytes32 identityId) view returns (uint8 kind, bytes32 qx, bytes32 qy, address eoa, uint64 executeAfter, bool active)",
+  "function initiateRestore(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
+  "function executeRestore(bytes32 identityId)",
+  "function cancelRestore(bytes32 identityId, bytes authorization)",
 ];
 
 export interface WalletDeployerChainConfig {
@@ -221,7 +230,13 @@ export class WalletDeployerWorker {
 
   private async processRecoveryJobs(chain: WalletDeployerChainConfig): Promise<void> {
     const chainId = String(chain.chainId);
-    const jobs = await this.fetchRecoveryJobs(chainId);
+    const jobs = (await this.fetchRecoveryJobs(chainId)).slice().sort((a, b) => {
+      const rank = (kind: string) => (kind === "cancel" ? 0 : kind === "initiate" ? 1 : 2);
+      return rank(a.kind) - rank(b.kind);
+    });
+    const cancelWallets = new Set(
+      jobs.filter((j) => j.kind === "cancel").map((j) => j.walletAddress.toLowerCase())
+    );
     if (!jobs.length) return;
 
     const provider = new JsonRpcProvider(chain.rpcUrl);
@@ -249,8 +264,17 @@ export class WalletDeployerWorker {
         if (claimed.kind === "initiate") {
           await this.runInitiate(claimed, chain, guardian, recoveryAddr, provider);
         } else if (claimed.kind === "cancel") {
-          await this.runCancel(claimed, guardian, provider);
+          await this.runCancel(claimed, guardian, provider, recoveryAddr);
         } else if (claimed.kind === "execute") {
+          if (cancelWallets.has(claimed.walletAddress.toLowerCase())) {
+            await this.trackRecoveryJob({
+              id: claimed.id,
+              status: "rejected",
+              error: "cancelled",
+              expectedVersion: claimed.version,
+            });
+            continue;
+          }
           await this.runExecute(claimed, guardian, recoveryAddr, provider);
         }
       } catch (error) {
@@ -281,6 +305,56 @@ export class WalletDeployerWorker {
     if (!job.newQx || !job.newQy) {
       throw new Error("initiate job missing new owner coords");
     }
+    const account = await this.fetchWalletAccount(job.walletAddress);
+    if (account?.identityId) {
+      await this.ensureIdentityWalletDeployed(job, account, chain, provider);
+      if (!recoveryAddr) {
+        throw new Error("recoveryAddress / IdentityStore not configured on deployer chain");
+      }
+      const store = new Contract(recoveryAddr, IDENTITY_STORE_ABI, guardian);
+      try {
+        const operator = getAddress(await store.recoveryOperator());
+        if (operator !== getAddress(guardian.address)) {
+          await this.trackRecoveryJob({
+            id: job.id,
+            status: "pending",
+            error: "awaiting_operator",
+            expectedVersion: job.version,
+          });
+          return;
+        }
+        const tx = await store.initiateRestore(account.identityId, 0, job.newQx, job.newQy, ZeroAddress);
+        const receipt = await tx.wait();
+        const delay = Number(await store.restoreDelay());
+        if (delay === 0) {
+          const exec = await store.executeRestore(account.identityId);
+          await exec.wait();
+        }
+        await this.trackRecoveryJob({
+          id: job.id,
+          status: "included",
+          txHash: receipt?.hash ?? tx.hash,
+          expectedVersion: job.version,
+        });
+        this.activity?.append("recovery-initiated", {
+          chainId: String(chain.chainId),
+          payload: { jobId: job.id, wallet: job.walletAddress, identity: true, txHash: receipt?.hash },
+        });
+        return;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/NotRecoveryOperator|awaiting_operator/i.test(message)) {
+          await this.trackRecoveryJob({
+            id: job.id,
+            status: "pending",
+            error: "awaiting_operator",
+            expectedVersion: job.version,
+          });
+          return;
+        }
+        throw error;
+      }
+    }
     if (!recoveryAddr) {
       throw new Error("recoveryAddress not configured on deployer chain");
     }
@@ -288,8 +362,8 @@ export class WalletDeployerWorker {
     const code = await provider.getCode(job.walletAddress);
     if (code === "0x") {
       const accounts = await this.fetchUndeployedAccounts(String(chain.chainId));
-      const account = accounts.find((a) => a.address.toLowerCase() === job.walletAddress.toLowerCase());
-      if (!account) {
+      const undeployed = accounts.find((a) => a.address.toLowerCase() === job.walletAddress.toLowerCase());
+      if (!undeployed) {
         // Not funded yet — leave pending for retry (re-queue as pending).
         await this.trackRecoveryJob({
           id: job.id,
@@ -303,7 +377,7 @@ export class WalletDeployerWorker {
       const factory = new Contract(chain.factoryAddress, FACTORY_ABI, signer);
       const token = new Contract(chain.feeTokenAddress, ERC20_ABI, provider);
       const minBalance = BigInt(chain.minBalanceUsdc ?? 1);
-      const balance = BigInt(await token.balanceOf(account.address));
+      const balance = BigInt(await token.balanceOf(undeployed.address));
       if (balance < minBalance) {
         await this.trackRecoveryJob({
           id: job.id,
@@ -313,12 +387,12 @@ export class WalletDeployerWorker {
         });
         return;
       }
-      if (!account.identityId) {
+      if (!undeployed.identityId) {
         throw new Error("wallet account missing identityId");
       }
-      const deployTx = await factory.createAccount(account.identityId, account.salt);
+      const deployTx = await factory.createAccount(undeployed.identityId, undeployed.salt);
       await deployTx.wait();
-      await this.markDeployed(account.address, String(chain.chainId));
+      await this.markDeployed(undeployed.address, String(chain.chainId));
     }
 
     const recovery = new Contract(recoveryAddr, RECOVERY_ABI, guardian);
@@ -337,13 +411,53 @@ export class WalletDeployerWorker {
     });
   }
 
+  private async ensureIdentityWalletDeployed(
+    job: WalletRecoveryJobRecord,
+    account: WalletAccountRecord,
+    chain: WalletDeployerChainConfig,
+    provider: JsonRpcProvider
+  ): Promise<void> {
+    const code = await provider.getCode(job.walletAddress);
+    if (code !== "0x") return;
+    const token = new Contract(chain.feeTokenAddress, ERC20_ABI, provider);
+    const minBalance = BigInt(chain.minBalanceUsdc ?? 1);
+    const balance = BigInt(await token.balanceOf(account.address));
+    if (balance < minBalance) return;
+    if (!account.identityId) throw new Error("wallet account missing identityId");
+    const signer = new Wallet(chain.privateKey, provider);
+    const factory = new Contract(chain.factoryAddress, FACTORY_ABI, signer);
+    const deployTx = await factory.createAccount(account.identityId, account.salt);
+    await deployTx.wait();
+    await this.markDeployed(account.address, String(chain.chainId));
+  }
+
   private async runCancel(
     job: WalletRecoveryJobRecord,
     guardian: Wallet,
-    provider: JsonRpcProvider
+    provider: JsonRpcProvider,
+    recoveryAddr?: string
   ): Promise<void> {
     if (!job.cancelSignature) {
       throw new Error("cancel job missing signature");
+    }
+    const account = await this.fetchWalletAccount(job.walletAddress);
+    if (account?.identityId) {
+      const storeAddr = (await this.identityStoreAddress(job, provider)) ?? recoveryAddr;
+      if (!storeAddr) throw new Error("IdentityStore not configured for cancel");
+      const store = new Contract(storeAddr, IDENTITY_STORE_ABI, guardian);
+      const tx = await store.cancelRestore(account.identityId, job.cancelSignature);
+      const receipt = await tx.wait();
+      await this.trackRecoveryJob({
+        id: job.id,
+        status: "included",
+        txHash: receipt?.hash ?? tx.hash,
+        expectedVersion: job.version,
+      });
+      this.activity?.append("recovery-cancelled", {
+        chainId: job.chainId,
+        payload: { jobId: job.id, wallet: job.walletAddress, identity: true, txHash: receipt?.hash },
+      });
+      return;
     }
     let signature = job.cancelSignature;
     if (signature.trim().startsWith("{")) {
@@ -375,6 +489,44 @@ export class WalletDeployerWorker {
     recoveryAddr: string | undefined,
     provider: JsonRpcProvider
   ): Promise<void> {
+    const account = await this.fetchWalletAccount(job.walletAddress);
+    if (account?.identityId) {
+      if (!recoveryAddr) throw new Error("recoveryAddress not configured");
+      const store = new Contract(recoveryAddr, IDENTITY_STORE_ABI, guardian);
+      const pending = await store.pendingRestores(account.identityId);
+      if (!pending.active) {
+        await this.trackRecoveryJob({
+          id: job.id,
+          status: "rejected",
+          error: "no_pending_restore",
+          expectedVersion: job.version,
+        });
+        return;
+      }
+      const now = await this.chainNow(provider);
+      if (Number(pending.executeAfter) > now) {
+        await this.trackRecoveryJob({
+          id: job.id,
+          status: "pending",
+          error: "timelock_not_elapsed",
+          expectedVersion: job.version,
+        });
+        return;
+      }
+      const tx = await store.executeRestore(account.identityId);
+      const receipt = await tx.wait();
+      await this.trackRecoveryJob({
+        id: job.id,
+        status: "included",
+        txHash: receipt?.hash ?? tx.hash,
+        expectedVersion: job.version,
+      });
+      this.activity?.append("recovery-executed", {
+        chainId: job.chainId,
+        payload: { jobId: job.id, wallet: job.walletAddress, identity: true, txHash: receipt?.hash },
+      });
+      return;
+    }
     if (!recoveryAddr) throw new Error("recoveryAddress not configured");
     const wallet = new Contract(getAddress(job.walletAddress), WALLET_ABI, provider);
     const pending = await wallet.pendingOwner();
@@ -387,7 +539,7 @@ export class WalletDeployerWorker {
       });
       return;
     }
-    const now = Math.floor(Date.now() / 1000);
+    const now = await this.chainNow(provider);
     if (Number(pending.executableAt) > now) {
       await this.trackRecoveryJob({
         id: job.id,
@@ -412,24 +564,46 @@ export class WalletDeployerWorker {
     });
   }
 
+  private async chainNow(provider: JsonRpcProvider): Promise<number> {
+    const block = await provider.getBlock("latest");
+    return Number(block?.timestamp ?? Math.floor(Date.now() / 1000));
+  }
+
   private async maybeQueueExecutes(
     chain: WalletDeployerChainConfig,
     provider: JsonRpcProvider
   ): Promise<void> {
-    // Look at recent initiate jobs that are included; if pendingOwner ready, create execute job.
+    // Look at recent initiate jobs that are included; if pending restore/owner ready, execute.
     const included = await this.fetchRecoveryJobs(String(chain.chainId), "included");
     const initiates = included.filter((j) => j.kind === "initiate");
     for (const job of initiates) {
       if (this.stopped) return;
       try {
+        const account = await this.fetchWalletAccount(job.walletAddress);
+        if (account?.identityId && chain.recoveryAddress?.trim() && !isUnsetSecret(chain.recoveryAddress)) {
+          const guardianKey =
+            !chain.guardianPrivateKey?.trim() || isUnsetSecret(chain.guardianPrivateKey)
+              ? chain.privateKey
+              : chain.guardianPrivateKey;
+          const guardian = new Wallet(guardianKey, provider);
+          const store = new Contract(chain.recoveryAddress, IDENTITY_STORE_ABI, guardian);
+          const pending = await store.pendingRestores(account.identityId);
+          if (!pending.active) continue;
+          const now = await this.chainNow(provider);
+          if (Number(pending.executeAfter) > now) continue;
+          const tx = await store.executeRestore(account.identityId);
+          const receipt = await tx.wait();
+          this.activity?.append("recovery-executed", {
+            chainId: String(chain.chainId),
+            payload: { wallet: job.walletAddress, identity: true, txHash: receipt?.hash, fromJob: job.id },
+          });
+          continue;
+        }
         const wallet = new Contract(getAddress(job.walletAddress), WALLET_ABI, provider);
         const pending = await wallet.pendingOwner();
         if (!pending.active) continue;
-        const now = Math.floor(Date.now() / 1000);
+        const now = await this.chainNow(provider);
         if (Number(pending.executableAt) > now) continue;
-        // Create execute via API by posting a new job — use internal track isn't enough.
-        // Worker creates execute jobs by calling initiate-style internal create... we don't have create.
-        // Instead execute directly here without a job row.
         if (!chain.recoveryAddress?.trim() || isUnsetSecret(chain.recoveryAddress)) continue;
         const guardianKey =
           !chain.guardianPrivateKey?.trim() || isUnsetSecret(chain.guardianPrivateKey)
@@ -447,6 +621,28 @@ export class WalletDeployerWorker {
         /* ignore per-wallet */
       }
     }
+  }
+
+  private async fetchWalletAccount(address: string): Promise<WalletAccountRecord | null> {
+    const base = this.config.serverUrl.replace(/\/$/, "");
+    const response = await fetch(`${base}/api/wallet/accounts/${getAddress(address)}`);
+    if (!response.ok) return null;
+    const body = (await response.json()) as { account?: WalletAccountRecord };
+    return body.account ?? null;
+  }
+
+  private async identityStoreAddress(
+    job: WalletRecoveryJobRecord,
+    provider: JsonRpcProvider
+  ): Promise<string | null> {
+    try {
+      const wallet = new Contract(getAddress(job.walletAddress), ["function store() view returns (address)"], provider);
+      const store = (await wallet.store()) as string;
+      if (store && store !== ZeroAddress) return getAddress(store);
+    } catch {
+      /* undeployed or legacy */
+    }
+    return null;
   }
 
   private async fetchUndeployedAccounts(chainId: string, limit = 100): Promise<WalletAccountRecord[]> {

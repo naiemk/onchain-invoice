@@ -1,7 +1,7 @@
 import { fetchWalletConfig, getWalletAccount } from "./wallet-api.js";
 import { authenticatePasskey, ensureSessionCredential, type WalletSession } from "./webauthn.js";
 import { saveWalletSession } from "./wallet-session.js";
-import { fetchIdentityWallets, loginIdentityPasskey } from "./identity-api.js";
+import { fetchIdentityWallets, joinIdentitySuperWallet, loginIdentityPasskey } from "./identity-api.js";
 import { resolveWalletLabel } from "./wallet-label.js";
 import { t } from "../i18n/t.js";
 
@@ -27,6 +27,29 @@ async function sessionFromIdentityLogin(input: {
     throw Object.assign(new Error(t("wallet.unlockWrongWallet")), { code: "wrong_wallet" });
   }
   const config = await fetchWalletConfig();
+  for (const [index, w] of wallets.entries()) {
+    if (w.identityId && w.identityId.toLowerCase() !== login.identityId.toLowerCase()) {
+      await joinIdentitySuperWallet(w.address).catch(() => undefined);
+    }
+    const existingLabel = input.preferred?.address.toLowerCase() === w.address.toLowerCase() ? input.preferred?.label : undefined;
+    const server = await getWalletAccount(w.address).catch(() => w);
+    saveWalletSession({
+      address: w.address,
+      chainId: config.chainId,
+      salt: w.salt,
+      qx: input.qx || w.ownerQx,
+      qy: input.qy || w.ownerQy,
+      credentialId: input.credentialId,
+      rawId: input.rawId || input.credentialId,
+      label: resolveWalletLabel({
+        saved: existingLabel,
+        server: server?.label ?? w.label,
+        fallback: t("wallet.defaultWalletName"),
+        index,
+      }),
+      identityId: login.identityId,
+    });
+  }
   const server = await getWalletAccount(account.address).catch(() => account);
   return {
     address: account.address,

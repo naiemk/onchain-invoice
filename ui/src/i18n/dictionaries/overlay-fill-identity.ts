@@ -252,5 +252,15 @@ export const overlayFillIdentity = assemble({
     connectWalletSubmitting: enAll("Submitting…"),
     connectWalletAdded: enAll("Wallet added"),
     connectWalletFailed: enAll("Could not add the wallet."),
+    superWalletIdentityLede: enAll(
+      "Add other identities by email. Those identities will sign together as a Super Wallet — used as the email-restore operator."
+    ),
+    superWalletIdentityEmails: enAll("Other identity emails (one per line)"),
+    superWalletIdentityMissing: enAll("No identity found for {email}."),
+    superWalletRestoreInboxTitle: enAll("Pending email restores"),
+    superWalletRestoreInboxHint: enAll(
+      "Sign with this identity. When enough signers have signed, the restore starts on-chain."
+    ),
+    superWalletRestoreSign: enAll("Sign restore"),
   },
 });
