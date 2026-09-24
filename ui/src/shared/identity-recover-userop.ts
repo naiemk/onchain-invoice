@@ -12,6 +12,7 @@ import {
   METHOD_WEBAUTHN,
   METHOD_YUBIKEY,
   computeIdentityMethodId,
+  encodeSuperIdentityBlobs,
 } from "../../../commerce/shared/identity-store.js";
 import { eoaFromOwnerQx, isEoaOwnerQy, parseEoaCredentialId } from "../../../commerce/shared/wallet-eip712.js";
 import type { IdentityMethodKind } from "../../../commerce/shared/identity.js";
@@ -42,6 +43,10 @@ const ADD_METHOD_IFACE = new Interface([
 const REMOVE_METHOD_IFACE = new Interface([
   "function removeMethod(bytes32 identityId, bytes32 methodId, bytes authorization)",
 ]);
+const INITIATE_RESTORE_IFACE = new Interface([
+  "function initiateRestore(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
+]);
+const ENABLE_SUPER_IFACE = new Interface(["function enableSuper(bytes32[] extraIdentities, uint8 threshold_)"]);
 
 /** Public config, then IdentityWallet.store() / factory.store() if the contracts are identity ones. */
 export async function resolveIdentityStoreAddress(walletAddress?: string): Promise<string | null> {
@@ -106,6 +111,122 @@ async function submitIdentityStoreUserOp(input: {
     throw new Error(formatSendRejectReason(reason, (key, vars) => t(key as Parameters<typeof t>[0], vars)));
   }
   return { userOpHash, txHash: result.txHash };
+}
+
+export async function buildIdentityExecuteUserOp(input: {
+  walletAddress: string;
+  callData: string;
+}): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
+  const config = await fetchWalletConfig();
+  const chain = primaryChain(config);
+  if (!chain.feeTokenAddress || !config.bundlerBeneficiary) {
+    throw new Error(t("wallet.removeNeedBundler"));
+  }
+  if (!chain.rpcUrl) throw new Error(t("wallet.removeNeedStore"));
+  const feeAmount = BigInt(config.bundlerFeeUsdc || "0");
+  const provider = new JsonRpcProvider(chain.rpcUrl);
+  const entryPoint = new Contract(config.entryPointAddress, ENTRYPOINT_ABI, provider);
+  const nonce = BigInt(await entryPoint.getNonce(input.walletAddress, 0));
+  const callData = encodeExecuteCallData([
+    buildFeeTransferCall(chain.feeTokenAddress, config.bundlerBeneficiary, feeAmount),
+    { target: input.walletAddress, value: 0n, data: input.callData },
+  ]);
+  const unsigned = buildPackedUserOperation({
+    sender: input.walletAddress,
+    nonce,
+    callData,
+    gas: { verificationGasLimit: 1_200_000n, callGasLimit: 900_000n },
+  });
+  const userOpHash = (await entryPoint.getUserOpHash(userOpToTuple(unsigned))) as string;
+  return { userOp: unsigned, userOpHash };
+}
+
+export async function submitEnableSuperUserOp(input: {
+  session: WalletSession;
+  extraIdentityIds: string[];
+  threshold: number;
+}): Promise<void> {
+  const passkey = await resolveCurrentWalletPasskey(input.session, "enable-advanced");
+  const built = await buildIdentityExecuteUserOp({
+    walletAddress: input.session.address,
+    callData: ENABLE_SUPER_IFACE.encodeFunctionData("enableSuper", [input.extraIdentityIds, input.threshold]),
+  });
+  const signature = await signWithCurrentWalletPasskey(built.userOpHash, passkey, { path: "enable-advanced" });
+  const config = await fetchWalletConfig();
+  const chain = primaryChain(config);
+  await submitUserOp({
+    walletAddress: input.session.address,
+    chainId: chain.chainId,
+    userOpHash: built.userOpHash,
+    userOp: { ...built.userOp, signature },
+  });
+  const result = await waitForUserOp(built.userOpHash);
+  if (result.status !== "included") {
+    throw new Error(formatSendRejectReason(result.rejectReason ?? result.status, (key, vars) => t(key as Parameters<typeof t>[0], vars)));
+  }
+}
+
+export async function buildInitiateRestoreUserOp(input: {
+  operatorWallet: string;
+  storeAddress: string;
+  identityId: string;
+  kind: number;
+  qx: string;
+  qy: string;
+}): Promise<{ userOp: PackedUserOperationJson; userOpHash: string }> {
+  const config = await fetchWalletConfig();
+  const chain = primaryChain(config);
+  if (!chain.feeTokenAddress || !config.bundlerBeneficiary) {
+    throw new Error(t("wallet.removeNeedBundler"));
+  }
+  if (!chain.rpcUrl) throw new Error(t("wallet.removeNeedStore"));
+  const feeAmount = BigInt(config.bundlerFeeUsdc || "0");
+  const provider = new JsonRpcProvider(chain.rpcUrl);
+  const entryPoint = new Contract(config.entryPointAddress, ENTRYPOINT_ABI, provider);
+  const nonce = BigInt(await entryPoint.getNonce(input.operatorWallet, 0));
+  const callData = encodeExecuteCallData([
+    buildFeeTransferCall(chain.feeTokenAddress, config.bundlerBeneficiary, feeAmount),
+    {
+      target: input.storeAddress,
+      value: 0n,
+      data: INITIATE_RESTORE_IFACE.encodeFunctionData("initiateRestore", [
+        input.identityId,
+        input.kind,
+        input.qx,
+        input.qy,
+        ZeroAddress,
+      ]),
+    },
+  ]);
+  const unsigned = buildPackedUserOperation({
+    sender: input.operatorWallet,
+    nonce,
+    callData,
+    gas: { verificationGasLimit: 1_200_000n, callGasLimit: 900_000n },
+  });
+  const userOpHash = (await entryPoint.getUserOpHash(userOpToTuple(unsigned))) as string;
+  return { userOp: unsigned, userOpHash };
+}
+
+export async function submitSignedIdentityUserOp(input: {
+  walletAddress: string;
+  userOp: PackedUserOperationJson;
+  userOpHash: string;
+  blobs: string[];
+}): Promise<void> {
+  const config = await fetchWalletConfig();
+  const chain = primaryChain(config);
+  const signature = input.blobs.length === 1 ? input.blobs[0]! : encodeSuperIdentityBlobs(input.blobs);
+  await submitUserOp({
+    walletAddress: input.walletAddress,
+    chainId: chain.chainId,
+    userOpHash: input.userOpHash,
+    userOp: { ...input.userOp, signature },
+  });
+  const result = await waitForUserOp(input.userOpHash);
+  if (result.status !== "included") {
+    throw new Error(formatSendRejectReason(result.rejectReason ?? result.status, (key, vars) => t(key as Parameters<typeof t>[0], vars)));
+  }
 }
 
 function methodKindNum(kind: IdentityMethodKind | undefined): number {

@@ -7,6 +7,7 @@ import {
   METHOD_YUBIKEY,
   computeIdentityMethodId,
   hashIdentityAddMethod,
+  hashIdentityCancelRestore,
   hashIdentityRemoveMethod,
   loginOptionsAfterFailedGet,
   randomIdentityId,
@@ -503,5 +504,68 @@ describe("IdentityStore", function () {
     const extra = simulatePasskey();
     await store.connect(eoa).addMethodByEoa(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress);
     expect((await store.getIdentity(identityId)).webauthnCount).to.equal(3n);
+  });
+
+  it("delayed restore: initiate, too-early execute, cancel with old key, then execute after delay", async function () {
+    const { ethers, store, owner, storeAddress, chainId } = await deployStore();
+    await store.connect(owner).setRestoreDelay(2);
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    const recovered = simulatePasskey();
+    await store.register(identityId, passkey.qx, passkey.qy);
+
+    await store.initiateRestore(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
+    const pending = await store.pendingRestores(identityId);
+    expect(pending.active).to.equal(true);
+    await expectRevert(store.executeRestore.staticCall(identityId), "RestoreNotReady");
+    await expectRevert(
+      store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress),
+      "RestorePending"
+    );
+
+    const cancelDigest = await store.hashCancelRestore(identityId);
+    await store.cancelRestore(identityId, identityPasskeyBlob({ identityId, key: passkey, message: cancelDigest }));
+    expect((await store.pendingRestores(identityId)).active).to.equal(false);
+
+    await store.initiateRestore(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
+    await ethers.provider.send("evm_increaseTime", [3]);
+    await ethers.provider.send("evm_mine", []);
+    await store.executeRestore(identityId);
+    const login = keccak256(toUtf8Bytes("delayed-restore"));
+    expect(
+      await store.verify(login, identityPasskeyBlob({ identityId, key: recovered, message: login }))
+    ).to.equal(identityId);
+    expect(hashIdentityCancelRestore(storeAddress, chainId, identityId)).to.equal(cancelDigest);
+  });
+
+  it("disableRestore clears a pending restore and blocks execute", async function () {
+    const { store, eoa } = await deployStore();
+    await store.setRestoreDelay(60);
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    await store.register(identityId, passkey.qx, passkey.qy);
+    const addEoa = await store.hashAddMethod(
+      identityId,
+      METHOD_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      eoa.address
+    );
+    await store.addMethod(
+      identityId,
+      METHOD_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      eoa.address,
+      identityPasskeyBlob({ identityId, key: passkey, message: addEoa })
+    );
+    await store.initiateRestore(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress);
+    await store.connect(eoa).disableRestore(identityId);
+    expect((await store.pendingRestores(identityId)).active).to.equal(false);
+    await expectRevert(store.executeRestore.staticCall(identityId), "RestoreNotPending");
+    await expectRevert(
+      store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress),
+      "RestoreIsDisabled"
+    );
   });
 });

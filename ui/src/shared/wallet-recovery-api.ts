@@ -224,6 +224,7 @@ export async function cancelRecoveryRequest(input: {
   credentialId: string;
   assertion: unknown;
   captchaToken?: string | null;
+  authorization?: string;
 }): Promise<{ request: RecoveryRequestPublic }> {
   const res = await fetch(apiUrl(`/api/wallet/recovery/requests/${input.requestId}/cancel`), {
     method: "POST",

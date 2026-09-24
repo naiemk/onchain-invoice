@@ -57,6 +57,7 @@ export function RecoveryOptions() {
         <button
           type="button"
           className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/40"
+          data-testid="recover-cancel-restore"
           onClick={() => setModal("cancel")}
         >
           <ShieldX className="h-5 w-5 shrink-0 text-emphasis" aria-hidden />

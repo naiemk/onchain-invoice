@@ -18,6 +18,7 @@ import {
 import { fetchWalletConfig } from "@/shared/wallet-api.js";
 import { loadWalletSession, type WalletSession } from "@/shared/wallet-session.js";
 import { assertPasskeyChallenge, formatPasskeyError } from "@/shared/webauthn.js";
+import { signCancelRestoreAuthorization } from "@/shared/identity-sign.js";
 
 export function LostDeviceRecoveryDialog({
   open,
@@ -68,6 +69,9 @@ export function LostDeviceRecoveryDialog({
         challengeBase64Url: ch.challenge,
         credentialId: live.credentialId,
       });
+      const authorization = live.identityId
+        ? await signCancelRestoreAuthorization({ session: live })
+        : undefined;
       await cancelRecoveryRequest({
         requestId: activeId,
         challengeId: ch.challengeId,
@@ -76,6 +80,7 @@ export function LostDeviceRecoveryDialog({
         credentialId: live.credentialId,
         assertion,
         captchaToken,
+        authorization,
       });
       setStatus(t("wallet.recoverCancelled"));
       setActiveId(null);
@@ -97,7 +102,12 @@ export function LostDeviceRecoveryDialog({
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
         <DialogFooter>
-          <Button type="button" disabled={busy || !activeId} onClick={() => void cancelRequest()}>
+          <Button
+            type="button"
+            data-testid="confirm-cancel-restore"
+            disabled={busy || !activeId}
+            onClick={() => void cancelRequest()}
+          >
             {t("wallet.recoverCancel")}
           </Button>
         </DialogFooter>

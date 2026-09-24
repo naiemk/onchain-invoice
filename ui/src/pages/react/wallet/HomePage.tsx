@@ -26,6 +26,7 @@ import {
 import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { isAdvancedMode } from "@/shared/wallet-mode.js";
 import { ChainBalanceList, WalletBalancePreview } from "./WalletBalancePreview";
+import { IdentityOperatorRestoresCard } from "./IdentityOperatorRestoresCard";
 import { WalletFrame } from "./WalletFrame";
 import { useWalletPolicy } from "./wallet-policy";
 import { isClosedProposal, isFullySigned, ProposalSummaryLine } from "./proposal-display";
@@ -101,7 +102,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
   }, [activating, loadBalance]);
 
   useEffect(() => {
-    if (session.identityId || isSuperWallet) {
+    if (isSuperWallet) {
       setPendingRecovery(false);
       return;
     }
@@ -116,7 +117,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
   }, [isSuperWallet, session.address]);
 
   useEffect(() => {
-    if (!advanced || session.identityId) {
+    if (!advanced && !session.identityId) {
       setNotices([]);
       return;
     }
@@ -131,9 +132,14 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
       }
       const balance = await fetchWalletBalance(session.address).catch(() => null);
       const deployed = balance?.chains.some((c) => c.deployed) ?? false;
-      const policy = await resolveAdvancedPolicy(session.address, deployed);
-      onChainAdvanced = policy.advanced;
-      superUnsupported = !onChainAdvanced && policy.supportsAdvanced === false;
+      if (session.identityId) {
+        onChainAdvanced = isSuperWallet;
+        superUnsupported = false;
+      } else {
+        const policy = await resolveAdvancedPolicy(session.address, deployed);
+        onChainAdvanced = policy.advanced;
+        superUnsupported = !onChainAdvanced && policy.supportsAdvanced === false;
+      }
       if (onChainAdvanced) {
         try {
           const roster = await listWalletEntities(session.address);
@@ -189,7 +195,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
 
       setNotices(items);
     })();
-  }, [advanced, session.address, session.chainId, session.identityId, t]);
+  }, [advanced, isSuperWallet, session.address, session.chainId, session.identityId, t]);
 
   useEffect(() => {
     if (!isSuperWallet) {
@@ -270,6 +276,7 @@ function WalletDashboard({ session: initialSession }: { session: WalletSession }
             </AlertDescription>
           </Alert>
         )}
+        {session.identityId ? <IdentityOperatorRestoresCard /> : null}
         {isSuperWallet && policy && (
           <section
             data-testid="super-wallet-home-summary"

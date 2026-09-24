@@ -8,7 +8,10 @@ flowchart LR
   m2 --> m3[M3_Mainnet_ops]
   m3 --> m4[M4_Docs_agents]
   m4 --> m5[M5_Security_audit]
+  m3 --> mw[M_wallet_simple_GA]
 ```
+
+Hosted **simple wallet** (IdentityWallet + IdentityStore, Base) has its own certification program: [`docs/wallet-mainnet-assurance.md`](docs/wallet-mainnet-assurance.md). That path is not gated on M5 (commerce/sweeper audit). Super Wallet remains beta until a later program.
 
 ---
 
@@ -114,12 +117,35 @@ Goal: external review of frozen mainnet surface before (or immediately after) wi
 
 ---
 
+## M-wallet — Simple wallet mainnet assurance
+
+Goal: hosted simple wallets on Base are recoverable in every state and cannot lock or lose funds on the certified path. Super Wallet stays in product as **beta / not fully audited**.
+
+Program of record: [`docs/wallet-mainnet-assurance.md`](docs/wallet-mainnet-assurance.md) (epics 0–5, state matrix, CI gates, live drills, Identity\* audit).
+
+```mermaid
+flowchart LR
+  p0[P0_Spec] --> p1[P1_Invariants] --> p2[P2_CI] --> p3[P3_Drills] --> p4[P4_Audit] --> p5[P5_Simple_GA]
+```
+
+- [x] P0: publish assurance program + threat model
+- [ ] P1: second-method-before-funds + last-method / `disableRestore` invariants + store-owner timelock
+- [ ] P2: `wallet-cert` Hardhat + identity-email-restore required CI + ABI snapshots
+- [ ] P3: Base live recovery drills + monitoring + persist-log backups
+- [ ] P4: external audit of IdentityStore / IdentityWallet / factory (operator Super in-scope; user Super out)
+- [ ] P5: simple wallet GA on `https://trustless-commerce.com`; Super beta banner remains
+
+**Exit:** matrix cells and threat rows in the assurance doc have tests or named ops procedures; CI fails if path A (recovery) or path B (UserOp auth) regresses; audit P0/P1 closed.
+
+---
+
 ## Explicitly later / out of band
 
 - Arbitrum and other EVM L2s (UI labels exist; not a roadmap gate)
 - Redis / multi-replica API
 - Deposit-tx indexing (still balance-poll unless product requires it)
 - Mainnet sweeper auto-update (remain off by default)
+- User Super Wallet certification (after simple-wallet GA; see M-wallet)
 
 ---
 

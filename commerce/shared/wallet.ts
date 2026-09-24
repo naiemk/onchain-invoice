@@ -298,6 +298,7 @@ export interface WalletRecoveryRequestRecord {
   guardianActedAt: string | null;
   jobId: string | null;
   chainId: string;
+  operatorPayload: string | null;
   createdAt: string;
   updatedAt: string;
 }

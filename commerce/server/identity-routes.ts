@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { ZeroAddress, getAddress, hexlify, isAddress, isHexString, randomBytes, verifyTypedData } from "ethers";
+import { Contract, JsonRpcProvider, ZeroAddress, getAddress, hexlify, isAddress, isHexString, randomBytes, verifyTypedData } from "ethers";
 import { verifyCaptcha } from "./captcha.js";
 import type { AppConfig } from "./config.js";
 import type { CommerceDb } from "./db.js";
@@ -8,6 +8,7 @@ import { exchangeGoogleCode, googleAuthUrl, parseGoogleIdToken } from "./google-
 import {
   addIdentityMethodOnChain,
   identityMethodExistsOnChain,
+  readIdentityRecoveryOperator,
   readIdentityRestoreEnabled,
   registerIdentityOnChain,
   removeIdentityMethodOnChain,
@@ -710,7 +711,7 @@ export function registerIdentityRoutes(
           handlers.sendJson(res, 404, { error: "identity_not_found" });
           return true;
         }
-        const wallets = db.listWalletAccountsByIdentityId(method.identityId);
+        const wallets = db.listWalletAccountsLinkedToIdentity(method.identityId);
         issueSessionCookie(res, config, identity.identityId, identity.email);
         handlers.sendJson(res, 200, {
           identityId: method.identityId,
@@ -723,8 +724,166 @@ export function registerIdentityRoutes(
 
       if (req.method === "GET" && url.pathname === "/api/identity/wallets") {
         const session = requireSession(req, config);
-        const wallets = db.listWalletAccountsByIdentityId(session.identityId);
+        const wallets = db.listWalletAccountsLinkedToIdentity(session.identityId);
         handlers.sendJson(res, 200, { wallets, identityId: session.identityId });
+        return true;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/identity/wallets/join") {
+        const session = requireSession(req, config);
+        const body = await handlers.readJson(req);
+        const address = str(body.address);
+        if (!address || !isAddress(address)) {
+          handlers.sendJson(res, 400, { error: "address_required" });
+          return true;
+        }
+        const account = db.getWalletAccount(address);
+        if (!account) {
+          handlers.sendJson(res, 404, { error: "wallet_not_found" });
+          return true;
+        }
+        const rpc = config.identity.rpcUrl ?? config.wallet.rpcUrl;
+        if (!rpc) {
+          handlers.sendJson(res, 400, { error: "rpc_required" });
+          return true;
+        }
+        try {
+          const provider = new JsonRpcProvider(rpc);
+          const wallet = new Contract(
+            getAddress(address),
+            [
+              "function superWallet() view returns (bool)",
+              "function isSigner(bytes32 identityId) view returns (bool)",
+            ],
+            provider
+          );
+          const isSuper = Boolean(await wallet.superWallet());
+          const signer = Boolean(await wallet.isSigner(session.identityId));
+          if (!isSuper || !signer) {
+            handlers.sendJson(res, 403, { error: "not_super_signer" });
+            return true;
+          }
+        } catch (e) {
+          handlers.sendJson(res, 400, {
+            error: "join_failed",
+            message: e instanceof Error ? e.message : String(e),
+          });
+          return true;
+        }
+        db.upsertWalletEntity({
+          walletAddress: account.address,
+          entityId: session.identityId,
+          label: session.email,
+        });
+        handlers.sendJson(res, 200, { account, identityId: session.identityId });
+        return true;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/identity/operator/restores") {
+        const session = requireSession(req, config);
+        const operator = await readIdentityRecoveryOperator(config.identity);
+        if (!operator) {
+          handlers.sendJson(res, 200, { operator: null, threshold: 0, requests: [] });
+          return true;
+        }
+        const rpc = config.identity.rpcUrl ?? config.wallet.rpcUrl;
+        if (!rpc) {
+          handlers.sendJson(res, 200, { operator, threshold: 0, requests: [] });
+          return true;
+        }
+        const provider = new JsonRpcProvider(rpc);
+        let isSigner = false;
+        let threshold = 0;
+        try {
+          const wallet = new Contract(
+            operator,
+            [
+              "function superWallet() view returns (bool)",
+              "function isSigner(bytes32 identityId) view returns (bool)",
+              "function threshold() view returns (uint8)",
+            ],
+            provider
+          );
+          isSigner = Boolean(await wallet.isSigner(session.identityId));
+          threshold = Number(await wallet.threshold());
+        } catch {
+          isSigner = false;
+        }
+        if (!isSigner) {
+          handlers.sendJson(res, 200, { operator, threshold, requests: [] });
+          return true;
+        }
+        const requests = db
+          .listWalletRecoveryRequests(["awaiting_guardian", "queued", "on_chain"])
+          .filter((r) => Boolean(db.getWalletAccount(r.walletAddress)?.identityId))
+          .map((r) => ({
+            ...r,
+            identityId: db.getWalletAccount(r.walletAddress)?.identityId ?? null,
+          }));
+        handlers.sendJson(res, 200, { operator, threshold, requests });
+        return true;
+      }
+
+      const operatorSignMatch = url.pathname.match(/^\/api\/identity\/operator\/restores\/([^/]+)\/sign$/);
+      if (req.method === "POST" && operatorSignMatch) {
+        const session = requireSession(req, config);
+        const request = db.getWalletRecoveryRequest(operatorSignMatch[1]!);
+        if (!request) {
+          handlers.sendJson(res, 404, { error: "request_not_found" });
+          return true;
+        }
+        const body = await handlers.readJson(req);
+        const blob = str(body.signature) ?? str(body.blob);
+        const userOpHash = str(body.userOpHash);
+        if (!blob) {
+          handlers.sendJson(res, 400, { error: "signature_required" });
+          return true;
+        }
+        let payload: { userOpHash?: string; userOp?: unknown; blobs?: Record<string, string> } = {};
+        if (request.operatorPayload) {
+          try {
+            payload = JSON.parse(request.operatorPayload) as typeof payload;
+          } catch {
+            payload = {};
+          }
+        }
+        if (userOpHash) payload.userOpHash = userOpHash;
+        if (body.userOp && typeof body.userOp === "object") payload.userOp = body.userOp;
+        payload.blobs = { ...(payload.blobs ?? {}), [session.identityId.toLowerCase()]: blob };
+        const updated = db.updateWalletRecoveryRequest(request.id, {
+          operatorPayload: JSON.stringify(payload),
+        });
+        handlers.sendJson(res, 200, { request: updated, payload });
+        return true;
+      }
+
+      const operatorInitiatedMatch = url.pathname.match(
+        /^\/api\/identity\/operator\/restores\/([^/]+)\/initiated$/
+      );
+      if (req.method === "POST" && operatorInitiatedMatch) {
+        const session = requireSession(req, config);
+        const request = db.getWalletRecoveryRequest(operatorInitiatedMatch[1]!);
+        if (!request) {
+          handlers.sendJson(res, 404, { error: "request_not_found" });
+          return true;
+        }
+        const account = db.getWalletAccount(request.walletAddress);
+        if (!account?.identityId) {
+          handlers.sendJson(res, 400, { error: "not_identity_wallet" });
+          return true;
+        }
+        const job = db.createWalletRecoveryJob({
+          walletAddress: request.walletAddress,
+          chainId: request.chainId,
+          kind: "execute",
+        });
+        const updated = db.updateWalletRecoveryRequest(request.id, {
+          status: "on_chain",
+          guardianAddress: session.identityId,
+          guardianActedAt: new Date().toISOString(),
+          jobId: job.id,
+        });
+        handlers.sendJson(res, 200, { request: updated, job });
         return true;
       }
 

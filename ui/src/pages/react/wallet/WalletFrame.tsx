@@ -398,7 +398,7 @@ function WalletAppMenu({
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <WalletSwitcher session={session} registry={registry} onSessionChange={onSessionChange} onNavigate={onNavigate} />
       <WalletNavLinks current={current} onNavigate={onNavigate} />
-      {!isSuperWallet && !session?.identityId && (
+      {!isSuperWallet && (
         <div className="mt-auto">
           <WalletModeToggle />
         </div>

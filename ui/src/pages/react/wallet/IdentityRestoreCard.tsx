@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchIdentityMe } from "@/shared/identity-api.js";
 import { fetchWalletConfig } from "@/shared/wallet-api.js";
+import { subscribePageVisible } from "@/shared/page-visibility.js";
 import type { WalletSession } from "@/shared/wallet-session.js";
 
 const STORE_ABI = ["function disableRestore(bytes32 identityId)"];
@@ -31,6 +32,20 @@ export function IdentityRestoreCard({ session }: { session: WalletSession }) {
   useEffect(() => {
     void reload();
   }, [reload, session.address]);
+
+  useEffect(() => {
+    return subscribePageVisible(() => {
+      void reload();
+    });
+  }, [reload]);
+
+  useEffect(() => {
+    if ((me?.methods.eoa ?? 0) > 0) return;
+    const id = window.setInterval(() => {
+      void reload();
+    }, 2_000);
+    return () => window.clearInterval(id);
+  }, [me?.methods.eoa, reload]);
 
   const disable = async () => {
     const identityId = session.identityId ?? me?.identityId;
@@ -81,6 +96,7 @@ export function IdentityRestoreCard({ session }: { session: WalletSession }) {
                   type="button"
                   size="sm"
                   variant="secondary"
+                  data-testid="identity-restore-turn-off"
                   disabled={!hasEoa || busy}
                   onClick={() => void disable()}
                 >

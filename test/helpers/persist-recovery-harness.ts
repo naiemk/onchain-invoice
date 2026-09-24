@@ -143,6 +143,7 @@ export async function deployPersistRecoveryStack(ethers: {
   const Store = await ethers.getContractFactory("IdentityStore");
   const store = await Store.deploy(await owner.getAddress(), await owner.getAddress());
   await store.waitForDeployment?.();
+  await store.setRestoreDelay(1);
   const Factory = await ethers.getContractFactory("IdentityWalletFactory");
   const factory = await Factory.deploy(
     await walletImpl.getAddress(),
@@ -210,6 +211,7 @@ export function persistRecoveryApiEnv(input: {
     WALLET_DEPLOYER_PRIVATE_KEY: HH_DEPLOYER_KEY,
     RESEND_API_KEY: "",
     IDENTITY_DEV_OTP: "1",
+    IDENTITY_RESTORE_DELAY: "1",
     TURNSTILE_SECRET: "",
     RATE_LIMIT_CREATE_PER_SECOND: "500",
     RATE_LIMIT_PUBLIC_PER_SECOND: "500",
