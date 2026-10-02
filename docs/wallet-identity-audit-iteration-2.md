@@ -1,5 +1,7 @@
 # Identity wallet audit, iteration 2
 
+Iteration 3 assumes the fixes below and attacks that result: [wallet-identity-audit-iteration-3.md](wallet-identity-audit-iteration-3.md).
+
 Second pass on the same contracts as [iteration 1](wallet-identity-audit.md) (`3be1976e8b2090649fa643dd54ceacae18e32245`, solc 0.8.26, OpenZeppelin 5.6.1). Iteration 1 listed AUD-01 through AUD-07. This pass does three things: it keeps the fixes inside the product's design, it attacks those fixes, and it records what a second look found.
 
 Contracts are still unchanged. New checks are in [`test/IdentityWalletAudit.ts`](../test/IdentityWalletAudit.ts). `npx hardhat test test/IdentityWalletAudit.ts` — 9 passing. The iteration 1 failures still fail on the current code. That is deliberate.
@@ -98,7 +100,7 @@ Keep the direct EOA call so a user can pay gas on Etherscan. Also accept an IDS1
 
 **Nullifier left out of the hash.** If `authId` is calldata and not part of the typed struct, a watcher can consume a different id or replay the signature under a new id. The id has to be in the EIP-712 payload. Same for `restoreNonce` on cancel.
 
-**Operator replaces the pending key forever.** `replaceRestore` always starts a full delay. A malicious operator can keep resetting it. That grief is smaller than the power they already have, which is to wait out the delay and install their own key. A user who still has a method signs a cancel for the current nonce. A user who does not is already inside the operator trust assumption.
+**Operator replaces the pending key forever.** `replaceRestore` always starts a full delay. A malicious operator can keep resetting it. Iteration 2 treated that as smaller than waiting out one delay and installing a key. Iteration 3 revises that: a retry resets the clock for a user who cannot cancel, so replace has to be limited to a pending restore that cannot execute (AUD-11).
 
 **Swapping the key under a signed operator UserOp.** The 2-of-3 signature covers `callData`, and `callData` contains `(qx, qy)`. The iteration 2 test signs `initiateRestore` for one key and resubmits it with another key. The EntryPoint reverts `AA24`. A fix that reads the new key from storage or from a second unsigned call would drop this binding. Do not do that.
 

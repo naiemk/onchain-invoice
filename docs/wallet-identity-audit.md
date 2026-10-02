@@ -2,6 +2,8 @@
 
 Iteration 2 (fixes that fit the design, and a second pass): [wallet-identity-audit-iteration-2.md](wallet-identity-audit-iteration-2.md).
 
+Iteration 3 (assume those fixes, then the holes they open, and what stays cheap): [wallet-identity-audit-iteration-3.md](wallet-identity-audit-iteration-3.md).
+
 Internal review of the hosted identity wallet. This is not a third-party audit and it is not a certification. Do not treat mainnet balances as covered until an external auditor has reviewed a frozen tag, the PoCs below, and the deployed addresses.
 
 Reviewed contracts match git `3be1976e8b2090649fa643dd54ceacae18e32245` (`main` at the start of this review). Solidity `0.8.26`, optimizer on, 1,000,000 runs, `viaIR`, EVM target `cancun`. OpenZeppelin Contracts `5.6.1`. PoCs live in [`test/IdentityWalletAudit.ts`](../test/IdentityWalletAudit.ts) and were executed with `npx hardhat test test/IdentityWalletAudit.ts` (8 passing).
