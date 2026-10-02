@@ -1,0 +1,401 @@
+/**
+ * Audit PoCs for IdentityStore / IdentityWallet / IdentityWalletFactory.
+ * These tests record broken invariants. They do not change production contracts.
+ */
+import { expect } from "chai";
+import { Interface, ZeroAddress, ZeroHash, keccak256, toUtf8Bytes, zeroPadValue } from "ethers";
+import { network } from "hardhat";
+import {
+  ENTRYPOINT_V09,
+  buildPackedUserOperation,
+  encodeExecuteCallData,
+  userOpToTuple,
+} from "../commerce/shared/userop.js";
+import { deriveIdentityWalletSalt } from "../commerce/shared/wallet-address.js";
+import {
+  METHOD_EOA,
+  METHOD_WEBAUTHN,
+  computeIdentityMethodId,
+  encodeSuperIdentityBlobs,
+  randomIdentityId,
+} from "../commerce/shared/identity-store.js";
+import { identityPasskeyBlob, simulatePasskey, type SimulatedPasskey } from "./helpers/identity-signing.js";
+
+const PING_IFACE = new Interface(["function ping(bytes32 value)"]);
+
+async function expectRevert(promise: Promise<unknown>, name: string): Promise<void> {
+  try {
+    await promise;
+    expect.fail(`Expected revert ${name}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    expect(msg).to.include(name);
+  }
+}
+
+async function deployAuditStack() {
+  const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
+  const [owner, eoa] = await ethers.getSigners();
+  const Store = await ethers.getContractFactory("IdentityStore");
+  const store = await Store.deploy(owner.address, owner.address);
+  await store.waitForDeployment();
+  const Harness = await ethers.getContractFactory("IdentityWalletHarness");
+  const impl = await Harness.deploy();
+  await impl.waitForDeployment();
+  const Factory = await ethers.getContractFactory("IdentityWalletFactory");
+  const factory = await Factory.deploy(await impl.getAddress(), await store.getAddress(), owner.address);
+  await factory.waitForDeployment();
+  const Ping = await ethers.getContractFactory("E2ePing");
+  const ping = await Ping.deploy();
+  await ping.waitForDeployment();
+  const EntryPoint = await ethers.getContractFactory("E2eEntryPoint");
+  const epImpl = await EntryPoint.deploy();
+  await epImpl.waitForDeployment();
+  const epCode = await ethers.provider.getCode(await epImpl.getAddress());
+  await ethers.provider.send("hardhat_setCode", [ENTRYPOINT_V09, epCode]);
+  const entryPoint = await ethers.getContractAt("E2eEntryPoint", ENTRYPOINT_V09);
+  return {
+    ethers,
+    store,
+    factory,
+    ping,
+    entryPoint,
+    owner,
+    eoa,
+    storeAddress: (await store.getAddress()) as string,
+    pingAddress: (await ping.getAddress()) as string,
+  };
+}
+
+type Stack = Awaited<ReturnType<typeof deployAuditStack>>;
+
+async function walletAt(stack: Stack, salt: string) {
+  const walletAddress = (await stack.factory.predictAddress(salt)) as string;
+  const wallet = await stack.ethers.getContractAt("IdentityWalletHarness", walletAddress);
+  return { wallet, walletAddress };
+}
+
+async function sendPing(stack: Stack, walletAddress: string, identityId: string, key: SimulatedPasskey, tag: string) {
+  const callData = encodeExecuteCallData([
+    { target: stack.pingAddress, value: 0n, data: PING_IFACE.encodeFunctionData("ping", [keccak256(toUtf8Bytes(tag))]) },
+  ]);
+  const nonce = await stack.entryPoint.getNonce(walletAddress, 0);
+  const unsigned = buildPackedUserOperation({ sender: walletAddress, nonce, callData });
+  const userOpHash = await stack.entryPoint.getUserOpHash(userOpToTuple(unsigned));
+  const userOp = buildPackedUserOperation({
+    sender: walletAddress,
+    nonce,
+    callData,
+    signature: identityPasskeyBlob({ identityId, key, message: userOpHash }),
+  });
+  await stack.entryPoint.handleOps([userOpToTuple(userOp)], stack.owner.address);
+  return keccak256(toUtf8Bytes(tag));
+}
+
+describe("Identity wallet audit", function () {
+  it("AUD-07 the first register call owns an identityId", async function () {
+    const stack = await deployAuditStack();
+    const identityId = randomIdentityId();
+    const attacker = simulatePasskey();
+    const victim = simulatePasskey();
+    await stack.store.register(identityId, attacker.qx, attacker.qy);
+    await expectRevert(stack.store.register(identityId, victim.qx, victim.qy), "IdentityExists");
+    const login = keccak256(toUtf8Bytes("front-run"));
+    expect(
+      await stack.store.verify(login, identityPasskeyBlob({ identityId, key: attacker, message: login }))
+    ).to.equal(identityId);
+    expect(
+      await stack.store.verify(login, identityPasskeyBlob({ identityId, key: victim, message: login }))
+    ).to.equal(ZeroHash);
+  });
+
+  it("AUD-01 first createAccount for a public salt owns that address", async function () {
+    const stack = await deployAuditStack();
+    const victimId = randomIdentityId();
+    const attackerId = randomIdentityId();
+    const victim = simulatePasskey();
+    const attacker = simulatePasskey();
+    await stack.store.register(victimId, victim.qx, victim.qy);
+    await stack.store.register(attackerId, attacker.qx, attacker.qy);
+
+    const salt = deriveIdentityWalletSalt(victimId, 0);
+    await stack.factory.createAccount(attackerId, salt);
+    await stack.factory.createAccount(victimId, salt);
+
+    const { wallet, walletAddress } = await walletAt(stack, salt);
+    expect(await wallet.identityId()).to.equal(attackerId);
+
+    const marked = keccak256(toUtf8Bytes("victim-deposit"));
+    expect(await sendPing(stack, walletAddress, attackerId, attacker, "victim-deposit")).to.equal(marked);
+    expect(await stack.ping.lastPing()).to.equal(marked);
+
+    const callData = encodeExecuteCallData([
+      { target: stack.pingAddress, value: 0n, data: PING_IFACE.encodeFunctionData("ping", [keccak256(toUtf8Bytes("no"))]) },
+    ]);
+    const nonce = await stack.entryPoint.getNonce(walletAddress, 0);
+    const unsigned = buildPackedUserOperation({ sender: walletAddress, nonce, callData });
+    const userOpHash = await stack.entryPoint.getUserOpHash(userOpToTuple(unsigned));
+    const victimOp = buildPackedUserOperation({
+      sender: walletAddress,
+      nonce,
+      callData,
+      signature: identityPasskeyBlob({ identityId: victimId, key: victim, message: userOpHash }),
+    });
+    await expectRevert(stack.entryPoint.handleOps([userOpToTuple(victimOp)], stack.owner.address), "AA24");
+  });
+
+  it("AUD-02 removed method authorization can be replayed, and so can its removal", async function () {
+    const stack = await deployAuditStack();
+    const identityId = randomIdentityId();
+    const primary = simulatePasskey();
+    const stolen = simulatePasskey();
+    await stack.store.register(identityId, primary.qx, primary.qy);
+    const salt = keccak256(toUtf8Bytes("aud-02"));
+    await stack.factory.createAccount(identityId, salt);
+    const { wallet, walletAddress } = await walletAt(stack, salt);
+
+    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress);
+    const addAuth = identityPasskeyBlob({ identityId, key: primary, message: addDigest });
+    await stack.store.addMethod(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress, addAuth);
+    const stolenId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress);
+
+    const removeDigest = await stack.store.hashRemoveMethod(identityId, stolenId);
+    const removeAuth = identityPasskeyBlob({ identityId, key: primary, message: removeDigest });
+    await stack.store.removeMethod(identityId, stolenId, removeAuth);
+    expect((await stack.store.getMethod(stolenId)).exists).to.equal(false);
+
+    await stack.store.addMethod(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress, addAuth);
+    expect((await stack.store.getMethod(stolenId)).exists).to.equal(true);
+    const marked = await sendPing(stack, walletAddress, identityId, stolen, "stolen-key");
+    expect(await stack.ping.lastPing()).to.equal(marked);
+    expect(await wallet.identityId()).to.equal(identityId);
+
+    await stack.store.removeMethod(identityId, stolenId, removeAuth);
+    expect((await stack.store.getMethod(stolenId)).exists).to.equal(false);
+  });
+
+  it("AUD-03 a cancel signature stops every later restore for that identity", async function () {
+    const stack = await deployAuditStack();
+    await stack.store.setRestoreDelay(3);
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    const first = simulatePasskey();
+    const second = simulatePasskey();
+    await stack.store.register(identityId, passkey.qx, passkey.qy);
+
+    await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, first.qx, first.qy, ZeroAddress);
+    const cancelDigest = await stack.store.hashCancelRestore(identityId);
+    const cancelAuth = identityPasskeyBlob({ identityId, key: passkey, message: cancelDigest });
+    await stack.store.cancelRestore(identityId, cancelAuth);
+
+    await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
+    expect(await stack.store.hashCancelRestore(identityId)).to.equal(cancelDigest);
+    await stack.store.cancelRestore(identityId, cancelAuth);
+    expect((await stack.store.pendingRestores(identityId)).active).to.equal(false);
+
+    await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
+    await stack.ethers.provider.send("evm_increaseTime", [4]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await stack.store.cancelRestore(identityId, cancelAuth);
+    await expectRevert(stack.store.executeRestore.staticCall(identityId), "RestoreNotPending");
+    const login = keccak256(toUtf8Bytes("should-not-restore"));
+    expect(
+      await stack.store.verify(login, identityPasskeyBlob({ identityId, key: second, message: login }))
+    ).to.equal(ZeroHash);
+  });
+
+  it("AUD-04 an existing-method restore occupies the only pending slot", async function () {
+    const stack = await deployAuditStack();
+    await stack.store.setRestoreDelay(2);
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    const replacement = simulatePasskey();
+    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
+    await stack.ethers.provider.send("evm_increaseTime", [3]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await expectRevert(stack.store.executeRestore.staticCall(identityId), "MethodExists");
+    expect((await stack.store.pendingRestores(identityId)).active).to.equal(true);
+    await expectRevert(
+      stack.store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, replacement.qx, replacement.qy, ZeroAddress),
+      "RestorePending"
+    );
+  });
+
+  it("AUD-05 disableRestore then a removal leaves one method and restore off", async function () {
+    const stack = await deployAuditStack();
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    const qx = zeroPadValue("0x00", 32);
+    const qy = zeroPadValue("0x00", 32);
+    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_EOA, qx, qy, stack.eoa.address);
+    await stack.store.addMethod(
+      identityId,
+      METHOD_EOA,
+      qx,
+      qy,
+      stack.eoa.address,
+      identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
+    );
+    const passkeyId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
+    const removeDigest = await stack.store.hashRemoveMethod(identityId, passkeyId);
+    await stack.store.removeMethod(
+      identityId,
+      passkeyId,
+      identityPasskeyBlob({ identityId, key: passkey, message: removeDigest })
+    );
+    await stack.store.connect(stack.eoa).disableRestore(identityId);
+    const idn = await stack.store.getIdentity(identityId);
+    expect(idn.methodCount).to.equal(1n);
+    expect(idn.restoreEnabled).to.equal(false);
+    expect(idn.eoaCount).to.equal(1n);
+    const recovered = simulatePasskey();
+    await expectRevert(
+      stack.store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress),
+      "RestoreIsDisabled"
+    );
+  });
+
+  it("AUD-06 restoreDelay defaults to 0 and the owner can set it back to 0", async function () {
+    const stack = await deployAuditStack();
+    expect(await stack.store.restoreDelay()).to.equal(0n);
+    await stack.store.setRecoveryOperator(stack.eoa.address);
+    await expectRevert(
+      stack.store.restoreAddMethod.staticCall(randomIdentityId(), METHOD_WEBAUTHN, zeroPadValue("0x11", 32), zeroPadValue("0x22", 32), ZeroAddress),
+      "NotRecoveryOperator"
+    );
+    await stack.store.connect(stack.owner).setRecoveryOperator(stack.owner.address);
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    const injected = simulatePasskey();
+    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    await stack.store.restoreAddMethod(identityId, METHOD_WEBAUTHN, injected.qx, injected.qy, ZeroAddress);
+    const login = keccak256(toUtf8Bytes("instant"));
+    expect(
+      await stack.store.verify(login, identityPasskeyBlob({ identityId, key: injected, message: login }))
+    ).to.equal(identityId);
+
+    const otherId = randomIdentityId();
+    const other = simulatePasskey();
+    const later = simulatePasskey();
+    await stack.store.register(otherId, other.qx, other.qy);
+    await stack.store.setRestoreDelay(259200);
+    await stack.store.setRestoreDelay(0);
+    await stack.store.restoreAddMethod(otherId, METHOD_WEBAUTHN, later.qx, later.qy, ZeroAddress);
+    expect(
+      await stack.store.verify(login, identityPasskeyBlob({ identityId: otherId, key: later, message: login }))
+    ).to.equal(otherId);
+  });
+
+  it("two of three operator identities can install a spend method after the delay", async function () {
+    const stack = await deployAuditStack();
+    await stack.store.setRestoreDelay(1);
+    const alice = randomIdentityId();
+    const reco1 = randomIdentityId();
+    const reco2 = randomIdentityId();
+    const reco3 = randomIdentityId();
+    const pkAlice = simulatePasskey();
+    const pk1 = simulatePasskey();
+    const pk2 = simulatePasskey();
+    const pk3 = simulatePasskey();
+    const injected = simulatePasskey();
+    await stack.store.register(alice, pkAlice.qx, pkAlice.qy);
+    await stack.store.register(reco1, pk1.qx, pk1.qy);
+    await stack.store.register(reco2, pk2.qx, pk2.qy);
+    await stack.store.register(reco3, pk3.qx, pk3.qy);
+
+    const operatorSalt = keccak256(toUtf8Bytes("operator"));
+    await stack.factory.createAccount(reco1, operatorSalt);
+    const operator = await walletAt(stack, operatorSalt);
+    await stack.ethers.provider.send("hardhat_impersonateAccount", [operator.walletAddress]);
+    await stack.ethers.provider.send("hardhat_setBalance", [operator.walletAddress, "0x1000000000000000000"]);
+    const self = await stack.ethers.getSigner(operator.walletAddress);
+    await operator.wallet.connect(self).enableSuper([reco2, reco3], 2);
+    await stack.store.setRecoveryOperator(operator.walletAddress);
+    await expectRevert(
+      stack.store.initiateRestore.staticCall(alice, METHOD_WEBAUTHN, injected.qx, injected.qy, ZeroAddress),
+      "NotRecoveryOperator"
+    );
+
+    const aliceSalt = keccak256(toUtf8Bytes("alice"));
+    await stack.factory.createAccount(alice, aliceSalt);
+    const aliceWallet = await walletAt(stack, aliceSalt);
+
+    const oneBlob = identityPasskeyBlob({
+      identityId: reco1,
+      key: pk1,
+      message: keccak256(toUtf8Bytes("lone")),
+    });
+    expect(await operator.wallet.exposedValidate(keccak256(toUtf8Bytes("lone")), oneBlob)).to.equal(false);
+
+    const callData = encodeExecuteCallData([
+      {
+        target: stack.storeAddress,
+        value: 0n,
+        data: stack.store.interface.encodeFunctionData("initiateRestore", [
+          alice,
+          METHOD_WEBAUTHN,
+          injected.qx,
+          injected.qy,
+          ZeroAddress,
+        ]),
+      },
+    ]);
+    const nonce = await stack.entryPoint.getNonce(operator.walletAddress, 0);
+    const unsigned = buildPackedUserOperation({ sender: operator.walletAddress, nonce, callData });
+    const userOpHash = await stack.entryPoint.getUserOpHash(userOpToTuple(unsigned));
+    const lone = buildPackedUserOperation({
+      sender: operator.walletAddress,
+      nonce,
+      callData,
+      signature: identityPasskeyBlob({ identityId: reco1, key: pk1, message: userOpHash }),
+    });
+    await expectRevert(stack.entryPoint.handleOps([userOpToTuple(lone)], stack.owner.address), "AA24");
+
+    const signed = buildPackedUserOperation({
+      sender: operator.walletAddress,
+      nonce,
+      callData,
+      signature: encodeSuperIdentityBlobs([
+        identityPasskeyBlob({ identityId: reco1, key: pk1, message: userOpHash }),
+        identityPasskeyBlob({ identityId: reco2, key: pk2, message: userOpHash }),
+      ]),
+    });
+    await stack.entryPoint.handleOps([userOpToTuple(signed)], stack.owner.address);
+    expect((await stack.store.pendingRestores(alice)).active).to.equal(true);
+    await expectRevert(stack.store.executeRestore.staticCall(alice), "RestoreNotReady");
+
+    const cancelDigest = await stack.store.hashCancelRestore(alice);
+    await stack.store.cancelRestore(alice, identityPasskeyBlob({ identityId: alice, key: pkAlice, message: cancelDigest }));
+    expect((await stack.store.pendingRestores(alice)).active).to.equal(false);
+
+    const again = buildPackedUserOperation({
+      sender: operator.walletAddress,
+      nonce: await stack.entryPoint.getNonce(operator.walletAddress, 0),
+      callData,
+    });
+    const againHash = await stack.entryPoint.getUserOpHash(userOpToTuple(again));
+    await stack.entryPoint.handleOps(
+      [
+        userOpToTuple(
+          buildPackedUserOperation({
+            sender: operator.walletAddress,
+            nonce: again.nonce,
+            callData,
+            signature: encodeSuperIdentityBlobs([
+              identityPasskeyBlob({ identityId: reco1, key: pk1, message: againHash }),
+              identityPasskeyBlob({ identityId: reco3, key: pk3, message: againHash }),
+            ]),
+          })
+        ),
+      ],
+      stack.owner.address
+    );
+    await stack.ethers.provider.send("evm_increaseTime", [2]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await stack.store.executeRestore(alice);
+    const marked = await sendPing(stack, aliceWallet.walletAddress, alice, injected, "operator-installed");
+    expect(await stack.ping.lastPing()).to.equal(marked);
+  });
+});
