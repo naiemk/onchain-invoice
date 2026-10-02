@@ -15,11 +15,12 @@ import { deriveIdentityWalletSalt } from "../commerce/shared/wallet-address.js";
 import {
   METHOD_EOA,
   METHOD_WEBAUTHN,
+  METHOD_YUBIKEY,
   computeIdentityMethodId,
   encodeSuperIdentityBlobs,
   randomIdentityId,
 } from "../commerce/shared/identity-store.js";
-import { identityPasskeyBlob, simulatePasskey, type SimulatedPasskey } from "./helpers/identity-signing.js";
+import { identityPasskeyBlob, simulatePasskey, yubikeyBlob, type SimulatedPasskey } from "./helpers/identity-signing.js";
 
 const PING_IFACE = new Interface(["function ping(bytes32 value)"]);
 
@@ -288,6 +289,29 @@ describe("Identity wallet audit", function () {
     ).to.equal(otherId);
   });
 
+  it("a YubiKey second method cannot turn restore off", async function () {
+    const stack = await deployAuditStack();
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    const yubi = simulatePasskey();
+    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
+    await stack.store.addMethod(
+      identityId,
+      METHOD_YUBIKEY,
+      yubi.qx,
+      yubi.qy,
+      ZeroAddress,
+      identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
+    );
+    expect((await stack.store.getIdentity(identityId)).methodCount).to.equal(2n);
+    expect((await stack.store.getIdentity(identityId)).yubikeyCount).to.equal(1n);
+    await expectRevert(stack.store.connect(stack.eoa).disableRestore.staticCall(identityId), "RestoreRequiresEoa");
+    const login = keccak256(toUtf8Bytes("yubi-still-spends"));
+    expect(await stack.store.verify(login, yubikeyBlob(identityId, yubi, login))).to.equal(identityId);
+    expect((await stack.store.getIdentity(identityId)).restoreEnabled).to.equal(true);
+  });
+
   it("two of three operator identities can install a spend method after the delay", async function () {
     const stack = await deployAuditStack();
     await stack.store.setRestoreDelay(1);
@@ -353,14 +377,43 @@ describe("Identity wallet audit", function () {
     });
     await expectRevert(stack.entryPoint.handleOps([userOpToTuple(lone)], stack.owner.address), "AA24");
 
+    const signature = encodeSuperIdentityBlobs([
+      identityPasskeyBlob({ identityId: reco1, key: pk1, message: userOpHash }),
+      identityPasskeyBlob({ identityId: reco2, key: pk2, message: userOpHash }),
+    ]);
+    const swappedKey = simulatePasskey();
+    const swappedCallData = encodeExecuteCallData([
+      {
+        target: stack.storeAddress,
+        value: 0n,
+        data: stack.store.interface.encodeFunctionData("initiateRestore", [
+          alice,
+          METHOD_WEBAUTHN,
+          swappedKey.qx,
+          swappedKey.qy,
+          ZeroAddress,
+        ]),
+      },
+    ]);
+    await expectRevert(
+      stack.entryPoint.handleOps([
+        userOpToTuple(
+          buildPackedUserOperation({
+            sender: operator.walletAddress,
+            nonce,
+            callData: swappedCallData,
+            signature,
+          })
+        ),
+      ], stack.owner.address),
+      "AA24"
+    );
+
     const signed = buildPackedUserOperation({
       sender: operator.walletAddress,
       nonce,
       callData,
-      signature: encodeSuperIdentityBlobs([
-        identityPasskeyBlob({ identityId: reco1, key: pk1, message: userOpHash }),
-        identityPasskeyBlob({ identityId: reco2, key: pk2, message: userOpHash }),
-      ]),
+      signature,
     });
     await stack.entryPoint.handleOps([userOpToTuple(signed)], stack.owner.address);
     expect((await stack.store.pendingRestores(alice)).active).to.equal(true);
