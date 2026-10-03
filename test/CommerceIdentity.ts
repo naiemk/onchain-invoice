@@ -1,16 +1,19 @@
 import { expect } from "chai";
-import { createServer, type Server } from "node:http";
-import { ethers as ethersLib } from "ethers";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { network } from "hardhat";
+import { Wallet, ethers as ethersLib } from "ethers";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../commerce/server/app.js";
 import { loadConfig } from "../commerce/server/config.js";
+import { CommerceDb } from "../commerce/server/db.js";
 import { clearLastDevOtp, getLastDevOtp } from "../commerce/server/email.js";
 import { cookieHeaderFromResponse } from "../commerce/server/identity-session.js";
 import { resetRateLimitBuckets } from "../commerce/server/rate-limit.js";
+import { METHOD_WEBAUTHN, computeIdentityMethodId, signIdentityVerifyEoa } from "../commerce/shared/identity-store.js";
 import { deriveIdentityWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
-import { signIdentityVerifyEoa } from "../commerce/shared/identity-store.js";
+import { registrationAssertion, simulatePasskey } from "./helpers/identity-signing.js";
 
 const FACTORY = "0x805131afe47723819B7b81dA25256429d77aa12E";
 const IMPL = "0x4D19ce70D3D4a63cBa685665B39C133141B5dDC2";
@@ -32,17 +35,18 @@ const BASE_ENV = {
 } as const;
 
 async function withApp(
-  fn: (baseUrl: string) => Promise<void>,
+  fn: (baseUrl: string, dbPath: string) => Promise<void>,
   envOverrides: Record<string, string> = {}
 ): Promise<void> {
   resetRateLimitBuckets();
   clearLastDevOtp();
   const dir = await mkdtemp(join(tmpdir(), "commerce-identity-"));
+  const dbPath = join(dir, "test.db");
   const config = loadConfig({
     ...process.env,
     ...BASE_ENV,
     ...envOverrides,
-    DB_PATH: join(dir, "test.db"),
+    DB_PATH: dbPath,
   } as NodeJS.ProcessEnv);
   const app = createApp(config);
   await new Promise<void>((resolve) => {
@@ -52,7 +56,7 @@ async function withApp(
   if (!address || typeof address === "string") throw new Error("expected TCP address");
   const baseUrl = `http://127.0.0.1:${address.port}`;
   try {
-    await fn(baseUrl);
+    await fn(baseUrl, dbPath);
   } finally {
     await app.close();
     await rm(dir, { recursive: true, force: true });
@@ -103,6 +107,56 @@ function listenTokenStub(idToken: string): Promise<{ url: string; close: () => P
       });
     });
   });
+}
+
+const HARDHAT_KEY1 = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
+
+async function exposeRpc(
+  send: (method: string, params: unknown[]) => Promise<unknown>
+): Promise<{ url: string; close: () => Promise<void> }> {
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    const payload = JSON.parse(Buffer.concat(chunks).toString() || "{}") as
+      | { id?: number; method: string; params?: unknown[] }
+      | { id?: number; method: string; params?: unknown[] }[];
+    const items = Array.isArray(payload) ? payload : [payload];
+    const results = [];
+    for (const body of items) {
+      try {
+        const result = await send(body.method, body.params ?? []);
+        results.push({ jsonrpc: "2.0", id: body.id ?? null, result });
+      } catch (err) {
+        results.push({
+          jsonrpc: "2.0",
+          id: body.id ?? null,
+          error: { code: -32000, message: err instanceof Error ? err.message : String(err) },
+        });
+      }
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(Array.isArray(payload) ? results : results[0]));
+  }
+  const server = createServer((req, res) => {
+    void handle(req, res);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("expected a TCP port");
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
+  };
+}
+
+async function webauthnCount(baseUrl: string, cookie: string): Promise<number> {
+  const me = await fetch(`${baseUrl}/api/identity/me`, { headers: { cookie } });
+  expect(me.status).to.equal(200);
+  const body = (await me.json()) as { methods: { webauthn: number } };
+  return body.methods.webauthn;
 }
 
 describe("commerce identity API", function () {
@@ -705,5 +759,112 @@ describe("commerce identity API", function () {
       },
       { IDENTITY_RESTORE_ENABLED: "0" }
     );
+  });
+
+  it("records a passkey only after the chain registration is in a block", async function () {
+    const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
+    const [owner] = await ethers.getSigners();
+    const Store = await ethers.getContractFactory("IdentityStore");
+    const store = await Store.deploy(owner.address, owner.address);
+    await store.waitForDeployment();
+    const deployer = new Wallet(HARDHAT_KEY1);
+    await ethers.provider.send("hardhat_setBalance", [deployer.address, "0x1000000000000000000"]);
+    const rpc = await exposeRpc((method, params) => ethers.provider.send(method, params));
+    try {
+      await withApp(
+        async (baseUrl, dbPath) => {
+          const { cookie, identityId } = await verifyOtp(baseUrl, "chain@example.com");
+          const passkey = simulatePasskey();
+          const failed = await fetch(`${baseUrl}/api/identity/passkey/register`, {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({
+              qx: passkey.qx,
+              qy: passkey.qy,
+              credentialId: "cred-chain",
+              registrationAssertion: "0x01",
+            }),
+          });
+          expect(failed.status).to.equal(502);
+          expect(await webauthnCount(baseUrl, cookie)).to.equal(0);
+
+          const methodId = computeIdentityMethodId(
+            identityId,
+            METHOD_WEBAUTHN,
+            passkey.qx,
+            passkey.qy,
+            ethersLib.ZeroAddress
+          );
+          const stale = new CommerceDb(dbPath);
+          try {
+            stale.insertIdentityMethod({
+              id: methodId,
+              identityId,
+              kind: "webauthn",
+              credentialId: "cred-stale",
+              qx: passkey.qx,
+              qy: passkey.qy,
+              eoa: null,
+            });
+          } finally {
+            stale.close();
+          }
+          const repaired = await fetch(`${baseUrl}/api/identity/passkey/register`, {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({
+              qx: passkey.qx,
+              qy: passkey.qy,
+              credentialId: "cred-chain",
+              registrationAssertion: registrationAssertion(passkey, identityId),
+            }),
+          });
+          expect(repaired.status).to.equal(201);
+          expect((await store.getMethod(methodId)).exists).to.equal(true);
+          const again = await fetch(`${baseUrl}/api/identity/passkey/register`, {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({
+              qx: passkey.qx,
+              qy: passkey.qy,
+              credentialId: "cred-chain",
+              registrationAssertion: registrationAssertion(passkey, identityId),
+            }),
+          });
+          expect(again.status).to.equal(409);
+          expect(((await again.json()) as { error?: string }).error).to.equal("identity_exists");
+
+          const other = await verifyOtp(baseUrl, "taken@example.com");
+          const attacker = simulatePasskey();
+          await store.register(
+            other.identityId,
+            attacker.qx,
+            attacker.qy,
+            registrationAssertion(attacker, other.identityId)
+          );
+          const user = simulatePasskey();
+          const mismatch = await fetch(`${baseUrl}/api/identity/passkey/register`, {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie: other.cookie },
+            body: JSON.stringify({
+              qx: user.qx,
+              qy: user.qy,
+              credentialId: "cred-taken",
+              registrationAssertion: registrationAssertion(user, other.identityId),
+            }),
+          });
+          expect(mismatch.status).to.equal(422);
+          expect(((await mismatch.json()) as { error?: string }).error).to.equal("identity_key_mismatch");
+          expect(await webauthnCount(baseUrl, other.cookie)).to.equal(0);
+        },
+        {
+          IDENTITY_STORE_ADDRESS: await store.getAddress(),
+          WALLET_RPC_URL: rpc.url,
+          WALLET_DEPLOYER_PRIVATE_KEY: HARDHAT_KEY1,
+        }
+      );
+    } finally {
+      await rpc.close();
+    }
   });
 });

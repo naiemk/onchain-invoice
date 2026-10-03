@@ -11,6 +11,7 @@ import {
   readIdentityRecoveryOperator,
   readIdentityRestoreEnabled,
   identitySignerConfigured,
+  readRegisteredPasskey,
   registerIdentityOnChain,
   removeIdentityMethodOnChain,
   restoreIdentityMethodOnChain,
@@ -624,13 +625,9 @@ export function registerIdentityRoutes(
           handlers.sendJson(res, 400, { error: "qx_qy_credentialId_required" });
           return true;
         }
-        if (identitySignerConfigured(config.identity) && !registrationAssertion) {
+        const chainOn = identitySignerConfigured(config.identity);
+        if (chainOn && !registrationAssertion) {
           handlers.sendJson(res, 400, { error: "registration_assertion_required" });
-          return true;
-        }
-        const counts = methodCounts(db, session.identityId);
-        if (counts.webauthn > 0) {
-          handlers.sendJson(res, 409, { error: "identity_exists", hint: "pair" });
           return true;
         }
         const identity = db.getIdentityById(session.identityId);
@@ -639,30 +636,82 @@ export function registerIdentityRoutes(
           return true;
         }
         const methodId = computeIdentityMethodId(identity.identityId, METHOD_WEBAUTHN, qx, qy, ZeroAddress);
-        db.insertIdentityMethod({
+        const attestation = body.webauthnAttestation != null ? JSON.stringify(body.webauthnAttestation) : null;
+        const methodRow = {
           id: methodId,
           identityId: identity.identityId,
-          kind: "webauthn",
+          kind: "webauthn" as const,
           credentialId,
           qx,
           qy,
           eoa: null,
-        });
-        const attestation = body.webauthnAttestation != null ? JSON.stringify(body.webauthnAttestation) : null;
-        try {
-          await registerIdentityOnChain(
-            config.identity,
-            identity.identityId,
-            qx,
-            qy,
-            registrationAssertion
-          );
-        } catch (e) {
-          handlers.sendJson(res, 502, {
-            error: "identity_register_failed",
-            message: e instanceof Error ? e.message : String(e),
-          });
-          return true;
+        };
+        if (!chainOn) {
+          const counts = methodCounts(db, session.identityId);
+          if (counts.webauthn > 0) {
+            handlers.sendJson(res, 409, { error: "identity_exists", hint: "pair" });
+            return true;
+          }
+          db.insertIdentityMethod(methodRow);
+          try {
+            await registerIdentityOnChain(
+              config.identity,
+              identity.identityId,
+              qx,
+              qy,
+              registrationAssertion
+            );
+          } catch (e) {
+            handlers.sendJson(res, 502, {
+              error: "identity_register_failed",
+              message: e instanceof Error ? e.message : String(e),
+            });
+            return true;
+          }
+        } else {
+          // The chain is the record of the key. A database row alone does not block a retry, and a different on-chain key is refused.
+          const state = await readRegisteredPasskey(config.identity, identity.identityId, qx, qy);
+          if (state === "mismatch") {
+            handlers.sendJson(res, 422, { error: "identity_key_mismatch" });
+            return true;
+          }
+          if (state === "match") {
+            const stored = db
+              .listIdentityMethods(identity.identityId)
+              .some((method) => method.id.toLowerCase() === methodId.toLowerCase());
+            if (stored) {
+              handlers.sendJson(res, 409, { error: "identity_exists", hint: "pair" });
+              return true;
+            }
+          } else if (state !== "absent") {
+            handlers.sendJson(res, 502, {
+              error: "identity_register_failed",
+              message: "identity_store_unreadable",
+            });
+            return true;
+          } else {
+            try {
+              await registerIdentityOnChain(
+                config.identity,
+                identity.identityId,
+                qx,
+                qy,
+                registrationAssertion
+              );
+            } catch (e) {
+              const code = e && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "";
+              if (code === "identity_key_mismatch") {
+                handlers.sendJson(res, 422, { error: "identity_key_mismatch" });
+                return true;
+              }
+              handlers.sendJson(res, 502, {
+                error: "identity_register_failed",
+                message: e instanceof Error ? e.message : String(e),
+              });
+              return true;
+            }
+          }
+          db.insertIdentityMethod(methodRow);
         }
         let wallets = db.listWalletAccountsByIdentityId(identity.identityId);
         if (wallets.length === 0) {
