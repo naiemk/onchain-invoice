@@ -28,7 +28,7 @@ New hosted `/wallet` users use **IdentityWallet** + **IdentityStore** (not `Wall
 - Methods: WebAuthn, YubiKey, EOA on the identity. `disableRestore` is permanent and EOA-gated
 - Email OTP starts a recovery **request** only; on-chain restore is `recoveryOperator` (`initiateRestore` → delay → `executeRestore`). Operator is a reco 2-of-3 Super Wallet (operator infrastructure; user Super remains beta)
 - Existing methods can `cancelRestore` during the delay and can `addMethod` even after `disableRestore`
-- Counterfactual address salt: `keccak256(abi.encode("TC-IDENTITY-WALLET-V1", identityId, index))`
+- Counterfactual address salt: `keccak256(abi.encode("TC-IDENTITY-WALLET-V1", identityId, index))`. The factory derives that salt from the identity id and index. The API assigns `index` from the wallets it already created for that identity and does not adopt clones at other indexes as the receive address.
 - `IDENTITY_RESTORE_ENABLED` is a test override of on-chain `restoreEnabled`; do not set it on mainnet
 - Super Wallet (`enableSuper`) is **beta / not fully audited**. It does **not** call `disableRestore` (unlike legacy `enableAdvanced`)
 

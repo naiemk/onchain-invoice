@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 abstract contract IdentityErrors {
     error IdentityExists();
     error IdentityNotFound();
+    error IdentityMismatch();
     error InvalidIdentity();
     error InvalidMethodKind();
     error InvalidMethod();

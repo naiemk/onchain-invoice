@@ -1,4 +1,5 @@
 import { Contract, JsonRpcProvider, Wallet, ZeroAddress, getAddress } from "ethers";
+import { identityWalletIndexForSalt } from "../shared/wallet-address.js";
 import type { IdentityConfig } from "./config.js";
 
 const STORE_ABI = [
@@ -18,7 +19,7 @@ const STORE_ABI = [
 ];
 
 const FACTORY_ABI = [
-  "function createAccount(bytes32 identityId, bytes32 salt) returns (address)",
+  "function createAccount(bytes32 identityId, uint256 index) returns (address)",
   "function predictAddress(bytes32 salt) view returns (address)",
   "function store() view returns (address)",
 ];
@@ -249,8 +250,10 @@ export async function createIdentityWalletOnChain(
   if (!config.walletFactoryAddress) return false;
   const ctx = signerFor(config);
   if (!ctx) return false;
+  const index = identityWalletIndexForSalt(identityId, salt);
+  if (index == null) return false;
   const factory = new Contract(config.walletFactoryAddress, FACTORY_ABI, ctx.wallet);
-  const tx = await factory.createAccount(identityId, salt);
+  const tx = await factory.createAccount(identityId, index);
   await tx.wait();
   return true;
 }

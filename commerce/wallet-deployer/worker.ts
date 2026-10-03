@@ -3,6 +3,7 @@ import { AbiCoder, Contract, JsonRpcProvider, Wallet, ZeroAddress, getAddress } 
 import type { WalletAccountRecord, WalletRecoveryJobRecord } from "../shared/wallet.js";
 import { encodeWebAuthnSignatureFromJson } from "../shared/webauthn-signature.js";
 import { ERC20_ABI } from "../shared/userop.js";
+import { identityWalletIndexForSalt } from "../shared/wallet-address.js";
 import { ActivityLog } from "../sweeper/activity-log.js";
 import { load as loadYaml } from "../sweeper/config-loader.js";
 import { isUnsetSecret } from "../sweeper/worker.js";
@@ -14,9 +15,11 @@ import {
 import type { Server } from "node:http";
 
 const FACTORY_ABI = [
-  "function createAccount(bytes32 identityId, bytes32 salt) returns (address)",
+  "function createAccount(bytes32 identityId, uint256 index) returns (address)",
   "function predictAddress(bytes32 salt) view returns (address)",
 ];
+
+const WALLET_IDENTITY_ABI = ["function identityId() view returns (bytes32)"];
 
 const RECOVERY_ABI = [
   "function initiateOwnerRecovery(address wallet, bytes newOwnerPubkey)",
@@ -185,11 +188,24 @@ export class WalletDeployerWorker {
           await this.trackActivation(account.address, { error: "predicted_address_mismatch" });
           continue;
         }
+        if (!account.identityId) {
+          await this.trackActivation(account.address, { error: "missing_identity_id" });
+          continue;
+        }
+        const index = identityWalletIndexForSalt(account.identityId, account.salt);
+        if (index == null) {
+          await this.trackActivation(account.address, { error: "unknown_wallet_index" });
+          continue;
+        }
         const code = await provider.getCode(account.address);
         if (code !== "0x") {
+          const matches = await this.deployedIdentityMatches(provider, account.address, account.identityId);
+          if (!matches) {
+            await this.trackActivation(account.address, { error: "identity_mismatch" });
+            continue;
+          }
           await this.markDeployed(account.address, String(chain.chainId));
           await this.trackActivation(account.address, { deployed: true });
-          // If a recovery initiate is pending for this wallet, process after deploy.
           continue;
         }
         const balance = BigInt(await token.balanceOf(account.address));
@@ -198,13 +214,14 @@ export class WalletDeployerWorker {
           continue;
         }
         await this.trackActivation(account.address, { funded: true });
-        if (!account.identityId) {
-          await this.trackActivation(account.address, { funded: true, error: "missing_identity_id" });
-          continue;
-        }
         try {
-          const tx = await factory.createAccount(account.identityId, account.salt);
+          const tx = await factory.createAccount(account.identityId, index);
           const receipt = await tx.wait();
+          const matches = await this.deployedIdentityMatches(provider, account.address, account.identityId);
+          if (!matches) {
+            await this.trackActivation(account.address, { funded: true, error: "identity_mismatch" });
+            continue;
+          }
           await this.markDeployed(account.address, String(chain.chainId));
           await this.trackActivation(account.address, { deployed: true });
           this.activity?.append("wallet-deployed", {
@@ -390,8 +407,10 @@ export class WalletDeployerWorker {
       if (!undeployed.identityId) {
         throw new Error("wallet account missing identityId");
       }
-      const deployTx = await factory.createAccount(undeployed.identityId, undeployed.salt);
-      await deployTx.wait();
+      const deployed = await this.deployIdentityClone(factory, provider, undeployed.identityId, undeployed.salt, undeployed.address);
+      if (!deployed) {
+        throw new Error("identity wallet salt does not match this identity");
+      }
       await this.markDeployed(undeployed.address, String(chain.chainId));
     }
 
@@ -418,7 +437,12 @@ export class WalletDeployerWorker {
     provider: JsonRpcProvider
   ): Promise<void> {
     const code = await provider.getCode(job.walletAddress);
-    if (code !== "0x") return;
+    if (code !== "0x") {
+      if (!account.identityId) throw new Error("wallet account missing identityId");
+      const matches = await this.deployedIdentityMatches(provider, job.walletAddress, account.identityId);
+      if (!matches) throw new Error("identity wallet at this address belongs to a different identity");
+      return;
+    }
     const token = new Contract(chain.feeTokenAddress, ERC20_ABI, provider);
     const minBalance = BigInt(chain.minBalanceUsdc ?? 1);
     const balance = BigInt(await token.balanceOf(account.address));
@@ -426,9 +450,44 @@ export class WalletDeployerWorker {
     if (!account.identityId) throw new Error("wallet account missing identityId");
     const signer = new Wallet(chain.privateKey, provider);
     const factory = new Contract(chain.factoryAddress, FACTORY_ABI, signer);
-    const deployTx = await factory.createAccount(account.identityId, account.salt);
-    await deployTx.wait();
+    const deployed = await this.deployIdentityClone(factory, provider, account.identityId, account.salt, account.address);
+    if (!deployed) {
+      throw new Error("identity wallet salt does not match this identity");
+    }
     await this.markDeployed(account.address, String(chain.chainId));
+  }
+
+  /** Deploy `identityId` at the index encoded in `salt`, or accept code that already belongs to that identity. */
+  private async deployIdentityClone(
+    factory: Contract,
+    provider: JsonRpcProvider,
+    identityId: string,
+    salt: string,
+    address: string
+  ): Promise<boolean> {
+    const index = identityWalletIndexForSalt(identityId, salt);
+    if (index == null) return false;
+    const code = await provider.getCode(address);
+    if (code !== "0x") {
+      return this.deployedIdentityMatches(provider, address, identityId);
+    }
+    const tx = await factory.createAccount(identityId, index);
+    await tx.wait();
+    return this.deployedIdentityMatches(provider, address, identityId);
+  }
+
+  private async deployedIdentityMatches(
+    provider: JsonRpcProvider,
+    address: string,
+    identityId: string
+  ): Promise<boolean> {
+    try {
+      const wallet = new Contract(address, WALLET_IDENTITY_ABI, provider);
+      const onChain = String(await wallet.identityId());
+      return onChain.toLowerCase() === identityId.toLowerCase();
+    } catch {
+      return false;
+    }
   }
 
   private async runCancel(

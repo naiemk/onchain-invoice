@@ -27,12 +27,24 @@ export function deriveWalletSalt(qx: string, qy: string): string {
 
 const IDENTITY_WALLET_SALT_VERSION = "TC-IDENTITY-WALLET-V1";
 
-/** Deterministic salt for IdentityWalletFactory.createAccount(identityId, salt). */
+/** Deterministic salt for IdentityWalletFactory.createAccount(identityId, index). */
 export function deriveIdentityWalletSalt(identityId: string, index: number): string {
   const coder = AbiCoder.defaultAbiCoder();
   return keccak256(
     coder.encode(["string", "bytes32", "uint256"], [IDENTITY_WALLET_SALT_VERSION, identityId, index])
   );
+}
+
+/** Highest index the API or deployer will scan when a stored salt has no explicit index. */
+export const IDENTITY_WALLET_INDEX_SCAN = 63;
+
+/** Index whose derived salt equals `salt`, or null when this identity did not produce it. */
+export function identityWalletIndexForSalt(identityId: string, salt: string): number | null {
+  const wanted = salt.toLowerCase();
+  for (let index = 0; index <= IDENTITY_WALLET_INDEX_SCAN; index++) {
+    if (deriveIdentityWalletSalt(identityId, index).toLowerCase() === wanted) return index;
+  }
+  return null;
 }
 
 /** Predict counterfactual wallet clone address without RPC. */

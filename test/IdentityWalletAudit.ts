@@ -110,7 +110,7 @@ describe("Identity wallet audit", function () {
     ).to.equal(ZeroHash);
   });
 
-  it("AUD-01 first createAccount for a public salt owns that address", async function () {
+  it("a caller cannot place their identity at another identity's wallet address", async function () {
     const stack = await deployAuditStack();
     const victimId = randomIdentityId();
     const attackerId = randomIdentityId();
@@ -119,30 +119,34 @@ describe("Identity wallet audit", function () {
     await stack.store.register(victimId, victim.qx, victim.qy);
     await stack.store.register(attackerId, attacker.qx, attacker.qy);
 
-    const salt = deriveIdentityWalletSalt(victimId, 0);
-    await stack.factory.createAccount(attackerId, salt);
-    await stack.factory.createAccount(victimId, salt);
+    await stack.factory.createAccount(attackerId, 0);
+    await stack.factory.createAccount(victimId, 0);
 
-    const { wallet, walletAddress } = await walletAt(stack, salt);
-    expect(await wallet.identityId()).to.equal(attackerId);
+    const victimSalt = deriveIdentityWalletSalt(victimId, 0);
+    const attackerSalt = deriveIdentityWalletSalt(attackerId, 0);
+    expect(victimSalt).to.not.equal(attackerSalt);
+    const victimWallet = await walletAt(stack, victimSalt);
+    const attackerWallet = await walletAt(stack, attackerSalt);
+    expect(await victimWallet.wallet.identityId()).to.equal(victimId);
+    expect(await attackerWallet.wallet.identityId()).to.equal(attackerId);
 
     const marked = keccak256(toUtf8Bytes("victim-deposit"));
-    expect(await sendPing(stack, walletAddress, attackerId, attacker, "victim-deposit")).to.equal(marked);
+    expect(await sendPing(stack, victimWallet.walletAddress, victimId, victim, "victim-deposit")).to.equal(marked);
     expect(await stack.ping.lastPing()).to.equal(marked);
 
     const callData = encodeExecuteCallData([
       { target: stack.pingAddress, value: 0n, data: PING_IFACE.encodeFunctionData("ping", [keccak256(toUtf8Bytes("no"))]) },
     ]);
-    const nonce = await stack.entryPoint.getNonce(walletAddress, 0);
-    const unsigned = buildPackedUserOperation({ sender: walletAddress, nonce, callData });
+    const nonce = await stack.entryPoint.getNonce(victimWallet.walletAddress, 0);
+    const unsigned = buildPackedUserOperation({ sender: victimWallet.walletAddress, nonce, callData });
     const userOpHash = await stack.entryPoint.getUserOpHash(userOpToTuple(unsigned));
-    const victimOp = buildPackedUserOperation({
-      sender: walletAddress,
+    const attackerOp = buildPackedUserOperation({
+      sender: victimWallet.walletAddress,
       nonce,
       callData,
-      signature: identityPasskeyBlob({ identityId: victimId, key: victim, message: userOpHash }),
+      signature: identityPasskeyBlob({ identityId: attackerId, key: attacker, message: userOpHash }),
     });
-    await expectRevert(stack.entryPoint.handleOps([userOpToTuple(victimOp)], stack.owner.address), "AA24");
+    await expectRevert(stack.entryPoint.handleOps([userOpToTuple(attackerOp)], stack.owner.address), "AA24");
   });
 
   it("AUD-02 removed method authorization can be replayed, and so can its removal", async function () {
@@ -151,9 +155,8 @@ describe("Identity wallet audit", function () {
     const primary = simulatePasskey();
     const stolen = simulatePasskey();
     await stack.store.register(identityId, primary.qx, primary.qy);
-    const salt = keccak256(toUtf8Bytes("aud-02"));
-    await stack.factory.createAccount(identityId, salt);
-    const { wallet, walletAddress } = await walletAt(stack, salt);
+    await stack.factory.createAccount(identityId, 0);
+    const { wallet, walletAddress } = await walletAt(stack, await stack.factory.walletSalt(identityId, 0));
 
     const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress);
     const addAuth = identityPasskeyBlob({ identityId, key: primary, message: addDigest });
@@ -329,9 +332,8 @@ describe("Identity wallet audit", function () {
     await stack.store.register(reco2, pk2.qx, pk2.qy);
     await stack.store.register(reco3, pk3.qx, pk3.qy);
 
-    const operatorSalt = keccak256(toUtf8Bytes("operator"));
-    await stack.factory.createAccount(reco1, operatorSalt);
-    const operator = await walletAt(stack, operatorSalt);
+    await stack.factory.createAccount(reco1, 0);
+    const operator = await walletAt(stack, await stack.factory.walletSalt(reco1, 0));
     await stack.ethers.provider.send("hardhat_impersonateAccount", [operator.walletAddress]);
     await stack.ethers.provider.send("hardhat_setBalance", [operator.walletAddress, "0x1000000000000000000"]);
     const self = await stack.ethers.getSigner(operator.walletAddress);
@@ -342,9 +344,8 @@ describe("Identity wallet audit", function () {
       "NotRecoveryOperator"
     );
 
-    const aliceSalt = keccak256(toUtf8Bytes("alice"));
-    await stack.factory.createAccount(alice, aliceSalt);
-    const aliceWallet = await walletAt(stack, aliceSalt);
+    await stack.factory.createAccount(alice, 0);
+    const aliceWallet = await walletAt(stack, await stack.factory.walletSalt(alice, 0));
 
     const oneBlob = identityPasskeyBlob({
       identityId: reco1,

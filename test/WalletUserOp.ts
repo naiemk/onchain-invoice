@@ -29,9 +29,8 @@ describe("IdentityWallet userOp batch (fee + transfer)", function () {
     const impl = await Impl.deploy();
     const Factory = await ethers.getContractFactory("IdentityWalletFactory");
     const factory = await Factory.deploy(await impl.getAddress(), await store.getAddress(), owner.address);
-    const salt = ethers.id("identity-wallet-userop-batch");
-    await factory.createAccount(identityId, salt);
-    const walletAddress = await factory.predictAddress(salt);
+    await factory.createAccount(identityId, 0);
+    const walletAddress = await factory.predictAddress(await factory.walletSalt(identityId, 0));
 
     const MockToken = await ethers.getContractFactory("MockFeeToken");
     const token = await MockToken.deploy();

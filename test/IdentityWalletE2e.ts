@@ -71,8 +71,9 @@ async function deployIdentityStack() {
   };
 }
 
-async function createWallet(stack: Awaited<ReturnType<typeof deployIdentityStack>>, identityId: string, salt: string) {
-  await stack.factory.createAccount(identityId, salt);
+async function createWallet(stack: Awaited<ReturnType<typeof deployIdentityStack>>, identityId: string, index = 0) {
+  await stack.factory.createAccount(identityId, index);
+  const salt = await stack.factory.walletSalt(identityId, index);
   const walletAddress = await stack.factory.predictAddress(salt);
   const wallet = await stack.ethers.getContractAt("IdentityWalletHarness", walletAddress);
   return { wallet, walletAddress };
@@ -84,7 +85,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
     await stack.store.register(identityId, pk.qx, pk.qy);
-    const { wallet, walletAddress } = await createWallet(stack, identityId, keccak256(toUtf8Bytes("w1")));
+    const { wallet, walletAddress } = await createWallet(stack, identityId);
     expect(await wallet.identityId()).to.equal(identityId);
 
     const callData = encodeExecuteCallData([
@@ -105,7 +106,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const windows = simulatePasskey();
     const iphone = simulatePasskey();
     await stack.store.register(identityId, windows.qx, windows.qy);
-    const { walletAddress } = await createWallet(stack, identityId, keccak256(toUtf8Bytes("w-pair")));
+    const { walletAddress } = await createWallet(stack, identityId);
     const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, iphone.qx, iphone.qy, ZeroAddress);
     await stack.store.addMethod(
       identityId,
@@ -142,7 +143,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const passkey = simulatePasskey();
     const yubi = simulatePasskey();
     await stack.store.register(identityId, passkey.qx, passkey.qy);
-    const { walletAddress } = await createWallet(stack, identityId, keccak256(toUtf8Bytes("w-methods")));
+    const { walletAddress } = await createWallet(stack, identityId);
     const yDigest = await stack.store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
     await stack.store.addMethod(
       identityId,
@@ -200,7 +201,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const pk = simulatePasskey();
     const stranger = simulatePasskey();
     await stack.store.register(identityId, pk.qx, pk.qy);
-    const { walletAddress } = await createWallet(stack, identityId, keccak256(toUtf8Bytes("w-aa24")));
+    const { walletAddress } = await createWallet(stack, identityId);
     const callData = encodeExecuteCallData([
       { target: stack.pingAddress, value: 0n, data: PING_IFACE.encodeFunctionData("ping", [keccak256(toUtf8Bytes("no"))]) },
     ]);
@@ -224,7 +225,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const pkB = simulatePasskey();
     await stack.store.register(idA, pkA.qx, pkA.qy);
     await stack.store.register(idB, pkB.qx, pkB.qy);
-    const { wallet, walletAddress } = await createWallet(stack, idA, keccak256(toUtf8Bytes("super")));
+    const { wallet, walletAddress } = await createWallet(stack, idA);
 
     await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
     await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);
@@ -260,7 +261,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
   it("factory and wallet reject missing identity / double initialize / zero store", async function () {
     const stack = await deployIdentityStack();
     await expectRevert(
-      stack.factory.createAccount.staticCall(randomIdentityId(), keccak256(toUtf8Bytes("nope"))),
+      stack.factory.createAccount.staticCall(randomIdentityId(), 0),
       "IdentityNotFound"
     );
     const Factory = await stack.ethers.getContractFactory("IdentityWalletFactory");
@@ -274,12 +275,11 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
     await stack.store.register(identityId, pk.qx, pk.qy);
-    const salt = keccak256(toUtf8Bytes("once"));
-    await stack.factory.createAccount(identityId, salt);
-    await stack.factory.createAccount(identityId, salt);
+    await stack.factory.createAccount(identityId, 0);
+    await stack.factory.createAccount(identityId, 0);
     const wallet = await stack.ethers.getContractAt(
       "IdentityWalletHarness",
-      await stack.factory.predictAddress(salt)
+      await stack.factory.predictAddress(await stack.factory.walletSalt(identityId, 0))
     );
     await expectRevert(wallet.initialize.staticCall(stack.storeAddress, identityId), "InvalidInitialization");
   });
@@ -292,7 +292,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     await stack.store.register(idA, simulatePasskey().qx, simulatePasskey().qy);
     await stack.store.register(idB, simulatePasskey().qx, simulatePasskey().qy);
     await stack.store.register(idC, simulatePasskey().qx, simulatePasskey().qy);
-    const { wallet, walletAddress } = await createWallet(stack, idA, keccak256(toUtf8Bytes("th")));
+    const { wallet, walletAddress } = await createWallet(stack, idA);
     await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
     await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);
     const self = await stack.ethers.getSigner(walletAddress);
@@ -314,7 +314,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const first = simulatePasskey();
     const second = simulatePasskey();
     await stack.store.register(identityId, first.qx, first.qy);
-    const { walletAddress } = await createWallet(stack, identityId, keccak256(toUtf8Bytes("bundler-add")));
+    const { walletAddress } = await createWallet(stack, identityId);
     const digest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
     const auth = identityPasskeyBlob({ identityId, key: first, message: digest });
     const storeIface = stack.store.interface;
@@ -360,7 +360,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
       ZeroAddress,
       identityPasskeyBlob({ identityId, key: first, message: addDigest })
     );
-    const { walletAddress } = await createWallet(stack, identityId, keccak256(toUtf8Bytes("bundler-remove")));
+    const { walletAddress } = await createWallet(stack, identityId);
     const secondId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
     const removeDigest = await stack.store.hashRemoveMethod(identityId, secondId);
     const auth = identityPasskeyBlob({ identityId, key: first, message: removeDigest });
@@ -390,7 +390,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const idA = randomIdentityId();
     const pk = simulatePasskey();
     await stack.store.register(idA, pk.qx, pk.qy);
-    const { wallet, walletAddress } = await createWallet(stack, idA, keccak256(toUtf8Bytes("t1")));
+    const { wallet, walletAddress } = await createWallet(stack, idA);
     await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
     await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);
     const self = await stack.ethers.getSigner(walletAddress);
@@ -418,7 +418,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     await stack.store.register(reco1, pk1.qx, pk1.qy);
     await stack.store.register(reco2, pk2.qx, pk2.qy);
     await stack.store.register(reco3, pk3.qx, pk3.qy);
-    const { wallet, walletAddress } = await createWallet(stack, reco1, keccak256(toUtf8Bytes("reco-super")));
+    const { wallet, walletAddress } = await createWallet(stack, reco1);
     await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
     await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);
     const self = await stack.ethers.getSigner(walletAddress);

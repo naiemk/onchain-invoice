@@ -1,6 +1,10 @@
 import { expect } from "chai";
 import { network } from "hardhat";
-import { deriveIdentityWalletSalt, predictWalletAddress } from "../commerce/shared/wallet-address.js";
+import {
+  deriveIdentityWalletSalt,
+  identityWalletIndexForSalt,
+  predictWalletAddress,
+} from "../commerce/shared/wallet-address.js";
 import { randomIdentityId } from "../commerce/shared/identity-store.js";
 import { simulatePasskey } from "./helpers/identity-signing.js";
 
@@ -11,6 +15,9 @@ describe("IdentityWallet counterfactual address", function () {
     const b = deriveIdentityWalletSalt(id, 0);
     expect(a).to.equal(b);
     expect(deriveIdentityWalletSalt(id, 1)).to.not.equal(a);
+    expect(identityWalletIndexForSalt(id, a)).to.equal(0);
+    expect(identityWalletIndexForSalt(id, deriveIdentityWalletSalt(id, 7))).to.equal(7);
+    expect(identityWalletIndexForSalt(id, deriveIdentityWalletSalt(randomIdentityId(), 0))).to.equal(null);
   });
 
   it("predictWalletAddress matches factory before deploy", async function () {
@@ -28,6 +35,7 @@ describe("IdentityWallet counterfactual address", function () {
     const factoryAddr = await factory.getAddress();
     const implAddr = await impl.getAddress();
     const salt = deriveIdentityWalletSalt(identityId, 0);
+    expect(String(await factory.walletSalt(identityId, 0)).toLowerCase()).to.equal(salt.toLowerCase());
     const predictedOffchain = predictWalletAddress(factoryAddr, implAddr, salt);
     const predictedOnchain = await factory.predictAddress(salt);
     expect(predictedOffchain.toLowerCase()).to.equal(predictedOnchain.toLowerCase());

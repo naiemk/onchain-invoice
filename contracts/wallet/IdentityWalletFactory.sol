@@ -21,17 +21,26 @@ contract IdentityWalletFactory is Ownable, IdentityErrors {
         store = IdentityStore(store_);
     }
 
+    /// @dev Same preimage as `deriveIdentityWalletSalt` off chain.
+    function walletSalt(bytes32 identityId, uint256 index) public pure returns (bytes32) {
+        return keccak256(abi.encode("TC-IDENTITY-WALLET-V1", identityId, index));
+    }
+
     function predictAddress(bytes32 salt) public view returns (address) {
         return Clones.predictDeterministicAddress(walletImplementation, salt, address(this));
     }
 
-    function createAccount(bytes32 identityId, bytes32 salt) external returns (address wallet) {
+    /// @notice Deploy the clone for `identityId` at `index`, or return it when that identity already owns it.
+    function createAccount(bytes32 identityId, uint256 index) external returns (address wallet) {
         if (!store.identityExists(identityId)) revert IdentityNotFound();
+        bytes32 salt = walletSalt(identityId, index);
         wallet = predictAddress(salt);
         if (wallet.code.length == 0) {
             wallet = Clones.cloneDeterministic(walletImplementation, salt);
             IdentityWallet(payable(wallet)).initialize(address(store), identityId);
+            emit WalletCreated(wallet, salt, identityId);
+            return wallet;
         }
-        emit WalletCreated(wallet, salt, identityId);
+        if (IdentityWallet(payable(wallet)).identityId() != identityId) revert IdentityMismatch();
     }
 }
