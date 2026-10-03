@@ -100,7 +100,7 @@ Keep the direct EOA call so a user can pay gas on Etherscan. Also accept an IDS1
 
 **Nullifier left out of the hash.** If `authId` is calldata and not part of the typed struct, a watcher can consume a different id or replay the signature under a new id. The id has to be in the EIP-712 payload. Same for `restoreNonce` on cancel.
 
-**Operator replaces the pending key forever.** `replaceRestore` always starts a full delay. A malicious operator can keep resetting it. Iteration 2 treated that as smaller than waiting out one delay and installing a key. Iteration 3 revises that: a retry resets the clock for a user who cannot cancel, so replace has to be limited to a pending restore that cannot execute (AUD-11).
+**Operator replaces the pending key forever.** A `replaceRestore` that always starts a new delay would let the operator move a clock `RestorePending` currently holds still. Iteration 3 withdraws that function. Restricting when replace may run would be an operations policy in Solidity. The AUD-04 contract fix is the initiate pre-check, plus `executeRestore` closing the slot when the pending key is already a method.
 
 **Swapping the key under a signed operator UserOp.** The 2-of-3 signature covers `callData`, and `callData` contains `(qx, qy)`. The iteration 2 test signs `initiateRestore` for one key and resubmits it with another key. The EntryPoint reverts `AA24`. A fix that reads the new key from storage or from a second unsigned call would drop this binding. Do not do that.
 

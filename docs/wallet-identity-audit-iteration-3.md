@@ -2,12 +2,16 @@
 
 Third pass on the same contracts as [iteration 1](wallet-identity-audit.md) and [iteration 2](wallet-identity-audit-iteration-2.md) (`3be1976e8b2090649fa643dd54ceacae18e32245`, solc 0.8.26, OpenZeppelin 5.6.1). This pass assumes every fix in iteration 2 is already implemented, then asks what that implementation breaks and what it left unspecified. The contracts in the repo are still the unfixed ones. Nothing here is a patch.
 
-Iteration 2 closed AUD-01 through AUD-10 inside the product's design. Four holes sit in those fixes as they were written. Two of them are on paths a lost-device user depends on. None of them belong on invoice creation or on an ordinary spend.
+Iteration 2 closed AUD-01 through AUD-10 inside the product's design. A second look at those fixes produced four notes. Re-checked against one rule: a contract change has to enforce an authorization or state invariant that a caller can break on their own. Procedures for the operator, the worker, and the wallet UI stay off chain.
 
-| Severity | Count | Ids |
-|----------|------:|-----|
-| High | 2 | AUD-11, AUD-13 |
-| Medium | 2 | AUD-12, AUD-14 |
+| Id | In the contract? | Why |
+|----|------------------|-----|
+| AUD-11 | No new function | A malicious operator can already wait out one delay and install a key. A support retry that resets the clock is a worker bug. `replaceRestore`, and the rules for when it may run, would encode that procedure. Leave the function out. |
+| AUD-12 | Yes | `usedAuth[authId]` lets a stranger consume another identity's signature. The signature's scope is `identityId`. The storage key has to match. Same one write. |
+| AUD-13 | Yes | Disable is permissionless once the user has signed. The signup assertion is already public. A relayer policy cannot stop a caller from replaying it. The typehash is the authorization check. |
+| AUD-14 | Yes, one assignment | The timelock's promise is that a new operator waits 259200 seconds. A second schedule that keeps the old deadline breaks that promise for the holder of the owner key, which is the key the timelock exists for. Checking that the new operator is a 2-of-3 wallet stays off chain. |
+
+Contract work from this pass is AUD-12, AUD-13, and the deadline reset in AUD-14. AUD-11 is withdrawn as a contract change.
 
 ## What stays cheap
 
@@ -30,7 +34,7 @@ Operator UserOps may pass a higher verification gas for two or three P-256 check
 The rare-path write is one slot, about 22,000 gas when the slot was zero. That is the right place to pay:
 
 - `usedAuth[identityId][authId]` on add and on remove
-- `restoreNonce` packed into the pending restore record that initiate and replace already rewrite
+- `restoreNonce` packed into the pending restore record that initiate already rewrites
 - `restoreEnabled` on disable, which the store already updates
 - the scheduled-operator record, written only when the owner schedules
 
@@ -53,32 +57,16 @@ Treating iteration 2 as shipped:
 
 The design rules from iteration 2 still bind: email off chain, simple wallet stays 1-of-n, lost-device recovery stays operator 2-of-3 then delay then permissionless `executeRestore`, salt preimage string stays `TC-IDENTITY-WALLET-V1`, the new recovery key stays inside the signed operator calldata, the deployer is a relayer.
 
-## AUD-11 — `replaceRestore` can postpone a valid restore forever
+## AUD-11 — withdrawn. Do not add `replaceRestore`
 
-- **Severity:** High
-- **Property:** Lockout
-- **Opened by:** the AUD-04 fix
+- **Severity:** none as a contract finding
+- **Opened by:** the AUD-04 fix, as first written
 
-Iteration 2 adds `replaceRestore`. As specified, it overwrites any pending slot and sets `executeAfter = block.timestamp + restoreDelay`. Today `initiateRestore` reverts with `RestorePending` while a slot is active, so the operator cannot move a clock that has already started. After the fix they can.
+Iteration 2 adds `replaceRestore`, which overwrites any pending slot and starts a new delay. That function is what would let a caller keep moving `executeAfter`. The scenarios that motivated restricting it are a worker retrying a healthy restore, and a 2-of-3 operator choosing to stall. The first is a bug in the worker. The second is inside the trust already given to that operator: after one delay they can install a key of their own. Solidity that distinguishes a "good" replace from a "bad" one is an operations policy.
 
-A lost-device user cannot cancel. Each replace starts another three days, and `executeRestore` never becomes reachable. The operator does not have to install a key to cause that. A second support retry, or a worker that refreshes the pending key because the first transaction looked stuck, does it with no theft in mind.
+The contract side of AUD-04 is the check already specified: `initiateRestore` reverts when that method id exists or `methodCount == 32`. While a slot is active, `RestorePending` continues to reject a second initiate. There is no second function.
 
-This is a smaller stick than waiting out one delay and installing an operator key. It is a different failure. Theft-after-one-delay is the accepted operator assumption. A clock that never finishes means the recovery the user was promised does not complete. A typo that is a fresh valid point is handled by letting that one delay finish: the useless method is added, the slot clears, and a new initiate starts one more delay. Six days for a typo is the trade. An open-ended reset is the bug.
-
-**Fix.** `replaceRestore` succeeds only when the current pending restore cannot be executed, and the replacement can:
-
-- the pending record is active
-- `computeMethodId` of the pending key already exists, or `methodCount == 32`
-- `computeMethodId` of the new key does not exist
-- `methodCount < 32`, so the new key can be added when the delay ends
-
-A pending key that is not yet on the identity, with room left under 32, cannot be replaced. `executeAfter` from the original initiate stands. A stuck slot (the key was added by a remaining device during the delay, or the list filled up after initiate) can be replaced onto one fresh key. That write sets a new `executeAfter` and increments `restoreNonce`. The new record is executable, so a second replace reverts. One repair, one delay.
-
-The new `(kind, qx, qy, eoa)` stays inside the operator UserOp calldata, the same binding iteration 2 tested for `initiateRestore`. A replace that reads the key from an unsigned argument or from a side queue drops that binding.
-
-`kind` belongs in the cancel struct next to `qx`, `qy`, `eoa`, and `executeAfter`, so the signature covers the whole pending tuple. Cancel remains a rare path. It still does not write `usedAuth`.
-
-A full list of 32 methods and zero remaining keys stays unrestorable: replace cannot free a slot, and the operator cannot remove a method. That case is outside normal use. The way to handle it later is a dedicated restore that drops one method and adds the new key, on this rare path, with its own delay. It is not a reason to let replace reset a healthy clock, and it is not something `verify` should do.
+One state-machine line belongs with that fix, because it is not a procedure. `executeRestore` today deletes the slot and then calls `_addMethod`. If the pending key was added during the delay, `_addMethod` reverts `MethodExists` and the delete reverts with it. The slot stays full. A user who still holds any method, including that key, can `cancelRestore`. The wedge matters when no method remains: nobody can cancel, and nobody can start a different key. Closing the slot when `computeMethodId` of the pending key already exists is the success case (the key is on the identity). `executeRestore` deletes the pending record and returns. Anyone may call it, same as today. No new arguments. A list that is already at 32 methods, with no key left to remove one, stays a residual. It does not justify a replace API.
 
 ## AUD-12 — a global `usedAuth` map lets one identity burn another's signature
 
@@ -96,7 +84,9 @@ Add and remove are public. An attacker with any identity of their own signs `Add
 usedAuth[identityId][authId]
 ```
 
-Still one `SSTORE`, still only inside `addMethod` and `removeMethod`, after the signature check and before the method list changes. `authId == 0` reverts, so an omitted field does not become a shared nullifier. The client draws a fresh 32-byte id for every signature. A new signature from a current method can add a key again. The published old signature cannot.
+Still one `SSTORE`, still only inside `addMethod` and `removeMethod`, after the signature check and before the method list changes. A published signature for that identity cannot be reused. Another identity's transaction cannot flip the slot.
+
+How the wallet picks the id is a client concern. The contract does not inspect entropy, reject low counters, or expire ids. Those checks would be a policy layer on top of a mapping that is already doing the job. The id stays inside the EIP-712 struct so a watcher cannot swap it.
 
 The check stays out of `verify` and out of `validateUserOp`. Those run on every send and must remain a view.
 
@@ -136,11 +126,9 @@ The owner key schedules a rotation to the new operator wallet. The three-day clo
 
 A first schedule, with the clock set inside that transaction, still takes the full three days. This hole is the overwrite.
 
-**Fix.** Every schedule stores `next` and sets `executeAfter = block.timestamp + 259200`, including when a schedule is already pending. `next` cannot be `address(0)` and cannot be the current operator. Execute waits until that deadline, then writes `recoveryOperator` and clears the schedule. Anyone may execute once the time has passed, so a lost owner key does not freeze a rotation that already matured. The owner may cancel by deleting the schedule. A cancel does not change `recoveryOperator` and does not shorten a future schedule.
+**Fix.** Every schedule stores `next` and sets `executeAfter = block.timestamp + 259200` in that same write, including when a schedule is already pending. Execute waits until the stored deadline, then writes `recoveryOperator` and clears the schedule. Anyone may execute once the time has passed. `next == address(0)` reverts, the same class of check as the other address arguments on this contract.
 
-The event is `RecoveryOperatorScheduled(next, executeAfter)`. Wallets and the operator worker keep calling the current on-chain `recoveryOperator` until `RecoveryOperatorUpdated`. A worker that aims at `next` early sends restores that the store rejects; the on-chain check is what keeps a single key from starting a restore during the wait.
-
-The contract does not try to prove that `next` is a 2-of-3 identity wallet. That check is brittle and it belongs off chain. A compromised owner can still aim the schedule at an EOA they hold. Users move funds during the three days. The delay floor still means the owner cannot turn restore into a same-transaction add.
+That is the whole contract change. It does not include a proof that `next` is a 2-of-3 identity wallet, a watcher, or a rule about which address the worker should call. `initiateRestore` already requires `msg.sender == recoveryOperator`, so a worker that aims at the scheduled address early is rejected by the existing check. A compromised owner can still schedule an EOA they hold. Moving funds during the three days is the owner's response, and it stays off chain. The delay floor still means the owner cannot turn restore into a same-transaction add.
 
 ## What this pass leaves standing
 
@@ -148,13 +136,13 @@ These stay true after the four corrections above. They are not new findings.
 
 - A stolen method can still spend, add the attacker's key, and remove the user's key down to the floor. While restore is on, the floor is one method. While restore is off, the floor is two. The stolen method can add its own second key and then delete the user's methods down to those two. That is 1-of-n. The floor stops a single key from stranding the identity with restore already off. It does not stop a live stolen method from rotating the set. `addMethod` after disable stays allowed, because a live method has to be able to enroll a replacement device.
 - Order while restore is on: the stolen method can remove the user down to one key, and then `disableRestore` reverts because `methodCount < 2`. The operator can still start a restore. The stolen method can also cancel that restore. Both follow from 1-of-n.
-- Operator theft after one real three-day wait stays the trusted assumption. AUD-11 removes the ability to stretch that wait. It does not remove the ability to finish it.
+- Operator theft after one real three-day wait stays the trusted assumption. The contract does not grow a function whose job is to stop that operator from scheduling a second restore.
 - A copied registration assertion registers the user's key. It does not install a different key. It must not be accepted as add, remove, cancel, or disable, which is what distinct typehashes are for.
 - `createAccount(victim, 99)` deploys a wallet the victim controls. The API allocates `index` from its own counter and keeps showing that address. Extra clones are not adopted as the receive address.
 - The factory's `identityId()` check is one storage read on deploy, and only when code is already there. Invoice prediction does not do it.
 - One operator identity still cannot start a restore. Two can. A remaining user method can cancel during the delay. After the delay the installed key can spend.
-- A signature over one restore key does not authorize a swapped key, as long as replace and initiate keep the key in the signed calldata.
+- A signature over one restore key does not authorize a swapped key. `initiateRestore` keeps `(kind, qx, qy, eoa)` in the signed operator calldata.
 - EntryPoint v0.9, ERC-7821, checked `uint8` math, and OpenZeppelin's WebAuthn challenge and UV checks are unchanged. `rpId` is still not pinned. Pinning it would be extra hashing on every spend for a check the authenticator already binds. Legacy `AdminGuardianRecovery` still cannot drive an identity clone.
 - The sweeper owner can still change `feeRecipient`, `feeBps`, and `minFee` with no timelock. That is the invoice system. It stays out of the identity-store change. Sweep gas stays one clone when the invoice is not deployed yet, then the token pulls.
 
-No new critical issue shows up in P-256 verification, the Super Wallet bitset, or `initialize`, once AUD-11 is narrowed. The critical item from iteration 1 remains AUD-01 until that fix is actually deployed. This pass only describes the holes that open when the iteration 2 fixes are built as written.
+No new critical issue shows up in P-256 verification, the Super Wallet bitset, or `initialize`. The critical item from iteration 1 remains AUD-01 until that fix is actually deployed. Contract changes from this pass are the per-identity nullifier, the `DisableRestore` typehash, the operator-schedule deadline written on every schedule, and closing a pending restore whose key is already a method. `replaceRestore` is not one of them.
