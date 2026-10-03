@@ -16,6 +16,7 @@ abstract contract IdentityErrors {
     error AuthAlreadyUsed();
     error RestoreIsDisabled();
     error RestoreRequiresEoa();
+    error RestoreNeedsTwoMethods();
     error NotIdentityEoa();
     error RestoreAlreadyDisabled();
     error NotRecoveryOperator();

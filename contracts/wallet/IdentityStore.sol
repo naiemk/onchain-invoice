@@ -202,7 +202,11 @@ contract IdentityStore is Ownable, IdentityErrors {
         IdentityTypes.Method storage m = _methods[methodId];
         if (!m.exists || m.identityId != identityId) revert MethodNotFound();
         IdentityTypes.Identity storage idn = _identities[identityId];
-        if (idn.methodCount <= 1) revert LastMethod();
+        if (idn.restoreEnabled) {
+            if (idn.methodCount <= 1) revert LastMethod();
+        } else if (idn.methodCount <= 2) {
+            revert LastMethod();
+        }
         if (verify(hashRemoveMethod(identityId, methodId, authId), authorization) != identityId) {
             revert InvalidSignature();
         }
@@ -215,6 +219,7 @@ contract IdentityStore is Ownable, IdentityErrors {
         IdentityTypes.Identity storage idn = _identities[identityId];
         if (!idn.exists) revert IdentityNotFound();
         if (!idn.restoreEnabled) revert RestoreAlreadyDisabled();
+        if (idn.methodCount < 2) revert RestoreNeedsTwoMethods();
         if (idn.eoaCount == 0) revert RestoreRequiresEoa();
         if (!_isIdentityEoa(identityId, msg.sender)) revert NotIdentityEoa();
         idn.restoreEnabled = false;

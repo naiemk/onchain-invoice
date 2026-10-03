@@ -214,6 +214,19 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
+    await expectRevert(store.connect(eoa).disableRestore.staticCall(identityId), "RestoreNeedsTwoMethods");
+    const second = simulatePasskey();
+    const addAuthId = freshAuthId();
+    const addDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress, addAuthId);
+    await store.addMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      second.qx,
+      second.qy,
+      ZeroAddress,
+      addAuthId,
+      identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
+    );
     await expectRevert(store.connect(eoa).disableRestore.staticCall(identityId), "RestoreRequiresEoa");
     await expectRevert(store.disableRestore.staticCall(randomIdentityId()), "IdentityNotFound");
   });

@@ -327,11 +327,12 @@ describe("Identity wallet audit", function () {
     expect((await stack.store.pendingRestores(identityId)).active).to.equal(true);
   });
 
-  it("AUD-05 disableRestore then a removal leaves one method and restore off", async function () {
+  it("turning restore off keeps two methods, and removal cannot go below that", async function () {
     const stack = await deployAuditStack();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
+    await expectRevert(stack.store.connect(stack.eoa).disableRestore.staticCall(identityId), "RestoreNeedsTwoMethods");
     const qx = zeroPadValue("0x00", 32);
     const qy = zeroPadValue("0x00", 32);
     const authId2 = freshAuthId();
@@ -341,18 +342,40 @@ describe("Identity wallet audit", function () {
       METHOD_EOA,
       qx,
       qy,
-      stack.eoa.address, authId2, identityPasskeyBlob({ identityId, key: passkey, message: addDigest }));
-    const passkeyId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
-    const authId3 = freshAuthId();
-    const removeDigest = await stack.store.hashRemoveMethod(identityId, passkeyId, authId3);
-    await stack.store.removeMethod(
-      identityId,
-      passkeyId, authId3, identityPasskeyBlob({ identityId, key: passkey, message: removeDigest }));
+      stack.eoa.address,
+      authId2,
+      identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
+    );
     await stack.store.connect(stack.eoa).disableRestore(identityId);
     const idn = await stack.store.getIdentity(identityId);
-    expect(idn.methodCount).to.equal(1n);
+    expect(idn.methodCount).to.equal(2n);
     expect(idn.restoreEnabled).to.equal(false);
-    expect(idn.eoaCount).to.equal(1n);
+    const passkeyId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
+    const removeAuthId = freshAuthId();
+    const removeDigest = await stack.store.hashRemoveMethod(identityId, passkeyId, removeAuthId);
+    await expectRevert(
+      stack.store.removeMethod.staticCall(
+        identityId,
+        passkeyId,
+        removeAuthId,
+        identityPasskeyBlob({ identityId, key: passkey, message: removeDigest })
+      ),
+      "LastMethod"
+    );
+    expect((await stack.store.getIdentity(identityId)).methodCount).to.equal(2n);
+    const extra = simulatePasskey();
+    const extraAuthId = freshAuthId();
+    const extraDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress, extraAuthId);
+    await stack.store.addMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      extra.qx,
+      extra.qy,
+      ZeroAddress,
+      extraAuthId,
+      identityPasskeyBlob({ identityId, key: passkey, message: extraDigest })
+    );
+    expect((await stack.store.getIdentity(identityId)).methodCount).to.equal(3n);
     const recovered = simulatePasskey();
     await expectRevert(
       stack.store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress),
