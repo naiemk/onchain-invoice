@@ -19,7 +19,9 @@ contract IdentityStore is Ownable, IdentityErrors {
         keccak256("AddMethod(bytes32 identityId,uint8 kind,bytes32 qx,bytes32 qy,address eoa,bytes32 authId)");
     bytes32 private constant REMOVE_METHOD_TYPEHASH =
         keccak256("RemoveMethod(bytes32 identityId,bytes32 methodId,bytes32 authId)");
-    bytes32 private constant CANCEL_RESTORE_TYPEHASH = keccak256("CancelRestore(bytes32 identityId)");
+    bytes32 private constant CANCEL_RESTORE_TYPEHASH = keccak256(
+        "CancelRestore(bytes32 identityId,uint64 restoreNonce,bytes32 qx,bytes32 qy,address eoa,uint64 executeAfter)"
+    );
 
     struct PendingRestore {
         uint8 kind;
@@ -28,6 +30,7 @@ contract IdentityStore is Ownable, IdentityErrors {
         address eoa;
         uint64 executeAfter;
         bool active;
+        uint64 restoreNonce;
     }
 
     address public recoveryOperator;
@@ -93,10 +96,22 @@ contract IdentityStore is Ownable, IdentityErrors {
         );
     }
 
+    /// @notice Digest for the pending restore: its nonce, key, and deadline.
     function hashCancelRestore(bytes32 identityId) public view returns (bytes32) {
+        PendingRestore storage pending = pendingRestores[identityId];
         return MessageHashUtils.toTypedDataHash(
             domainSeparator(),
-            keccak256(abi.encode(CANCEL_RESTORE_TYPEHASH, identityId))
+            keccak256(
+                abi.encode(
+                    CANCEL_RESTORE_TYPEHASH,
+                    identityId,
+                    pending.restoreNonce,
+                    pending.qx,
+                    pending.qy,
+                    pending.eoa,
+                    pending.executeAfter
+                )
+            )
         );
     }
 
@@ -204,7 +219,7 @@ contract IdentityStore is Ownable, IdentityErrors {
         if (!_isIdentityEoa(identityId, msg.sender)) revert NotIdentityEoa();
         idn.restoreEnabled = false;
         if (pendingRestores[identityId].active) {
-            delete pendingRestores[identityId];
+            _clearPendingRestore(identityId);
             emit RestoreCancelled(identityId);
         }
         emit RestoreDisabled(identityId, msg.sender);
@@ -241,7 +256,7 @@ contract IdentityStore is Ownable, IdentityErrors {
         if (verify(hashCancelRestore(identityId), authorization) != identityId) {
             revert InvalidSignature();
         }
-        delete pendingRestores[identityId];
+        _clearPendingRestore(identityId);
         emit RestoreCancelled(identityId);
     }
 
@@ -285,13 +300,15 @@ contract IdentityStore is Ownable, IdentityErrors {
         if (pendingRestores[identityId].active) revert RestorePending();
         _assertMethodFields(kind, qx, qy, eoa);
         uint64 executeAfter = uint64(block.timestamp) + restoreDelay;
+        uint64 restoreNonce = pendingRestores[identityId].restoreNonce + 1;
         pendingRestores[identityId] = PendingRestore({
             kind: kind,
             qx: qx,
             qy: qy,
             eoa: eoa,
             executeAfter: executeAfter,
-            active: true
+            active: true,
+            restoreNonce: restoreNonce
         });
         emit RestoreInitiated(identityId, kind, executeAfter);
     }
@@ -307,9 +324,16 @@ contract IdentityStore is Ownable, IdentityErrors {
         bytes32 qx = pending.qx;
         bytes32 qy = pending.qy;
         address eoa = pending.eoa;
-        delete pendingRestores[identityId];
+        _clearPendingRestore(identityId);
         bytes32 id = _addMethod(identityId, kind, qx, qy, eoa);
         emit MethodRestored(identityId, id, kind);
+    }
+
+    /// @dev Drops the pending key and keeps restoreNonce so the next restore signs a new digest.
+    function _clearPendingRestore(bytes32 identityId) internal {
+        uint64 nonce = pendingRestores[identityId].restoreNonce;
+        delete pendingRestores[identityId];
+        pendingRestores[identityId].restoreNonce = nonce;
     }
 
     /// @dev One storage write, scoped to the identity the signature names.

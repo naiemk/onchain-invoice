@@ -518,10 +518,25 @@ describe("IdentityStore", function () {
     );
 
     const cancelDigest = await store.hashCancelRestore(identityId);
+    expect(pending.restoreNonce).to.equal(1n);
+    expect(
+      hashIdentityCancelRestore(storeAddress, chainId, {
+        identityId,
+        restoreNonce: pending.restoreNonce,
+        qx: pending.qx,
+        qy: pending.qy,
+        eoa: pending.eoa,
+        executeAfter: pending.executeAfter,
+      })
+    ).to.equal(cancelDigest);
     await store.cancelRestore(identityId, identityPasskeyBlob({ identityId, key: passkey, message: cancelDigest }));
     expect((await store.pendingRestores(identityId)).active).to.equal(false);
 
     await store.initiateRestore(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
+    const secondPending = await store.pendingRestores(identityId);
+    const secondDigest = await store.hashCancelRestore(identityId);
+    expect(secondPending.restoreNonce).to.equal(2n);
+    expect(secondDigest).to.not.equal(cancelDigest);
     await ethers.provider.send("evm_increaseTime", [3]);
     await ethers.provider.send("evm_mine", []);
     await store.executeRestore(identityId);
@@ -529,7 +544,6 @@ describe("IdentityStore", function () {
     expect(
       await store.verify(login, identityPasskeyBlob({ identityId, key: recovered, message: login }))
     ).to.equal(identityId);
-    expect(hashIdentityCancelRestore(storeAddress, chainId, identityId)).to.equal(cancelDigest);
   });
 
   it("disableRestore clears a pending restore and blocks execute", async function () {

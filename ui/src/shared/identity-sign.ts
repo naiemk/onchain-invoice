@@ -187,7 +187,31 @@ export async function signCancelRestoreAuthorization(input: {
   if (!store) throw new Error(t("wallet.removeNeedStore"));
   const chainId = BigInt(input.session.chainId || config.chainId || "0");
   if (!chainId) throw new Error(t("wallet.noFactory"));
-  const digest = hashIdentityCancelRestore(store, chainId, identityId);
+  const rpc = primaryChain(config).rpcUrl;
+  if (!rpc) throw new Error(t("wallet.removeNeedStore"));
+  const pending = (await new Contract(
+    store,
+    [
+      "function pendingRestores(bytes32 identityId) view returns (uint8 kind, bytes32 qx, bytes32 qy, address eoa, uint64 executeAfter, bool active, uint64 restoreNonce)",
+    ],
+    new JsonRpcProvider(rpc)
+  ).pendingRestores(identityId)) as {
+    qx: string;
+    qy: string;
+    eoa: string;
+    executeAfter: bigint;
+    active: boolean;
+    restoreNonce: bigint;
+  };
+  if (!pending.active) throw new Error(t("wallet.recoverNeedSession"));
+  const digest = hashIdentityCancelRestore(store, chainId, {
+    identityId,
+    restoreNonce: pending.restoreNonce,
+    qx: pending.qx,
+    qy: pending.qy,
+    eoa: pending.eoa,
+    executeAfter: pending.executeAfter,
+  });
   return signIdentityDigest(
     {
       identityId,

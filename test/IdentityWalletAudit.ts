@@ -242,7 +242,7 @@ describe("Identity wallet audit", function () {
     ).to.equal(true);
   });
 
-  it("AUD-03 a cancel signature stops every later restore for that identity", async function () {
+  it("a cancel signature covers only the pending restore it names", async function () {
     const stack = await deployAuditStack();
     await stack.store.setRestoreDelay(3);
     const identityId = randomIdentityId();
@@ -252,24 +252,30 @@ describe("Identity wallet audit", function () {
     await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
 
     await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, first.qx, first.qy, ZeroAddress);
-    const cancelDigest = await stack.store.hashCancelRestore(identityId);
-    const cancelAuth = identityPasskeyBlob({ identityId, key: passkey, message: cancelDigest });
-    await stack.store.cancelRestore(identityId, cancelAuth);
+    const firstDigest = await stack.store.hashCancelRestore(identityId);
+    const firstAuth = identityPasskeyBlob({ identityId, key: passkey, message: firstDigest });
+    await stack.store.cancelRestore(identityId, firstAuth);
+    expect((await stack.store.pendingRestores(identityId)).active).to.equal(false);
+    expect((await stack.store.pendingRestores(identityId)).restoreNonce).to.equal(1n);
 
     await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
-    expect(await stack.store.hashCancelRestore(identityId)).to.equal(cancelDigest);
-    await stack.store.cancelRestore(identityId, cancelAuth);
+    const secondDigest = await stack.store.hashCancelRestore(identityId);
+    expect(secondDigest).to.not.equal(firstDigest);
+    expect((await stack.store.pendingRestores(identityId)).restoreNonce).to.equal(2n);
+    await expectRevert(stack.store.cancelRestore.staticCall(identityId, firstAuth), "InvalidSignature");
+    expect((await stack.store.pendingRestores(identityId)).active).to.equal(true);
+    await stack.store.cancelRestore(identityId, identityPasskeyBlob({ identityId, key: passkey, message: secondDigest }));
     expect((await stack.store.pendingRestores(identityId)).active).to.equal(false);
 
     await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
     await stack.ethers.provider.send("evm_increaseTime", [4]);
     await stack.ethers.provider.send("evm_mine", []);
-    await stack.store.cancelRestore(identityId, cancelAuth);
-    await expectRevert(stack.store.executeRestore.staticCall(identityId), "RestoreNotPending");
-    const login = keccak256(toUtf8Bytes("should-not-restore"));
+    await expectRevert(stack.store.cancelRestore.staticCall(identityId, firstAuth), "InvalidSignature");
+    await stack.store.executeRestore(identityId);
+    const login = keccak256(toUtf8Bytes("restored-key"));
     expect(
       await stack.store.verify(login, identityPasskeyBlob({ identityId, key: second, message: login }))
-    ).to.equal(ZeroHash);
+    ).to.equal(identityId);
   });
 
   it("AUD-04 an existing-method restore occupies the only pending slot", async function () {

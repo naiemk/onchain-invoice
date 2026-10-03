@@ -35,7 +35,7 @@ const WALLET_ABI = [
 const IDENTITY_STORE_ABI = [
   "function restoreDelay() view returns (uint64)",
   "function recoveryOperator() view returns (address)",
-  "function pendingRestores(bytes32 identityId) view returns (uint8 kind, bytes32 qx, bytes32 qy, address eoa, uint64 executeAfter, bool active)",
+  "function pendingRestores(bytes32 identityId) view returns (uint8 kind, bytes32 qx, bytes32 qy, address eoa, uint64 executeAfter, bool active, uint64 restoreNonce)",
   "function initiateRestore(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
   "function executeRestore(bytes32 identityId)",
   "function cancelRestore(bytes32 identityId, bytes authorization)",

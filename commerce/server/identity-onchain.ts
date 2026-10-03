@@ -10,7 +10,7 @@ const STORE_ABI = [
   "function initiateRestore(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
   "function executeRestore(bytes32 identityId)",
   "function cancelRestore(bytes32 identityId, bytes authorization)",
-  "function pendingRestores(bytes32 identityId) view returns (uint8 kind, bytes32 qx, bytes32 qy, address eoa, uint64 executeAfter, bool active)",
+  "function pendingRestores(bytes32 identityId) view returns (uint8 kind, bytes32 qx, bytes32 qy, address eoa, uint64 executeAfter, bool active, uint64 restoreNonce)",
   "function restoreDelay() view returns (uint64)",
   "function recoveryOperator() view returns (address)",
   "function identityExists(bytes32 identityId) view returns (bool)",
@@ -215,6 +215,7 @@ export type PendingIdentityRestore = {
   eoa: string;
   executeAfter: string;
   active: boolean;
+  restoreNonce: string;
 };
 
 export async function readPendingIdentityRestore(
@@ -232,6 +233,7 @@ export async function readPendingIdentityRestore(
       eoa: string;
       executeAfter: bigint;
       active: boolean;
+      restoreNonce: bigint;
     };
     return {
       kind: Number(rec.kind),
@@ -240,6 +242,7 @@ export async function readPendingIdentityRestore(
       eoa: rec.eoa,
       executeAfter: rec.executeAfter.toString(),
       active: Boolean(rec.active),
+      restoreNonce: rec.restoreNonce.toString(),
     };
   } catch {
     return null;
