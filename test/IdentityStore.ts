@@ -454,6 +454,10 @@ describe("IdentityStore", function () {
         overflow.qx,
         overflow.qy,
         ZeroAddress, authId15, identityPasskeyBlob({ identityId, key: first, message: digest })), "TooManyMethods");
+    await expectRevert(
+      store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, overflow.qx, overflow.qy, ZeroAddress),
+      "TooManyMethods"
+    );
   });
 
   it("addMethod still works after disableRestore", async function () {

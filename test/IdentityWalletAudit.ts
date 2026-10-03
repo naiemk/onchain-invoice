@@ -278,22 +278,53 @@ describe("Identity wallet audit", function () {
     ).to.equal(identityId);
   });
 
-  it("AUD-04 an existing-method restore occupies the only pending slot", async function () {
+  it("a restore does not start for a key already on the identity, and execute clears one that arrives during the delay", async function () {
     const stack = await deployAuditStack();
     await stack.store.setRestoreDelay(2);
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const replacement = simulatePasskey();
     await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
-    await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
+    await expectRevert(
+      stack.store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress),
+      "MethodExists"
+    );
+    expect((await stack.store.pendingRestores(identityId)).active).to.equal(false);
+
+    await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, replacement.qx, replacement.qy, ZeroAddress);
+    const arrived = freshAuthId();
+    const addDigest = await stack.store.hashAddMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      replacement.qx,
+      replacement.qy,
+      ZeroAddress,
+      arrived
+    );
+    await stack.store.addMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      replacement.qx,
+      replacement.qy,
+      ZeroAddress,
+      arrived,
+      identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
+    );
+    await expectRevert(stack.store.executeRestore.staticCall(identityId), "RestoreNotReady");
     await stack.ethers.provider.send("evm_increaseTime", [3]);
     await stack.ethers.provider.send("evm_mine", []);
-    await expectRevert(stack.store.executeRestore.staticCall(identityId), "MethodExists");
+    await stack.store.executeRestore(identityId);
+    expect((await stack.store.pendingRestores(identityId)).active).to.equal(false);
+    expect(
+      (
+        await stack.store.getMethod(
+          computeIdentityMethodId(identityId, METHOD_WEBAUTHN, replacement.qx, replacement.qy, ZeroAddress)
+        )
+      ).exists
+    ).to.equal(true);
+    const another = simulatePasskey();
+    await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, another.qx, another.qy, ZeroAddress);
     expect((await stack.store.pendingRestores(identityId)).active).to.equal(true);
-    await expectRevert(
-      stack.store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, replacement.qx, replacement.qy, ZeroAddress),
-      "RestorePending"
-    );
   });
 
   it("AUD-05 disableRestore then a removal leaves one method and restore off", async function () {

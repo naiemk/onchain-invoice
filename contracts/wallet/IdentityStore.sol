@@ -299,6 +299,9 @@ contract IdentityStore is Ownable, IdentityErrors {
         if (!idn.restoreEnabled) revert RestoreIsDisabled();
         if (pendingRestores[identityId].active) revert RestorePending();
         _assertMethodFields(kind, qx, qy, eoa);
+        bytes32 methodId = IdentitySigLib.computeMethodId(identityId, kind, qx, qy, eoa);
+        if (_methods[methodId].exists) revert MethodExists();
+        if (idn.methodCount >= IdentityTypes.MAX_METHODS) revert TooManyMethods();
         uint64 executeAfter = uint64(block.timestamp) + restoreDelay;
         uint64 restoreNonce = pendingRestores[identityId].restoreNonce + 1;
         pendingRestores[identityId] = PendingRestore({
@@ -324,6 +327,11 @@ contract IdentityStore is Ownable, IdentityErrors {
         bytes32 qx = pending.qx;
         bytes32 qy = pending.qy;
         address eoa = pending.eoa;
+        bytes32 existing = IdentitySigLib.computeMethodId(identityId, kind, qx, qy, eoa);
+        if (_methods[existing].exists) {
+            _clearPendingRestore(identityId);
+            return;
+        }
         _clearPendingRestore(identityId);
         bytes32 id = _addMethod(identityId, kind, qx, qy, eoa);
         emit MethodRestored(identityId, id, kind);
