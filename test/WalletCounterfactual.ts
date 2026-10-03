@@ -6,7 +6,7 @@ import {
   predictWalletAddress,
 } from "../commerce/shared/wallet-address.js";
 import { randomIdentityId } from "../commerce/shared/identity-store.js";
-import { simulatePasskey } from "./helpers/identity-signing.js";
+import { registrationAssertion, simulatePasskey } from "./helpers/identity-signing.js";
 
 describe("IdentityWallet counterfactual address", function () {
   it("deriveIdentityWalletSalt is deterministic", function () {
@@ -27,7 +27,7 @@ describe("IdentityWallet counterfactual address", function () {
     const identityId = randomIdentityId();
     const Store = await ethers.getContractFactory("IdentityStore");
     const store = await Store.deploy(owner.address, owner.address);
-    await store.register(identityId, key.qx, key.qy);
+    await store.register(identityId, key.qx, key.qy, registrationAssertion(key, identityId));
     const Impl = await ethers.getContractFactory("IdentityWallet");
     const impl = await Impl.deploy();
     const Factory = await ethers.getContractFactory("IdentityWalletFactory");

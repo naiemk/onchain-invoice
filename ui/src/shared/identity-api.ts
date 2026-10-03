@@ -92,6 +92,7 @@ export async function registerIdentityPasskey(input: {
   qy: string;
   credentialId: string;
   webauthnAttestation?: unknown;
+  registrationAssertion?: string;
 }): Promise<{ identityId: string; wallets: WalletAccountRecord[] }> {
   const res = await identityFetch("/api/identity/passkey/register", {
     method: "POST",

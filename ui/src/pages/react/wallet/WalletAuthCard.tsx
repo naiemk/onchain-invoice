@@ -27,6 +27,7 @@ import {
   formatPasskeyError,
   abortPendingWebAuthn,
   clearPendingPasskey,
+  signUserOpHash,
   clearSkipWebAuthnPrompt,
   markSkipWebAuthnPrompt,
   saveWalletSession,
@@ -296,12 +297,16 @@ export function WalletAuthCard({ onOpened }: { onOpened: () => void }) {
     setBusy(true);
     setStatus(t("wallet.creatingPasskey"));
     try {
-      const owner = await createPasskey(nextEmail, { purpose: "enroll", email: nextEmail });
+      const enrolledId = identityId ?? me?.identityId;
+      if (!enrolledId) throw new Error(t("wallet.recoverNeedSession"));
+      const owner = await createPasskey(nextEmail, { purpose: "enroll", email: nextEmail, identityId: enrolledId });
+      const registrationAssertion = await signUserOpHash(enrolledId, owner.credentialId);
       const registered = await registerIdentityPasskey({
         qx: owner.qx,
         qy: owner.qy,
         credentialId: owner.credentialId,
         webauthnAttestation: owner.attestation,
+        registrationAssertion,
       });
       if (!registered.wallets.length) throw new Error(t("wallet.noFactory"));
       clearPendingPasskey(owner.credentialId);

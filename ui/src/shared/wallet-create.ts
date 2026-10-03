@@ -5,6 +5,7 @@ import {
   loadWalletSession,
   saveWalletSession,
   clearPendingPasskey,
+  signUserOpHash,
   type WalletSession,
 } from "./webauthn.js";
 import {
@@ -94,11 +95,13 @@ export async function createCounterfactualWallet(
     return createAnotherIdentityWallet(label);
   }
   const owner = await createPasskey(label, { purpose: "enroll", email: me.email, identityId: me.identityId });
+  const registrationAssertion = await signUserOpHash(me.identityId, owner.credentialId);
   const registered = await registerIdentityPasskey({
     qx: owner.qx,
     qy: owner.qy,
     credentialId: owner.credentialId,
     webauthnAttestation: owner.attestation,
+    registrationAssertion,
   });
   const account = registered.wallets[0];
   if (!account) throw new Error(t("wallet.noFactory"));

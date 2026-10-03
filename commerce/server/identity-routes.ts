@@ -10,6 +10,7 @@ import {
   identityMethodExistsOnChain,
   readIdentityRecoveryOperator,
   readIdentityRestoreEnabled,
+  identitySignerConfigured,
   registerIdentityOnChain,
   removeIdentityMethodOnChain,
   restoreIdentityMethodOnChain,
@@ -612,8 +613,13 @@ export function registerIdentityRoutes(
         const qx = normalizeQxQy(body.qx ?? body.ownerQx);
         const qy = normalizeQxQy(body.qy ?? body.ownerQy);
         const credentialId = str(body.credentialId);
+        const registrationAssertion = str(body.registrationAssertion);
         if (!qx || !qy || !credentialId) {
           handlers.sendJson(res, 400, { error: "qx_qy_credentialId_required" });
+          return true;
+        }
+        if (identitySignerConfigured(config.identity) && !registrationAssertion) {
+          handlers.sendJson(res, 400, { error: "registration_assertion_required" });
           return true;
         }
         const counts = methodCounts(db, session.identityId);
@@ -638,7 +644,13 @@ export function registerIdentityRoutes(
         });
         const attestation = body.webauthnAttestation != null ? JSON.stringify(body.webauthnAttestation) : null;
         try {
-          await registerIdentityOnChain(config.identity, identity.identityId, qx, qy);
+          await registerIdentityOnChain(
+            config.identity,
+            identity.identityId,
+            qx,
+            qy,
+            registrationAssertion
+          );
         } catch (e) {
           handlers.sendJson(res, 502, {
             error: "identity_register_failed",

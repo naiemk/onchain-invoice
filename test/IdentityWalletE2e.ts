@@ -18,6 +18,7 @@ import {
 import {
   identityEoaBlob,
   identityPasskeyBlob,
+  registrationAssertion,
   simulatePasskey,
   yubikeyBlob,
 } from "./helpers/identity-signing.js";
@@ -84,7 +85,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const stack = await deployIdentityStack();
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
-    await stack.store.register(identityId, pk.qx, pk.qy);
+    await stack.store.register(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId));
     const { wallet, walletAddress } = await createWallet(stack, identityId);
     expect(await wallet.identityId()).to.equal(identityId);
 
@@ -105,7 +106,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const identityId = randomIdentityId();
     const windows = simulatePasskey();
     const iphone = simulatePasskey();
-    await stack.store.register(identityId, windows.qx, windows.qy);
+    await stack.store.register(identityId, windows.qx, windows.qy, registrationAssertion(windows, identityId));
     const { walletAddress } = await createWallet(stack, identityId);
     const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, iphone.qx, iphone.qy, ZeroAddress);
     await stack.store.addMethod(
@@ -142,7 +143,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const yubi = simulatePasskey();
-    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const { walletAddress } = await createWallet(stack, identityId);
     const yDigest = await stack.store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
     await stack.store.addMethod(
@@ -200,7 +201,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
     const stranger = simulatePasskey();
-    await stack.store.register(identityId, pk.qx, pk.qy);
+    await stack.store.register(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId));
     const { walletAddress } = await createWallet(stack, identityId);
     const callData = encodeExecuteCallData([
       { target: stack.pingAddress, value: 0n, data: PING_IFACE.encodeFunctionData("ping", [keccak256(toUtf8Bytes("no"))]) },
@@ -223,8 +224,8 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const idB = randomIdentityId();
     const pkA = simulatePasskey();
     const pkB = simulatePasskey();
-    await stack.store.register(idA, pkA.qx, pkA.qy);
-    await stack.store.register(idB, pkB.qx, pkB.qy);
+    await stack.store.register(idA, pkA.qx, pkA.qy, registrationAssertion(pkA, idA));
+    await stack.store.register(idB, pkB.qx, pkB.qy, registrationAssertion(pkB, idB));
     const { wallet, walletAddress } = await createWallet(stack, idA);
 
     await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
@@ -274,7 +275,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     );
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
-    await stack.store.register(identityId, pk.qx, pk.qy);
+    await stack.store.register(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId));
     await stack.factory.createAccount(identityId, 0);
     await stack.factory.createAccount(identityId, 0);
     const wallet = await stack.ethers.getContractAt(
@@ -289,9 +290,12 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const idA = randomIdentityId();
     const idB = randomIdentityId();
     const idC = randomIdentityId();
-    await stack.store.register(idA, simulatePasskey().qx, simulatePasskey().qy);
-    await stack.store.register(idB, simulatePasskey().qx, simulatePasskey().qy);
-    await stack.store.register(idC, simulatePasskey().qx, simulatePasskey().qy);
+    const keyA = simulatePasskey();
+    const keyB = simulatePasskey();
+    const keyC = simulatePasskey();
+    await stack.store.register(idA, keyA.qx, keyA.qy, registrationAssertion(keyA, idA));
+    await stack.store.register(idB, keyB.qx, keyB.qy, registrationAssertion(keyB, idB));
+    await stack.store.register(idC, keyC.qx, keyC.qy, registrationAssertion(keyC, idC));
     const { wallet, walletAddress } = await createWallet(stack, idA);
     await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
     await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);
@@ -313,7 +317,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const identityId = randomIdentityId();
     const first = simulatePasskey();
     const second = simulatePasskey();
-    await stack.store.register(identityId, first.qx, first.qy);
+    await stack.store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
     const { walletAddress } = await createWallet(stack, identityId);
     const digest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
     const auth = identityPasskeyBlob({ identityId, key: first, message: digest });
@@ -350,7 +354,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const identityId = randomIdentityId();
     const first = simulatePasskey();
     const second = simulatePasskey();
-    await stack.store.register(identityId, first.qx, first.qy);
+    await stack.store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
     const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
     await stack.store.addMethod(
       identityId,
@@ -389,7 +393,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const stack = await deployIdentityStack();
     const idA = randomIdentityId();
     const pk = simulatePasskey();
-    await stack.store.register(idA, pk.qx, pk.qy);
+    await stack.store.register(idA, pk.qx, pk.qy, registrationAssertion(pk, idA));
     const { wallet, walletAddress } = await createWallet(stack, idA);
     await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
     await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);
@@ -414,10 +418,10 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const pk2 = simulatePasskey();
     const pk3 = simulatePasskey();
     const recovered = simulatePasskey();
-    await stack.store.register(alice, pkAlice.qx, pkAlice.qy);
-    await stack.store.register(reco1, pk1.qx, pk1.qy);
-    await stack.store.register(reco2, pk2.qx, pk2.qy);
-    await stack.store.register(reco3, pk3.qx, pk3.qy);
+    await stack.store.register(alice, pkAlice.qx, pkAlice.qy, registrationAssertion(pkAlice, alice));
+    await stack.store.register(reco1, pk1.qx, pk1.qy, registrationAssertion(pk1, reco1));
+    await stack.store.register(reco2, pk2.qx, pk2.qy, registrationAssertion(pk2, reco2));
+    await stack.store.register(reco3, pk3.qx, pk3.qy, registrationAssertion(pk3, reco3));
     const { wallet, walletAddress } = await createWallet(stack, reco1);
     await stack.ethers.provider.send("hardhat_impersonateAccount", [walletAddress]);
     await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);

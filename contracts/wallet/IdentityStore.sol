@@ -133,10 +133,12 @@ contract IdentityStore is Ownable, IdentityErrors {
     }
 
     /// @notice First method must be a passkey. `identityId` is a random off-chain id (email lives in the DB).
-    function register(bytes32 identityId, bytes32 qx, bytes32 qy) external {
+    /// @notice First method is a WebAuthn assertion over `identityId` from `(qx, qy)`.
+    function register(bytes32 identityId, bytes32 qx, bytes32 qy, bytes calldata assertion) external {
         if (identityId == bytes32(0)) revert InvalidIdentity();
         if (_identities[identityId].exists) revert IdentityExists();
         _assertP256(qx, qy);
+        if (!IdentitySigLib.verifyWebAuthn(identityId, assertion, qx, qy)) revert InvalidSignature();
         bytes32 id = IdentitySigLib.computeMethodId(identityId, IdentityTypes.METHOD_WEBAUTHN, qx, qy, address(0));
         _identities[identityId] = IdentityTypes.Identity({
             exists: true,

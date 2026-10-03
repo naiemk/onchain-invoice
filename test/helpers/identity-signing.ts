@@ -30,6 +30,11 @@ export function simulatePasskey(): SimulatedPasskey {
   };
 }
 
+/** WebAuthn get-assertion over `identityId`, the proof `register` requires. */
+export function registrationAssertion(key: SimulatedPasskey, identityId: string): string {
+  return signWebAuthnChallenge(key.pem, identityId);
+}
+
 export function signWebAuthnChallenge(pem: string, message: string, rpId = "localhost"): string {
   const challenge = userOpHashToWebAuthnChallenge(message);
   const clientDataJSON = JSON.stringify({

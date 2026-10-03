@@ -7,7 +7,7 @@ import {
   buildFeeTransferCall,
 } from "../commerce/shared/userop.js";
 import { randomIdentityId } from "../commerce/shared/identity-store.js";
-import { simulatePasskey } from "./helpers/identity-signing.js";
+import { registrationAssertion, simulatePasskey } from "./helpers/identity-signing.js";
 
 describe("IdentityWallet userOp batch (fee + transfer)", function () {
   const ENTRYPOINT = "0x433709009B8330FDa32311DF1C2AFA402eD8D009";
@@ -23,7 +23,7 @@ describe("IdentityWallet userOp batch (fee + transfer)", function () {
     const Store = await ethers.getContractFactory("IdentityStore");
     const store = await Store.deploy(owner.address, owner.address);
     await store.waitForDeployment();
-    await store.register(identityId, key.qx, key.qy);
+    await store.register(identityId, key.qx, key.qy, registrationAssertion(key, identityId));
 
     const Impl = await ethers.getContractFactory("IdentityWallet");
     const impl = await Impl.deploy();

@@ -3,7 +3,7 @@ import { identityWalletIndexForSalt } from "../shared/wallet-address.js";
 import type { IdentityConfig } from "./config.js";
 
 const STORE_ABI = [
-  "function register(bytes32 identityId, bytes32 qx, bytes32 qy)",
+  "function register(bytes32 identityId, bytes32 qx, bytes32 qy, bytes assertion)",
   "function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes authorization)",
   "function removeMethod(bytes32 identityId, bytes32 methodId, bytes authorization)",
   "function restoreAddMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
@@ -94,18 +94,26 @@ function signerFor(config: IdentityConfig): { provider: JsonRpcProvider; wallet:
   return { provider, wallet: new Wallet(config.deployerPrivateKey, provider) };
 }
 
+export function identitySignerConfigured(config: IdentityConfig): boolean {
+  return Boolean(config.rpcUrl && config.deployerPrivateKey && config.storeAddress);
+}
+
 export async function registerIdentityOnChain(
   config: IdentityConfig,
   identityId: string,
   qx: string,
-  qy: string
+  qy: string,
+  assertion?: string
 ): Promise<boolean> {
   const ctx = signerFor(config);
   if (!ctx) return false;
+  if (!assertion || assertion === "0x") {
+    throw Object.assign(new Error("registration_assertion_required"), { code: "registration_assertion_required" });
+  }
   const store = new Contract(config.storeAddress!, STORE_ABI, ctx.wallet);
   const exists = (await store.identityExists(identityId)) as boolean;
   if (exists) return true;
-  const tx = await store.register(identityId, qx, qy);
+  const tx = await store.register(identityId, qx, qy, assertion);
   await tx.wait();
   return true;
 }

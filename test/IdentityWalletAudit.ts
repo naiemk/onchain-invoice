@@ -20,7 +20,13 @@ import {
   encodeSuperIdentityBlobs,
   randomIdentityId,
 } from "../commerce/shared/identity-store.js";
-import { identityPasskeyBlob, simulatePasskey, yubikeyBlob, type SimulatedPasskey } from "./helpers/identity-signing.js";
+import {
+  identityPasskeyBlob,
+  registrationAssertion,
+  simulatePasskey,
+  yubikeyBlob,
+  type SimulatedPasskey,
+} from "./helpers/identity-signing.js";
 
 const PING_IFACE = new Interface(["function ping(bytes32 value)"]);
 
@@ -94,13 +100,20 @@ async function sendPing(stack: Stack, walletAddress: string, identityId: string,
 }
 
 describe("Identity wallet audit", function () {
-  it("AUD-07 the first register call owns an identityId", async function () {
+  it("register accepts only an assertion from the key being stored", async function () {
     const stack = await deployAuditStack();
     const identityId = randomIdentityId();
     const attacker = simulatePasskey();
     const victim = simulatePasskey();
-    await stack.store.register(identityId, attacker.qx, attacker.qy);
-    await expectRevert(stack.store.register(identityId, victim.qx, victim.qy), "IdentityExists");
+    await expectRevert(
+      stack.store.register(identityId, attacker.qx, attacker.qy, registrationAssertion(victim, identityId)),
+      "InvalidSignature"
+    );
+    await stack.store.register(identityId, attacker.qx, attacker.qy, registrationAssertion(attacker, identityId));
+    await expectRevert(
+      stack.store.register(identityId, victim.qx, victim.qy, registrationAssertion(victim, identityId)),
+      "IdentityExists"
+    );
     const login = keccak256(toUtf8Bytes("front-run"));
     expect(
       await stack.store.verify(login, identityPasskeyBlob({ identityId, key: attacker, message: login }))
@@ -116,8 +129,8 @@ describe("Identity wallet audit", function () {
     const attackerId = randomIdentityId();
     const victim = simulatePasskey();
     const attacker = simulatePasskey();
-    await stack.store.register(victimId, victim.qx, victim.qy);
-    await stack.store.register(attackerId, attacker.qx, attacker.qy);
+    await stack.store.register(victimId, victim.qx, victim.qy, registrationAssertion(victim, victimId));
+    await stack.store.register(attackerId, attacker.qx, attacker.qy, registrationAssertion(attacker, attackerId));
 
     await stack.factory.createAccount(attackerId, 0);
     await stack.factory.createAccount(victimId, 0);
@@ -154,7 +167,7 @@ describe("Identity wallet audit", function () {
     const identityId = randomIdentityId();
     const primary = simulatePasskey();
     const stolen = simulatePasskey();
-    await stack.store.register(identityId, primary.qx, primary.qy);
+    await stack.store.register(identityId, primary.qx, primary.qy, registrationAssertion(primary, identityId));
     await stack.factory.createAccount(identityId, 0);
     const { wallet, walletAddress } = await walletAt(stack, await stack.factory.walletSalt(identityId, 0));
 
@@ -185,7 +198,7 @@ describe("Identity wallet audit", function () {
     const passkey = simulatePasskey();
     const first = simulatePasskey();
     const second = simulatePasskey();
-    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
 
     await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, first.qx, first.qy, ZeroAddress);
     const cancelDigest = await stack.store.hashCancelRestore(identityId);
@@ -214,7 +227,7 @@ describe("Identity wallet audit", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const replacement = simulatePasskey();
-    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
     await stack.ethers.provider.send("evm_increaseTime", [3]);
     await stack.ethers.provider.send("evm_mine", []);
@@ -230,7 +243,7 @@ describe("Identity wallet audit", function () {
     const stack = await deployAuditStack();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
-    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const qx = zeroPadValue("0x00", 32);
     const qy = zeroPadValue("0x00", 32);
     const addDigest = await stack.store.hashAddMethod(identityId, METHOD_EOA, qx, qy, stack.eoa.address);
@@ -273,7 +286,7 @@ describe("Identity wallet audit", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const injected = simulatePasskey();
-    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     await stack.store.restoreAddMethod(identityId, METHOD_WEBAUTHN, injected.qx, injected.qy, ZeroAddress);
     const login = keccak256(toUtf8Bytes("instant"));
     expect(
@@ -283,7 +296,7 @@ describe("Identity wallet audit", function () {
     const otherId = randomIdentityId();
     const other = simulatePasskey();
     const later = simulatePasskey();
-    await stack.store.register(otherId, other.qx, other.qy);
+    await stack.store.register(otherId, other.qx, other.qy, registrationAssertion(other, otherId));
     await stack.store.setRestoreDelay(259200);
     await stack.store.setRestoreDelay(0);
     await stack.store.restoreAddMethod(otherId, METHOD_WEBAUTHN, later.qx, later.qy, ZeroAddress);
@@ -297,7 +310,7 @@ describe("Identity wallet audit", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const yubi = simulatePasskey();
-    await stack.store.register(identityId, passkey.qx, passkey.qy);
+    await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const addDigest = await stack.store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
     await stack.store.addMethod(
       identityId,
@@ -327,10 +340,10 @@ describe("Identity wallet audit", function () {
     const pk2 = simulatePasskey();
     const pk3 = simulatePasskey();
     const injected = simulatePasskey();
-    await stack.store.register(alice, pkAlice.qx, pkAlice.qy);
-    await stack.store.register(reco1, pk1.qx, pk1.qy);
-    await stack.store.register(reco2, pk2.qx, pk2.qy);
-    await stack.store.register(reco3, pk3.qx, pk3.qy);
+    await stack.store.register(alice, pkAlice.qx, pkAlice.qy, registrationAssertion(pkAlice, alice));
+    await stack.store.register(reco1, pk1.qx, pk1.qy, registrationAssertion(pk1, reco1));
+    await stack.store.register(reco2, pk2.qx, pk2.qy, registrationAssertion(pk2, reco2));
+    await stack.store.register(reco3, pk3.qx, pk3.qy, registrationAssertion(pk3, reco3));
 
     await stack.factory.createAccount(reco1, 0);
     const operator = await walletAt(stack, await stack.factory.walletSalt(reco1, 0));

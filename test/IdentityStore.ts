@@ -17,6 +17,7 @@ import {
 import {
   identityEoaBlob,
   identityPasskeyBlob,
+  registrationAssertion,
   simulatePasskey,
   yubikeyBlob,
 } from "./helpers/identity-signing.js";
@@ -48,7 +49,7 @@ describe("IdentityStore", function () {
     const { store } = await deployStore();
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
-    await store.register(identityId, pk.qx, pk.qy);
+    await store.register(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId));
     const rec = await store.getIdentity(identityId);
     expect(rec.exists).to.equal(true);
     expect(rec.restoreEnabled).to.equal(true);
@@ -63,12 +64,15 @@ describe("IdentityStore", function () {
   it("rejects zero identity, duplicate register, and empty P-256", async function () {
     const { store } = await deployStore();
     const pk = simulatePasskey();
-    await expectRevert(store.register.staticCall(zeroPadValue("0x00", 32), pk.qx, pk.qy), "InvalidIdentity");
+    await expectRevert(store.register.staticCall(zeroPadValue("0x00", 32), pk.qx, pk.qy, "0x"), "InvalidIdentity");
     const identityId = randomIdentityId();
-    await store.register(identityId, pk.qx, pk.qy);
-    await expectRevert(store.register.staticCall(identityId, pk.qx, pk.qy), "IdentityExists");
+    await store.register(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId));
     await expectRevert(
-      store.register.staticCall(randomIdentityId(), zeroPadValue("0x00", 32), zeroPadValue("0x00", 32)),
+      store.register.staticCall(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId)),
+      "IdentityExists"
+    );
+    await expectRevert(
+      store.register.staticCall(randomIdentityId(), zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), "0x"),
       "InvalidMethod"
     );
   });
@@ -78,7 +82,7 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
     const other = simulatePasskey();
-    await store.register(identityId, pk.qx, pk.qy);
+    await store.register(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId));
     const message = keccak256(toUtf8Bytes("login"));
     const blob = identityPasskeyBlob({ identityId, key: pk, message });
     expect(await store.verify(message, blob)).to.equal(identityId);
@@ -93,7 +97,7 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const first = simulatePasskey();
     const second = simulatePasskey();
-    await store.register(identityId, first.qx, first.qy);
+    await store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
     const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
     const auth = identityPasskeyBlob({ identityId, key: first, message: digest });
     await store.addMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress, auth);
@@ -110,7 +114,7 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const yubi = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const digest = await store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
     await store.addMethod(
       identityId,
@@ -129,7 +133,7 @@ describe("IdentityStore", function () {
     const { store, eoa, other, chainId, storeAddress } = await deployStore();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const digest = await store.hashAddMethod(identityId, METHOD_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), eoa.address);
     await store.addMethod(
       identityId,
@@ -162,7 +166,7 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const extra = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const addEoa = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
@@ -208,7 +212,7 @@ describe("IdentityStore", function () {
     const { store, eoa } = await deployStore();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     await expectRevert(store.connect(eoa).disableRestore.staticCall(identityId), "RestoreRequiresEoa");
     await expectRevert(store.disableRestore.staticCall(randomIdentityId()), "IdentityNotFound");
   });
@@ -218,7 +222,7 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const recovered = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     await expectRevert(store.connect(other).restoreAddMethod.staticCall(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress), "NotRecoveryOperator");
 
     await store.restoreAddMethod(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
@@ -256,7 +260,7 @@ describe("IdentityStore", function () {
     await store.connect(owner).setRecoveryOperator(ZeroAddress);
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
-    await store.register(identityId, pk.qx, pk.qy);
+    await store.register(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId));
     await expectRevert(
       store.restoreAddMethod.staticCall(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress),
       "RestoreOperatorUnset"
@@ -268,7 +272,7 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const extra = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const digest = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
@@ -293,7 +297,7 @@ describe("IdentityStore", function () {
     const { store, eoa } = await deployStore();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
     await expectRevert(store.addMethod.staticCall(
         identityId,
@@ -337,7 +341,7 @@ describe("IdentityStore", function () {
     const { store, eoa } = await deployStore();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const eoaDigest = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
@@ -369,7 +373,7 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const first = simulatePasskey();
     const second = simulatePasskey();
-    await store.register(identityId, first.qx, first.qy);
+    await store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
     const addDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
     await store.addMethod(
       identityId,
@@ -433,7 +437,7 @@ describe("IdentityStore", function () {
     const { store } = await deployStore();
     const identityId = randomIdentityId();
     const first = simulatePasskey();
-    await store.register(identityId, first.qx, first.qy);
+    await store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
     for (let i = 0; i < 31; i++) {
       const extra = simulatePasskey();
       const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress);
@@ -464,7 +468,7 @@ describe("IdentityStore", function () {
     const passkey = simulatePasskey();
     const yubi = simulatePasskey();
     const recovered = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const eoaDigest = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
@@ -512,7 +516,7 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const recovered = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
 
     await store.initiateRestore(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
     const pending = await store.pendingRestores(identityId);
@@ -543,7 +547,7 @@ describe("IdentityStore", function () {
     await store.setRestoreDelay(60);
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
-    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const addEoa = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
