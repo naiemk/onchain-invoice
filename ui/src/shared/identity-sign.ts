@@ -9,6 +9,7 @@ import {
   freshAuthId,
   hashIdentityAddMethod,
   hashIdentityCancelRestore,
+  hashIdentityDisableRestore,
   hashIdentityRemoveMethod,
   wrapIdentityMethodSignature,
 } from "../../../commerce/shared/identity-store.js";
@@ -173,6 +174,31 @@ export async function signRemoveMethodAuthorization(input: {
     digest
   );
   return { authorization, authId };
+}
+
+/** IDS1 authorization from the current session method over hashDisableRestore. */
+export async function signDisableRestoreAuthorization(input: {
+  session: WalletSession;
+  storeAddress?: string;
+}): Promise<string> {
+  const identityId = input.session.identityId;
+  if (!identityId) throw new Error(t("wallet.recoverNeedSession"));
+  const config = await fetchWalletConfig();
+  const store = input.storeAddress ?? config.identityStoreAddress;
+  if (!store) throw new Error(t("wallet.removeNeedStore"));
+  const chainId = BigInt(input.session.chainId || config.chainId || "0");
+  if (!chainId) throw new Error(t("wallet.noFactory"));
+  const digest = hashIdentityDisableRestore(store, chainId, identityId);
+  return signIdentityDigest(
+    {
+      identityId,
+      credentialId: input.session.credentialId,
+      qx: input.session.qx,
+      qy: input.session.qy,
+      keyType: input.session.keyType,
+    },
+    digest
+  );
 }
 
 /** IDS1 authorization from the current session passkey over hashCancelRestore. */

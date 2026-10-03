@@ -43,6 +43,9 @@ const ADD_METHOD_IFACE = new Interface([
 const REMOVE_METHOD_IFACE = new Interface([
   "function removeMethod(bytes32 identityId, bytes32 methodId, bytes32 authId, bytes authorization)",
 ]);
+const DISABLE_RESTORE_IFACE = new Interface([
+  "function disableRestore(bytes32 identityId, bytes authorization)",
+]);
 const INITIATE_RESTORE_IFACE = new Interface([
   "function initiateRestore(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
 ]);
@@ -516,6 +519,23 @@ export async function onChainIdentityMethodCount(
   } catch {
     return null;
   }
+}
+
+/** Session passkey signs disableRestore; the open identity wallet pays the bundler fee. */
+export async function submitDisableRestoreUserOp(input: {
+  session: WalletSession;
+  authorization: string;
+  storeAddress: string;
+}): Promise<{ userOpHash: string; txHash: string | null }> {
+  const identityId = input.session.identityId;
+  if (!identityId) throw new Error(t("wallet.recoverNeedSession"));
+  const passkey = await resolveCurrentWalletPasskey(input.session, "remove-key");
+  return submitIdentityStoreUserOp({
+    walletAddress: input.session.address,
+    storeAddress: input.storeAddress,
+    storeData: DISABLE_RESTORE_IFACE.encodeFunctionData("disableRestore", [identityId, input.authorization]),
+    signUserOp: (userOpHash) => signWithCurrentWalletPasskey(userOpHash, passkey, { path: "remove-key" }),
+  });
 }
 
 /** Session passkey signs removeMethod; the open identity wallet pays the bundler fee. */

@@ -45,6 +45,10 @@ export const IDENTITY_REMOVE_METHOD_TYPES = {
   ],
 };
 
+export const IDENTITY_DISABLE_RESTORE_TYPES = {
+  DisableRestore: [{ name: "identityId", type: "bytes32" }],
+};
+
 export const IDENTITY_CANCEL_RESTORE_TYPES = {
   CancelRestore: [
     { name: "identityId", type: "bytes32" },
@@ -191,6 +195,12 @@ export function hashIdentityRemoveMethod(
     identityId,
     methodId,
     authId,
+  });
+}
+
+export function hashIdentityDisableRestore(store: string, chainId: number | bigint, identityId: string): string {
+  return TypedDataEncoder.hash(identityEip712Domain(store, chainId), IDENTITY_DISABLE_RESTORE_TYPES, {
+    identityId,
   });
 }
 

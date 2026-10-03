@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLocale } from "@/providers/LocaleProvider";
 import { fetchIdentityMe } from "@/shared/identity-api.js";
+import { signDisableRestoreAuthorization } from "@/shared/identity-sign.js";
+import { submitDisableRestoreUserOp } from "@/shared/identity-recover-userop.js";
 import { fetchWalletConfig } from "@/shared/wallet-api.js";
 import { subscribePageVisible } from "@/shared/page-visibility.js";
 import type { WalletSession } from "@/shared/wallet-session.js";
@@ -47,6 +49,10 @@ export function IdentityRestoreCard({ session }: { session: WalletSession }) {
     return () => window.clearInterval(id);
   }, [me?.methods.eoa, reload]);
 
+  const hasEoa = (me?.methods.eoa ?? 0) > 0;
+  const methodCount = (me?.methods.webauthn ?? 0) + (me?.methods.yubikey ?? 0) + (me?.methods.eoa ?? 0);
+  const canTurnOff = methodCount >= 2 && (hasEoa || Boolean(session.credentialId) || (me?.methods.yubikey ?? 0) > 0);
+
   const disable = async () => {
     const identityId = session.identityId ?? me?.identityId;
     if (!identityId) return;
@@ -54,13 +60,19 @@ export function IdentityRestoreCard({ session }: { session: WalletSession }) {
     setError(null);
     try {
       if (!store) throw new Error(t("wallet.removeNeedStore"));
-      const eth = (window as unknown as { ethereum?: object }).ethereum;
-      if (!eth) throw new Error(t("wallet.identityRestoreNeedEoa"));
-      const provider = new BrowserProvider(eth as ConstructorParameters<typeof BrowserProvider>[0]);
-      const signer = await provider.getSigner();
-      const contract = new Contract(store, STORE_ABI, signer);
-      const tx = await contract.disableRestore(identityId);
-      await tx.wait();
+      if (hasEoa) {
+        const eth = (window as unknown as { ethereum?: object }).ethereum;
+        if (!eth) throw new Error(t("wallet.identityRestoreNeedEoa"));
+        const provider = new BrowserProvider(eth as ConstructorParameters<typeof BrowserProvider>[0]);
+        const signer = await provider.getSigner();
+        const contract = new Contract(store, STORE_ABI, signer);
+        const tx = await contract.disableRestore(identityId);
+        await tx.wait();
+      } else {
+        const signing = { ...session, identityId };
+        const authorization = await signDisableRestoreAuthorization({ session: signing, storeAddress: store });
+        await submitDisableRestoreUserOp({ session: signing, authorization, storeAddress: store });
+      }
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -71,7 +83,6 @@ export function IdentityRestoreCard({ session }: { session: WalletSession }) {
 
   const email = me?.email;
   const restoreOn = me?.restoreEnabled !== false;
-  const hasEoa = (me?.methods.eoa ?? 0) > 0;
 
   return (
     <Alert className="mb-4" data-testid="identity-recovery-email-card">
@@ -97,12 +108,12 @@ export function IdentityRestoreCard({ session }: { session: WalletSession }) {
                   size="sm"
                   variant="secondary"
                   data-testid="identity-restore-turn-off"
-                  disabled={!hasEoa || busy}
+                  disabled={!canTurnOff || busy}
                   onClick={() => void disable()}
                 >
                   {t("wallet.identityRestoreTurnOff")}
                 </Button>
-                {!hasEoa ? (
+                {!canTurnOff ? (
                   <p className="text-xs text-muted-foreground">{t("wallet.identityRestoreNeedEoa")}</p>
                 ) : null}
               </div>

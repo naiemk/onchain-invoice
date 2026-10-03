@@ -414,7 +414,7 @@ describe("Identity wallet audit", function () {
     ).to.equal(otherId);
   });
 
-  it("a YubiKey second method cannot turn restore off", async function () {
+  it("a YubiKey on the identity can turn restore off", async function () {
     const stack = await deployAuditStack();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
@@ -427,13 +427,26 @@ describe("Identity wallet audit", function () {
       METHOD_YUBIKEY,
       yubi.qx,
       yubi.qy,
-      ZeroAddress, authId4, identityPasskeyBlob({ identityId, key: passkey, message: addDigest }));
+      ZeroAddress,
+      authId4,
+      identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
+    );
     expect((await stack.store.getIdentity(identityId)).methodCount).to.equal(2n);
-    expect((await stack.store.getIdentity(identityId)).yubikeyCount).to.equal(1n);
     await expectRevert(stack.store.connect(stack.eoa).disableRestore.staticCall(identityId), "RestoreRequiresEoa");
+    const disableBySig = stack.store.getFunction("disableRestore(bytes32,bytes)");
+    await expectRevert(
+      disableBySig.staticCall(identityId, registrationAssertion(passkey, identityId)),
+      "InvalidSignature"
+    );
+    await expectRevert(
+      disableBySig.staticCall(identityId, identityPasskeyBlob({ identityId, key: passkey, message: identityId })),
+      "InvalidSignature"
+    );
+    const digest = await stack.store.hashDisableRestore(identityId);
+    await disableBySig(identityId, yubikeyBlob(identityId, yubi, digest));
+    expect((await stack.store.getIdentity(identityId)).restoreEnabled).to.equal(false);
     const login = keccak256(toUtf8Bytes("yubi-still-spends"));
     expect(await stack.store.verify(login, yubikeyBlob(identityId, yubi, login))).to.equal(identityId);
-    expect((await stack.store.getIdentity(identityId)).restoreEnabled).to.equal(true);
   });
 
   it("two of three operator identities can install a spend method after the delay", async function () {

@@ -98,7 +98,7 @@ export const overlayFillIdentity = assemble({
     logOutIdentity: enAll("Sign out"),
     identityRestoreToggle: enAll("Turn off email restore"),
     identityRestoreToggleHint: enAll(
-      "Email restore is on. Turn it off only from a crypto wallet already on this identity — that transaction is sent directly, not through the bundler."
+      "Email restore is on. Any current passkey, YubiKey, or crypto wallet can turn it off once a second method is on this identity. That cannot be turned back on."
     ),
     identityRecoveryEmailTitle: enAll("Recovery email"),
     identityRecoveryEmailBody: enAll(
@@ -108,10 +108,10 @@ export const overlayFillIdentity = assemble({
       "Your identity email is already the recovery email. Use it on Recover if you lose your devices."
     ),
     identityRestoreOnHint: enAll(
-      "Email restore is on. Turn it off only from a crypto wallet already on this identity — that transaction is sent directly, not through the bundler."
+      "Email restore is on. Any current passkey, YubiKey, or crypto wallet can turn it off once a second method is on this identity. That cannot be turned back on."
     ),
     identityRestoreTurnOff: enAll("Turn off email restore"),
-    identityRestoreNeedEoa: enAll("Connect a crypto wallet on this identity first."),
+    identityRestoreNeedEoa: enAll("Add another passkey, YubiKey, or crypto wallet before turning email restore off."),
     identityRestoreOff: enAll(
       "Email restore is off. Recover with another passkey, YubiKey, or crypto wallet."
     ),

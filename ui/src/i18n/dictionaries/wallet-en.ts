@@ -72,16 +72,16 @@ export const walletEn = {
   logOutIdentity: "Sign out",
   identityRestoreToggle: "Turn off email restore",
   identityRestoreToggleHint:
-    "Email restore is on. Turn it off only from a crypto wallet already on this identity — that transaction is sent directly, not through the bundler.",
+    "Email restore is on. Any current passkey, YubiKey, or crypto wallet can turn it off once a second method is on this identity. That cannot be turned back on.",
   identityRecoveryEmailTitle: "Recovery email",
   identityRecoveryEmailBody:
     "{email} is the email on this identity. Use it to restore access if you lose your devices.",
   identityRecoveryEmailFallback:
     "Your identity email is already the recovery email. Use it on Recover if you lose your devices.",
   identityRestoreOnHint:
-    "Email restore is on. Turn it off only from a crypto wallet already on this identity — that transaction is sent directly, not through the bundler.",
+    "Email restore is on. Any current passkey, YubiKey, or crypto wallet can turn it off once a second method is on this identity. That cannot be turned back on.",
   identityRestoreTurnOff: "Turn off email restore",
-  identityRestoreNeedEoa: "Connect a crypto wallet on this identity first.",
+  identityRestoreNeedEoa: "Add another passkey, YubiKey, or crypto wallet before turning email restore off.",
   identityRestoreOff: "Email restore is off. Recover with another passkey, YubiKey, or crypto wallet.",
   openWithYubiKey: "Open with YubiKey",
   openWithCrypto: "Open with crypto wallet",

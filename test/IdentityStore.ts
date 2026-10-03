@@ -8,6 +8,7 @@ import {
   computeIdentityMethodId,
   hashIdentityAddMethod,
   hashIdentityCancelRestore,
+  hashIdentityDisableRestore,
   hashIdentityRemoveMethod,
   freshAuthId,
   loginOptionsAfterFailedGet,
@@ -427,6 +428,9 @@ describe("IdentityStore", function () {
     const methodId = computeIdentityMethodId(identityId, METHOD_YUBIKEY, pk.qx, pk.qy, ZeroAddress);
     expect(hashIdentityRemoveMethod(storeAddress, chainId, identityId, methodId, removeAuthId)).to.equal(
       await store.hashRemoveMethod(identityId, methodId, removeAuthId)
+    );
+    expect(hashIdentityDisableRestore(storeAddress, chainId, identityId)).to.equal(
+      await store.hashDisableRestore(identityId)
     );
   });
 

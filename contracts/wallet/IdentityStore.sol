@@ -22,6 +22,7 @@ contract IdentityStore is Ownable, IdentityErrors {
     bytes32 private constant CANCEL_RESTORE_TYPEHASH = keccak256(
         "CancelRestore(bytes32 identityId,uint64 restoreNonce,bytes32 qx,bytes32 qy,address eoa,uint64 executeAfter)"
     );
+    bytes32 private constant DISABLE_RESTORE_TYPEHASH = keccak256("DisableRestore(bytes32 identityId)");
 
     struct PendingRestore {
         uint8 kind;
@@ -112,6 +113,14 @@ contract IdentityStore is Ownable, IdentityErrors {
                     pending.executeAfter
                 )
             )
+        );
+    }
+
+    /// @notice Digest a current method signs to turn email recovery off.
+    function hashDisableRestore(bytes32 identityId) public view returns (bytes32) {
+        return MessageHashUtils.toTypedDataHash(
+            domainSeparator(),
+            keccak256(abi.encode(DISABLE_RESTORE_TYPEHASH, identityId))
         );
     }
 
@@ -218,16 +227,16 @@ contract IdentityStore is Ownable, IdentityErrors {
     function disableRestore(bytes32 identityId) external {
         IdentityTypes.Identity storage idn = _identities[identityId];
         if (!idn.exists) revert IdentityNotFound();
-        if (!idn.restoreEnabled) revert RestoreAlreadyDisabled();
         if (idn.methodCount < 2) revert RestoreNeedsTwoMethods();
         if (idn.eoaCount == 0) revert RestoreRequiresEoa();
         if (!_isIdentityEoa(identityId, msg.sender)) revert NotIdentityEoa();
-        idn.restoreEnabled = false;
-        if (pendingRestores[identityId].active) {
-            _clearPendingRestore(identityId);
-            emit RestoreCancelled(identityId);
-        }
-        emit RestoreDisabled(identityId, msg.sender);
+        _disableRestore(identityId);
+    }
+
+    /// @notice Any current method turns email recovery off. The signup assertion does not, because that signs the raw identity id.
+    function disableRestore(bytes32 identityId, bytes calldata authorization) external {
+        if (verify(hashDisableRestore(identityId), authorization) != identityId) revert InvalidSignature();
+        _disableRestore(identityId);
     }
 
     /// @notice Email-recovery path: operator starts (and, if delay is 0, finishes) adding a method.
@@ -340,6 +349,19 @@ contract IdentityStore is Ownable, IdentityErrors {
         _clearPendingRestore(identityId);
         bytes32 id = _addMethod(identityId, kind, qx, qy, eoa);
         emit MethodRestored(identityId, id, kind);
+    }
+
+    function _disableRestore(bytes32 identityId) internal {
+        IdentityTypes.Identity storage idn = _identities[identityId];
+        if (!idn.exists) revert IdentityNotFound();
+        if (!idn.restoreEnabled) revert RestoreAlreadyDisabled();
+        if (idn.methodCount < 2) revert RestoreNeedsTwoMethods();
+        idn.restoreEnabled = false;
+        if (pendingRestores[identityId].active) {
+            _clearPendingRestore(identityId);
+            emit RestoreCancelled(identityId);
+        }
+        emit RestoreDisabled(identityId, msg.sender);
     }
 
     /// @dev Drops the pending key and keeps restoreNonce so the next restore signs a new digest.
