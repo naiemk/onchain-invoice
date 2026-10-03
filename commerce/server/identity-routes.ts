@@ -549,6 +549,7 @@ export function registerIdentityRoutes(
           return true;
         }
         const authorization = str(body.authorization);
+        const authId = str(body.authId);
         const methodId = computeIdentityMethodId(recover.identityId, kindToNum(kind), qx, qy, ZeroAddress);
         if (pay === "relayer") {
           try {
@@ -567,6 +568,10 @@ export function registerIdentityRoutes(
               handlers.sendJson(res, 400, { error: "authorization_required" });
               return true;
             }
+            if (!authId) {
+              handlers.sendJson(res, 400, { error: "auth_id_required" });
+              return true;
+            }
             try {
               await addIdentityMethodOnChain(config.identity, {
                 identityId: recover.identityId,
@@ -575,6 +580,7 @@ export function registerIdentityRoutes(
                 qy,
                 eoa: ZeroAddress,
                 authorization,
+                authId,
               });
             } catch (e) {
               handlers.sendJson(res, 502, {
@@ -986,6 +992,7 @@ export function registerIdentityRoutes(
         const eoa = str(body.eoa) ?? ZeroAddress;
         const credentialId = str(body.credentialId) ?? null;
         const authorization = str(body.authorization);
+        const authId = str(body.authId);
         const pay = str(body.pay);
         const counts = methodCounts(db, session.identityId);
         if (counts.webauthn + counts.yubikey + counts.eoa < 1) {
@@ -1006,6 +1013,10 @@ export function registerIdentityRoutes(
             handlers.sendJson(res, 400, { error: "authorization_required" });
             return true;
           }
+          if (config.identity.storeAddress && config.identity.rpcUrl && authorization && !authId) {
+            handlers.sendJson(res, 400, { error: "auth_id_required" });
+            return true;
+          }
           if (authorization) {
             try {
               await addIdentityMethodOnChain(config.identity, {
@@ -1015,6 +1026,7 @@ export function registerIdentityRoutes(
                 qy,
                 eoa,
                 authorization,
+                authId: authId ?? "",
               });
             } catch (e) {
               handlers.sendJson(res, 502, {
@@ -1072,6 +1084,7 @@ export function registerIdentityRoutes(
           return true;
         }
         const authorization = str(body.authorization);
+        const authId = str(body.authId);
         if (config.identity.storeAddress && config.identity.rpcUrl) {
           const onChain = await identityMethodExistsOnChain(config.identity, method.id);
           if (onChain) {
@@ -1079,11 +1092,16 @@ export function registerIdentityRoutes(
               handlers.sendJson(res, 400, { error: "authorization_required" });
               return true;
             }
+            if (!authId) {
+              handlers.sendJson(res, 400, { error: "auth_id_required" });
+              return true;
+            }
             try {
               const removed = await removeIdentityMethodOnChain(config.identity, {
                 identityId: session.identityId,
                 methodId: method.id,
                 authorization,
+                authId,
               });
               if (!removed) {
                 handlers.sendJson(res, 400, { error: "remove_need_funds" });

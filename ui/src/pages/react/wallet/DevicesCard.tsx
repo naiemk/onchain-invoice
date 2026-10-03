@@ -19,7 +19,6 @@ import { PairDeviceDialog } from "./PairDeviceDialog";
 import { AddSecurityKeyWizard } from "./AddSecurityKeyWizard";
 import { ConnectWalletWizard } from "./ConnectWalletWizard";
 import {
-  hashRemoveMethodOnChain,
   identityWalletCanPay,
   resolveIdentityStoreAddress,
   submitPairRemoveMethodUserOp,
@@ -94,20 +93,13 @@ export function DevicesCard({ session }: { session: WalletSession; advanced?: bo
       const store = await resolveIdentityStoreAddress(live.address);
       if (store) {
         setStatus({ kind: "info", message: t("wallet.sendSigning") });
-        let digest: string | undefined;
-        try {
-          digest = await hashRemoveMethodOnChain(store, identityId, method.id);
-        } catch {
-          digest = undefined;
-        }
-        const authorization = await signRemoveMethodAuthorization({
+        const { authorization, authId } = await signRemoveMethodAuthorization({
           session: { ...live, identityId },
           methodId: method.id,
           storeAddress: store,
-          digest,
         });
         try {
-          await deleteIdentityMethod({ methodId: method.id, authorization });
+          await deleteIdentityMethod({ methodId: method.id, authorization, authId });
         } catch (error) {
           const code = error instanceof Error ? error.message : String(error);
           if (code === "last_method" || /LastMethod/i.test(code)) throw new Error("last_method");
@@ -119,6 +111,7 @@ export function DevicesCard({ session }: { session: WalletSession; advanced?: bo
             session: { ...live, identityId },
             methodId: method.id,
             authorization,
+            authId,
             storeAddress: store,
           });
           await deleteIdentityMethod({ methodId: method.id }).catch(() => undefined);

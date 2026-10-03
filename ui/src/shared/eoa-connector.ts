@@ -383,6 +383,7 @@ export async function signIdentityAddMethodTypedData(input: {
   qx: string;
   qy: string;
   eoa: string;
+  authId: string;
 }): Promise<{ address: string; signature: string }> {
   const address = await connectEoaWallet();
   await ensureEoaChain({ chainId: input.chainId });
@@ -394,6 +395,7 @@ export async function signIdentityAddMethodTypedData(input: {
     qx: input.qx,
     qy: input.qy,
     eoa: getAddress(input.eoa),
+    authId: input.authId,
   });
   return { address, signature };
 }
@@ -429,13 +431,14 @@ export async function sendIdentityAddMethod(input: {
   qy: string;
   eoa: string;
   authorization: string;
+  authId: string;
 }): Promise<string> {
   await connectEoaWallet();
   await ensureEoaChain();
   const signer = await eoaSigner();
   const contract = new Contract(
     input.store,
-    ["function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes authorization)"],
+    ["function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes32 authId, bytes authorization)"],
     signer
   );
   const tx = await contract.addMethod(
@@ -444,6 +447,7 @@ export async function sendIdentityAddMethod(input: {
     input.qx,
     input.qy,
     input.eoa,
+    input.authId,
     input.authorization
   );
   const receipt = await tx.wait();

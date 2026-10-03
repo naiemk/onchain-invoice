@@ -124,7 +124,7 @@ export function AddSecurityKeyWizard({
         throw new Error(t("wallet.addYubiNeedFunds", { fee: feeUsd }));
       }
       const signing = { ...session, identityId: session.identityId };
-      const authorization = await signAddMethodAuthorization({
+      const { authorization, authId } = await signAddMethodAuthorization({
         session: signing,
         kind: "yubikey",
         qx: key.qx,
@@ -136,6 +136,7 @@ export function AddSecurityKeyWizard({
         qx: key.qx,
         qy: key.qy,
         authorization,
+        authId,
         storeAddress: pay.store,
         kind: "yubikey",
       });

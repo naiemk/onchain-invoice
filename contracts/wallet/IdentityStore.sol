@@ -16,8 +16,9 @@ contract IdentityStore is Ownable, IdentityErrors {
     bytes32 private constant VERSION_HASH = keccak256("1");
     bytes32 private constant VERIFY_TYPEHASH = keccak256("Verify(bytes32 message)");
     bytes32 private constant ADD_METHOD_TYPEHASH =
-        keccak256("AddMethod(bytes32 identityId,uint8 kind,bytes32 qx,bytes32 qy,address eoa)");
-    bytes32 private constant REMOVE_METHOD_TYPEHASH = keccak256("RemoveMethod(bytes32 identityId,bytes32 methodId)");
+        keccak256("AddMethod(bytes32 identityId,uint8 kind,bytes32 qx,bytes32 qy,address eoa,bytes32 authId)");
+    bytes32 private constant REMOVE_METHOD_TYPEHASH =
+        keccak256("RemoveMethod(bytes32 identityId,bytes32 methodId,bytes32 authId)");
     bytes32 private constant CANCEL_RESTORE_TYPEHASH = keccak256("CancelRestore(bytes32 identityId)");
 
     struct PendingRestore {
@@ -36,6 +37,7 @@ contract IdentityStore is Ownable, IdentityErrors {
     mapping(bytes32 methodId => IdentityTypes.Method) private _methods;
     mapping(bytes32 identityId => bytes32[] methodIds) private _methodIds;
     mapping(bytes32 identityId => PendingRestore) public pendingRestores;
+    mapping(bytes32 identityId => mapping(bytes32 authId => bool)) private _usedAuth;
 
     event IdentityRegistered(bytes32 indexed identityId, bytes32 indexed methodId, uint8 kind);
     event MethodAdded(bytes32 indexed identityId, bytes32 indexed methodId, uint8 kind);
@@ -75,18 +77,19 @@ contract IdentityStore is Ownable, IdentityErrors {
         uint8 kind,
         bytes32 qx,
         bytes32 qy,
-        address eoa
+        address eoa,
+        bytes32 authId
     ) public view returns (bytes32) {
         return MessageHashUtils.toTypedDataHash(
             domainSeparator(),
-            keccak256(abi.encode(ADD_METHOD_TYPEHASH, identityId, kind, qx, qy, eoa))
+            keccak256(abi.encode(ADD_METHOD_TYPEHASH, identityId, kind, qx, qy, eoa, authId))
         );
     }
 
-    function hashRemoveMethod(bytes32 identityId, bytes32 methodId) public view returns (bytes32) {
+    function hashRemoveMethod(bytes32 identityId, bytes32 methodId, bytes32 authId) public view returns (bytes32) {
         return MessageHashUtils.toTypedDataHash(
             domainSeparator(),
-            keccak256(abi.encode(REMOVE_METHOD_TYPEHASH, identityId, methodId))
+            keccak256(abi.encode(REMOVE_METHOD_TYPEHASH, identityId, methodId, authId))
         );
     }
 
@@ -159,11 +162,13 @@ contract IdentityStore is Ownable, IdentityErrors {
         bytes32 qx,
         bytes32 qy,
         address eoa,
+        bytes32 authId,
         bytes calldata authorization
     ) external {
-        if (verify(hashAddMethod(identityId, kind, qx, qy, eoa), authorization) != identityId) {
+        if (verify(hashAddMethod(identityId, kind, qx, qy, eoa, authId), authorization) != identityId) {
             revert InvalidSignature();
         }
+        _consumeAuth(identityId, authId);
         _addMethod(identityId, kind, qx, qy, eoa);
     }
 
@@ -173,14 +178,20 @@ contract IdentityStore is Ownable, IdentityErrors {
         _addMethod(identityId, kind, qx, qy, eoa);
     }
 
-    function removeMethod(bytes32 identityId, bytes32 methodId, bytes calldata authorization) external {
+    function removeMethod(
+        bytes32 identityId,
+        bytes32 methodId,
+        bytes32 authId,
+        bytes calldata authorization
+    ) external {
         IdentityTypes.Method storage m = _methods[methodId];
         if (!m.exists || m.identityId != identityId) revert MethodNotFound();
         IdentityTypes.Identity storage idn = _identities[identityId];
         if (idn.methodCount <= 1) revert LastMethod();
-        if (verify(hashRemoveMethod(identityId, methodId), authorization) != identityId) {
+        if (verify(hashRemoveMethod(identityId, methodId, authId), authorization) != identityId) {
             revert InvalidSignature();
         }
+        _consumeAuth(identityId, authId);
         _removeMethod(identityId, methodId);
     }
 
@@ -299,6 +310,12 @@ contract IdentityStore is Ownable, IdentityErrors {
         delete pendingRestores[identityId];
         bytes32 id = _addMethod(identityId, kind, qx, qy, eoa);
         emit MethodRestored(identityId, id, kind);
+    }
+
+    /// @dev One storage write, scoped to the identity the signature names.
+    function _consumeAuth(bytes32 identityId, bytes32 authId) internal {
+        if (_usedAuth[identityId][authId]) revert AuthAlreadyUsed();
+        _usedAuth[identityId][authId] = true;
     }
 
     function _addMethod(

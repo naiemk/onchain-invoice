@@ -9,6 +9,7 @@ import {
   hashIdentityAddMethod,
   hashIdentityCancelRestore,
   hashIdentityRemoveMethod,
+  freshAuthId,
   loginOptionsAfterFailedGet,
   randomIdentityId,
   signIdentityAddMethodEoa,
@@ -98,9 +99,10 @@ describe("IdentityStore", function () {
     const first = simulatePasskey();
     const second = simulatePasskey();
     await store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
-    const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
+    const authId0 = freshAuthId();
+    const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress, authId0);
     const auth = identityPasskeyBlob({ identityId, key: first, message: digest });
-    await store.addMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress, auth);
+    await store.addMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress, authId0, auth);
     const rec = await store.getIdentity(identityId);
     expect(rec.webauthnCount).to.equal(2n);
     const login = keccak256(toUtf8Bytes("device-2"));
@@ -115,15 +117,14 @@ describe("IdentityStore", function () {
     const passkey = simulatePasskey();
     const yubi = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
-    const digest = await store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
+    const authId1 = freshAuthId();
+    const digest = await store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress, authId1);
     await store.addMethod(
       identityId,
       METHOD_YUBIKEY,
       yubi.qx,
       yubi.qy,
-      ZeroAddress,
-      identityPasskeyBlob({ identityId, key: passkey, message: digest })
-    );
+      ZeroAddress, authId1, identityPasskeyBlob({ identityId, key: passkey, message: digest }));
     expect(await store.hasKind(identityId, METHOD_YUBIKEY)).to.equal(true);
     const msg = keccak256(toUtf8Bytes("yubi-open"));
     expect(await store.verify(msg, yubikeyBlob(identityId, yubi, msg))).to.equal(identityId);
@@ -134,15 +135,14 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
-    const digest = await store.hashAddMethod(identityId, METHOD_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), eoa.address);
+    const authId2 = freshAuthId();
+    const digest = await store.hashAddMethod(identityId, METHOD_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), eoa.address, authId2);
     await store.addMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address,
-      identityPasskeyBlob({ identityId, key: passkey, message: digest })
-    );
+      eoa.address, authId2, identityPasskeyBlob({ identityId, key: passkey, message: digest }));
     expect(await store.hasKind(identityId, METHOD_EOA)).to.equal(true);
     const msg = keccak256(toUtf8Bytes("eoa-open"));
     const blob = await identityEoaBlob({
@@ -167,27 +167,27 @@ describe("IdentityStore", function () {
     const passkey = simulatePasskey();
     const extra = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
+    const authId3 = freshAuthId();
     const addEoa = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address
-    );
+      eoa.address, authId3);
     await store.addMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address,
-      identityPasskeyBlob({ identityId, key: passkey, message: addEoa })
-    );
+      eoa.address, authId3, identityPasskeyBlob({ identityId, key: passkey, message: addEoa }));
+    const extraAuthId = freshAuthId();
     const inner = await signIdentityAddMethodEoa(HARDHAT_KEY1, storeAddress, chainId, {
       identityId,
       kind: METHOD_WEBAUTHN,
       qx: extra.qx,
       qy: extra.qy,
       eoa: ZeroAddress,
+      authId: extraAuthId,
     });
     await store.addMethod(
       identityId,
@@ -195,6 +195,7 @@ describe("IdentityStore", function () {
       extra.qx,
       extra.qy,
       ZeroAddress,
+      extraAuthId,
       wrapIdentityMethodSignature({
         kind: METHOD_EOA,
         identityId,
@@ -231,21 +232,19 @@ describe("IdentityStore", function () {
       await store.verify(login, identityPasskeyBlob({ identityId, key: recovered, message: login }))
     ).to.equal(identityId);
 
+    const authId4 = freshAuthId();
     const addEoa = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address
-    );
+      eoa.address, authId4);
     await store.addMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address,
-      identityPasskeyBlob({ identityId, key: passkey, message: addEoa })
-    );
+      eoa.address, authId4, identityPasskeyBlob({ identityId, key: passkey, message: addEoa }));
     await store.connect(eoa).disableRestore(identityId);
     await expectRevert(store.restoreAddMethod.staticCall(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress), "RestoreIsDisabled");
     await expectRevert(
@@ -273,21 +272,19 @@ describe("IdentityStore", function () {
     const passkey = simulatePasskey();
     const extra = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
+    const authId5 = freshAuthId();
     const digest = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address
-    );
+      eoa.address, authId5);
     await store.addMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address,
-      identityPasskeyBlob({ identityId, key: passkey, message: digest })
-    );
+      eoa.address, authId5, identityPasskeyBlob({ identityId, key: passkey, message: digest }));
     await expectRevert(store.addMethodByEoa.staticCall(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress), "NotIdentityEoa");
     await store.connect(eoa).addMethodByEoa(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress);
     expect((await store.getIdentity(identityId)).webauthnCount).to.equal(2n);
@@ -298,43 +295,39 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
-    const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
+    const authId6 = freshAuthId();
+    const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress, authId6);
     await expectRevert(store.addMethod.staticCall(
         identityId,
         METHOD_WEBAUTHN,
         passkey.qx,
         passkey.qy,
-        ZeroAddress,
-        identityPasskeyBlob({ identityId, key: passkey, message: digest })
-      ), "MethodExists");
-    const kindDigest = await store.hashAddMethod(identityId, 9, passkey.qx, passkey.qy, ZeroAddress);
+        ZeroAddress, authId6, identityPasskeyBlob({ identityId, key: passkey, message: digest })), "MethodExists");
+    const authId7 = freshAuthId();
+    const kindDigest = await store.hashAddMethod(identityId, 9, passkey.qx, passkey.qy, ZeroAddress, authId7);
     await expectRevert(store.addMethod.staticCall(
         identityId,
         9,
         passkey.qx,
         passkey.qy,
-        ZeroAddress,
-        identityPasskeyBlob({ identityId, key: passkey, message: kindDigest })
-      ), "InvalidMethodKind");
+        ZeroAddress, authId7, identityPasskeyBlob({ identityId, key: passkey, message: kindDigest })), "InvalidMethodKind");
     const missing = randomIdentityId();
-    const addDigest = await store.hashAddMethod(missing, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
+    const authId8 = freshAuthId();
+    const addDigest = await store.hashAddMethod(missing, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress, authId8);
     await expectRevert(store.addMethod.staticCall(
         missing,
         METHOD_WEBAUTHN,
         passkey.qx,
         passkey.qy,
-        ZeroAddress,
-        identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
-      ), "InvalidSignature");
-    const yDigest = await store.hashAddMethod(identityId, METHOD_EOA, passkey.qx, passkey.qy, eoa.address);
+        ZeroAddress, authId8, identityPasskeyBlob({ identityId, key: passkey, message: addDigest })), "InvalidSignature");
+    const authId9 = freshAuthId();
+    const yDigest = await store.hashAddMethod(identityId, METHOD_EOA, passkey.qx, passkey.qy, eoa.address, authId9);
     await expectRevert(store.addMethod.staticCall(
         identityId,
         METHOD_EOA,
         passkey.qx,
         passkey.qy,
-        eoa.address,
-        identityPasskeyBlob({ identityId, key: passkey, message: yDigest })
-      ), "InvalidMethod");
+        eoa.address, authId9, identityPasskeyBlob({ identityId, key: passkey, message: yDigest })), "InvalidMethod");
   });
 
   it("rejects EOA methods with pubkey fields and P256 methods with an eoa", async function () {
@@ -342,30 +335,27 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
+    const authId10 = freshAuthId();
     const eoaDigest = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
       passkey.qx,
       zeroPadValue("0x00", 32),
-      eoa.address
-    );
+      eoa.address, authId10);
     await expectRevert(store.addMethod.staticCall(
         identityId,
         METHOD_EOA,
         passkey.qx,
         zeroPadValue("0x00", 32),
-        eoa.address,
-        identityPasskeyBlob({ identityId, key: passkey, message: eoaDigest })
-      ), "InvalidMethod");
-    const webDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, eoa.address);
+        eoa.address, authId10, identityPasskeyBlob({ identityId, key: passkey, message: eoaDigest })), "InvalidMethod");
+    const authId11 = freshAuthId();
+    const webDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, eoa.address, authId11);
     await expectRevert(store.addMethod.staticCall(
         identityId,
         METHOD_WEBAUTHN,
         passkey.qx,
         passkey.qy,
-        eoa.address,
-        identityPasskeyBlob({ identityId, key: passkey, message: webDigest })
-      ), "InvalidMethod");
+        eoa.address, authId11, identityPasskeyBlob({ identityId, key: passkey, message: webDigest })), "InvalidMethod");
   });
 
   it("removes a method with a remaining passkey authorization", async function () {
@@ -374,38 +364,43 @@ describe("IdentityStore", function () {
     const first = simulatePasskey();
     const second = simulatePasskey();
     await store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
-    const addDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
+    const authId12 = freshAuthId();
+    const addDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress, authId12);
     await store.addMethod(
       identityId,
       METHOD_WEBAUTHN,
       second.qx,
       second.qy,
-      ZeroAddress,
-      identityPasskeyBlob({ identityId, key: first, message: addDigest })
-    );
+      ZeroAddress, authId12, identityPasskeyBlob({ identityId, key: first, message: addDigest }));
     const secondId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
-    const removeDigest = await store.hashRemoveMethod(identityId, secondId);
+    const authId13 = freshAuthId();
+    const removeDigest = await store.hashRemoveMethod(identityId, secondId, authId13);
     await store.removeMethod(
       identityId,
-      secondId,
-      identityPasskeyBlob({ identityId, key: first, message: removeDigest })
-    );
+      secondId, authId13, identityPasskeyBlob({ identityId, key: first, message: removeDigest }));
     expect((await store.getIdentity(identityId)).webauthnCount).to.equal(1n);
     expect((await store.methodIdsOf(identityId)).length).to.equal(1);
 
     const firstId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, first.qx, first.qy, ZeroAddress);
+    const lastAuthId = freshAuthId();
     await expectRevert(store.removeMethod.staticCall(
         identityId,
         firstId,
-        identityPasskeyBlob({ identityId, key: first, message: await store.hashRemoveMethod(identityId, firstId) })
+        lastAuthId,
+        identityPasskeyBlob({ identityId, key: first, message: await store.hashRemoveMethod(identityId, firstId, lastAuthId) })
       ), "LastMethod");
-    await expectRevert(store.removeMethod.staticCall(identityId, keccak256(toUtf8Bytes("missing")), "0x"), "MethodNotFound");
+    await expectRevert(
+      store.removeMethod.staticCall(identityId, keccak256(toUtf8Bytes("missing")), freshAuthId(), "0x"),
+      "MethodNotFound"
+    );
   });
 
   it("TypeScript EIP-712 add/remove hashes match the store", async function () {
     const { store, chainId, storeAddress } = await deployStore();
     const identityId = randomIdentityId();
     const pk = simulatePasskey();
+    const addAuthId = freshAuthId();
+    const removeAuthId = freshAuthId();
     expect(
       hashIdentityAddMethod(storeAddress, chainId, {
         identityId,
@@ -413,11 +408,12 @@ describe("IdentityStore", function () {
         qx: pk.qx,
         qy: pk.qy,
         eoa: ZeroAddress,
+        authId: addAuthId,
       })
-    ).to.equal(await store.hashAddMethod(identityId, METHOD_YUBIKEY, pk.qx, pk.qy, ZeroAddress));
+    ).to.equal(await store.hashAddMethod(identityId, METHOD_YUBIKEY, pk.qx, pk.qy, ZeroAddress, addAuthId));
     const methodId = computeIdentityMethodId(identityId, METHOD_YUBIKEY, pk.qx, pk.qy, ZeroAddress);
-    expect(hashIdentityRemoveMethod(storeAddress, chainId, identityId, methodId)).to.equal(
-      await store.hashRemoveMethod(identityId, methodId)
+    expect(hashIdentityRemoveMethod(storeAddress, chainId, identityId, methodId, removeAuthId)).to.equal(
+      await store.hashRemoveMethod(identityId, methodId, removeAuthId)
     );
   });
 
@@ -440,26 +436,24 @@ describe("IdentityStore", function () {
     await store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
     for (let i = 0; i < 31; i++) {
       const extra = simulatePasskey();
-      const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress);
+      const authId14 = freshAuthId();
+      const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress, authId14);
       await store.addMethod(
         identityId,
         METHOD_WEBAUTHN,
         extra.qx,
         extra.qy,
-        ZeroAddress,
-        identityPasskeyBlob({ identityId, key: first, message: digest })
-      );
+        ZeroAddress, authId14, identityPasskeyBlob({ identityId, key: first, message: digest }));
     }
     const overflow = simulatePasskey();
-    const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, overflow.qx, overflow.qy, ZeroAddress);
+    const authId15 = freshAuthId();
+    const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, overflow.qx, overflow.qy, ZeroAddress, authId15);
     await expectRevert(store.addMethod.staticCall(
         identityId,
         METHOD_WEBAUTHN,
         overflow.qx,
         overflow.qy,
-        ZeroAddress,
-        identityPasskeyBlob({ identityId, key: first, message: digest })
-      ), "TooManyMethods");
+        ZeroAddress, authId15, identityPasskeyBlob({ identityId, key: first, message: digest })), "TooManyMethods");
   });
 
   it("addMethod still works after disableRestore", async function () {
@@ -469,41 +463,37 @@ describe("IdentityStore", function () {
     const yubi = simulatePasskey();
     const recovered = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
+    const authId16 = freshAuthId();
     const eoaDigest = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address
-    );
+      eoa.address, authId16);
     await store.addMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address,
-      identityPasskeyBlob({ identityId, key: passkey, message: eoaDigest })
-    );
-    const yDigest = await store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
+      eoa.address, authId16, identityPasskeyBlob({ identityId, key: passkey, message: eoaDigest }));
+    const authId17 = freshAuthId();
+    const yDigest = await store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress, authId17);
     await store.addMethod(
       identityId,
       METHOD_YUBIKEY,
       yubi.qx,
       yubi.qy,
-      ZeroAddress,
-      identityPasskeyBlob({ identityId, key: passkey, message: yDigest })
-    );
+      ZeroAddress, authId17, identityPasskeyBlob({ identityId, key: passkey, message: yDigest }));
     await store.connect(eoa).disableRestore(identityId);
     expect((await store.getIdentity(identityId)).restoreEnabled).to.equal(false);
-    const addDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
+    const authId18 = freshAuthId();
+    const addDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress, authId18);
     await store.addMethod(
       identityId,
       METHOD_WEBAUTHN,
       recovered.qx,
       recovered.qy,
-      ZeroAddress,
-      yubikeyBlob(identityId, yubi, addDigest)
-    );
+      ZeroAddress, authId18, yubikeyBlob(identityId, yubi, addDigest));
     expect((await store.getIdentity(identityId)).webauthnCount).to.equal(2n);
     const extra = simulatePasskey();
     await store.connect(eoa).addMethodByEoa(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress);
@@ -548,21 +538,19 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
+    const authId19 = freshAuthId();
     const addEoa = await store.hashAddMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address
-    );
+      eoa.address, authId19);
     await store.addMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      eoa.address,
-      identityPasskeyBlob({ identityId, key: passkey, message: addEoa })
-    );
+      eoa.address, authId19, identityPasskeyBlob({ identityId, key: passkey, message: addEoa }));
     await store.initiateRestore(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress);
     await store.connect(eoa).disableRestore(identityId);
     expect((await store.pendingRestores(identityId)).active).to.equal(false);

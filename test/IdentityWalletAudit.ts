@@ -18,6 +18,7 @@ import {
   METHOD_YUBIKEY,
   computeIdentityMethodId,
   encodeSuperIdentityBlobs,
+  freshAuthId,
   randomIdentityId,
 } from "../commerce/shared/identity-store.js";
 import {
@@ -162,7 +163,7 @@ describe("Identity wallet audit", function () {
     await expectRevert(stack.entryPoint.handleOps([userOpToTuple(attackerOp)], stack.owner.address), "AA24");
   });
 
-  it("AUD-02 removed method authorization can be replayed, and so can its removal", async function () {
+  it("an add or remove signature can be used once for that identity", async function () {
     const stack = await deployAuditStack();
     const identityId = randomIdentityId();
     const primary = simulatePasskey();
@@ -171,24 +172,74 @@ describe("Identity wallet audit", function () {
     await stack.factory.createAccount(identityId, 0);
     const { wallet, walletAddress } = await walletAt(stack, await stack.factory.walletSalt(identityId, 0));
 
-    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress);
+    const addAuthId = freshAuthId();
+    const addDigest = await stack.store.hashAddMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      stolen.qx,
+      stolen.qy,
+      ZeroAddress,
+      addAuthId
+    );
     const addAuth = identityPasskeyBlob({ identityId, key: primary, message: addDigest });
-    await stack.store.addMethod(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress, addAuth);
+    await stack.store.addMethod(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress, addAuthId, addAuth);
     const stolenId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress);
+    await expectRevert(
+      stack.store.addMethod.staticCall(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress, addAuthId, addAuth),
+      "AuthAlreadyUsed"
+    );
 
-    const removeDigest = await stack.store.hashRemoveMethod(identityId, stolenId);
+    const removeAuthId = freshAuthId();
+    const removeDigest = await stack.store.hashRemoveMethod(identityId, stolenId, removeAuthId);
     const removeAuth = identityPasskeyBlob({ identityId, key: primary, message: removeDigest });
-    await stack.store.removeMethod(identityId, stolenId, removeAuth);
+    await stack.store.removeMethod(identityId, stolenId, removeAuthId, removeAuth);
     expect((await stack.store.getMethod(stolenId)).exists).to.equal(false);
 
-    await stack.store.addMethod(identityId, METHOD_WEBAUTHN, stolen.qx, stolen.qy, ZeroAddress, addAuth);
+    const againId = freshAuthId();
+    const againDigest = await stack.store.hashAddMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      stolen.qx,
+      stolen.qy,
+      ZeroAddress,
+      againId
+    );
+    await stack.store.addMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      stolen.qx,
+      stolen.qy,
+      ZeroAddress,
+      againId,
+      identityPasskeyBlob({ identityId, key: primary, message: againDigest })
+    );
+    await expectRevert(
+      stack.store.removeMethod.staticCall(identityId, stolenId, removeAuthId, removeAuth),
+      "AuthAlreadyUsed"
+    );
     expect((await stack.store.getMethod(stolenId)).exists).to.equal(true);
     const marked = await sendPing(stack, walletAddress, identityId, stolen, "stolen-key");
     expect(await stack.ping.lastPing()).to.equal(marked);
     expect(await wallet.identityId()).to.equal(identityId);
 
-    await stack.store.removeMethod(identityId, stolenId, removeAuth);
-    expect((await stack.store.getMethod(stolenId)).exists).to.equal(false);
+    const otherId = randomIdentityId();
+    const other = simulatePasskey();
+    const added = simulatePasskey();
+    await stack.store.register(otherId, other.qx, other.qy, registrationAssertion(other, otherId));
+    const shared = addAuthId;
+    const sharedDigest = await stack.store.hashAddMethod(otherId, METHOD_WEBAUTHN, added.qx, added.qy, ZeroAddress, shared);
+    await stack.store.addMethod(
+      otherId,
+      METHOD_WEBAUTHN,
+      added.qx,
+      added.qy,
+      ZeroAddress,
+      shared,
+      identityPasskeyBlob({ identityId: otherId, key: other, message: sharedDigest })
+    );
+    expect(
+      (await stack.store.getMethod(computeIdentityMethodId(otherId, METHOD_WEBAUTHN, added.qx, added.qy, ZeroAddress))).exists
+    ).to.equal(true);
   });
 
   it("AUD-03 a cancel signature stops every later restore for that identity", async function () {
@@ -246,22 +297,20 @@ describe("Identity wallet audit", function () {
     await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const qx = zeroPadValue("0x00", 32);
     const qy = zeroPadValue("0x00", 32);
-    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_EOA, qx, qy, stack.eoa.address);
+    const authId2 = freshAuthId();
+    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_EOA, qx, qy, stack.eoa.address, authId2);
     await stack.store.addMethod(
       identityId,
       METHOD_EOA,
       qx,
       qy,
-      stack.eoa.address,
-      identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
-    );
+      stack.eoa.address, authId2, identityPasskeyBlob({ identityId, key: passkey, message: addDigest }));
     const passkeyId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
-    const removeDigest = await stack.store.hashRemoveMethod(identityId, passkeyId);
+    const authId3 = freshAuthId();
+    const removeDigest = await stack.store.hashRemoveMethod(identityId, passkeyId, authId3);
     await stack.store.removeMethod(
       identityId,
-      passkeyId,
-      identityPasskeyBlob({ identityId, key: passkey, message: removeDigest })
-    );
+      passkeyId, authId3, identityPasskeyBlob({ identityId, key: passkey, message: removeDigest }));
     await stack.store.connect(stack.eoa).disableRestore(identityId);
     const idn = await stack.store.getIdentity(identityId);
     expect(idn.methodCount).to.equal(1n);
@@ -311,15 +360,14 @@ describe("Identity wallet audit", function () {
     const passkey = simulatePasskey();
     const yubi = simulatePasskey();
     await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
-    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
+    const authId4 = freshAuthId();
+    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress, authId4);
     await stack.store.addMethod(
       identityId,
       METHOD_YUBIKEY,
       yubi.qx,
       yubi.qy,
-      ZeroAddress,
-      identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
-    );
+      ZeroAddress, authId4, identityPasskeyBlob({ identityId, key: passkey, message: addDigest }));
     expect((await stack.store.getIdentity(identityId)).methodCount).to.equal(2n);
     expect((await stack.store.getIdentity(identityId)).yubikeyCount).to.equal(1n);
     await expectRevert(stack.store.connect(stack.eoa).disableRestore.staticCall(identityId), "RestoreRequiresEoa");

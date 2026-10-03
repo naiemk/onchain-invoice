@@ -180,7 +180,7 @@ export function PairDeviceDialog({
       if (store && pay.canPay) {
         if (!identityId) throw new Error(t("wallet.recoverNeedSession"));
         const signing = { ...live, identityId };
-        const authorization = await signAddMethodAuthorization({
+        const { authorization, authId } = await signAddMethodAuthorization({
           session: signing,
           kind: "webauthn",
           qx: payload.qx,
@@ -192,6 +192,7 @@ export function PairDeviceDialog({
           qx: payload.qx,
           qy: payload.qy,
           authorization,
+          authId,
           storeAddress: store,
         });
         await addIdentityMethod({
@@ -205,7 +206,7 @@ export function PairDeviceDialog({
         setTxHash(result.txHash);
       } else if (store && identityId) {
         const signing = { ...live, identityId };
-        const authorization = await signAddMethodAuthorization({
+        const { authorization, authId } = await signAddMethodAuthorization({
           session: signing,
           kind: "webauthn",
           qx: payload.qx,
@@ -219,6 +220,7 @@ export function PairDeviceDialog({
           credentialId: payload.credentialId,
           provingCredentialId,
           authorization,
+          authId,
         });
       } else {
         await addIdentityMethod({

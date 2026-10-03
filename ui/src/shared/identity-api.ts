@@ -178,6 +178,7 @@ export async function addIdentityMethod(input: {
   credentialId?: string;
   provingCredentialId?: string;
   authorization?: string;
+  authId?: string;
   pay?: "recorded" | "pending";
 }): Promise<void> {
   const res = await identityFetch("/api/identity/methods", {
@@ -193,6 +194,7 @@ export async function deleteIdentityMethod(input: {
   qy?: string;
   credentialId?: string | null;
   authorization?: string;
+  authId?: string;
 }): Promise<void> {
   const res = await identityFetch("/api/identity/methods", {
     method: "DELETE",
@@ -282,6 +284,7 @@ export async function recoverAddIdentityMethod(input: {
   credentialId: string;
   kind?: IdentityMethodKind;
   authorization?: string;
+  authId?: string;
   captchaToken?: string | null;
 }): Promise<void> {
   const res = await identityFetch("/api/identity/recover/add-method", {
@@ -293,6 +296,7 @@ export async function recoverAddIdentityMethod(input: {
       credentialId: input.credentialId,
       kind: input.kind ?? "webauthn",
       authorization: input.authorization,
+      authId: input.authId,
       captchaToken: input.captchaToken ?? undefined,
     }),
   });

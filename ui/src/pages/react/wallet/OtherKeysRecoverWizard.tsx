@@ -74,7 +74,7 @@ export function OtherKeysRecoverWizard({
   const [walletCanPay, setWalletCanPay] = useState(false);
   const [feeUsd, setFeeUsd] = useState("");
   const [pendingOwner, setPendingOwner] = useState<PasskeyOwner | null>(null);
-  const [pendingAuthorization, setPendingAuthorization] = useState<string | null>(null);
+  const [pendingSigned, setPendingSigned] = useState<{ authorization: string; authId: string } | null>(null);
 
   const steps = [
     { id: 1, label: t("wallet.recoverOtherStepChoose") },
@@ -151,14 +151,14 @@ export function OtherKeysRecoverWizard({
           qy: identity.provingMethod.qy,
           eoa: identity.provingMethod.eoa,
         };
-        const authorization = await signRecoverAddMethodAuthorization({
+        const signed = await signRecoverAddMethodAuthorization({
           identityId: identity.identityId,
           proving,
           qx: owner.qx,
           qy: owner.qy,
         });
         setPendingOwner(owner);
-        setPendingAuthorization(authorization);
+        setPendingSigned(signed);
         setStep(4);
         return;
       }
@@ -230,7 +230,7 @@ export function OtherKeysRecoverWizard({
         });
       } else if (kind === "eoa" && pay === "wallet") {
         if (!payer) throw new Error(t("wallet.recoverSelectWallets"));
-        const authorization = await signRecoverAddMethodAuthorization({
+        const signed = await signRecoverAddMethodAuthorization({
           identityId: proved.identityId,
           proving,
           qx: owner.qx,
@@ -242,21 +242,23 @@ export function OtherKeysRecoverWizard({
           proving,
           qx: owner.qx,
           qy: owner.qy,
-          authorization,
+          authorization: signed.authorization,
+          authId: signed.authId,
         });
         await recoverAddIdentityMethod({
           pay: "recorded",
           qx: owner.qx,
           qy: owner.qy,
           credentialId: owner.credentialId,
-          authorization,
+          authorization: signed.authorization,
+          authId: signed.authId,
         });
       } else {
         const captchaToken = readCaptchaToken(captchaRef);
         if (siteKey && !captchaToken) throw new Error(t("wallet.recoverCaptchaRequired"));
         if (!store) throw new Error(t("wallet.noFactory"));
-        const authorization =
-          pendingAuthorization ??
+        const signed =
+          pendingSigned ??
           (await signRecoverAddMethodAuthorization({
             identityId: proved.identityId,
             proving,
@@ -268,7 +270,8 @@ export function OtherKeysRecoverWizard({
           qx: owner.qx,
           qy: owner.qy,
           credentialId: owner.credentialId,
-          authorization,
+          authorization: signed.authorization,
+          authId: signed.authId,
           captchaToken,
         });
       }

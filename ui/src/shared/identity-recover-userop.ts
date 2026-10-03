@@ -35,13 +35,13 @@ const STORE_READ_ABI = [
   "function getMethod(bytes32 methodId) view returns (tuple(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bool exists))",
   "function getIdentity(bytes32 identityId) view returns (tuple(bool exists, bool restoreEnabled, uint8 methodCount, uint8 eoaCount, uint8 webauthnCount, uint8 yubikeyCount))",
   "function methodIdsOf(bytes32 identityId) view returns (bytes32[])",
-  "function hashRemoveMethod(bytes32 identityId, bytes32 methodId) view returns (bytes32)",
+  "function hashRemoveMethod(bytes32 identityId, bytes32 methodId, bytes32 authId) view returns (bytes32)",
 ];
 const ADD_METHOD_IFACE = new Interface([
-  "function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes authorization)",
+  "function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes32 authId, bytes authorization)",
 ]);
 const REMOVE_METHOD_IFACE = new Interface([
-  "function removeMethod(bytes32 identityId, bytes32 methodId, bytes authorization)",
+  "function removeMethod(bytes32 identityId, bytes32 methodId, bytes32 authId, bytes authorization)",
 ]);
 const INITIATE_RESTORE_IFACE = new Interface([
   "function initiateRestore(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
@@ -241,6 +241,7 @@ async function submitAddMethodUserOp(input: {
   qx: string;
   qy: string;
   authorization: string;
+  authId: string;
   storeAddress?: string;
   kind?: IdentityMethodKind;
   eoa?: string;
@@ -262,6 +263,7 @@ async function submitAddMethodUserOp(input: {
       qx,
       qy,
       eoa,
+      input.authId,
       input.authorization,
     ]),
     signUserOp: input.signUserOp,
@@ -275,6 +277,7 @@ export async function submitRecoverAddMethodUserOp(input: {
   qx: string;
   qy: string;
   authorization: string;
+  authId: string;
 }): Promise<void> {
   await submitAddMethodUserOp({
     identityId: input.identityId,
@@ -282,6 +285,7 @@ export async function submitRecoverAddMethodUserOp(input: {
     qx: input.qx,
     qy: input.qy,
     authorization: input.authorization,
+    authId: input.authId,
     signUserOp: (userOpHash) =>
       signRecoverUserOpAuthorization({
         identityId: input.identityId,
@@ -297,6 +301,7 @@ export async function submitPairAddMethodUserOp(input: {
   qx: string;
   qy: string;
   authorization: string;
+  authId: string;
   storeAddress?: string;
   kind?: IdentityMethodKind;
   eoa?: string;
@@ -310,6 +315,7 @@ export async function submitPairAddMethodUserOp(input: {
     qx: input.qx,
     qy: input.qy,
     authorization: input.authorization,
+    authId: input.authId,
     storeAddress: input.storeAddress,
     kind: input.kind,
     eoa: input.eoa,
@@ -476,7 +482,8 @@ export async function resolveIdentitySignerMethod(
 export async function hashRemoveMethodOnChain(
   storeAddress: string,
   identityId: string,
-  methodId: string
+  methodId: string,
+  authId: string
 ): Promise<string> {
   const config = await fetchWalletConfig();
   const chain = primaryChain(config);
@@ -484,7 +491,8 @@ export async function hashRemoveMethodOnChain(
   const provider = new JsonRpcProvider(chain.rpcUrl);
   return (await new Contract(storeAddress, STORE_READ_ABI, provider).hashRemoveMethod(
     identityId,
-    methodId
+    methodId,
+    authId
   )) as string;
 }
 
@@ -515,6 +523,7 @@ export async function submitPairRemoveMethodUserOp(input: {
   session: WalletSession;
   methodId: string;
   authorization: string;
+  authId: string;
   storeAddress: string;
 }): Promise<{ userOpHash: string; txHash: string | null }> {
   const identityId = input.session.identityId;
@@ -526,6 +535,7 @@ export async function submitPairRemoveMethodUserOp(input: {
     storeData: REMOVE_METHOD_IFACE.encodeFunctionData("removeMethod", [
       identityId,
       input.methodId,
+      input.authId,
       input.authorization,
     ]),
     signUserOp: (userOpHash) => signWithCurrentWalletPasskey(userOpHash, passkey, { path: "remove-key" }),

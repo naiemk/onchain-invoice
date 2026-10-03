@@ -33,6 +33,7 @@ export const IDENTITY_ADD_METHOD_TYPES = {
     { name: "qx", type: "bytes32" },
     { name: "qy", type: "bytes32" },
     { name: "eoa", type: "address" },
+    { name: "authId", type: "bytes32" },
   ],
 };
 
@@ -40,6 +41,7 @@ export const IDENTITY_REMOVE_METHOD_TYPES = {
   RemoveMethod: [
     { name: "identityId", type: "bytes32" },
     { name: "methodId", type: "bytes32" },
+    { name: "authId", type: "bytes32" },
   ],
 };
 
@@ -105,7 +107,7 @@ export async function signIdentityAddMethodEoa(
   privateKey: string,
   store: string,
   chainId: number | bigint,
-  input: { identityId: string; kind: number; qx: string; qy: string; eoa: string }
+  input: { identityId: string; kind: number; qx: string; qy: string; eoa: string; authId: string }
 ): Promise<string> {
   const signer = new Wallet(privateKey);
   return signer.signTypedData(identityEip712Domain(store, chainId), IDENTITY_ADD_METHOD_TYPES, {
@@ -114,6 +116,7 @@ export async function signIdentityAddMethodEoa(
     qx: input.qx,
     qy: input.qy,
     eoa: getAddress(input.eoa),
+    authId: input.authId,
   });
 }
 
@@ -150,10 +153,15 @@ export function randomIdentityId(): string {
   return hexlify(randomBytes(32));
 }
 
+/** Fresh id for one add or remove signature. Another identity may reuse the same bytes. */
+export function freshAuthId(): string {
+  return hexlify(randomBytes(32));
+}
+
 export function hashIdentityAddMethod(
   store: string,
   chainId: number | bigint,
-  input: { identityId: string; kind: number; qx: string; qy: string; eoa: string }
+  input: { identityId: string; kind: number; qx: string; qy: string; eoa: string; authId: string }
 ): string {
   return TypedDataEncoder.hash(identityEip712Domain(store, chainId), IDENTITY_ADD_METHOD_TYPES, {
     identityId: input.identityId,
@@ -161,6 +169,7 @@ export function hashIdentityAddMethod(
     qx: input.qx,
     qy: input.qy,
     eoa: getAddress(input.eoa),
+    authId: input.authId,
   });
 }
 
@@ -168,11 +177,13 @@ export function hashIdentityRemoveMethod(
   store: string,
   chainId: number | bigint,
   identityId: string,
-  methodId: string
+  methodId: string,
+  authId: string
 ): string {
   return TypedDataEncoder.hash(identityEip712Domain(store, chainId), IDENTITY_REMOVE_METHOD_TYPES, {
     identityId,
     methodId,
+    authId,
   });
 }
 

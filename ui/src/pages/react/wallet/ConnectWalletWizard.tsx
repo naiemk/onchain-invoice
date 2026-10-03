@@ -169,7 +169,7 @@ export function ConnectWalletWizard({
       const store = payInfo.store ?? config.identityStoreAddress;
       if (!store) throw new Error(t("wallet.removeNeedStore"));
       const signing = { ...session, identityId: session.identityId };
-      const authorization = await signAddMethodAuthorization({
+      const { authorization, authId } = await signAddMethodAuthorization({
         session: signing,
         kind: "eoa",
         eoa,
@@ -185,6 +185,7 @@ export function ConnectWalletWizard({
           qy: ZeroHash,
           eoa,
           authorization,
+          authId,
         });
       } else {
         if (!payInfo.canPay) throw new Error(t("wallet.connectWalletPayBalanceDisabled", { fee: feeUsd }));
@@ -193,6 +194,7 @@ export function ConnectWalletWizard({
           qx: ZeroHash,
           qy: ZeroHash,
           authorization,
+          authId,
           storeAddress: store,
           kind: "eoa",
           eoa,

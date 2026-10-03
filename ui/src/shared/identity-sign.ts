@@ -6,6 +6,7 @@ import {
   METHOD_YUBIKEY,
   computeIdentityMethodId,
   encodeIdentityBlob,
+  freshAuthId,
   hashIdentityAddMethod,
   hashIdentityCancelRestore,
   hashIdentityRemoveMethod,
@@ -113,7 +114,7 @@ export async function signAddMethodAuthorization(input: {
   qy?: string;
   eoa?: string;
   storeAddress?: string;
-}): Promise<string> {
+}): Promise<{ authorization: string; authId: string }> {
   const identityId = input.session.identityId;
   if (!identityId) throw new Error(t("wallet.recoverNeedSession"));
   const config = await fetchWalletConfig();
@@ -124,14 +125,16 @@ export async function signAddMethodAuthorization(input: {
   const qx = input.kind === "eoa" ? ZeroHash : paddedCoord(input.qx);
   const qy = input.kind === "eoa" ? ZeroHash : paddedCoord(input.qy);
   const eoa = input.eoa ?? ZeroAddress;
+  const authId = freshAuthId();
   const digest = hashIdentityAddMethod(store, chainId, {
     identityId,
     kind: kindNum(input.kind),
     qx,
     qy,
     eoa,
+    authId,
   });
-  return signIdentityDigest(
+  const authorization = await signIdentityDigest(
     {
       identityId,
       credentialId: input.session.credentialId,
@@ -141,6 +144,7 @@ export async function signAddMethodAuthorization(input: {
     },
     digest
   );
+  return { authorization, authId };
 }
 
 /** IDS1 authorization from the current session passkey over hashRemoveMethod. */
@@ -148,8 +152,7 @@ export async function signRemoveMethodAuthorization(input: {
   session: WalletSession;
   methodId: string;
   storeAddress?: string;
-  digest?: string;
-}): Promise<string> {
+}): Promise<{ authorization: string; authId: string }> {
   const identityId = input.session.identityId;
   if (!identityId) throw new Error(t("wallet.recoverNeedSession"));
   const config = await fetchWalletConfig();
@@ -157,9 +160,9 @@ export async function signRemoveMethodAuthorization(input: {
   if (!store) throw new Error(t("wallet.removeNeedStore"));
   const chainId = BigInt(input.session.chainId || config.chainId || "0");
   if (!chainId) throw new Error(t("wallet.noFactory"));
-  const digest =
-    input.digest ?? hashIdentityRemoveMethod(store, chainId, identityId, input.methodId);
-  return signIdentityDigest(
+  const authId = freshAuthId();
+  const digest = hashIdentityRemoveMethod(store, chainId, identityId, input.methodId, authId);
+  const authorization = await signIdentityDigest(
     {
       identityId,
       credentialId: input.session.credentialId,
@@ -169,6 +172,7 @@ export async function signRemoveMethodAuthorization(input: {
     },
     digest
   );
+  return { authorization, authId };
 }
 
 /** IDS1 authorization from the current session passkey over hashCancelRestore. */
@@ -231,7 +235,7 @@ export async function signRecoverAddMethodAuthorization(input: {
   kind?: IdentityMethodKind;
   qx: string;
   qy: string;
-}): Promise<string> {
+}): Promise<{ authorization: string; authId: string }> {
   const config = await fetchWalletConfig();
   const store = config.identityStoreAddress;
   if (!store) throw new Error(t("wallet.noFactory"));
@@ -240,12 +244,14 @@ export async function signRecoverAddMethodAuthorization(input: {
   const kind = kindNum(input.kind ?? "webauthn");
   const qx = paddedCoord(input.qx);
   const qy = paddedCoord(input.qy);
+  const authId = freshAuthId();
   const digest = hashIdentityAddMethod(store, chainId, {
     identityId: input.identityId,
     kind,
     qx,
     qy,
     eoa: ZeroAddress,
+    authId,
   });
   if (input.proving.kind === "eoa") {
     const eoa = input.proving.eoa;
@@ -258,6 +264,7 @@ export async function signRecoverAddMethodAuthorization(input: {
       qx,
       qy,
       eoa: ZeroAddress,
+      authId,
     });
     const addMethodAuth = wrapIdentityMethodSignature({
       kind: METHOD_EOA,
@@ -268,17 +275,20 @@ export async function signRecoverAddMethodAuthorization(input: {
       inner: signed.signature,
     });
     if (await identityAuthorizationAccepted(digest, addMethodAuth, input.identityId)) {
-      return addMethodAuth;
+      return { authorization: addMethodAuth, authId };
     }
     const legacy = await signIdentityVerifyTypedData({ store, chainId, message: digest });
-    return wrapIdentityMethodSignature({
-      kind: METHOD_EOA,
-      identityId: input.identityId,
-      qx: ZeroHash,
-      qy: ZeroHash,
-      eoa,
-      inner: legacy.signature,
-    });
+    return {
+      authorization: wrapIdentityMethodSignature({
+        kind: METHOD_EOA,
+        identityId: input.identityId,
+        qx: ZeroHash,
+        qy: ZeroHash,
+        eoa,
+        inner: legacy.signature,
+      }),
+      authId,
+    };
   }
   const credentialId = input.proving.credentialId;
   const provingQx = input.proving.qx;
@@ -288,13 +298,16 @@ export async function signRecoverAddMethodAuthorization(input: {
     requireUv: true,
     credentialIds: [credentialId],
   });
-  return wrapIdentityMethodSignature({
-    kind: METHOD_YUBIKEY,
-    identityId: input.identityId,
-    qx: provingQx,
-    qy: provingQy,
-    inner,
-  });
+  return {
+    authorization: wrapIdentityMethodSignature({
+      kind: METHOD_YUBIKEY,
+      identityId: input.identityId,
+      qx: provingQx,
+      qy: provingQy,
+      inner,
+    }),
+    authId,
+  };
 }
 
 export async function signRecoverUserOpAuthorization(input: {

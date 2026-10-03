@@ -13,6 +13,7 @@ abstract contract IdentityErrors {
     error MethodNotFound();
     error LastMethod();
     error InvalidSignature();
+    error AuthAlreadyUsed();
     error RestoreIsDisabled();
     error RestoreRequiresEoa();
     error NotIdentityEoa();

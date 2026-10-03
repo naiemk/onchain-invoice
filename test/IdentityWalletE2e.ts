@@ -13,6 +13,7 @@ import {
   METHOD_YUBIKEY,
   computeIdentityMethodId,
   encodeSuperIdentityBlobs,
+  freshAuthId,
   randomIdentityId,
 } from "../commerce/shared/identity-store.js";
 import {
@@ -108,15 +109,14 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const iphone = simulatePasskey();
     await stack.store.register(identityId, windows.qx, windows.qy, registrationAssertion(windows, identityId));
     const { walletAddress } = await createWallet(stack, identityId);
-    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, iphone.qx, iphone.qy, ZeroAddress);
+    const authId0 = freshAuthId();
+    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, iphone.qx, iphone.qy, ZeroAddress, authId0);
     await stack.store.addMethod(
       identityId,
       METHOD_WEBAUTHN,
       iphone.qx,
       iphone.qy,
-      ZeroAddress,
-      identityPasskeyBlob({ identityId, key: windows, message: addDigest })
-    );
+      ZeroAddress, authId0, identityPasskeyBlob({ identityId, key: windows, message: addDigest }));
 
     const callData = encodeExecuteCallData([
       {
@@ -145,30 +145,27 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const yubi = simulatePasskey();
     await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     const { walletAddress } = await createWallet(stack, identityId);
-    const yDigest = await stack.store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
+    const authId1 = freshAuthId();
+    const yDigest = await stack.store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress, authId1);
     await stack.store.addMethod(
       identityId,
       METHOD_YUBIKEY,
       yubi.qx,
       yubi.qy,
-      ZeroAddress,
-      identityPasskeyBlob({ identityId, key: passkey, message: yDigest })
-    );
+      ZeroAddress, authId1, identityPasskeyBlob({ identityId, key: passkey, message: yDigest }));
+    const authId2 = freshAuthId();
     const eDigest = await stack.store.hashAddMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      stack.eoa.address
-    );
+      stack.eoa.address, authId2);
     await stack.store.addMethod(
       identityId,
       METHOD_EOA,
       zeroPadValue("0x00", 32),
       zeroPadValue("0x00", 32),
-      stack.eoa.address,
-      identityPasskeyBlob({ identityId, key: passkey, message: eDigest })
-    );
+      stack.eoa.address, authId2, identityPasskeyBlob({ identityId, key: passkey, message: eDigest }));
 
     const send = async (tag: "yubi" | "crypto") => {
       const callData = encodeExecuteCallData([
@@ -319,7 +316,8 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const second = simulatePasskey();
     await stack.store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
     const { walletAddress } = await createWallet(stack, identityId);
-    const digest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
+    const authId3 = freshAuthId();
+    const digest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress, authId3);
     const auth = identityPasskeyBlob({ identityId, key: first, message: digest });
     const storeIface = stack.store.interface;
     const callData = encodeExecuteCallData([
@@ -332,6 +330,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
           second.qx,
           second.qy,
           ZeroAddress,
+          authId3,
           auth,
         ]),
       },
@@ -355,25 +354,25 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     const first = simulatePasskey();
     const second = simulatePasskey();
     await stack.store.register(identityId, first.qx, first.qy, registrationAssertion(first, identityId));
-    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
+    const authId4 = freshAuthId();
+    const addDigest = await stack.store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress, authId4);
     await stack.store.addMethod(
       identityId,
       METHOD_WEBAUTHN,
       second.qx,
       second.qy,
-      ZeroAddress,
-      identityPasskeyBlob({ identityId, key: first, message: addDigest })
-    );
+      ZeroAddress, authId4, identityPasskeyBlob({ identityId, key: first, message: addDigest }));
     const { walletAddress } = await createWallet(stack, identityId);
     const secondId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
-    const removeDigest = await stack.store.hashRemoveMethod(identityId, secondId);
+    const authId5 = freshAuthId();
+    const removeDigest = await stack.store.hashRemoveMethod(identityId, secondId, authId5);
     const auth = identityPasskeyBlob({ identityId, key: first, message: removeDigest });
     const storeIface = stack.store.interface;
     const callData = encodeExecuteCallData([
       {
         target: stack.storeAddress,
         value: 0n,
-        data: storeIface.encodeFunctionData("removeMethod", [identityId, secondId, auth]),
+        data: storeIface.encodeFunctionData("removeMethod", [identityId, secondId, authId5, auth]),
       },
     ]);
     const nonce = await stack.entryPoint.getNonce(walletAddress, 0);

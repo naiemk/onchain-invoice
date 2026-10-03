@@ -4,8 +4,8 @@ import type { IdentityConfig } from "./config.js";
 
 const STORE_ABI = [
   "function register(bytes32 identityId, bytes32 qx, bytes32 qy, bytes assertion)",
-  "function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes authorization)",
-  "function removeMethod(bytes32 identityId, bytes32 methodId, bytes authorization)",
+  "function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes32 authId, bytes authorization)",
+  "function removeMethod(bytes32 identityId, bytes32 methodId, bytes32 authId, bytes authorization)",
   "function restoreAddMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
   "function initiateRestore(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa)",
   "function executeRestore(bytes32 identityId)",
@@ -127,10 +127,14 @@ export async function addIdentityMethodOnChain(
     qy: string;
     eoa?: string;
     authorization: string;
+    authId: string;
   }
 ): Promise<boolean> {
   const ctx = signerFor(config);
   if (!ctx) return false;
+  if (!input.authId) {
+    throw Object.assign(new Error("auth_id_required"), { code: "auth_id_required" });
+  }
   const store = new Contract(config.storeAddress!, STORE_ABI, ctx.wallet);
   const tx = await store.addMethod(
     input.identityId,
@@ -138,6 +142,7 @@ export async function addIdentityMethodOnChain(
     input.qx,
     input.qy,
     input.eoa && input.eoa !== ZeroAddress ? getAddress(input.eoa) : ZeroAddress,
+    input.authId,
     input.authorization
   );
   await tx.wait();
@@ -146,12 +151,15 @@ export async function addIdentityMethodOnChain(
 
 export async function removeIdentityMethodOnChain(
   config: IdentityConfig,
-  input: { identityId: string; methodId: string; authorization: string }
+  input: { identityId: string; methodId: string; authorization: string; authId: string }
 ): Promise<boolean> {
   const ctx = signerFor(config);
   if (!ctx) return false;
+  if (!input.authId) {
+    throw Object.assign(new Error("auth_id_required"), { code: "auth_id_required" });
+  }
   const store = new Contract(config.storeAddress!, STORE_ABI, ctx.wallet);
-  const tx = await store.removeMethod(input.identityId, input.methodId, input.authorization);
+  const tx = await store.removeMethod(input.identityId, input.methodId, input.authId, input.authorization);
   await tx.wait();
   return true;
 }
