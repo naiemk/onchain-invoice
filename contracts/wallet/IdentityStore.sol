@@ -35,7 +35,9 @@ contract IdentityStore is Ownable, IdentityErrors {
     }
 
     address public recoveryOperator;
-    uint64 public restoreDelay;
+    uint64 public immutable restoreDelay;
+    address public scheduledRecoveryOperator;
+    uint64 public recoveryOperatorExecuteAfter;
 
     mapping(bytes32 identityId => IdentityTypes.Identity) private _identities;
     mapping(bytes32 methodId => IdentityTypes.Method) private _methods;
@@ -51,21 +53,32 @@ contract IdentityStore is Ownable, IdentityErrors {
     event RestoreCancelled(bytes32 indexed identityId);
     event MethodRestored(bytes32 indexed identityId, bytes32 indexed methodId, uint8 kind);
     event RecoveryOperatorUpdated(address indexed recoveryOperator);
-    event RestoreDelayUpdated(uint64 restoreDelay);
+    event RecoveryOperatorScheduled(address indexed next, uint64 executeAfter);
 
     constructor(address recoveryOperator_, address initialOwner) Ownable(initialOwner) {
+        if (recoveryOperator_ == address(0)) revert ZeroAddress();
         recoveryOperator = recoveryOperator_;
+        restoreDelay = 259200;
         emit RecoveryOperatorUpdated(recoveryOperator_);
     }
 
-    function setRecoveryOperator(address recoveryOperator_) external onlyOwner {
-        recoveryOperator = recoveryOperator_;
-        emit RecoveryOperatorUpdated(recoveryOperator_);
+    /// @notice Start a three-day wait before `next` becomes the recovery operator. A later schedule starts the wait over.
+    function scheduleRecoveryOperator(address next) external onlyOwner {
+        if (next == address(0)) revert ZeroAddress();
+        scheduledRecoveryOperator = next;
+        recoveryOperatorExecuteAfter = uint64(block.timestamp) + restoreDelay;
+        emit RecoveryOperatorScheduled(next, recoveryOperatorExecuteAfter);
     }
 
-    function setRestoreDelay(uint64 restoreDelay_) external onlyOwner {
-        restoreDelay = restoreDelay_;
-        emit RestoreDelayUpdated(restoreDelay_);
+    /// @notice Anyone may apply a scheduled operator after the wait, then the schedule is cleared.
+    function executeRecoveryOperator() external {
+        address next = scheduledRecoveryOperator;
+        if (next == address(0)) revert RecoveryOperatorNotScheduled();
+        if (block.timestamp < recoveryOperatorExecuteAfter) revert RecoveryOperatorNotReady();
+        recoveryOperator = next;
+        scheduledRecoveryOperator = address(0);
+        recoveryOperatorExecuteAfter = 0;
+        emit RecoveryOperatorUpdated(next);
     }
 
     function domainSeparator() public view returns (bytes32) {
@@ -239,7 +252,7 @@ contract IdentityStore is Ownable, IdentityErrors {
         _disableRestore(identityId);
     }
 
-    /// @notice Email-recovery path: operator starts (and, if delay is 0, finishes) adding a method.
+    /// @notice Operator starts a restore. The new method is added later by `executeRestore`.
     function restoreAddMethod(
         bytes32 identityId,
         uint8 kind,
@@ -248,12 +261,9 @@ contract IdentityStore is Ownable, IdentityErrors {
         address eoa
     ) external {
         _initiateRestore(identityId, kind, qx, qy, eoa);
-        if (restoreDelay == 0) {
-            _executeRestore(identityId);
-        }
     }
 
-    /// @notice Operator starts a delayed restore. Same as restoreAddMethod when delay is 0 after executeRestore.
+    /// @notice Operator starts a delayed restore.
     function initiateRestore(
         bytes32 identityId,
         uint8 kind,

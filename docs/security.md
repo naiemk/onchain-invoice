@@ -26,7 +26,7 @@ New hosted `/wallet` users use **IdentityWallet** + **IdentityStore** (not `Wall
 
 - Spend: EntryPoint v0.9 UserOp → `IdentityStore.verify` must return the wallet’s `identityId`
 - Methods: WebAuthn, YubiKey, EOA on the identity. `disableRestore` is permanent. Any current method can turn it off once the identity has two methods, either by a direct call from an EOA on the identity or by a signature over `DisableRestore(identityId)`. That signature is not the signup assertion.
-- Email OTP starts a recovery **request** only; on-chain restore is `recoveryOperator` (`initiateRestore` → delay → `executeRestore`). Operator is a reco 2-of-3 Super Wallet (operator infrastructure; user Super remains beta)
+- Email OTP starts a recovery **request** only; on-chain restore is `recoveryOperator` (`initiateRestore` → three days → `executeRestore`). Operator is a reco 2-of-3 Super Wallet (operator infrastructure; user Super remains beta). The worker keeps using the current `recoveryOperator` until a scheduled change is executed; the store rejects anyone else. Scheduling another operator, including replacing a schedule that is already waiting, starts a new three-day wait.
 - Existing methods can `cancelRestore` during the delay and can `addMethod` even after `disableRestore`
 - Counterfactual address salt: `keccak256(abi.encode("TC-IDENTITY-WALLET-V1", identityId, index))`. The factory derives that salt from the identity id and index. The API assigns `index` from the wallets it already created for that identity and does not adopt clones at other indexes as the receive address.
 - `IDENTITY_RESTORE_ENABLED` is a test override of on-chain `restoreEnabled`; do not set it on mainnet

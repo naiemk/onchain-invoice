@@ -342,11 +342,6 @@ export class WalletDeployerWorker {
         }
         const tx = await store.initiateRestore(account.identityId, 0, job.newQx, job.newQy, ZeroAddress);
         const receipt = await tx.wait();
-        const delay = Number(await store.restoreDelay());
-        if (delay === 0) {
-          const exec = await store.executeRestore(account.identityId);
-          await exec.wait();
-        }
         await this.trackRecoveryJob({
           id: job.id,
           status: "included",

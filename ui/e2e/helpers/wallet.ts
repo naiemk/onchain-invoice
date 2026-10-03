@@ -421,9 +421,15 @@ export async function setStoreRecoveryOperator(superAddress: string, stack?: Loc
   if (!env.storeAddress) throw new Error("local stack missing IdentityStore address");
   const provider = new JsonRpcProvider(env.rpcUrl);
   const owner = new Wallet(env.ownerKey, provider);
-  const store = new Contract(env.storeAddress, ["function setRecoveryOperator(address)"], owner);
-  const tx = await store.setRecoveryOperator(superAddress);
+  const store = new Contract(
+    env.storeAddress,
+    ["function scheduleRecoveryOperator(address next)", "function executeRecoveryOperator()"],
+    owner
+  );
+  const tx = await store.scheduleRecoveryOperator(superAddress);
   await tx.wait();
+  await increaseChainTime(259201, env);
+  await (await store.executeRecoveryOperator()).wait();
 }
 
 export async function increaseChainTime(seconds: number, stack?: LocalStack): Promise<void> {
@@ -498,7 +504,7 @@ export async function waitForRestoreCompleted(walletAddress: string, timeoutMs =
   const deadline = Date.now() + timeoutMs;
   let last = "unfetched";
   while (Date.now() < deadline) {
-    await increaseChainTime(2, stack).catch(() => undefined);
+    await increaseChainTime(259201, stack).catch(() => undefined);
     await triggerWorker("deployer", stack).catch(() => undefined);
     const res = await fetch(`${apiBase()}/api/wallet/recovery?wallet=${encodeURIComponent(walletAddress)}`);
     if (res.ok) {

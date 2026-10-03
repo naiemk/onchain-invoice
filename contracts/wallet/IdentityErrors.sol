@@ -21,6 +21,8 @@ abstract contract IdentityErrors {
     error RestoreAlreadyDisabled();
     error NotRecoveryOperator();
     error RestoreOperatorUnset();
+    error RecoveryOperatorNotScheduled();
+    error RecoveryOperatorNotReady();
     error RestorePending();
     error RestoreNotPending();
     error RestoreNotReady();

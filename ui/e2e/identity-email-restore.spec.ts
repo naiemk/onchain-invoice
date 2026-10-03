@@ -79,7 +79,7 @@ test.describe.serial("identity email restore", () => {
     await alice.page.getByTestId("confirm-cancel-restore").click();
     await expect(alice.page.getByText(/Recovery cancelled/i)).toBeVisible({ timeout: 30_000 });
     await withWorkerTicks(["deployer"], async () => {
-      await increaseChainTime(2);
+      await increaseChainTime(259201);
       await expect.poll(async () => {
         const res = await fetch(`${apiBase()}/api/wallet/recovery?wallet=${encodeURIComponent(created.address)}`);
         const body = (await res.json()) as { pendingOwner?: { active?: boolean } | null; request?: { status?: string } | null };

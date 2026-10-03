@@ -407,7 +407,6 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
 
   it("super wallet 2-of-3 initiates a delayed identity restore", async function () {
     const stack = await deployIdentityStack();
-    await stack.store.setRestoreDelay(1);
     const alice = randomIdentityId();
     const reco1 = randomIdentityId();
     const reco2 = randomIdentityId();
@@ -426,7 +425,10 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     await stack.ethers.provider.send("hardhat_setBalance", [walletAddress, "0x1000000000000000000"]);
     const self = await stack.ethers.getSigner(walletAddress);
     await wallet.connect(self).enableSuper([reco2, reco3], 2);
-    await stack.store.setRecoveryOperator(walletAddress);
+    await stack.store.scheduleRecoveryOperator(walletAddress);
+    await stack.ethers.provider.send("evm_increaseTime", [259201]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await stack.store.executeRecoveryOperator();
 
     const callData = encodeExecuteCallData([
       {
@@ -456,7 +458,7 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     await stack.entryPoint.handleOps([userOpToTuple(userOp)], stack.owner.address);
     expect((await stack.store.pendingRestores(alice)).active).to.equal(true);
     await expectRevert(stack.store.executeRestore.staticCall(alice), "RestoreNotReady");
-    await stack.ethers.provider.send("evm_increaseTime", [2]);
+    await stack.ethers.provider.send("evm_increaseTime", [259201]);
     await stack.ethers.provider.send("evm_mine", []);
     await stack.store.executeRestore(alice);
     const login = keccak256(toUtf8Bytes("alice-restored"));

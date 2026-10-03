@@ -172,12 +172,6 @@ export async function restoreIdentityMethodOnChain(
   if (!ctx) return false;
   const store = new Contract(config.storeAddress!, STORE_ABI, ctx.wallet);
   const eoa = input.eoa && input.eoa !== ZeroAddress ? getAddress(input.eoa) : ZeroAddress;
-  const delay = Number(await store.restoreDelay());
-  if (delay === 0) {
-    const tx = await store.restoreAddMethod(input.identityId, input.kind, input.qx, input.qy, eoa);
-    await tx.wait();
-    return true;
-  }
   const tx = await store.initiateRestore(input.identityId, input.kind, input.qx, input.qy, eoa);
   await tx.wait();
   return true;

@@ -12,19 +12,18 @@ async function main() {
   const { ethers, networkName } = connection as typeof connection & { networkName?: string };
   const [deployer] = await ethers.getSigners();
 
-  const recoveryOperator = envOptional("IDENTITY_RECOVERY_OPERATOR", deployer.address);
-  const restoreDelay = BigInt(envOptional("IDENTITY_RESTORE_DELAY", "259200"));
+  const recoveryOperator = envOptional("IDENTITY_RECOVERY_OPERATOR");
+  if (!recoveryOperator) {
+    throw new Error("IDENTITY_RECOVERY_OPERATOR is required");
+  }
 
   console.error(`Deploying identity wallet stack on network=${networkName ?? "default"} as ${deployer.address}`);
-  console.error(`recoveryOperator=${recoveryOperator} restoreDelay=${restoreDelay}`);
+  console.error(`recoveryOperator=${recoveryOperator}`);
 
   const Store = await ethers.getContractFactory("IdentityStore");
   const store = await Store.deploy(recoveryOperator, deployer.address);
   await store.waitForDeployment();
-  if (restoreDelay > 0n) {
-    const tx = await store.setRestoreDelay(restoreDelay);
-    await tx.wait();
-  }
+  const restoreDelay = (await store.restoreDelay()) as bigint;
 
   const Impl = await ethers.getContractFactory("IdentityWallet");
   const impl = await Impl.deploy();

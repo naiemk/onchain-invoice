@@ -244,7 +244,7 @@ describe("Identity wallet audit", function () {
 
   it("a cancel signature covers only the pending restore it names", async function () {
     const stack = await deployAuditStack();
-    await stack.store.setRestoreDelay(3);
+    expect(await stack.store.restoreDelay()).to.equal(259200n);
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const first = simulatePasskey();
@@ -268,7 +268,7 @@ describe("Identity wallet audit", function () {
     expect((await stack.store.pendingRestores(identityId)).active).to.equal(false);
 
     await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
-    await stack.ethers.provider.send("evm_increaseTime", [4]);
+    await stack.ethers.provider.send("evm_increaseTime", [259201]);
     await stack.ethers.provider.send("evm_mine", []);
     await expectRevert(stack.store.cancelRestore.staticCall(identityId, firstAuth), "InvalidSignature");
     await stack.store.executeRestore(identityId);
@@ -280,7 +280,7 @@ describe("Identity wallet audit", function () {
 
   it("a restore does not start for a key already on the identity, and execute clears one that arrives during the delay", async function () {
     const stack = await deployAuditStack();
-    await stack.store.setRestoreDelay(2);
+    expect(await stack.store.restoreDelay()).to.equal(259200n);
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const replacement = simulatePasskey();
@@ -311,7 +311,7 @@ describe("Identity wallet audit", function () {
       identityPasskeyBlob({ identityId, key: passkey, message: addDigest })
     );
     await expectRevert(stack.store.executeRestore.staticCall(identityId), "RestoreNotReady");
-    await stack.ethers.provider.send("evm_increaseTime", [3]);
+    await stack.ethers.provider.send("evm_increaseTime", [259201]);
     await stack.ethers.provider.send("evm_mine", []);
     await stack.store.executeRestore(identityId);
     expect((await stack.store.pendingRestores(identityId)).active).to.equal(false);
@@ -383,35 +383,47 @@ describe("Identity wallet audit", function () {
     );
   });
 
-  it("AUD-06 restoreDelay defaults to 0 and the owner can set it back to 0", async function () {
+  it("the restore delay is three days and an operator change waits three days", async function () {
     const stack = await deployAuditStack();
-    expect(await stack.store.restoreDelay()).to.equal(0n);
-    await stack.store.setRecoveryOperator(stack.eoa.address);
+    expect(await stack.store.restoreDelay()).to.equal(259200n);
+    const Store = await stack.ethers.getContractFactory("IdentityStore");
+    await expectRevert(Store.deploy(ZeroAddress, stack.owner.address), "ZeroAddress");
+    await expectRevert(stack.store.scheduleRecoveryOperator.staticCall(ZeroAddress), "ZeroAddress");
     await expectRevert(
-      stack.store.restoreAddMethod.staticCall(randomIdentityId(), METHOD_WEBAUTHN, zeroPadValue("0x11", 32), zeroPadValue("0x22", 32), ZeroAddress),
-      "NotRecoveryOperator"
+      stack.store.connect(stack.eoa).scheduleRecoveryOperator.staticCall(stack.eoa.address),
+      "OwnableUnauthorizedAccount"
     );
-    await stack.store.connect(stack.owner).setRecoveryOperator(stack.owner.address);
+
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const injected = simulatePasskey();
     await stack.store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));
     await stack.store.restoreAddMethod(identityId, METHOD_WEBAUTHN, injected.qx, injected.qy, ZeroAddress);
-    const login = keccak256(toUtf8Bytes("instant"));
+    const login = keccak256(toUtf8Bytes("not-yet"));
     expect(
       await stack.store.verify(login, identityPasskeyBlob({ identityId, key: injected, message: login }))
-    ).to.equal(identityId);
+    ).to.equal(ZeroHash);
+    expect((await stack.store.pendingRestores(identityId)).active).to.equal(true);
 
-    const otherId = randomIdentityId();
-    const other = simulatePasskey();
-    const later = simulatePasskey();
-    await stack.store.register(otherId, other.qx, other.qy, registrationAssertion(other, otherId));
-    await stack.store.setRestoreDelay(259200);
-    await stack.store.setRestoreDelay(0);
-    await stack.store.restoreAddMethod(otherId, METHOD_WEBAUTHN, later.qx, later.qy, ZeroAddress);
-    expect(
-      await stack.store.verify(login, identityPasskeyBlob({ identityId: otherId, key: later, message: login }))
-    ).to.equal(otherId);
+    await stack.store.scheduleRecoveryOperator(stack.eoa.address);
+    const firstDeadline = await stack.store.recoveryOperatorExecuteAfter();
+    await stack.ethers.provider.send("evm_increaseTime", [1000]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await stack.store.scheduleRecoveryOperator(stack.eoa.address);
+    const secondDeadline = await stack.store.recoveryOperatorExecuteAfter();
+    const now = Number((await stack.ethers.provider.getBlock("latest")).timestamp);
+    expect(secondDeadline).to.equal(BigInt(now) + 259200n);
+    expect(secondDeadline).to.be.gt(firstDeadline);
+    await expectRevert(stack.store.executeRecoveryOperator.staticCall(), "RecoveryOperatorNotReady");
+    await stack.ethers.provider.send("evm_increaseTime", [259201]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await stack.store.connect(stack.eoa).executeRecoveryOperator();
+    expect(await stack.store.recoveryOperator()).to.equal(stack.eoa.address);
+    expect(await stack.store.scheduledRecoveryOperator()).to.equal(ZeroAddress);
+    await expectRevert(
+      stack.store.restoreAddMethod.staticCall(identityId, METHOD_WEBAUTHN, injected.qx, injected.qy, ZeroAddress),
+      "NotRecoveryOperator"
+    );
   });
 
   it("a YubiKey on the identity can turn restore off", async function () {
@@ -451,7 +463,6 @@ describe("Identity wallet audit", function () {
 
   it("two of three operator identities can install a spend method after the delay", async function () {
     const stack = await deployAuditStack();
-    await stack.store.setRestoreDelay(1);
     const alice = randomIdentityId();
     const reco1 = randomIdentityId();
     const reco2 = randomIdentityId();
@@ -472,7 +483,10 @@ describe("Identity wallet audit", function () {
     await stack.ethers.provider.send("hardhat_setBalance", [operator.walletAddress, "0x1000000000000000000"]);
     const self = await stack.ethers.getSigner(operator.walletAddress);
     await operator.wallet.connect(self).enableSuper([reco2, reco3], 2);
-    await stack.store.setRecoveryOperator(operator.walletAddress);
+    await stack.store.scheduleRecoveryOperator(operator.walletAddress);
+    await stack.ethers.provider.send("evm_increaseTime", [259201]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await stack.store.executeRecoveryOperator();
     await expectRevert(
       stack.store.initiateRestore.staticCall(alice, METHOD_WEBAUTHN, injected.qx, injected.qy, ZeroAddress),
       "NotRecoveryOperator"
@@ -580,7 +594,7 @@ describe("Identity wallet audit", function () {
       ],
       stack.owner.address
     );
-    await stack.ethers.provider.send("evm_increaseTime", [2]);
+    await stack.ethers.provider.send("evm_increaseTime", [259201]);
     await stack.ethers.provider.send("evm_mine", []);
     await stack.store.executeRestore(alice);
     const marked = await sendPing(stack, aliceWallet.walletAddress, alice, injected, "operator-installed");

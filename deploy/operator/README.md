@@ -48,7 +48,7 @@ Copy addresses into API / nodes env:
 3. Fill sweeper `.env` / YAML; set `SWEEPER_CHAINS=8453,56,tron` and `TRON_CHAIN_ID=tron`; register the sweeper.
 4. Build/serve UI with `VITE_DEPLOYMENT_MODE=mainnet` (or a hostname without `testnet.`).
 5. Smoke: `npm run mainnet:invoice-smoke` (bytecode + health). Then create invoice per chain → pay a small amount → confirm sweep (needs VPS keys).
-6. Identity wallets: `npm run wallet:deploy:base` with a funded Base key, copy `IDENTITY_STORE_ADDRESS` / `WALLET_FACTORY_ADDRESS` into tcmain API + nodes env, fund bundler + wallet-deployer, set `recoveryOperator` to the reco 2-of-3 Super Wallet.
+6. Identity wallets: `npm run wallet:deploy:base` with a funded Base key and `IDENTITY_RECOVERY_OPERATOR` set to the reco 2-of-3 Super Wallet. Copy `IDENTITY_STORE_ADDRESS` / `WALLET_FACTORY_ADDRESS` into tcmain API + nodes env, and fund the bundler + wallet-deployer. The worker keeps using the current on-chain `recoveryOperator` until `executeRecoveryOperator` runs; the store rejects anyone else. A replacement schedule waits three days from the latest schedule.
 
 Out of scope for the prep PR: live CREATE2, committing real mainnet addresses, Solana mainnet, Ethereum/Arbitrum settlement.
 

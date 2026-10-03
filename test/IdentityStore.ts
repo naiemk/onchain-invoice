@@ -233,7 +233,7 @@ describe("IdentityStore", function () {
   });
 
   it("restoreAddMethod works while restore is on and is blocked after disable", async function () {
-    const { store, owner, eoa, other } = await deployStore();
+    const { ethers, store, owner, eoa, other } = await deployStore();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const recovered = simulatePasskey();
@@ -242,6 +242,13 @@ describe("IdentityStore", function () {
 
     await store.restoreAddMethod(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
     const login = keccak256(toUtf8Bytes("recovered-device"));
+    expect(
+      await store.verify(login, identityPasskeyBlob({ identityId, key: recovered, message: login }))
+    ).to.equal(zeroPadValue("0x00", 32));
+    expect((await store.pendingRestores(identityId)).active).to.equal(true);
+    await ethers.provider.send("evm_increaseTime", [259201]);
+    await ethers.provider.send("evm_mine", []);
+    await store.executeRestore(identityId);
     expect(
       await store.verify(login, identityPasskeyBlob({ identityId, key: recovered, message: login }))
     ).to.equal(identityId);
@@ -268,16 +275,10 @@ describe("IdentityStore", function () {
     expect(owner.address).to.be.a("string");
   });
 
-  it("unsets the recovery operator and rejects restore", async function () {
+  it("rejects a recovery operator of the zero address", async function () {
     const { store, owner } = await deployStore();
-    await store.connect(owner).setRecoveryOperator(ZeroAddress);
-    const identityId = randomIdentityId();
-    const pk = simulatePasskey();
-    await store.register(identityId, pk.qx, pk.qy, registrationAssertion(pk, identityId));
-    await expectRevert(
-      store.restoreAddMethod.staticCall(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress),
-      "RestoreOperatorUnset"
-    );
+    await expectRevert(store.connect(owner).scheduleRecoveryOperator.staticCall(ZeroAddress), "ZeroAddress");
+    expect(await store.recoveryOperator()).to.equal(owner.address);
   });
 
   it("addMethodByEoa pays gas without a bundler", async function () {
@@ -522,8 +523,7 @@ describe("IdentityStore", function () {
   });
 
   it("delayed restore: initiate, too-early execute, cancel with old key, then execute after delay", async function () {
-    const { ethers, store, owner, storeAddress, chainId } = await deployStore();
-    await store.connect(owner).setRestoreDelay(2);
+    const { ethers, store, storeAddress, chainId } = await deployStore();
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     const recovered = simulatePasskey();
@@ -558,7 +558,7 @@ describe("IdentityStore", function () {
     const secondDigest = await store.hashCancelRestore(identityId);
     expect(secondPending.restoreNonce).to.equal(2n);
     expect(secondDigest).to.not.equal(cancelDigest);
-    await ethers.provider.send("evm_increaseTime", [3]);
+    await ethers.provider.send("evm_increaseTime", [259201]);
     await ethers.provider.send("evm_mine", []);
     await store.executeRestore(identityId);
     const login = keccak256(toUtf8Bytes("delayed-restore"));
@@ -569,7 +569,6 @@ describe("IdentityStore", function () {
 
   it("disableRestore clears a pending restore and blocks execute", async function () {
     const { store, eoa } = await deployStore();
-    await store.setRestoreDelay(60);
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId));

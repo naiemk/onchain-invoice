@@ -143,7 +143,6 @@ export async function deployPersistRecoveryStack(ethers: {
   const Store = await ethers.getContractFactory("IdentityStore");
   const store = await Store.deploy(await owner.getAddress(), await owner.getAddress());
   await store.waitForDeployment?.();
-  await store.setRestoreDelay(1);
   const Factory = await ethers.getContractFactory("IdentityWalletFactory");
   const factory = await Factory.deploy(
     await walletImpl.getAddress(),
