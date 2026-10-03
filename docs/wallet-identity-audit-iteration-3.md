@@ -11,7 +11,7 @@ Iteration 2 closed AUD-01 through AUD-10 inside the product's design. A second l
 | AUD-13 | Yes | Disable is permissionless once the user has signed. The signup assertion is already public. A relayer policy cannot stop a caller from replaying it. The typehash is the authorization check. |
 | AUD-14 | Yes, one assignment | The timelock's promise is that a new operator waits 259200 seconds. A second schedule that keeps the old deadline breaks that promise for the holder of the owner key, which is the key the timelock exists for. Checking that the new operator is a 2-of-3 wallet stays off chain. |
 
-Contract work from this pass is AUD-12, AUD-13, and the deadline reset in AUD-14. AUD-11 is withdrawn as a contract change.
+Contract work from this pass is AUD-12, AUD-13, the deadline reset in AUD-14, and one branch in `executeRestore` for a pending key that is already on the identity. `replaceRestore` is not a contract change.
 
 ## What stays cheap
 
