@@ -1,6 +1,9 @@
 import { expect } from "chai";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { network } from "hardhat";
-import { ZeroAddress, keccak256, toUtf8Bytes, zeroPadValue } from "ethers";
+import { Wallet, ZeroAddress, keccak256, toUtf8Bytes, zeroPadValue } from "ethers";
+import { registerIdentityOnChain } from "../commerce/server/identity-onchain.js";
+import type { IdentityConfig } from "../commerce/server/config.js";
 import {
   METHOD_EOA,
   METHOD_WEBAUTHN,
@@ -25,6 +28,61 @@ import {
 } from "./helpers/identity-signing.js";
 
 const HARDHAT_KEY1 = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
+
+async function exposeRpc(
+  send: (method: string, params: unknown[]) => Promise<unknown>
+): Promise<{ url: string; close: () => Promise<void> }> {
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    const payload = JSON.parse(Buffer.concat(chunks).toString() || "{}") as
+      | { id?: number; method: string; params?: unknown[] }
+      | { id?: number; method: string; params?: unknown[] }[];
+    const items = Array.isArray(payload) ? payload : [payload];
+    const results = [];
+    for (const body of items) {
+      try {
+        const result = await send(body.method, body.params ?? []);
+        results.push({ jsonrpc: "2.0", id: body.id ?? null, result });
+      } catch (err) {
+        results.push({
+          jsonrpc: "2.0",
+          id: body.id ?? null,
+          error: { code: -32000, message: err instanceof Error ? err.message : String(err) },
+        });
+      }
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(Array.isArray(payload) ? results : results[0]));
+  }
+  const server = createServer((req, res) => {
+    void handle(req, res);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("expected a TCP port");
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
+  };
+}
+
+function signerConfig(rpcUrl: string, storeAddress: string): IdentityConfig {
+  return {
+    sessionSecret: "identity-register-test",
+    googleAuthUrl: "http://127.0.0.1",
+    googleTokenUrl: "http://127.0.0.1",
+    skipIdTokenVerify: true,
+    successRedirect: "http://127.0.0.1",
+    devOtp: false,
+    rpcUrl,
+    deployerPrivateKey: HARDHAT_KEY1,
+    storeAddress,
+  };
+}
 
 async function deployStore() {
   const { ethers } = (await network.create()) as Awaited<ReturnType<typeof network.create>> & { ethers: any };
@@ -593,5 +651,52 @@ describe("IdentityStore", function () {
       store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress),
       "RestoreIsDisabled"
     );
+  });
+
+  it("an existing on-chain identity succeeds only when the passkey matches", async function () {
+    const { ethers, store } = await deployStore();
+    const deployer = new Wallet(HARDHAT_KEY1);
+    await ethers.provider.send("hardhat_setBalance", [deployer.address, "0x1000000000000000000"]);
+    const rpc = await exposeRpc((method, params) => ethers.provider.send(method, params));
+    try {
+      const config = signerConfig(rpc.url, await store.getAddress());
+      const identityId = randomIdentityId();
+      const passkey = simulatePasskey();
+      const other = simulatePasskey();
+      expect(
+        await registerIdentityOnChain(config, identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId))
+      ).to.equal(true);
+      expect(
+        await registerIdentityOnChain(config, identityId, passkey.qx, passkey.qy, registrationAssertion(passkey, identityId))
+      ).to.equal(true);
+      const stored = await store.getMethod(
+        computeIdentityMethodId(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress)
+      );
+      expect(stored.exists).to.equal(true);
+      let mismatch: unknown;
+      try {
+        await registerIdentityOnChain(config, identityId, other.qx, other.qy, registrationAssertion(other, identityId));
+      } catch (err) {
+        mismatch = err;
+      }
+      expect((mismatch as { code?: string } | undefined)?.code).to.equal("identity_key_mismatch");
+      expect(
+        (
+          await store.getMethod(
+            computeIdentityMethodId(identityId, METHOD_WEBAUTHN, other.qx, other.qy, ZeroAddress)
+          )
+        ).exists
+      ).to.equal(false);
+      const unread = await registerIdentityOnChain(
+        { ...config, rpcUrl: undefined, deployerPrivateKey: undefined, storeAddress: undefined },
+        identityId,
+        other.qx,
+        other.qy,
+        registrationAssertion(other, identityId)
+      );
+      expect(unread).to.equal(false);
+    } finally {
+      await rpc.close();
+    }
   });
 });

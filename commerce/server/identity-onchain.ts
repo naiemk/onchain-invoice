@@ -1,4 +1,5 @@
 import { Contract, JsonRpcProvider, Wallet, ZeroAddress, getAddress } from "ethers";
+import { METHOD_WEBAUTHN, computeIdentityMethodId } from "../shared/identity-store.js";
 import { identityWalletIndexForSalt } from "../shared/wallet-address.js";
 import type { IdentityConfig } from "./config.js";
 
@@ -98,6 +99,44 @@ export function identitySignerConfigured(config: IdentityConfig): boolean {
   return Boolean(config.rpcUrl && config.deployerPrivateKey && config.storeAddress);
 }
 
+export type RegisteredPasskeyState = "absent" | "match" | "mismatch";
+
+function sameWord(left: string, right: string): boolean {
+  return left.toLowerCase() === right.toLowerCase();
+}
+
+/** Whether this passkey is the WebAuthn method stored for an identity that is already on chain. */
+export async function readRegisteredPasskey(
+  config: IdentityConfig,
+  identityId: string,
+  qx: string,
+  qy: string
+): Promise<RegisteredPasskeyState | null> {
+  const provider = providerFor(config);
+  if (!provider || !config.storeAddress) return null;
+  const store = new Contract(config.storeAddress, STORE_ABI, provider);
+  const exists = (await store.identityExists(identityId)) as boolean;
+  if (!exists) return "absent";
+  const methodId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, qx, qy, ZeroAddress);
+  const method = (await store.getMethod(methodId)) as {
+    identityId: string;
+    kind: number | bigint;
+    qx: string;
+    qy: string;
+    exists: boolean;
+  };
+  if (
+    method.exists &&
+    sameWord(method.identityId, identityId) &&
+    Number(method.kind) === METHOD_WEBAUTHN &&
+    sameWord(method.qx, qx) &&
+    sameWord(method.qy, qy)
+  ) {
+    return "match";
+  }
+  return "mismatch";
+}
+
 export async function registerIdentityOnChain(
   config: IdentityConfig,
   identityId: string,
@@ -110,9 +149,15 @@ export async function registerIdentityOnChain(
   if (!assertion || assertion === "0x") {
     throw Object.assign(new Error("registration_assertion_required"), { code: "registration_assertion_required" });
   }
+  const state = await readRegisteredPasskey(config, identityId, qx, qy);
+  if (state === "match") return true;
+  if (state === "mismatch") {
+    throw Object.assign(new Error("identity_key_mismatch"), { code: "identity_key_mismatch" });
+  }
+  if (state !== "absent") {
+    throw Object.assign(new Error("identity_store_unreadable"), { code: "identity_store_unreadable" });
+  }
   const store = new Contract(config.storeAddress!, STORE_ABI, ctx.wallet);
-  const exists = (await store.identityExists(identityId)) as boolean;
-  if (exists) return true;
   const tx = await store.register(identityId, qx, qy, assertion);
   await tx.wait();
   return true;
