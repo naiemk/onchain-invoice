@@ -133,6 +133,8 @@ export async function installE2eEoa(
       };
     };
     const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+    let lastAccounts = "";
+    let lastChain = "";
     const emit = (event: string, ...args: unknown[]) => {
       for (const listener of listeners.get(event) ?? []) listener(...args);
     };
@@ -147,10 +149,21 @@ export async function installE2eEoa(
           error.code = failure.code;
           throw error;
         }
-        if (method === "eth_requestAccounts" || method === "eth_accounts") emit("accountsChanged", result);
+        // Emit only when the value changes. Wagmi re-reads accounts and chain
+        // from these events, so echoing every eth_accounts call loops forever.
+        if (method === "eth_requestAccounts" || method === "eth_accounts") {
+          const next = JSON.stringify(result);
+          if (next !== lastAccounts) {
+            lastAccounts = next;
+            emit("accountsChanged", result);
+          }
+        }
         if (method === "wallet_switchEthereumChain") {
-          const hex = (params?.[0] as { chainId?: string } | undefined)?.chainId;
-          if (hex) emit("chainChanged", hex);
+          const hex = (params?.[0] as { chainId?: string } | undefined)?.chainId ?? "";
+          if (hex && hex.toLowerCase() !== lastChain) {
+            lastChain = hex.toLowerCase();
+            emit("chainChanged", hex);
+          }
         }
         return result;
       },
