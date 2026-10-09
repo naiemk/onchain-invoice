@@ -58,6 +58,11 @@ export type CeremonyRequest = {
   userHandleB64?: string;
   allow?: { idB64: string; transports?: string[] }[];
   exclude?: { idB64: string }[];
+  /**
+   * Raw credential id (standard base64) the person picked in the browser sheet.
+   * One match signs without this. Several matches refuse unless it names one of them.
+   */
+  selectedIdB64?: string;
 };
 
 export type CeremonySuccess = {
@@ -165,6 +170,14 @@ function createCredential(
   return success(credential, "create", authenticatorData, clientDataJSON, Buffer.alloc(0));
 }
 
+/** Chrome and Safari steer `security-key` and `client-device` hints to one authenticator. */
+function hintedAttachment(hints: string[] | undefined): AuthenticatorKind | null {
+  const list = hints ?? [];
+  if (list.includes("security-key")) return "cross-platform";
+  if (list.includes("client-device")) return "platform";
+  return null;
+}
+
 function getAssertion(
   store: CeremonyStore,
   request: CeremonyRequest,
@@ -172,7 +185,8 @@ function getAssertion(
   challenge: Buffer
 ): CeremonyResult {
   const allow = request.allow ?? [];
-  const matches =
+  const hinted = hintedAttachment(request.hints);
+  let matches =
     allow.length > 0
       ? store.credentials.filter(
           (credential) =>
@@ -186,10 +200,17 @@ function getAssertion(
           (credential) =>
             credential.rpId === rpId &&
             credential.discoverable &&
-            credential.attachment === ((request.hints ?? []).includes("security-key") ? "cross-platform" : "platform")
+            credential.attachment === (hinted ?? "platform")
         );
-  const credential = matches[matches.length - 1];
-  if (!credential) return fail("NotAllowedError", "The operation either timed out or was not allowed.");
+  if (allow.length > 0 && hinted) {
+    matches = matches.filter((credential) => credential.attachment === hinted);
+  }
+  if (request.selectedIdB64) {
+    const selected = Buffer.from(request.selectedIdB64, "base64");
+    matches = matches.filter((credential) => credential.rawId.equals(selected));
+  }
+  if (matches.length !== 1) return fail("NotAllowedError", "The operation either timed out or was not allowed.");
+  const credential = matches[0]!;
 
   if (credential.attachment === "cross-platform") credential.signCount += 1;
   const uv = userVerified(credential.attachment, request.userVerification);

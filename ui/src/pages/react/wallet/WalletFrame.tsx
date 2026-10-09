@@ -329,7 +329,6 @@ function WalletModeToggle() {
 function useWalletNavLinks(): Array<{ href: string; key: string; label: string }> {
   const { t } = useLocale();
   const { isSuperWallet } = useWalletPolicy();
-  const identity = Boolean(loadWalletSession()?.identityId);
 
   return useMemo(() => {
     const items: Array<{ href: string; key: string; label: string }> = [
@@ -339,14 +338,14 @@ function useWalletNavLinks(): Array<{ href: string; key: string; label: string }
       { href: "/wallet/cash", key: "cash", label: t("wallet.cashTab") },
       { href: "/wallet/security", key: "security", label: t("wallet.securityTab") },
     ];
-    if (isSuperWallet && !identity) {
+    if (isSuperWallet) {
       items.push(
         { href: "/wallet/access", key: "access", label: t("wallet.accessTab") },
         { href: "/wallet/invoices", key: "invoices", label: t("wallet.invoicesTab") }
       );
     }
     return items;
-  }, [t, isSuperWallet, identity]);
+  }, [t, isSuperWallet]);
 }
 
 function WalletNavLinks({ current, onNavigate }: { current: WalletTab; onNavigate?: () => void }) {

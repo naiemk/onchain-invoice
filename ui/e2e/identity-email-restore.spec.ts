@@ -12,6 +12,7 @@ import {
   increaseChainTime,
   loginIdentityFromEmail,
   openDevice,
+  pairGuestDevice,
   setStoreRecoveryOperator,
   signOperatorRestoreFromUi,
   signOut,
@@ -52,16 +53,23 @@ test.describe.serial("identity email restore", () => {
   });
 
   test("unfunded Alice loses her key, 2-of-3 email restore, then logs in", async ({ browser }) => {
+    const stack = await loadLocalStack();
     const alice = await openDevice(browser);
     const created = await createIdentityWalletFromUi(alice.page, "Alice Unfunded");
     await signOut(alice);
     const lost = await openDevice(browser);
     await startEmailRestore(lost.page, created.email);
     await signOperatorRestoreFromUi(reco1);
+    const midway = await recoveryStatus(created.address);
+    expect(midway.request?.status).toBe("awaiting_guardian");
+    expect(midway.pendingOwner?.active ?? false).toBe(false);
     await signOperatorRestoreFromUi(reco2);
     await waitForRestoreCompleted(created.address);
     await loginIdentityFromEmail(lost.page, created.email);
     await expect(lost.page.getByTestId("wallet-switcher")).toBeVisible();
+    await fundUsdc(created.address, 5_000_000n);
+    await waitForDeployed(created.address);
+    await confirmSimpleSend(lost.page, stack.collectorAddress, "1");
     await alice.context.close();
     await lost.context.close();
   });
@@ -87,6 +95,34 @@ test.describe.serial("identity email restore", () => {
       }).toBe(false);
     });
     await alice.context.close();
+    await lost.context.close();
+  });
+
+  test("a paired device cancels a pending restore", async ({ browser }) => {
+    const alice = await openDevice(browser);
+    const created = await createIdentityWalletFromUi(alice.page, "Alice Second Device");
+    await fundUsdc(created.address, 5_000_000n);
+    await waitForDeployed(created.address);
+    const guest = await openDevice(browser);
+    await pairGuestDevice(alice, guest, "Alice Second Phone");
+    const lost = await openDevice(browser);
+    await startEmailRestore(lost.page, created.email);
+    await signOperatorRestoreFromUi(reco1);
+    await signOperatorRestoreFromUi(reco2);
+    await guest.page.goto("/wallet/security");
+    await expect(guest.page.getByTestId("recover-cancel-restore")).toBeVisible({ timeout: 30_000 });
+    await guest.page.getByTestId("recover-cancel-restore").click();
+    await guest.page.getByTestId("confirm-cancel-restore").click();
+    await expect(guest.page.getByText(/Recovery cancelled/i)).toBeVisible({ timeout: 30_000 });
+    await withWorkerTicks(["deployer"], async () => {
+      await increaseChainTime(259201);
+      await expect.poll(async () => {
+        const body = await recoveryStatus(created.address);
+        return Boolean(body.pendingOwner?.active) || body.request?.status === "on_chain";
+      }).toBe(false);
+    });
+    await alice.context.close();
+    await guest.context.close();
     await lost.context.close();
   });
 
@@ -147,6 +183,18 @@ test.describe.serial("identity email restore", () => {
     await context.close();
   });
 });
+
+async function recoveryStatus(address: string): Promise<{
+  request?: { status?: string } | null;
+  pendingOwner?: { active?: boolean } | null;
+}> {
+  const res = await fetch(`${apiBase()}/api/wallet/recovery?wallet=${encodeURIComponent(address)}`);
+  if (!res.ok) throw new Error(`recovery status ${res.status}`);
+  return (await res.json()) as {
+    request?: { status?: string } | null;
+    pendingOwner?: { active?: boolean } | null;
+  };
+}
 
 async function aliceEmailFromSession(host: DeviceSession): Promise<string> {
   return host.page.evaluate(async () => {

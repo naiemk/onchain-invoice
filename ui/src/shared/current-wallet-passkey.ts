@@ -2,7 +2,8 @@ import { ZeroHash } from "ethers";
 import { t } from "../i18n/t.js";
 import { KEY_EOA, KEY_WEBAUTHN, KEY_YUBIKEY } from "../../../commerce/shared/advanced-wallet.js";
 import type { WalletEntityKeyRecord } from "../../../commerce/shared/wallet.js";
-import { signUserOpTypedData } from "./eoa-connector.js";
+import { signIdentityVerifyTypedData } from "./eoa-connector.js";
+import { fetchWalletConfig } from "./wallet-api.js";
 import {
   loadWalletSession,
   saveWalletSessionIfActive,
@@ -156,6 +157,9 @@ export async function resolveCurrentWalletPasskey(
     qy: signer.qy,
     advanced: false,
     identityId,
+    entityId: session.entityId ?? identityId,
+    keyId: session.keyId || signer.methodId,
+    eoa: session.eoa,
     keyType:
       signer.kind === METHOD_YUBIKEY
         ? KEY_YUBIKEY
@@ -197,10 +201,12 @@ export async function signWithCurrentWalletPasskey(
   if (passkey.keyType === KEY_EOA && passkey.eoa) {
     const chainId = BigInt(passkey.chainId || "0");
     if (!chainId) throw new Error(t("wallet.superWalletNoSigningKey"));
-    const inner = await signUserOpTypedData({
-      wallet: passkey.address,
-      userOpHash,
+    const store = (await fetchWalletConfig()).identityStoreAddress;
+    if (!store) throw new Error(t("wallet.removeNeedStore"));
+    const { signature: inner } = await signIdentityVerifyTypedData({
+      store,
       chainId,
+      message: userOpHash,
     });
     const signer = await identitySignerFromSession({
       identityId: passkey.identityId,
@@ -208,6 +214,7 @@ export async function signWithCurrentWalletPasskey(
       qx: passkey.qx,
       qy: passkey.qy,
       keyType: KEY_EOA,
+      eoa: passkey.eoa,
     });
     return encodeIdentityBlob({
       kind: METHOD_EOA,

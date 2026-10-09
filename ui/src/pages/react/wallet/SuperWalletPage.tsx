@@ -32,7 +32,7 @@ import { healWalletSession } from "@/shared/wallet-session-heal.js";
 import { saveWalletMode } from "@/shared/wallet-mode.js";
 import { initEoaConnector } from "@/shared/eoa-connector.js";
 import type { WalletPublicConfig } from "../../../../../commerce/shared/wallet.js";
-import { lookupIdentityEmail } from "@/shared/identity-api.js";
+import { fetchIdentityMe, lookupIdentityEmail } from "@/shared/identity-api.js";
 import { submitEnableSuperUserOp } from "@/shared/identity-recover-userop.js";
 import { WalletFrame } from "./WalletFrame";
 import { useWalletPolicy } from "./wallet-policy";
@@ -181,6 +181,15 @@ export function SuperWalletPage() {
         .split(/[\n,]+/)
         .map((e) => e.trim().toLowerCase())
         .filter((e) => e.includes("@"));
+      const me = await fetchIdentityMe();
+      const ownerId = session.identityId || me?.identityId;
+      if (ownerId) {
+        await registerWalletEntity({
+          walletAddress: session.address,
+          entityId: ownerId,
+          label: me?.email,
+        });
+      }
       const extraIds: string[] = [];
       for (const email of emails) {
         const lookup = await lookupIdentityEmail(email);

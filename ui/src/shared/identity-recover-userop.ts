@@ -28,6 +28,7 @@ import {
 } from "./wallet-api.js";
 import type { WalletSession } from "./wallet-session.js";
 import { formatSendRejectReason } from "./userop-errors.js";
+import { deleteWalletEntityKey, listWalletEntities, registerWalletEntityKey } from "./wallet-advanced-api.js";
 import { t } from "../i18n/t.js";
 
 const STORE_VIEW_ABI = ["function store() view returns (address)"];
@@ -324,6 +325,103 @@ export async function submitPairAddMethodUserOp(input: {
     eoa: input.eoa,
     signUserOp: (userOpHash) => signWithCurrentWalletPasskey(userOpHash, passkey, { path: "add-key" }),
   });
+}
+
+/** Admin (or any signer, when the threshold allows one blob) adds a method another identity already authorized. */
+export async function submitAuthorizedAddMethodUserOp(input: {
+  session: WalletSession;
+  identityId: string;
+  kind: IdentityMethodKind;
+  qx: string;
+  qy: string;
+  eoa?: string;
+  authorization: string;
+  authId: string;
+}): Promise<void> {
+  const passkey = await resolveCurrentWalletPasskey(input.session, "add-key");
+  await submitAddMethodUserOp({
+    identityId: input.identityId,
+    walletAddress: input.session.address,
+    qx: input.qx,
+    qy: input.qy,
+    authorization: input.authorization,
+    authId: input.authId,
+    kind: input.kind,
+    eoa: input.eoa,
+    signUserOp: (userOpHash) => signWithCurrentWalletPasskey(userOpHash, passkey, { path: "add-key" }),
+  });
+}
+
+/** Mirror IdentityStore methods onto the team roster so remove-key uses the on-chain method id. */
+export async function syncIdentityEntityKeys(walletAddress: string, entityIds: string[]): Promise<void> {
+  const store = await resolveIdentityStoreAddress(walletAddress);
+  if (!store || entityIds.length === 0) return;
+  const config = await fetchWalletConfig();
+  const chain = primaryChain(config);
+  if (!chain.rpcUrl) return;
+  const provider = new JsonRpcProvider(chain.rpcUrl);
+  const contract = new Contract(store, STORE_READ_ABI, provider);
+  const roster = await listWalletEntities(walletAddress).catch(() => ({ entities: [], keys: [] }));
+  for (const entityId of entityIds) {
+    let ids: string[] = [];
+    try {
+      ids = (await contract.methodIdsOf(entityId)) as string[];
+    } catch {
+      continue;
+    }
+    const onChain = new Set(ids.map((id) => id.toLowerCase()));
+    for (const key of roster.keys.filter((k) => k.entityId.toLowerCase() === entityId.toLowerCase())) {
+      if (!onChain.has(key.keyId.toLowerCase())) {
+        await deleteWalletEntityKey(walletAddress, entityId, key.keyId).catch(() => undefined);
+      }
+    }
+    for (const id of ids) {
+      if (roster.keys.some((k) => k.keyId.toLowerCase() === id.toLowerCase())) continue;
+      const rec = (await contract.getMethod(id)) as {
+        kind: bigint | number;
+        qx: string;
+        qy: string;
+        eoa: string;
+        exists: boolean;
+      };
+      if (!rec.exists) continue;
+      const kind = Number(rec.kind);
+      await registerWalletEntityKey({
+        walletAddress,
+        entityId,
+        keyId: id,
+        keyType: kind,
+        qx: kind === METHOD_EOA ? ZeroHash : rec.qx,
+        qy: kind === METHOD_EOA ? ZeroHash : rec.qy,
+        eoa: kind === METHOD_EOA ? rec.eoa : null,
+      });
+    }
+  }
+}
+
+/** One identity blob calls this wallet. Valid while the Super Wallet threshold is 1. */
+export async function submitIdentitySelfCall(input: {
+  session: WalletSession;
+  callData: string;
+}): Promise<void> {
+  const passkey = await resolveCurrentWalletPasskey(input.session, "configure");
+  const built = await buildIdentityExecuteUserOp({
+    walletAddress: input.session.address,
+    callData: input.callData,
+  });
+  const signature = await signWithCurrentWalletPasskey(built.userOpHash, passkey, { path: "configure" });
+  const config = await fetchWalletConfig();
+  const chain = primaryChain(config);
+  await submitUserOp({
+    walletAddress: input.session.address,
+    chainId: chain.chainId,
+    userOpHash: built.userOpHash,
+    userOp: { ...built.userOp, signature },
+  });
+  const result = await waitForUserOp(built.userOpHash);
+  if (result.status !== "included") {
+    throw new Error(formatSendRejectReason(result.rejectReason ?? result.status, (key, vars) => t(key as Parameters<typeof t>[0], vars)));
+  }
 }
 
 type IdentityDeviceRef = {

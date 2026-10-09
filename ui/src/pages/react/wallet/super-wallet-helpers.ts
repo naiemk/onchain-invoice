@@ -13,6 +13,8 @@ import type {
 import { buildSignedAddKeyUserOp, buildSignedRemoveEntityUserOp, buildSignedRemoveKeyUserOp } from "@/shared/advanced-userop-client.js";
 import { asAdvancedKeyType } from "@/shared/advanced-signing-key.js";
 import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
+import { signRemoveMethodAuthorization } from "@/shared/identity-sign.js";
+import { resolveIdentityStoreAddress, submitPairRemoveMethodUserOp } from "@/shared/identity-recover-userop.js";
 import { submitSignedUserOp } from "@/shared/userop-client.js";
 import { fetchWalletBalance, getWalletAccount, listDevices, primaryChain, waitForUserOp, type WalletPublicConfig } from "@/shared/wallet-api.js";
 import {
@@ -236,6 +238,24 @@ export async function submitRemoveKey(input: {
   entityId: string;
   keyId: string;
 }): Promise<void> {
+  if (input.session.identityId) {
+    const store = await resolveIdentityStoreAddress(input.session.address);
+    if (!store) throw new Error(t("wallet.removeNeedStore"));
+    const { authorization, authId } = await signRemoveMethodAuthorization({
+      session: input.session,
+      methodId: input.keyId,
+      storeAddress: store,
+    });
+    await submitPairRemoveMethodUserOp({
+      session: input.session,
+      methodId: input.keyId,
+      authorization,
+      authId,
+      storeAddress: store,
+    });
+    await deleteWalletEntityKey(input.session.address, input.entityId, input.keyId);
+    return;
+  }
   const fee = BigInt(input.config.bundlerFeeUsdc || "0");
   const passkey = await resolveCurrentWalletPasskey(input.session, "remove-key");
   const { userOp, userOpHash } = await buildSignedRemoveKeyUserOp({

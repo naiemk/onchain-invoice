@@ -1,4 +1,4 @@
-import { Contract, JsonRpcProvider, ZeroAddress, ZeroHash, zeroPadValue } from "ethers";
+import { Contract, JsonRpcProvider, ZeroAddress, ZeroHash, getAddress, zeroPadValue } from "ethers";
 import type { IdentityMethodKind } from "../../../commerce/shared/identity.js";
 import {
   METHOD_EOA,
@@ -14,7 +14,7 @@ import {
   wrapIdentityMethodSignature,
 } from "../../../commerce/shared/identity-store.js";
 import { t } from "../i18n/t.js";
-import { KEY_YUBIKEY } from "../../../commerce/shared/advanced-wallet.js";
+import { KEY_EOA, KEY_YUBIKEY } from "../../../commerce/shared/advanced-wallet.js";
 import { fetchWalletConfig, primaryChain } from "./wallet-api.js";
 import { signUserOpHash } from "./webauthn.js";
 import type { WalletSession } from "./wallet-session.js";
@@ -48,6 +48,7 @@ export type IdentitySigningSession = {
   qx: string;
   qy: string;
   keyType?: number;
+  eoa?: string;
 };
 
 /**
@@ -63,6 +64,16 @@ export async function identitySignerFromSession(session: IdentitySigningSession)
   credentialId: string;
 }> {
   const identityId = session.identityId;
+  if (session.keyType === KEY_EOA && session.eoa) {
+    const eoa = getAddress(session.eoa);
+    return {
+      kind: METHOD_EOA,
+      methodId: computeIdentityMethodId(identityId, METHOD_EOA, ZeroHash, ZeroHash, eoa),
+      qx: ZeroHash,
+      qy: ZeroHash,
+      credentialId: session.credentialId,
+    };
+  }
   const keys = (await fetchIdentityMe().catch(() => null))?.keys ?? [];
   const row =
     keys.find((k) => k.credentialId && credentialIdsMatch(k.credentialId, session.credentialId)) ??

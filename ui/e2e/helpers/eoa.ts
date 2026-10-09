@@ -1,44 +1,113 @@
-import { JsonRpcProvider, Wallet, getBytes, parseEther } from "ethers";
+import { JsonRpcProvider, Wallet, getBytes, isHexString, parseEther } from "ethers";
 import type { BrowserContext } from "@playwright/test";
 
 export const E2E_EOA_ADDRESS = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
 export const E2E_EOA_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
+export const E2E_CHAIN_ID = 11155111;
 
 export type E2eEoaSession = {
   address: string;
   privateKey: string;
   signedTypes: string[];
+  /** Chain id the shim reported at each typed-data signature. */
+  chainIdsAtSign: number[];
 };
+
+type RpcFailure = { __tcE2eRpcError: true; code: number; message: string };
+
+type TypedPayload = {
+  domain: Record<string, unknown>;
+  types: Record<string, unknown>;
+  primaryType?: string;
+  message: Record<string, unknown>;
+};
+
+function rpcFailure(code: number, message: string): RpcFailure {
+  return { __tcE2eRpcError: true, code, message };
+}
+
+function chainIdHex(chainId: number): string {
+  return `0x${chainId.toString(16)}`;
+}
+
+function readChainId(params?: unknown[]): number | null {
+  const first = params?.[0];
+  const hex =
+    first && typeof first === "object" && "chainId" in first ? String((first as { chainId?: unknown }).chainId ?? "") : "";
+  if (!/^0x[0-9a-fA-F]+$/.test(hex)) return null;
+  const id = Number(hex);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function isAddress(value: string): boolean {
+  return /^0x[0-9a-fA-F]{40}$/.test(value);
+}
+
+/** MetaMask sends `[address, json]` or, on some wallets, the JSON first. */
+function readTypedData(params?: unknown[]): TypedPayload | null {
+  const candidates = [params?.[1], params?.[0]];
+  for (const raw of candidates) {
+    const payload = typeof raw === "string" ? (raw.trim().startsWith("{") ? JSON.parse(raw) : null) : raw;
+    if (!payload || typeof payload !== "object" || !("types" in payload) || !("message" in payload)) continue;
+    return payload as TypedPayload;
+  }
+  return null;
+}
+
+/** MetaMask `personal_sign` is `[message, address]`. Message is hex bytes or UTF-8 text. */
+function readPersonalMessage(params?: unknown[]): string | Uint8Array {
+  const first = String(params?.[0] ?? "");
+  const second = String(params?.[1] ?? "");
+  const raw = isAddress(first) && !isAddress(second) ? second : first;
+  if (isHexString(raw)) return getBytes(raw);
+  return raw;
+}
 
 export async function installE2eEoa(
   context: BrowserContext,
   rpcUrl: string,
-  privateKey = E2E_EOA_KEY
+  privateKey = E2E_EOA_KEY,
+  options: { chainId?: number } = {}
 ): Promise<E2eEoaSession> {
   const provider = new JsonRpcProvider(rpcUrl);
   const wallet = new Wallet(privateKey, provider);
   const signedTypes: string[] = [];
+  const chainIdsAtSign: number[] = [];
+  let chainId = options.chainId ?? E2E_CHAIN_ID;
+  const knownChains = new Set<number>([chainId]);
 
   await context.exposeFunction(
     "tcE2eEoaRequest",
     async (method: string, params?: unknown[]) => {
       if (method === "eth_requestAccounts" || method === "eth_accounts") return [wallet.address];
-      if (method === "eth_chainId") return "0xaa36a7";
-      if (method === "net_version") return "11155111";
-      if (method === "eth_signTypedData_v4") {
-        const raw = params?.[1];
-        const payload = typeof raw === "string" ? JSON.parse(raw) : raw;
-        const types = { ...(payload.types ?? {}) };
+      if (method === "eth_chainId") return chainIdHex(chainId);
+      if (method === "net_version") return String(chainId);
+      if (method === "eth_signTypedData_v4" || method === "eth_signTypedData_v3" || method === "eth_signTypedData") {
+        const payload = readTypedData(params);
+        if (!payload) return rpcFailure(-32602, "Invalid typed data");
+        const types = { ...payload.types };
         delete types.EIP712Domain;
         const primary = String(payload.primaryType ?? "");
         if (primary) signedTypes.push(primary);
+        chainIdsAtSign.push(chainId);
         return wallet.signTypedData(payload.domain, types, payload.message);
       }
-      if (method === "personal_sign") {
-        const hexMsg = String(params?.[0] ?? "0x");
-        return wallet.signMessage(getBytes(hexMsg));
+      if (method === "personal_sign") return wallet.signMessage(readPersonalMessage(params));
+      if (method === "wallet_switchEthereumChain") {
+        const next = readChainId(params);
+        if (next == null) return rpcFailure(-32602, "Expected chainId");
+        if (!knownChains.has(next)) {
+          return rpcFailure(4902, "Unrecognized chain ID. Try adding the chain using wallet_addEthereumChain first.");
+        }
+        chainId = next;
+        return null;
       }
-      if (method === "wallet_switchEthereumChain" || method === "wallet_addEthereumChain") return null;
+      if (method === "wallet_addEthereumChain") {
+        const next = readChainId(params);
+        if (next == null) return rpcFailure(-32602, "Expected chainId");
+        knownChains.add(next);
+        return null;
+      }
       if (method === "eth_sendTransaction") {
         const tx = (params?.[0] ?? {}) as { to?: string; data?: string; value?: string };
         const sent = await wallet.sendTransaction({
@@ -59,18 +128,40 @@ export async function installE2eEoa(
       ethereum?: {
         isMetaMask?: boolean;
         request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-        on: () => void;
-        removeListener: () => void;
+        on: (event: string, listener: (...args: unknown[]) => void) => void;
+        removeListener: (event: string, listener: (...args: unknown[]) => void) => void;
       };
+    };
+    const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+    const emit = (event: string, ...args: unknown[]) => {
+      for (const listener of listeners.get(event) ?? []) listener(...args);
     };
     w.ethereum = {
       isMetaMask: true,
-      request: ({ method, params }) => {
+      request: async ({ method, params }) => {
         if (!w.tcE2eEoaRequest) throw new Error("e2e eoa missing");
-        return w.tcE2eEoaRequest(method, params);
+        const result = await w.tcE2eEoaRequest(method, params);
+        if (result && typeof result === "object" && "__tcE2eRpcError" in result) {
+          const failure = result as { code?: number; message?: string };
+          const error = new Error(failure.message || "wallet request failed") as Error & { code?: number };
+          error.code = failure.code;
+          throw error;
+        }
+        if (method === "eth_requestAccounts" || method === "eth_accounts") emit("accountsChanged", result);
+        if (method === "wallet_switchEthereumChain") {
+          const hex = (params?.[0] as { chainId?: string } | undefined)?.chainId;
+          if (hex) emit("chainChanged", hex);
+        }
+        return result;
       },
-      on: () => undefined,
-      removeListener: () => undefined,
+      on: (event, listener) => {
+        const set = listeners.get(event) ?? new Set();
+        set.add(listener);
+        listeners.set(event, set);
+      },
+      removeListener: (event, listener) => {
+        listeners.get(event)?.delete(listener);
+      },
     };
     const announce = () => {
       window.dispatchEvent(
@@ -91,7 +182,7 @@ export async function installE2eEoa(
     announce();
   });
 
-  return { address: wallet.address, privateKey, signedTypes };
+  return { address: wallet.address, privateKey, signedTypes, chainIdsAtSign };
 }
 
 export async function fundEoaNative(rpcUrl: string, fromKey: string, to: string, amount = parseEther("1")): Promise<void> {

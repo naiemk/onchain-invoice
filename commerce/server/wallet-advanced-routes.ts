@@ -9,6 +9,7 @@ import {
   userOpToTuple,
 } from "../shared/userop.js";
 import { encodeAdvancedSignature, unwrapAdvancedInnerSig } from "../shared/advanced-wallet.js";
+import { encodeSuperIdentityBlobs } from "../shared/identity-store.js";
 import { recordProposalTransfers } from "./wallet-transfer-sync.js";
 
 const WALLET_POLICY_ABI = [
@@ -258,12 +259,15 @@ export function registerWalletAdvancedRoutes(
           const nonce = (await entryPoint.getNonce(wallet, 0)).toString();
           proposalRecord = db.prepareWalletProposal(proposalId, nonce) ?? proposalRecord;
         }
-        const packedSig = encodeAdvancedSignature(
-          signatures.map((s) => ({
-            keyId: s.keyId,
-            sig: unwrapAdvancedInnerSig(s.signature, s.keyId),
-          }))
-        );
+        const identitySuper = await readIdentitySuper(wallet, appConfig);
+        const packedSig = identitySuper
+          ? packIdentitySuperSignature(signatures.map((s) => s.signature))
+          : encodeAdvancedSignature(
+              signatures.map((s) => ({
+                keyId: s.keyId,
+                sig: unwrapAdvancedInnerSig(s.signature, s.keyId),
+              }))
+            );
         const feeAmount = BigInt(appConfig.wallet.bundlerFeeUsdc);
         const userOp = await buildProposalUserOp({
           wallet,
@@ -353,6 +357,8 @@ export function registerWalletAdvancedRoutes(
           eoa: body.eoa != null ? String(body.eoa) : null,
           credentialId: body.credentialId != null ? String(body.credentialId) : null,
           label: body.label != null ? String(body.label) : null,
+          authorization: body.authorization != null ? String(body.authorization) : null,
+          authId: body.authId != null ? String(body.authId) : null,
         });
         handlers.sendJson(res, 201, { request });
         return true;
@@ -453,17 +459,68 @@ async function getAdvancedPolicy(
       vetoBitmap: vetoBitmap.toString(),
     });
   } catch {
-    // Clones of the pre-Super-Wallet implementation revert on advanced().
-    handlers.sendJson(res, 200, {
-      wallet,
-      advanced: false,
-      supportsAdvanced: false,
-      threshold: 1,
-      entityCount: 0,
-      vetoCount: 0,
-      vetoBitmap: "0",
-    });
+    try {
+      const identity = new Contract(
+        wallet,
+        [
+          "function superWallet() view returns (bool)",
+          "function threshold() view returns (uint8)",
+          "function signerCount() view returns (uint8)",
+        ],
+        provider
+      );
+      const [superWallet, threshold, signerCount] = await Promise.all([
+        identity.superWallet(),
+        identity.threshold(),
+        identity.signerCount(),
+      ]);
+      const advanced = Boolean(superWallet);
+      handlers.sendJson(res, 200, {
+        wallet,
+        advanced,
+        supportsAdvanced: true,
+        threshold: advanced ? Number(threshold) : 1,
+        entityCount: advanced ? Number(signerCount) : 0,
+        vetoCount: 0,
+        vetoBitmap: "0",
+      });
+    } catch {
+      // Clones of the pre-Super-Wallet implementation revert on advanced().
+      handlers.sendJson(res, 200, {
+        wallet,
+        advanced: false,
+        supportsAdvanced: false,
+        threshold: 1,
+        entityCount: 0,
+        vetoCount: 0,
+        vetoBitmap: "0",
+      });
+    }
   }
+}
+
+const IDENTITY_PROPOSAL_GAS = {
+  verificationGasLimit: 2_000_000n,
+  callGasLimit: 1_200_000n,
+  preVerificationGas: 400_000n,
+};
+
+async function readIdentitySuper(wallet: string, appConfig: AppConfig): Promise<boolean> {
+  const rpcUrl = appConfig.wallet.rpcUrl;
+  if (!rpcUrl) return false;
+  try {
+    const provider = new JsonRpcProvider(rpcUrl);
+    return Boolean(
+      await new Contract(wallet, ["function superWallet() view returns (bool)"], provider).superWallet()
+    );
+  } catch {
+    return false;
+  }
+}
+
+function packIdentitySuperSignature(blobs: string[]): string {
+  if (blobs.length === 1) return blobs[0]!;
+  return encodeSuperIdentityBlobs(blobs);
 }
 
 async function computeProposalUserOpHash(input: {
@@ -511,10 +568,12 @@ async function buildProposalUserOp(input: {
     },
   ];
   const callData = encodeExecuteCallData(calls);
+  const identitySuper = await readIdentitySuper(input.wallet, input.appConfig);
   return buildPackedUserOperation({
     sender: input.wallet,
     nonce: BigInt(input.proposal.nonce ?? "0"),
     callData,
     signature: input.signature,
+    gas: identitySuper ? IDENTITY_PROPOSAL_GAS : undefined,
   });
 }

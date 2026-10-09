@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { zeroPadValue } from "ethers";
+import { Interface, ZeroAddress, ZeroHash, zeroPadValue } from "ethers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,14 +23,18 @@ import { fetchWalletBalance, fetchWalletConfig, waitForUserOp } from "@/shared/w
 import { subscribePageVisible } from "@/shared/page-visibility.js";
 import {
   approveKeyEnrollmentRequest,
+  createProposal,
+  deleteWalletEntity,
   listKeyEnrollmentRequests,
   listWalletEntities,
   registerWalletEntity,
+  registerWalletEntityKey,
   rejectKeyEnrollmentRequest,
   resolveAdvancedPolicy,
   type AdvancedPolicy,
 } from "@/shared/wallet-advanced-api.js";
 import { hashEntityEmail } from "../../../../../commerce/shared/advanced-wallet.js";
+import { computeIdentityMethodId } from "../../../../../commerce/shared/identity-store.js";
 import {
   buildSignedAddEntityUserOp,
   buildSignedSetThresholdUserOp,
@@ -41,6 +45,11 @@ import { loadWalletSession, walletSessionsEquivalent, type WalletSession } from 
 import { healSuperWalletFromEmail, healWalletSession } from "@/shared/wallet-session-heal.js";
 import { useWalletPolicy } from "./wallet-policy";
 import { initEoaConnector } from "@/shared/eoa-connector.js";
+import {
+  submitAuthorizedAddMethodUserOp,
+  submitIdentitySelfCall,
+  syncIdentityEntityKeys,
+} from "@/shared/identity-recover-userop.js";
 import type {
   WalletEntityKeyRecord,
   WalletEntityRecord,
@@ -59,6 +68,11 @@ import {
   submitRemoveKey,
   wouldDropBelowThreshold,
 } from "./super-wallet-helpers";
+
+const IDENTITY_WALLET_IFACE = new Interface([
+  "function setThreshold(uint8 threshold_)",
+  "function removeSigner(bytes32 signerId)",
+]);
 
 type StatusKind = "info" | "error" | "success";
 
@@ -114,7 +128,14 @@ export function AccessPage() {
     setThreshold(pol.threshold);
 
     if (pol.advanced) {
-      const roster = await listWalletEntities(sess.address).catch(() => ({ entities: [], keys: [] }));
+      let roster = await listWalletEntities(sess.address).catch(() => ({ entities: [], keys: [] }));
+      if (sess.identityId && roster.entities.length > 0) {
+        await syncIdentityEntityKeys(
+          sess.address,
+          roster.entities.map((e) => e.entityId)
+        ).catch(() => undefined);
+        roster = await listWalletEntities(sess.address).catch(() => roster);
+      }
       setEntities(roster.entities);
       setKeys(roster.keys);
       const pending = await listKeyEnrollmentRequests(sess.address, "pending").catch(() => []);
@@ -201,6 +222,25 @@ export function AccessPage() {
     setBusy("threshold");
     setStatus({ kind: "info", message: t("wallet.sendSigning") });
     try {
+      if (session.identityId) {
+        const data = IDENTITY_WALLET_IFACE.encodeFunctionData("setThreshold", [threshold]);
+        if ((policy?.threshold ?? 1) > 1) {
+          const proposal = await createProposal({
+            walletAddress: session.address,
+            chainId: config.chainId,
+            target: session.address,
+            value: "0",
+            data,
+          });
+          navigate(`/wallet/send?id=${proposal.id}`);
+          return;
+        }
+        await submitIdentitySelfCall({ session, callData: data });
+        setStatus(null);
+        await runRefresh();
+        await refreshPolicy();
+        return;
+      }
       const fee = BigInt(config.bundlerFeeUsdc || "0");
       const passkey = await resolveCurrentWalletPasskey(session, "configure");
       const { userOp, userOpHash } = await buildSignedSetThresholdUserOp({
@@ -267,6 +307,39 @@ export function AccessPage() {
       const requests = await listKeyEnrollmentRequests(session.address, "pending");
       const req = requests.find((r) => r.id === requestId);
       if (!req) throw new Error("request_not_found");
+      if (session.identityId) {
+        if (!req.authorization || !req.authId) {
+          throw new Error("The identity has not authorized this key.");
+        }
+        const kind = req.keyType === 1 ? "yubikey" : req.keyType === 2 ? "eoa" : "webauthn";
+        const qx = req.keyType === 2 ? ZeroHash : (req.qx ?? ZeroHash);
+        const qy = req.keyType === 2 ? ZeroHash : (req.qy ?? ZeroHash);
+        const eoa = req.keyType === 2 ? (req.eoa ?? ZeroAddress) : ZeroAddress;
+        await submitAuthorizedAddMethodUserOp({
+          session,
+          identityId: req.entityId,
+          kind,
+          qx,
+          qy,
+          eoa,
+          authorization: req.authorization,
+          authId: req.authId,
+        });
+        await registerWalletEntityKey({
+          walletAddress: session.address,
+          entityId: req.entityId,
+          keyId: computeIdentityMethodId(req.entityId, req.keyType, qx, qy, eoa),
+          keyType: req.keyType,
+          qx,
+          qy,
+          eoa: req.keyType === 2 ? eoa : null,
+          credentialId: req.credentialId,
+        });
+        await approveKeyEnrollmentRequest(session.address, requestId);
+        setStatus(null);
+        await runRefresh();
+        return;
+      }
       await submitAddKey({
         session,
         config,
@@ -323,6 +396,25 @@ export function AccessPage() {
     if (!window.confirm(t("wallet.superWalletRemoveEntityConfirm"))) return;
     setBusy(`remove-entity-${entityId}`);
     try {
+      if (session.identityId) {
+        const data = IDENTITY_WALLET_IFACE.encodeFunctionData("removeSigner", [entityId]);
+        if (policy.threshold > 1) {
+          const proposal = await createProposal({
+            walletAddress: session.address,
+            chainId: config.chainId,
+            target: session.address,
+            value: "0",
+            data,
+          });
+          navigate(`/wallet/send?id=${proposal.id}`);
+          return;
+        }
+        await submitIdentitySelfCall({ session, callData: data });
+        await deleteWalletEntity(session.address, entityId);
+        await runRefresh();
+        await refreshPolicy();
+        return;
+      }
       await submitRemoveEntity({
         session,
         config,

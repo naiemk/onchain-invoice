@@ -85,7 +85,7 @@ describe("WebAuthn ceremony", function () {
           op: "get",
           challengeB64: challenge.toString("base64"),
           allow: [{ idB64: created.rawIdB64 }],
-          hints: ["security-key"],
+          hints: ["client-device"],
         })
       )
     );
@@ -175,16 +175,41 @@ describe("WebAuthn ceremony", function () {
     const security = mustOk(securityHint);
     expect(security.rawIdB64).to.equal(yubi.rawIdB64);
 
-    const deviceHint = mustOk(performWebAuthnCeremony(store, request({ op: "get", hints: ["client-device"], allow: [] })));
-    expect(deviceHint.rawIdB64).to.equal(latestFace.rawIdB64);
-    expect(deviceHint.rawIdB64).to.not.equal(firstFace.rawIdB64);
+    const severalFaces = performWebAuthnCeremony(store, request({ op: "get", hints: ["client-device"], allow: [] }));
+    expect(severalFaces.ok).to.equal(false);
+    if (!severalFaces.ok) expect(severalFaces.name).to.equal("NotAllowedError");
+
+    const picked = mustOk(
+      performWebAuthnCeremony(
+        store,
+        request({
+          op: "get",
+          hints: ["client-device"],
+          allow: [],
+          selectedIdB64: firstFace.rawIdB64,
+        })
+      )
+    );
+    expect(picked.rawIdB64).to.equal(firstFace.rawIdB64);
+    expect(picked.rawIdB64).to.not.equal(latestFace.rawIdB64);
+
+    const platformForSecurityKey = performWebAuthnCeremony(
+      store,
+      request({
+        op: "get",
+        hints: ["security-key"],
+        allow: [{ idB64: firstFace.rawIdB64 }],
+      })
+    );
+    expect(platformForSecurityKey.ok).to.equal(false);
+    if (!platformForSecurityKey.ok) expect(platformForSecurityKey.name).to.equal("NotAllowedError");
 
     const byId = mustOk(
       performWebAuthnCeremony(
         store,
         request({
           op: "get",
-          hints: ["security-key"],
+          hints: ["client-device"],
           allow: [{ idB64: firstFace.rawIdB64 }],
         })
       )

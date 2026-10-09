@@ -1,3 +1,4 @@
+import { ZeroHash } from "ethers";
 import { KEY_EOA, KEY_WEBAUTHN, KEY_YUBIKEY } from "../../../commerce/shared/advanced-wallet.js";
 import type { WalletEntityKeyRecord } from "../../../commerce/shared/wallet.js";
 import { connectEoaWallet, getConnectedEoaAddress } from "./eoa-connector.js";
@@ -57,6 +58,24 @@ export async function resolveSessionSigningKey(
   if (!connected) return null;
   const key =
     roster.keys.find((k) => k.keyType === KEY_EOA && k.eoa?.toLowerCase() === connected.toLowerCase()) ?? null;
-  if (!key) return null;
-  return { session, key };
+  if (!key?.eoa) return null;
+  const identityId = session.identityId || key.entityId;
+  if (!identityId) return null;
+  return {
+    session,
+    key,
+    passkey: {
+      address: session.address,
+      chainId: session.chainId,
+      credentialId: session.credentialId || "",
+      qx: key.qx || ZeroHash,
+      qy: key.qy || ZeroHash,
+      advanced: false,
+      identityId,
+      entityId: key.entityId,
+      keyId: key.keyId,
+      keyType: KEY_EOA,
+      eoa: key.eoa,
+    },
+  };
 }

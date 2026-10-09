@@ -213,6 +213,8 @@ interface WalletKeyEnrollmentRequestRow {
   eoa: string | null;
   credential_id: string | null;
   label: string | null;
+  authorization: string | null;
+  auth_id: string | null;
   status: WalletKeyEnrollmentStatus;
   expires_at: string;
   created_at: string;
@@ -1375,6 +1377,8 @@ export class CommerceDb {
     this.ensureColumn("wallet_recovery_requests", "operator_payload", "TEXT");
     this.ensureColumn("wallet_accounts", "identity_id", "TEXT");
     this.ensureColumn("wallet_accounts", "label", "TEXT");
+    this.ensureColumn("wallet_key_enrollment_requests", "authorization", "TEXT");
+    this.ensureColumn("wallet_key_enrollment_requests", "auth_id", "TEXT");
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_wallet_accounts_activation
         ON wallet_accounts(activation_priority_at, activation_status, activation_next_check_at);
@@ -2209,6 +2213,8 @@ export class CommerceDb {
     eoa?: string | null;
     credentialId?: string | null;
     label?: string | null;
+    authorization?: string | null;
+    authId?: string | null;
     ttlMs?: number;
   }): WalletKeyEnrollmentRequestRecord {
     const now = new Date();
@@ -2218,8 +2224,8 @@ export class CommerceDb {
       .prepare(
         `INSERT INTO wallet_key_enrollment_requests (
            id, wallet_address, entity_id, key_type, qx, qy, eoa, credential_id, label,
-           status, expires_at, created_at, resolved_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL)`
+           authorization, auth_id, status, expires_at, created_at, resolved_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL)`
       )
       .run(
         id,
@@ -2231,6 +2237,8 @@ export class CommerceDb {
         input.eoa ?? null,
         input.credentialId ?? null,
         input.label ?? null,
+        input.authorization ?? null,
+        input.authId ?? null,
         expiresAt,
         now.toISOString()
       );
@@ -3990,6 +3998,8 @@ function mapWalletKeyEnrollmentRequest(row: WalletKeyEnrollmentRequestRow): Wall
     eoa: row.eoa,
     credentialId: row.credential_id,
     label: row.label,
+    authorization: row.authorization,
+    authId: row.auth_id,
     status: row.status,
     expiresAt: row.expires_at,
     createdAt: row.created_at,

@@ -31,6 +31,8 @@ import {
   clearPendingPasskey,
 } from "@/shared/webauthn.js";
 import { connectEoaWallet, initEoaConnector } from "@/shared/eoa-connector.js";
+import { signAddMethodAuthorization } from "@/shared/identity-sign.js";
+import { loadWalletSession } from "@/shared/wallet-session.js";
 import { WalletFrame } from "./WalletFrame";
 
 const POLL_MS = 2500;
@@ -120,6 +122,7 @@ export function JoinSuperPage() {
             rawId: material.rawId ?? "",
             label: material.label,
             eoa: material.keyType === KEY_EOA ? material.eoa : undefined,
+            identityId: material.entityId,
           });
           setWaiting(false);
           setStatus({ kind: "success", message: t("wallet.joinSuperApproved") });
@@ -165,11 +168,31 @@ export function JoinSuperPage() {
       setStatus({ kind: "error", message: t("wallet.superWalletEmailRequired") });
       return;
     }
-    const entityId = hashEntityEmail(trimmed);
+    const wanted = trimmed.toLowerCase();
+    const hashed = hashEntityEmail(trimmed);
     const roster = await listWalletEntities(walletAddress);
-    if (!roster.entities.some((e) => e.entityId === entityId)) {
+    const entity =
+      roster.entities.find((e) => e.label?.trim().toLowerCase() === wanted) ??
+      roster.entities.find((e) => e.entityId.toLowerCase() === hashed.toLowerCase());
+    if (!entity) {
       setStatus({ kind: "error", message: t("wallet.joinSuperEntityMissing") });
       return;
+    }
+    const entityId = entity.entityId;
+    const session = loadWalletSession();
+    let authorization: string | undefined;
+    let authId: string | undefined;
+    if (session?.identityId && session.identityId.toLowerCase() === entityId.toLowerCase()) {
+      const kind = keyType === KEY_YUBIKEY ? "yubikey" : keyType === KEY_EOA ? "eoa" : "webauthn";
+      const signed = await signAddMethodAuthorization({
+        session,
+        kind,
+        qx: material.qx,
+        qy: material.qy,
+        eoa: material.eoa,
+      });
+      authorization = signed.authorization;
+      authId = signed.authId;
     }
     setStatus({ kind: "info", message: t("wallet.joinSuperSubmitting") });
     const request = await createKeyEnrollmentRequest({
@@ -181,6 +204,8 @@ export function JoinSuperPage() {
       eoa: material.eoa,
       credentialId: material.credentialId ?? null,
       label: trimmed,
+      authorization,
+      authId,
     });
     await pollUntilApproved(request.id, {
       entityId,

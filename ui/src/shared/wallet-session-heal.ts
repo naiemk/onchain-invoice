@@ -31,7 +31,7 @@ export async function healWalletSession(
         ...next,
         salt: account.salt || next.salt,
         label: resolveWalletLabel({ saved: next.label, server: account.label }),
-        identityId: account.identityId || next.identityId,
+        identityId: next.identityId || account.identityId,
       };
     }
   } catch {

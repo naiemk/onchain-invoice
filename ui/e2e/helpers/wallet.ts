@@ -328,11 +328,13 @@ export async function enrollSuperEntity(
   email: string,
   walletAddress: string,
   origin: string,
-  chainId: string
+  chainId: string,
+  method: "passkey" | "yubikey" | "eoa" = "passkey"
 ): Promise<void> {
   await guest.page.goto(superJoinUrl(origin, walletAddress, chainId));
   await guest.page.locator("#join-email").fill(email);
-  await guest.page.locator("#join-passkey").click();
+  const joinButton = method === "yubikey" ? "#join-yubikey" : method === "eoa" ? "#join-eoa" : "#join-passkey";
+  await guest.page.locator(joinButton).click();
   await expect(guest.page.locator("#join-wait")).toBeVisible({ timeout: 15_000 });
   await host.page.goto("/wallet/access");
   await expect(host.page.getByRole("button", { name: "Approve key" })).toBeVisible({ timeout: 15_000 });

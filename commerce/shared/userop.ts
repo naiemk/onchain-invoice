@@ -323,7 +323,7 @@ export function buildPackedUserOperation(input: {
   nonce: bigint;
   callData: string;
   signature?: string;
-  gas?: Partial<typeof DEFAULT_GAS>;
+  gas?: Partial<{ [K in keyof typeof DEFAULT_GAS]: bigint }>;
 }): PackedUserOperationJson {
   const g = { ...DEFAULT_GAS, ...input.gas };
   return {

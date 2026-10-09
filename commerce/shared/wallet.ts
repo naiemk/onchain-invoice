@@ -123,6 +123,9 @@ export interface WalletKeyEnrollmentRequestRecord {
   eoa: string | null;
   credentialId: string | null;
   label: string | null;
+  /** IDS1 blob from an existing method, authorizing addMethod for this key. */
+  authorization: string | null;
+  authId: string | null;
   status: WalletKeyEnrollmentStatus;
   expiresAt: string;
   createdAt: string;

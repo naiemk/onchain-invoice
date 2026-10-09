@@ -1,4 +1,4 @@
-import type { BrowserContext } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 import {
   emptyCeremonyStore,
   performWebAuthnCeremony,
@@ -11,6 +11,15 @@ export type DeviceKeys = CeremonyStore;
 
 export function emptyDeviceKeys(): DeviceKeys {
   return emptyCeremonyStore();
+}
+
+/** The person picked this credential in the browser sheet. `rawIdB64` is standard base64. */
+export async function selectE2eWebAuthn(page: Page, rawIdB64: string): Promise<void> {
+  await page.evaluate((id) => {
+    const select = (window as Window & { tcE2eWebAuthnSelect?: (idB64: string) => void }).tcE2eWebAuthnSelect;
+    if (!select) throw new Error("webauthn select missing");
+    select(id);
+  }, rawIdB64);
 }
 
 /**
@@ -108,6 +117,13 @@ export async function installE2eWebAuthn(context: BrowserContext, keys: DeviceKe
       };
     };
 
+    let armedSelection = "";
+    const selectCredential = (idB64: string) => {
+      armedSelection = idB64;
+      window.dispatchEvent(new CustomEvent("tc-e2e-webauthn-select", { detail: idB64 }));
+    };
+    (window as Window & { tcE2eWebAuthnSelect?: (idB64: string) => void }).tcE2eWebAuthnSelect = selectCredential;
+
     const perform = async (request: unknown) => {
       let result: Awaited<ReturnType<typeof w.tcE2eWebAuthnPerform>>;
       try {
@@ -163,17 +179,43 @@ export async function installE2eWebAuthn(context: BrowserContext, keys: DeviceKe
       if (options?.signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError");
       return perform(readRequest(options, "create"));
     };
+    const waitForSelection = (signal: AbortSignal | undefined): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const abort = () => {
+          cleanup();
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        };
+        const onSelect = (event: Event) => {
+          const id = (event as CustomEvent<string>).detail;
+          cleanup();
+          resolve(id);
+        };
+        const cleanup = () => {
+          signal?.removeEventListener("abort", abort);
+          window.removeEventListener("tc-e2e-webauthn-select", onSelect);
+        };
+        if (signal?.aborted) {
+          abort();
+          return;
+        }
+        signal?.addEventListener("abort", abort);
+        window.addEventListener("tc-e2e-webauthn-select", onSelect);
+      });
+
     const get = async (options?: CredentialRequestOptions & { mediation?: string }) => {
       if (options?.signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError");
+      const request = readRequest(options, "get") as { selectedIdB64?: string };
       if (options?.mediation === "conditional") {
-        const signal = options.signal;
-        return await new Promise<Credential>((_resolve, reject) => {
-          const abort = () => reject(new DOMException("The operation was aborted.", "AbortError"));
-          if (!signal) return;
-          signal.addEventListener("abort", abort, { once: true });
-        });
+        // Autofill does not sign until the person picks a passkey, even when only one exists.
+        request.selectedIdB64 = await waitForSelection(options.signal);
+        armedSelection = "";
+        return perform(request);
       }
-      return perform(readRequest(options, "get"));
+      if (armedSelection) {
+        request.selectedIdB64 = armedSelection;
+        armedSelection = "";
+      }
+      return perform(request);
     };
 
     const credentialsCtor = (globalThis as { CredentialsContainer?: { prototype: CredentialsContainer } }).CredentialsContainer;

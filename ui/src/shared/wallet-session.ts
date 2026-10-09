@@ -240,6 +240,7 @@ export function saveMemberWalletSession(input: {
   rawId: string;
   label: string;
   eoa?: string;
+  identityId?: string;
 }): void {
   upsertWalletSession({
     address: input.address,
@@ -255,6 +256,7 @@ export function saveMemberWalletSession(input: {
     keyId: input.keyId,
     keyType: input.keyType,
     eoa: input.eoa,
+    identityId: input.identityId ?? input.entityId,
   });
 }
 

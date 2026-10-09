@@ -1,7 +1,8 @@
 import { createAppKit } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { base, defineChain, sepolia, type AppKitNetwork } from "@reown/appkit/networks";
-import { getAccount, signMessage, signTypedData } from "@wagmi/core";
+import { connect, getAccount, injected, signMessage, signTypedData } from "@wagmi/core";
+import { http } from "viem";
 import { BrowserProvider, Contract, ZeroAddress, getAddress } from "ethers";
 import type { WalletPublicConfig } from "../../../commerce/shared/wallet.js";
 import type {
@@ -85,6 +86,38 @@ function providerErrorCode(err: unknown): number | undefined {
   return e.code ?? e.error?.code ?? e.data?.originalError?.code;
 }
 
+/** E2E keeps AppKit closed and signs through wagmi's injected connector on the shim. */
+async function initE2eInjectedWagmi(): Promise<void> {
+  if (!identityNetwork) return;
+  const network = identityNetwork;
+  const id = Number(network.id);
+  const rpc = network.rpcUrls?.default?.http?.[0];
+  const adapter = new WagmiAdapter({
+    networks: [network],
+    projectId: projectId() || LOCALHOST_REOWN_PROJECT_ID,
+    connectors: [
+      injected({
+        shimDisconnect: false,
+        target: () => {
+          const ethereum = injectedProvider();
+          if (!ethereum) return undefined;
+          return { id: "io.metamask", name: "MetaMask", provider: ethereum as never };
+        },
+      }),
+    ],
+    ...(rpc && Number.isFinite(id) ? { transports: { [id]: http(rpc) } } : {}),
+  });
+  wagmiConfig = adapter.wagmiConfig;
+}
+
+async function connectE2eWagmiAccount(): Promise<void> {
+  if (!isE2eInjectedEoa() || !wagmiConfig) return;
+  if (getAccount(wagmiConfig).address) return;
+  const connector = wagmiConfig.connectors[0];
+  if (!connector) throw new Error("No injected wallet found");
+  await connect(wagmiConfig, { connector });
+}
+
 function activeProvider(): EthProvider | null {
   if (selectedProvider) return selectedProvider;
   const fromKit = appKitModal?.getWalletProvider() as EthProvider | undefined;
@@ -101,8 +134,12 @@ export async function initEoaConnector(config: WalletPublicConfig): Promise<void
     }
     return;
   }
+  if (isE2eInjectedEoa()) {
+    await initE2eInjectedWagmi();
+    return;
+  }
   const pid = projectId();
-  if (!pid || isE2eInjectedEoa()) return;
+  if (!pid) return;
   const extras = [sepolia, base].filter((n) => n.id !== identityNetwork!.id);
   const networks = [identityNetwork, ...extras] as [AppKitNetwork, ...AppKitNetwork[]];
   try {
@@ -270,6 +307,7 @@ export async function connectEoaWallet(): Promise<string> {
   }
   selectedProvider = (appKitModal?.getWalletProvider() as EthProvider | undefined) ?? selectedProvider ?? injectedProvider();
   await ensureEoaChain();
+  await connectE2eWagmiAccount();
   return address;
 }
 
@@ -368,9 +406,20 @@ export async function signIdentityVerifyTypedData(input: {
 }): Promise<{ address: string; signature: string }> {
   const address = await connectEoaWallet();
   await ensureEoaChain({ chainId: input.chainId });
-  const domain = identityEip712Domain(input.store, input.chainId);
+  const domain = { ...identityEip712Domain(input.store, input.chainId), chainId: Number(input.chainId) };
+  const message = { message: input.message };
+  if (wagmiConfig && projectId() && getAccount(wagmiConfig).address) {
+    const signature = await signTypedData(wagmiConfig, {
+      account: address as `0x${string}`,
+      domain,
+      types: IDENTITY_VERIFY_TYPES,
+      primaryType: "Verify",
+      message,
+    });
+    return { address, signature };
+  }
   const signer = await eoaSigner();
-  const signature = await signer.signTypedData(domain, IDENTITY_VERIFY_TYPES, { message: input.message });
+  const signature = await signer.signTypedData(domain, IDENTITY_VERIFY_TYPES, message);
   return { address, signature };
 }
 

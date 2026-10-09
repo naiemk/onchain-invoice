@@ -76,14 +76,12 @@ test.describe.serial("local Hardhat stack", () => {
     await host.page.goto("/create");
     await host.page.locator("#price").fill("5.00");
     await expect(host.page.getByRole("button", { name: "Create pay link" })).toBeEnabled({ timeout: 15_000 });
-    await host.page.evaluate(() => {
-      window.open = (url?: string | URL) => {
-        window.location.assign(String(url ?? ""));
-        return null;
-      };
-    });
     await host.page.getByRole("button", { name: "Create pay link" }).click();
-    await expect(host.page.getByRole("button", { name: "Continue to payment" })).toBeVisible({ timeout: 15_000 });
+    const ready = host.page.getByRole("dialog", { name: "Your payment link is ready" });
+    await expect(ready).toBeVisible({ timeout: 15_000 });
+    const payLink = await ready.locator("input").inputValue();
+    expect(payLink).toContain("/pay?");
+    await host.page.goto(payLink);
     const created = host.page.waitForResponse(
       (res) =>
         res.url().includes("/api/invoices") &&
@@ -91,7 +89,7 @@ test.describe.serial("local Hardhat stack", () => {
         res.status() === 201,
       { timeout: 30_000 }
     );
-    await host.page.getByRole("button", { name: "Continue to payment" }).click();
+    await host.page.locator("#activate").click();
     const res = await created;
     const body = (await res.json()) as {
       invoice?: { id?: string; invoiceAddress?: string; selectedTo?: string };

@@ -141,6 +141,8 @@ export async function createKeyEnrollmentRequest(input: {
   eoa?: string | null;
   credentialId?: string | null;
   label?: string | null;
+  authorization?: string | null;
+  authId?: string | null;
 }): Promise<WalletKeyEnrollmentRequestRecord> {
   const res = await fetch(apiUrl(`/api/wallet/${input.walletAddress}/key-enrollment-requests`), {
     method: "POST",
