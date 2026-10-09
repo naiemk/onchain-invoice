@@ -300,10 +300,12 @@ test.describe("identity recovery", () => {
 
   test("removes a YubiKey and an EOA, and refuses to remove the last method", async ({ browser }) => {
     const stack = await loadLocalStack();
+    const throwaway = Wallet.createRandom();
     const keys = emptyDeviceKeys();
     const context = await browser.newContext();
     await installE2eWebAuthn(context, keys);
-    await installE2eEoa(context, stack.rpcUrl);
+    const eoa = await installE2eEoa(context, stack.rpcUrl, throwaway.privateKey);
+    await fundEoaNative(stack.rpcUrl, stack.ownerKey, eoa.address);
     const page = await context.newPage();
     const host: DeviceSession = { context, page, keys };
     const created = await createIdentityWalletFromUi(host.page, "E2E Remove Methods");
