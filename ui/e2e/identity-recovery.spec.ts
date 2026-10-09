@@ -131,6 +131,8 @@ test.describe("identity recovery", () => {
     await expect(host.page.getByText(/A passkey was added/i)).toBeVisible({ timeout: 60_000 });
     await fundUsdc(created.address, 5_000_000n, stack);
     await waitForDeployed(created.address);
+    const active = await host.page.evaluate(() => localStorage.getItem("tc-wallet-active"));
+    expect(active?.toLowerCase()).toBe(created.address.toLowerCase());
     await sendOneUsdc(host.page);
     await context.close();
   });
@@ -257,7 +259,7 @@ test.describe("identity recovery", () => {
       return ethereum?.request({ method: "eth_chainId" });
     });
     expect(reported).toBe("0xaa36a7");
-    await host.page.getByRole("button", { name: "Close" }).click();
+    await closeWizard(host.page, "connect-wallet-wizard");
     await expect(host.page.getByTestId("devices-card").getByText("Wallet", { exact: true })).toBeVisible();
     await context.close();
   });
@@ -361,7 +363,15 @@ async function addSecurityKey(page: DeviceSession["page"]): Promise<void> {
     await page.getByTestId("yubi-register").click();
     await expect(page.getByTestId("yubi-tx-executed")).toBeVisible({ timeout: 60_000 });
   });
-  await page.getByRole("button", { name: "Close" }).click();
+  await closeWizard(page, "add-security-key-wizard");
+}
+
+function closeWizard(page: DeviceSession["page"], testId: string): Promise<void> {
+  return page
+    .getByTestId(testId)
+    .getByRole("button", { name: "Close", exact: true })
+    .filter({ hasNot: page.locator("svg") })
+    .click();
 }
 
 async function connectWallet(page: DeviceSession["page"], pay: "self" | "wallet"): Promise<void> {

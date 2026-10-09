@@ -130,12 +130,12 @@ function SimpleSendPage() {
   }, [session, config, loadActivation]);
 
   useEffect(() => {
-    if (!session || !config || deployed !== false || !funded) return;
+    if (!session || !config || deployed === true) return;
     const id = window.setInterval(() => {
       void loadActivation(session, config).catch(() => undefined);
     }, 3_000);
     return () => window.clearInterval(id);
-  }, [session, config, deployed, funded, loadActivation]);
+  }, [session, config, deployed, loadActivation]);
 
   const handleRefresh = async () => {
     if (!session || !config) return;
