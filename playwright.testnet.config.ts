@@ -4,7 +4,7 @@
  *   E2E_TESTNET=1 E2E_RPC_URL=… E2E_USDC=… E2E_COLLECTOR_ADDRESS=… E2E_FUNDER_KEY=… \
  *     npm run test:ui-e2e:testnet
  *
- * Starts local Vite with the WebAuthn test shim, proxied at the live API.
+ * Starts local Vite proxied at the live API. Playwright installs a Face ID and security-key simulator.
  * Bundler/sweeper/deployer are the hosted nodes (they poll; no POST /tick).
  */
 import { defineConfig } from "@playwright/test";
@@ -33,7 +33,6 @@ export default defineConfig({
     env: {
       ...process.env,
       VITE_DEV_PROXY_TARGET: API,
-      VITE_E2E_WEBAUTHN: "1",
     },
   },
 });

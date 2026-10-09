@@ -426,10 +426,12 @@ export async function setStoreRecoveryOperator(superAddress: string, stack?: Loc
     ["function scheduleRecoveryOperator(address next)", "function executeRecoveryOperator()"],
     owner
   );
-  const tx = await store.scheduleRecoveryOperator(superAddress);
-  await tx.wait();
+  const scheduleNonce = await provider.getTransactionCount(owner.address, "pending");
+  const scheduled = await store.scheduleRecoveryOperator(superAddress, { nonce: scheduleNonce });
+  await scheduled.wait();
   await increaseChainTime(259201, env);
-  await (await store.executeRecoveryOperator()).wait();
+  const executeNonce = await provider.getTransactionCount(owner.address, "latest");
+  await (await store.executeRecoveryOperator({ nonce: executeNonce })).wait();
 }
 
 export async function increaseChainTime(seconds: number, stack?: LocalStack): Promise<void> {
@@ -525,8 +527,9 @@ export async function waitForRestoreCompleted(walletAddress: string, timeoutMs =
 
 export async function loginIdentityFromEmail(page: Page, email: string): Promise<void> {
   await page.goto("/wallet");
-  if (await page.getByTestId("wallet-switcher").isVisible().catch(() => false)) return;
+  const lock = page.getByRole("button", { name: "Lock wallet" });
+  if (await lock.isVisible().catch(() => false)) return;
   await page.locator("#identity-email").fill(email);
   await page.getByRole("button", { name: /^next$/i }).click();
-  await expect(page.getByTestId("wallet-switcher")).toBeVisible({ timeout: 30_000 });
+  await expect(lock).toBeVisible({ timeout: 30_000 });
 }

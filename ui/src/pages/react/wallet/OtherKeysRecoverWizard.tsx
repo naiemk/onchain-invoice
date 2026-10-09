@@ -318,7 +318,7 @@ export function OtherKeysRecoverWizard({
             onClick={() => {
               setKind("yubikey");
               setPendingOwner(null);
-              setPendingAuthorization(null);
+              setPendingSigned(null);
               setStep(2);
             }}
             data-testid="recover-choose-yubikey"
@@ -335,7 +335,7 @@ export function OtherKeysRecoverWizard({
             onClick={() => {
               setKind("eoa");
               setPendingOwner(null);
-              setPendingAuthorization(null);
+              setPendingSigned(null);
               setStep(2);
             }}
             data-testid="recover-choose-eoa"

@@ -61,7 +61,6 @@ export default defineConfig({
       env: {
         ...process.env,
         VITE_DEV_PROXY_TARGET: `http://127.0.0.1:${API_PORT}`,
-        VITE_E2E_WEBAUTHN: "1",
       },
     },
   ],

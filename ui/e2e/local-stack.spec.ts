@@ -1,6 +1,6 @@
 /**
  * Local Hardhat stack journey: create a **new** wallet here (old Sepolia clones are irrelevant).
- * WebAuthn is a per-context P-256 test-key shim, not a CDP virtual authenticator.
+ * WebAuthn is a per-context Face ID and security-key ceremony, not a CDP virtual authenticator.
  * Nodes do not poll on an interval; tests POST /tick on the running bundler/sweeper/deployer.
  * Default CI path is local Hardhat (`e2eLocal`). Live testnet: `npm run test:ui-e2e:testnet`.
  */

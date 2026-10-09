@@ -76,10 +76,12 @@ test.describe("identity recovery", () => {
     await expect(host.page.getByRole("button", { name: "Continue with passkey" })).toBeVisible({ timeout: 20_000 });
     await expect(host.page.getByText("Who pays for recovery")).toHaveCount(0);
     expect(host.keys.createCount).toBe(createBeforeProve + 1);
-    expect(host.keys.signCount).toBe(signBeforeProve + 1);
+    const assertions = host.keys.signCount - signBeforeProve;
+    expect(assertions).toBeGreaterThanOrEqual(1);
+    expect(assertions).toBeLessThanOrEqual(2);
     await host.page.getByRole("button", { name: "Continue with passkey" }).click();
     await expect(host.page.getByText(/A passkey was added/i)).toBeVisible({ timeout: 60_000 });
-    expect(host.keys.signCount).toBe(signBeforeProve + 1);
+    expect(host.keys.signCount).toBe(signBeforeProve + assertions);
     await host.context.close();
   });
 

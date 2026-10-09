@@ -30,7 +30,7 @@ import {
 import { fetchWalletConfig, registerDevice } from "@/shared/wallet-api.js";
 import { shortAddress, type WalletSession } from "@/shared/wallet-session.js";
 import { eoaCredentialId, eoaOwnerCoords } from "../../../../../commerce/shared/wallet-eip712.js";
-import { METHOD_EOA } from "../../../../../commerce/shared/identity-store.js";
+import { freshAuthId, METHOD_EOA } from "../../../../../commerce/shared/identity-store.js";
 
 type ConnectStep = 1 | 2 | 3 | 4;
 type PayMode = "self" | "wallet";
@@ -118,6 +118,7 @@ export function ConnectWalletWizard({
       qx: ZeroHash,
       qy: ZeroHash,
       eoa: address,
+      authId: freshAuthId(),
     });
     setEoa(address);
     await loadPayOptions();
