@@ -22,12 +22,8 @@ if [[ "$factory_lc" != "$expected_lc" ]]; then
   exit 0
 fi
 
-QX="0x00000000000000000000000000000000000000000000000000000000000000aa"
-QY="0x00000000000000000000000000000000000000000000000000000000000000bb"
-body="{\"ownerQx\":\"${QX}\",\"ownerQy\":\"${QY}\",\"credentialId\":\"advanced-e2e\"}"
-created="$(api_json POST /api/wallet/accounts "$body")"
-assert_status "$created" 201
-addr="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(json.loads(d["body"])["account"]["address"])' "$created")"
+created="$(create_identity_wallet advanced)"
+addr="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["address"])' "$created")"
 
 policy="$(api_json GET "/api/wallet/${addr}/advanced-policy")"
 # Undeployed counterfactual may 400/503 — both acceptable for smoke.

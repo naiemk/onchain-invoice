@@ -22,6 +22,8 @@ services:
       WALLET_IMPLEMENTATION_ADDRESS: ${WALLET_IMPLEMENTATION_ADDRESS:-0x4D19ce70D3D4a63cBa685665B39C133141B5dDC2}
       WALLET_CHAIN_ID: ${WALLET_CHAIN_ID:-11155111}
       WALLET_BUNDLER_FEE_TOKEN: ${WALLET_BUNDLER_FEE_TOKEN:-0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238}
+      # Test stack only: exposes GET /api/identity/email/dev-otp so wallet tests can finish sign-in.
+      IDENTITY_DEV_OTP: "1"
     volumes:
       - api-data:/data
     ports:
