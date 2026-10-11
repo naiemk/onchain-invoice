@@ -35,6 +35,8 @@ BUILD_LOCAL=0 npm run system-test:infra-deploy
 
 Override image tag: `IMAGE_TAG=main npm run system-test`. Local tags: `PULL=0 IMAGE_TAG=system-test-local npm run system-test`.
 
+Wallet smoke (`06`, `07`) signs in with the identity email code and registers a passkey. The compose API sets `IDENTITY_DEV_OTP=1` so the test can read that code from `GET /api/identity/email/dev-otp`. `POST /api/wallet/accounts` stays closed (`410 use_identity`). The first wallet comes from `POST /api/identity/passkey/register`; another comes from `POST /api/identity/wallets`.
+
 ## Layout
 
 | Path | Role |

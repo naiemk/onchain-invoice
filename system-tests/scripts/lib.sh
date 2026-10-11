@@ -33,10 +33,10 @@ except Exception:
 print(json.dumps({"method": method, "path": path, "body": body, "headers": extra}))
 ' "$method" "$path" "$body" "${extra_headers:-}")"
   # Retry only when docker exec / fetch returns empty (transport flake).
+  # SYSTEM_TEST_API_URL hits a server on the host (no compose). CI leaves it unset.
   local attempts=5
   local attempt out=""
-  for ((attempt=1; attempt<=attempts; attempt++)); do
-    out="$(printf '%s\n' "$envelope" | "${COMPOSE[@]}" exec -T api node -e '
+  local fetch_js='
 let raw = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => { raw += c; });
@@ -47,16 +47,24 @@ process.stdin.on("end", () => {
     body ? { "content-type": "application/json" } : {},
     extra || {}
   );
-  fetch("http://127.0.0.1:8080" + path, {
+  const base = process.env.API_BASE || "http://127.0.0.1:8080";
+  fetch(base + path, {
     method,
     headers,
     body: body || undefined,
   }).then(async (res) => {
-    process.stdout.write(JSON.stringify({ status: res.status, body: await res.text() }));
+    const setCookie = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];
+    process.stdout.write(JSON.stringify({ status: res.status, body: await res.text(), setCookie }));
     process.exit(0);
   }).catch((e) => { console.error(String(e)); process.exit(1); });
 });
-' 2>/dev/null || true)"
+'
+  for ((attempt=1; attempt<=attempts; attempt++)); do
+    if [[ -n "${SYSTEM_TEST_API_URL:-}" ]]; then
+      out="$(printf '%s\n' "$envelope" | API_BASE="$SYSTEM_TEST_API_URL" node -e "$fetch_js" 2>/dev/null || true)"
+    else
+      out="$(printf '%s\n' "$envelope" | "${COMPOSE[@]}" exec -T -e API_BASE=http://127.0.0.1:8080 api node -e "$fetch_js" 2>/dev/null || true)"
+    fi
     if [[ -n "$out" ]]; then
       printf '%s' "$out"
       return 0
@@ -107,6 +115,70 @@ assert_body_field() {
   local wrapped="$1"
   local expr="$2"
   python3 -c 'import json,sys; d=json.loads(sys.argv[1]); b=json.loads(d["body"]); assert eval(sys.argv[2], {"b": b}), (b, sys.argv[2])' "$wrapped" "$expr"
+}
+
+# Name=value pairs from Set-Cookie, ready to send back as a Cookie header.
+response_set_cookie() {
+  python3 -c '
+import json, sys
+d = json.loads(sys.argv[1])
+parts = []
+for c in d.get("setCookie") or []:
+    name = c.split(";", 1)[0].strip()
+    if name:
+        parts.append(name)
+print("; ".join(parts))
+' "$1"
+}
+
+# Email OTP + passkey register. Prints {"address","cookie","credentialId","identityId"}.
+# The API must be started with IDENTITY_DEV_OTP=1 so the sign-in code is readable.
+create_identity_wallet() {
+  local label="$1"
+  local email qx qy cred started otp code to verified cookie headers body registered
+  email="sys-${label}-$(date +%s)-${RANDOM}@example.com"
+  qx="0x$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+  qy="0x$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+  cred="e2e-${label}-$(date +%s)-${RANDOM}"
+
+  started="$(api_json POST /api/identity/email/start "{\"email\":\"${email}\"}")"
+  assert_status "$started" 200
+  assert_body_field "$started" 'b.get("ok") is True and not b.get("exists")'
+
+  otp="$(api_json GET /api/identity/email/dev-otp)"
+  assert_status "$otp" 200
+  code="$(python3 -c 'import json,sys; print(json.loads(json.loads(sys.argv[1])["body"]).get("code") or "")' "$otp")"
+  to="$(python3 -c 'import json,sys; print(json.loads(json.loads(sys.argv[1])["body"]).get("to") or "")' "$otp")"
+  if [[ "$to" != "$email" || ! "$code" =~ ^[0-9]{6}$ ]]; then
+    echo "dev OTP for ${email} was not issued (set IDENTITY_DEV_OTP=1): ${otp}" >&2
+    return 1
+  fi
+
+  verified="$(api_json POST /api/identity/email/verify "{\"email\":\"${email}\",\"code\":\"${code}\"}")"
+  assert_status "$verified" 200
+  cookie="$(response_set_cookie "$verified")"
+  if [[ "$cookie" != *"tc_identity="* ]]; then
+    echo "identity verify did not set tc_identity: ${verified}" >&2
+    return 1
+  fi
+
+  headers="$(python3 -c 'import json,sys; print(json.dumps({"cookie": sys.argv[1]}))' "$cookie")"
+  body="{\"qx\":\"${qx}\",\"qy\":\"${qy}\",\"credentialId\":\"${cred}\"}"
+  registered="$(api_json POST /api/identity/passkey/register "$body" "$headers")"
+  assert_status "$registered" 201
+  assert_body_field "$registered" 'isinstance(b.get("wallets"), list) and b["wallets"] and b["wallets"][0].get("address")'
+
+  python3 -c '
+import json, sys
+d = json.loads(sys.argv[1])
+b = json.loads(d["body"])
+print(json.dumps({
+  "address": b["wallets"][0]["address"],
+  "identityId": b.get("identityId"),
+  "cookie": sys.argv[2],
+  "credentialId": sys.argv[3],
+}))
+' "$registered" "$cookie" "$cred"
 }
 
 assert_contains_ci() {
