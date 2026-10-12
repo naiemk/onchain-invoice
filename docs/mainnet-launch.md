@@ -30,9 +30,9 @@ Do this before changing Identity contracts. A later factory deploy binds the byt
 
 | ID | Task | Description | Definition of done |
 |----|------|-------------|-------------------|
-| L0.1 | Super Wallet beta label | User `enableSuper` stays available and is labeled beta: unaudited, the user can stay on a simple wallet. Copy must match the chain: Identity `enableSuper` does not call `disableRestore`. | UI convert flow and any legal/help string say beta. A test or screenshot review shows the string. No user-facing string says Identity `enableSuper` turns off email recovery. |
-| L0.2 | No new hosted legacy wallets | Hosted `/wallet` on mainnet creates IdentityWallet accounts only. `Wallet.sol` + `AdminGuardianRecovery` stay for wallets that already exist. | Wallet create and public wallet-config on a mainnet-mode build refuse a new legacy account. A test covers that refusal. |
-| L0.3 | Launch tag rule | Identity implementation, factory, and store are frozen before the Base deploy. A new implementation means a new factory and new addresses. | `docs/wallet-mainnet-assurance.md` and this page state that rule. The Base deploy task (L4.4) records the git tag it deployed. |
+| [x] L0.1 | Super Wallet beta label | User `enableSuper` stays available and is labeled beta: unaudited, the user can stay on a simple wallet. Copy must match the chain: Identity `enableSuper` does not call `disableRestore`. | UI convert flow and any legal/help string say beta. A test or screenshot review shows the string. No user-facing string says Identity `enableSuper` turns off email recovery. |
+| [x] L0.2 | No new hosted legacy wallets | Hosted `/wallet` on mainnet creates IdentityWallet accounts only. `Wallet.sol` + `AdminGuardianRecovery` stay for wallets that already exist. | Wallet create and public wallet-config on a mainnet-mode build refuse a new legacy account. A test covers that refusal. |
+| [x] L0.3 | Launch tag rule | Identity implementation, factory, and store are frozen before the Base deploy. A new implementation means a new factory and new addresses. `scripts/deploy-identity-wallet.ts` writes `gitTag` on the artifact. | `docs/wallet-mainnet-assurance.md` and this page state that rule. The Base deploy task (L4.4) records the git tag it deployed. |
 
 ---
 
@@ -42,12 +42,12 @@ Critical path A is recoverability. Critical path B is fund safety. These tasks c
 
 | ID | Task | Description | Definition of done |
 |----|------|-------------|-------------------|
-| L1.1 | Second method before funds | The product treats a simple wallet as fundable only after the identity has at least two on-chain methods (passkey plus EOA or YubiKey). Until then the receive address stays hidden. | With one method, the receive UI does not show the address and does not start a send. After a second method lands on the store, the address appears. Playwright covers both states. |
-| L1.2 | Deployer waits for the second method | `wallet-deployer` does not call `createAccount` until the identity has at least two methods. A USDC transfer that arrives early is still recoverable through the persist log and a later deploy. | A one-method funded counterfactual stays code `0x` after a deployer tick. After the second method, the same tick deploys it. A test covers both. |
-| L1.3 | Last method cannot be removed while restore is off | If `restoreEnabled == false`, `removeMethod` reverts when it would leave zero methods. | Hardhat: disable restore with two methods, remove down to one, the next remove reverts, and the remaining method can still send. |
-| L1.4 | `disableRestore` needs two methods | `disableRestore` reverts when `methodCount < 2`. | Hardhat: one-method identity cannot disable restore. Two-method identity can. Email restore is blocked after a successful disable, and the other key can still add a method. |
-| L1.5 | Cancel beats execute | A cancel mined before the delay wins against `executeRestore`. | Hardhat (F8): pending restore, cancel, then execute reverts. The old method still spends. |
-| L1.6 | Production ignores the restore override | `IDENTITY_RESTORE_ENABLED` is a test hook. tcmain must not boot with it set. | tcmain env examples omit it. A production-like config that sets it fails boot. A test covers the failure. |
+| [x] L1.1 | Second method before funds | The product treats a simple wallet as fundable only after the identity has at least two on-chain methods (passkey plus EOA or YubiKey). Until then the receive address stays hidden. | With one method, the receive UI does not show the address and does not start a send. After a second method lands on the store, the address appears. Playwright covers both states. |
+| [x] L1.2 | Deployer waits for the second method | `wallet-deployer` does not call `createAccount` until the identity has at least two methods. A USDC transfer that arrives early is still recoverable through the persist log and a later deploy. | A one-method funded counterfactual stays code `0x` after a deployer tick. After the second method, the same tick deploys it. A test covers both. |
+| [x] L1.3 | Last method cannot be removed while restore is off | If `restoreEnabled == false`, `removeMethod` reverts when it would leave zero methods. | Hardhat: disable restore with two methods, remove down to one, the next remove reverts, and the remaining method can still send. |
+| [x] L1.4 | `disableRestore` needs two methods | `disableRestore` reverts when `methodCount < 2`. | Hardhat: one-method identity cannot disable restore. Two-method identity can. Email restore is blocked after a successful disable, and the other key can still add a method. |
+| [x] L1.5 | Cancel beats execute | A cancel mined before the delay wins against `executeRestore`. | Hardhat (F8): pending restore, cancel, then execute reverts. The old method still spends. |
+| [x] L1.6 | Production ignores the restore override | `IDENTITY_RESTORE_ENABLED` is a test hook. tcmain must not boot with it set. | tcmain env examples omit it. A production-like config that sets it fails boot. A test covers the failure. |
 | L1.7 | Store owner is slow | Production `IdentityStore` owner is a timelocked multisig. `setRecoveryOperator` and `setRestoreDelay` are break-glass through that timelock. | Design is written (delay, owners, how tcmain points at it). The Base deploy uses that owner. A test or script shows a direct EOA owner cannot call those setters on the production store. |
 
 ---
@@ -60,7 +60,7 @@ A later commit has to go red if recovery or spend authorization breaks.
 |----|------|-------------|-------------------|
 | L2.1 | `wallet-cert` Hardhat suite | One tagged suite for the matrix and threat rows that are contract tests: IdentityStore delay, cancel, execute, disable; last-method and disableRestore gates; IdentityWallet UserOp and AA24; reco 2-of-3 `initiateRestore`; spend after restore; spend after disable via the remaining EOA or YubiKey; F8. | `npm test` (or the documented `wallet-cert` script) runs that set on every PR. The job is required on `main`. |
 | L2.2 | Email-restore CI | The hosted email path (operator signature, second signature executes, cancel, funded send, restore disabled) runs in GitHub Actions. | `.github/workflows/ci.yml` runs `ui/e2e/identity-email-restore.spec.ts` or a headless subset, required on `main`. A red run blocks merge. |
-| L2.3 | Bytecode snapshots | ABI and bytecode of IdentityStore, IdentityWallet, and IdentityWalletFactory are snapshotted. | A PR that changes those bytecodes fails until the snapshot is updated in the same PR. The snapshot file names the compiler version. |
+| [x] L2.3 | Bytecode snapshots | ABI and bytecode of IdentityStore, IdentityWallet, and IdentityWalletFactory are snapshotted. | A PR that changes those bytecodes fails until the snapshot is updated in the same PR. The snapshot file names the compiler version. |
 | L2.4 | CODEOWNERS | Identity contracts and the cert tests need a review from the owner. | `CODEOWNERS` covers `contracts/wallet/Identity*.sol` and the `wallet-cert` tests. A PR without that review cannot merge. |
 | L2.5 | Matrix evidence | Every cell S1–S12 and F1–F12 in the assurance doc points at a test id or an ops procedure id. | The assurance doc has no `TBD-*` left. Each id resolves to a test name or a section in the operator runbook (L5.5). |
 
@@ -145,6 +145,8 @@ flowchart LR
 ```
 
 L3 can run beside L1 and L2. L4.4 waits until L0.3, L1, and L2.1 are done so the factory is not deployed twice. L7 waits until L6 P0/P1 are closed.
+
+L2.1 and L2.2 have CI jobs (`wallet-cert`, `identity-email-restore`). They stay open until those jobs are required checks on `main`. `CODEOWNERS` covers the identity contracts and cert tests; L2.4 stays open until that review is required to merge. L1.7 has the timelock contract and a Hardhat test; the Base store owner is still assigned at L4.4. L2.5 still has `TBD-*` cells for the operator runbooks.
 
 ## Follow-ons
 

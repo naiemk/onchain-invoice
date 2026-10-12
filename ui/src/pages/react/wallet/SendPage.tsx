@@ -35,6 +35,7 @@ import { loadWalletSession, walletSessionsEquivalent, type WalletSession } from 
 import { buildSignedAdvancedSendUserOp } from "@/shared/advanced-userop-client.js";
 import { buildSignedSendUserOp, submitSignedUserOp } from "@/shared/userop-client.js";
 import { resolveCurrentWalletPasskey } from "@/shared/current-wallet-passkey.js";
+import { useIdentityFundable } from "@/shared/identity-fundable.js";
 import { ERC20_ABI, parseUsdcInput } from "../../../../../commerce/shared/userop.js";
 import { formatSendRejectReason } from "@/shared/userop-errors.js";
 import { WalletFrame } from "./WalletFrame";
@@ -62,6 +63,7 @@ function SimpleSendPage() {
   const { t } = useLocale();
   const navigate = useNavigate();
   const [session, setSession] = useState<WalletSession | null>(() => loadWalletSession());
+  const fundable = useIdentityFundable(session?.identityId);
   const [config, setConfig] = useState<WalletPublicConfig | null>(null);
   const [balanceUsd, setBalanceUsd] = useState("0.00");
   const [tokenBalances, setTokenBalances] = useState<Record<string, bigint>>({});
@@ -304,7 +306,7 @@ function SimpleSendPage() {
 
   if (!session) return null;
 
-  const canSend = deployed === true;
+  const canSend = deployed === true && fundable === true;
 
   return (
     <WalletFrame
@@ -314,7 +316,17 @@ function SimpleSendPage() {
     >
       <PageSplit>
         <PageCard>
-          {deployed === false && (
+          {session.identityId && fundable === false && (
+            <Alert className="mb-4" data-testid="send-needs-second-method">
+              <AlertDescription>
+                {t("wallet.sendNeedsSecondMethod")}{" "}
+                <Link to="/wallet/security" className="font-medium underline">
+                  {t("wallet.addSecurityKey")}
+                </Link>
+              </AlertDescription>
+            </Alert>
+          )}
+          {deployed === false && fundable !== false && (
             <Alert variant="warn" className="mb-4">
               <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span>{funded ? t("wallet.userOpAccountNotDeployed") : t("wallet.sendNotDeployed")}</span>

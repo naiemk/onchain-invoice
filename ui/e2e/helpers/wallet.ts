@@ -1,5 +1,8 @@
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { Contract, JsonRpcProvider, Wallet } from "ethers";
+import { Contract, JsonRpcProvider, Wallet, ZeroAddress } from "ethers";
+import { METHOD_WEBAUTHN } from "../../../commerce/shared/identity-store.js";
+import { identityPasskeyBlob } from "../../../test/helpers/identity-signing.js";
+import { createPasskeyFixture } from "../../../test/helpers/passkey-fixture.js";
 import { apiBase, isTestnetE2e, loadLocalStack, sleep, triggerWorker, withWorkerTicks, type LocalStack } from "./stack.js";
 import { emptyDeviceKeys, installE2eWebAuthn, type DeviceKeys } from "./webauthn-shim.js";
 
@@ -108,6 +111,70 @@ export async function pokeWalletBalance(address: string): Promise<void> {
   }
 }
 
+const STORE_METHOD_ABI = [
+  "function getIdentity(bytes32 identityId) view returns (bool exists, bool restoreEnabled, uint8 methodCount, uint8 eoaCount, uint8 webauthnCount, uint8 yubikeyCount)",
+  "function hashAddMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa) view returns (bytes32)",
+  "function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes authorization)",
+] as const;
+
+async function readSessionIdentityId(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const active = localStorage.getItem("tc-wallet-active");
+    const raw = localStorage.getItem("tc-wallet-registry");
+    const registry = raw ? (JSON.parse(raw) as Array<{ address?: string; identityId?: string }>) : [];
+    const current = registry.find((row) => row.address && active && row.address.toLowerCase() === active.toLowerCase());
+    return current?.identityId ?? registry.find((row) => row.identityId)?.identityId ?? null;
+  });
+}
+
+/** Add a second WebAuthn method on the store so the deployer may createAccount. */
+export async function addSecondPasskeyOnChain(device: DeviceSession, stack?: LocalStack): Promise<void> {
+  const env = stack ?? (await loadLocalStack());
+  if (!env.storeAddress) throw new Error("local stack missing IdentityStore address");
+  const current = device.keys.current;
+  if (!current) throw new Error("device has no passkey to authorize addMethod");
+  const identityId = await readSessionIdentityId(device.page);
+  if (!identityId) throw new Error("session has no identityId");
+  const second = createPasskeyFixture();
+  const provider = new JsonRpcProvider(env.rpcUrl);
+  try {
+    const owner = new Wallet(env.ownerKey, provider);
+    const store = new Contract(env.storeAddress, STORE_METHOD_ABI, owner);
+    const digest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress);
+    const tx = await store.addMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      second.qx,
+      second.qy,
+      ZeroAddress,
+      identityPasskeyBlob({
+        identityId,
+        key: { qx: current.qx, qy: current.qy, pem: current.privateKeyPem },
+        message: digest,
+      })
+    );
+    await tx.wait();
+  } finally {
+    provider.destroy();
+  }
+}
+
+export async function ensureSecondMethod(device: DeviceSession, stack?: LocalStack): Promise<void> {
+  const env = stack ?? (await loadLocalStack());
+  if (!env.storeAddress) throw new Error("local stack missing IdentityStore address");
+  const identityId = await readSessionIdentityId(device.page);
+  if (!identityId) throw new Error("session has no identityId");
+  const provider = new JsonRpcProvider(env.rpcUrl);
+  try {
+    const store = new Contract(env.storeAddress, STORE_METHOD_ABI, provider);
+    const rec = (await store.getIdentity(identityId)) as { methodCount?: bigint | number };
+    if (Number(rec.methodCount ?? 0) >= 2) return;
+  } finally {
+    provider.destroy();
+  }
+  await addSecondPasskeyOnChain(device, env);
+}
+
 export async function waitForDeployed(address: string, timeoutMs = 30_000): Promise<void> {
   const base = apiBase();
   const stack = await loadLocalStack();
@@ -204,6 +271,7 @@ export async function pairGuestDevice(host: DeviceSession, guest: DeviceSession,
     return registry[0]?.address ?? null;
   });
   if (!identity?.identityId) throw new Error("host has no identity");
+  await ensureSecondMethod(host);
   if (hostAddress) {
     await fundUsdc(hostAddress, 5_000_000n);
     await waitForDeployed(hostAddress).catch(() => undefined);

@@ -12,6 +12,7 @@ import {
   confirmSimpleSend,
   createSuperPayProposal,
   createWalletFromUi,
+  ensureSecondMethod,
   enrollSuperEntity,
   executeProposalExpectNoSignatures,
   executeSuperContractCall,
@@ -62,8 +63,9 @@ test.describe.serial("local Hardhat stack", () => {
   });
 
   test("receive USDC and wait for on-chain createAccount", async () => {
+    await ensureSecondMethod(host, stack);
     await host.page.goto("/wallet/receive");
-    await expect(host.page.getByText("Receive")).toBeVisible();
+    await expect(host.page.getByTestId("receive-address")).toBeVisible({ timeout: 30_000 });
     await fundUsdc(walletAddress, 20_000_000n, stack);
     await waitForDeployed(walletAddress);
     await host.page.goto("/wallet");
