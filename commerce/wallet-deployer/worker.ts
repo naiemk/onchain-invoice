@@ -16,7 +16,44 @@ import type { Server } from "node:http";
 const FACTORY_ABI = [
   "function createAccount(bytes32 identityId, bytes32 salt) returns (address)",
   "function predictAddress(bytes32 salt) view returns (address)",
+  "function store() view returns (address)",
 ];
+
+const IDENTITY_GET_ABI = [
+  "function getIdentity(bytes32 identityId) view returns (bool exists, bool restoreEnabled, uint8 methodCount, uint8 eoaCount, uint8 webauthnCount, uint8 yubikeyCount)",
+];
+
+/** A funded identity wallet deploys only after a second on-chain method. */
+export async function identityDeployGate(
+  provider: import("ethers").Provider,
+  factoryAddress: string,
+  identityId: string
+): Promise<"deploy" | "needs_second_method"> {
+  const factory = new Contract(factoryAddress, FACTORY_ABI, provider);
+  const storeAddr = (await factory.store()) as string;
+  const store = new Contract(storeAddr, IDENTITY_GET_ABI, provider);
+  const rec = (await store.getIdentity(identityId)) as { exists?: boolean; methodCount?: bigint | number };
+  const exists = Boolean(rec.exists);
+  const count = Number(rec.methodCount ?? 0);
+  if (!exists || count < 2) return "needs_second_method";
+  return "deploy";
+}
+
+/** Gate, then createAccount. Used by the deployer tick. */
+export async function deployIdentityIfReady(
+  factory: Contract,
+  identityId: string,
+  salt: string
+): Promise<"needs_second_method" | "deployed"> {
+  const runner = factory.runner;
+  const provider = runner && "provider" in runner ? runner.provider : null;
+  if (!provider) throw new Error("factory runner has no provider");
+  const gate = await identityDeployGate(provider, await factory.getAddress(), identityId);
+  if (gate === "needs_second_method") return gate;
+  const tx = await factory.createAccount(identityId, salt);
+  await tx.wait();
+  return "deployed";
+}
 
 const RECOVERY_ABI = [
   "function initiateOwnerRecovery(address wallet, bytes newOwnerPubkey)",
@@ -203,13 +240,16 @@ export class WalletDeployerWorker {
           continue;
         }
         try {
-          const tx = await factory.createAccount(account.identityId, account.salt);
-          const receipt = await tx.wait();
+          const outcome = await deployIdentityIfReady(factory, account.identityId, account.salt);
+          if (outcome === "needs_second_method") {
+            await this.trackActivation(account.address, { funded: true, error: "needs_second_method" });
+            continue;
+          }
           await this.markDeployed(account.address, String(chain.chainId));
           await this.trackActivation(account.address, { deployed: true });
           this.activity?.append("wallet-deployed", {
             chainId: String(chain.chainId),
-            payload: { address: account.address, txHash: receipt?.hash },
+            payload: { address: account.address },
           });
         } catch (error) {
           await this.trackActivation(account.address, { funded: true, error: String(error) }).catch(() => undefined);

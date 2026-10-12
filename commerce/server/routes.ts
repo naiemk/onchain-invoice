@@ -195,6 +195,7 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
           feeTokenDecimals: w.feeTokenDecimals,
           turnstileSiteKey: context.config.turnstileSiteKey ?? null,
           identityStoreAddress,
+          legacyAccountCreate: false,
           googleAuthEnabled: Boolean(
             context.config.identity.googleClientId &&
               context.config.identity.googleClientSecret &&

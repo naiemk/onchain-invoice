@@ -28,7 +28,11 @@ Do not rely on Super upgrade copy that says email recovery is permanently disabl
 
 Production `restoreDelay` is **259200 seconds (3 days)** — default in [`scripts/deploy-identity-wallet.ts`](../scripts/deploy-identity-wallet.ts) and tcmain `IDENTITY_RESTORE_DELAY`. Freeze that number for GA unless audit requires a change.
 
-`IDENTITY_RESTORE_ENABLED` (API override of on-chain `restoreEnabled`) is a **test hook**. It must not be set on tcmain.
+`IDENTITY_RESTORE_ENABLED` (API override of on-chain `restoreEnabled`) is a **test hook**. It must not be set on tcmain. `loadConfig` throws if that variable is set and `TC_PRODUCT=tcmain` or the host is `trustless-commerce.com`.
+
+Identity implementation, factory, and store are frozen before the Base deploy. A new implementation means a new factory and new addresses. [`scripts/deploy-identity-wallet.ts`](../scripts/deploy-identity-wallet.ts) writes `gitTag` (`git describe --tags --always --dirty`) on the deploy artifact. L4.4 records that tag with the deployed addresses. Creation bytecode for IdentityStore, IdentityWallet, and IdentityWalletFactory is snapshotted in [`test/snapshots/identity-bytecode.json`](../test/snapshots/identity-bytecode.json) at solc 0.8.26 (`npm run test:wallet-cert`).
+
+Production `IdentityStore` owner is [`IdentityStoreTimelock`](../contracts/wallet/IdentityStoreTimelock.sol). The proposer is the operator multisig. The timelock delay is 259200 seconds unless an audit sets a different break-glass delay. At the L4.4 Base deploy, tcmain points the store owner at that timelock address. `setRecoveryOperator` and `setRestoreDelay` go through schedule, wait, then execute. A direct EOA owner call reverts `OwnableUnauthorizedAccount` ([`test/IdentityStoreTimelock.ts`](../test/IdentityStoreTimelock.ts)). The Base deploy does not use this owner until that assignment.
 
 ---
 
@@ -43,11 +47,11 @@ Recoverability is not true in every state:
 Fund safety is not CI-complete:
 
 - Hardhat covers store/wallet math ([`test/IdentityStore.ts`](../test/IdentityStore.ts), [`test/IdentityWalletE2e.ts`](../test/IdentityWalletE2e.ts))
-- Playwright email + operator path is **not** in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) or [`scripts/pre-commit-ci.sh`](../scripts/pre-commit-ci.sh)
+- Playwright email + operator path runs in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (`identity-email-restore`). It is not a required status check until branch protection says so. Precommit stays [`scripts/pre-commit-ci.sh`](../scripts/pre-commit-ci.sh)
 - No invariant / fuzz suite
 - [Security](security.md) still describes legacy `AdminGuardianRecovery`, not IdentityStore operator
 - No external audit of Identity\* contracts
-- Store `Ownable` can `setRecoveryOperator` / `setRestoreDelay` with no timelock
+- Store owner setters go through `IdentityStoreTimelock` in tests. The Base deploy still has to assign that contract as owner (L1.7 / L4.4)
 
 ---
 
@@ -164,7 +168,7 @@ Legend: **Email** = operator `initiateRestore` after OTP. **Other-key** = existi
 | S5 | Pending restore, delay not elapsed | Cannot start another (`RestorePending`) | Yes; cancel with old key | IdentityStore delayed restore | add race test |
 | S6 | Pending, ready to execute | Anyone `executeRestore` | Yes | IdentityStore + worker execute | `wallet-cert` |
 | S7 | Cancelled pending | Can start again | Yes | IdentityStore cancel | keep + e2e cancel |
-| S8 | `disableRestore` | **No** (`RestoreIsDisabled`) | **Yes** if a method remains | IdentityStore disable + Playwright block | last-method invariant **TBD-S8** |
+| S8 | `disableRestore` | **No** (`RestoreIsDisabled`) | **Yes** if a method remains | IdentityStore “disableRestore needs two methods…”; IdentityWalletE2e “remaining passkey still spends after disableRestore…” | same tests |
 | S9 | Email lost, other-key remains | No OTP path | Yes | Other-keys wizard / recover prove | e2e other-keys |
 | S10 | Operator Super down / EOA ≠ operator | Request stuck `awaiting_operator` | Yes | Worker branch | Ops runbook **TBD-S10** |
 | S11 | SQLite wiped, chain intact | After persist-log replay | After reindex | CommercePersistRecoveryE2e | live drill **TBD-S11** |
@@ -172,11 +176,11 @@ Legend: **Email** = operator `initiateRestore` after OTP. **Other-key** = existi
 | S13 | User Super converted | Not certified | User-accepted | — | Beta banner only |
 | S14 | `recoveryOperator == 0` | Initiate reverts `RestoreOperatorUnset` | Yes | IdentityStore unset operator | keep |
 
-**Product gates scheduled (not in this doc PR):**
+**Product gates in this tree:**
 
-- Hide receive + skip deployer `createAccount` until identity has ≥2 methods
-- Cannot `removeMethod` to zero remaining methods when `restoreEnabled == false`
-- Cannot `disableRestore` unless `methodCount >= 2` (optional; preferred with the remove invariant)
+- Receive UI and deployer `createAccount` wait until `methodCount >= 2` (`useIdentityFundable`, `deployIdentityIfReady`, Playwright `identity-fund-gate.spec.ts`, Hardhat `IdentityDeployerGate`)
+- `removeMethod` reverts `LastMethod` when `methodCount <= 1`, including after `disableRestore`
+- `disableRestore` reverts `RestoreNeedsSecondMethod` when `methodCount < 2`, then still requires an EOA (`RestoreRequiresEoa`)
 
 CREATE2 salt (golden vs factory `predictAddress`):
 
@@ -198,11 +202,11 @@ See [`commerce/shared/wallet-address.ts`](../commerce/shared/wallet-address.ts) 
 | F4 | USDC on undeployed CREATE2, never `createAccount` | Lock-up | Deployer min-balance deploy; persist-log | persist-recovery harness + **TBD-S2** |
 | F5 | Compromised reco Super | Initiate restore for any `restoreEnabled` identity | 2-of-3; 3-day delay; cancel with remaining method; store-owner break-glass under timelock | IdentityWalletE2e 2-of-3 restore + e2e |
 | F6 | Compromised store owner | Swap operator / set delay 0 | Production owner = timelocked multisig | Ops + **TBD-F6** |
-| F7 | `disableRestore` then lose last method | Permanent lock-up | Second method before funds; cannot remove last method if restore off | **TBD-S8** |
-| F8 | Cancel vs execute race | Attacker method lands | Worker cancel-before-execute; on-chain cancel before `executeAfter` wins | Worker sort + **TBD-F8** Hardhat |
+| F7 | `disableRestore` then lose last method | Permanent lock-up | Second method before funds; cannot remove last method if restore off | IdentityStore last-method test; IdentityWalletE2e “remaining passkey still spends…” |
+| F8 | Cancel vs execute race | Attacker method lands | Worker cancel-before-execute; on-chain cancel before `executeAfter` wins | IdentityStore “cancel before the delay blocks executeRestore”; IdentityWalletE2e “cancel before the delay blocks execute…” |
 | F9 | Email OTP only | Session / request, not on-chain restore | Operator still required | CommerceIdentity + hosted recovery tests |
 | F10 | SQLite / chain desync | Login vs UserOp mismatch | Chain is authority; reindex after restore/remove | persist + **TBD-S11** |
-| F11 | `IDENTITY_RESTORE_ENABLED=0` in prod | Email restore silently dead | Ban on tcmain env examples; cert test | **TBD-F11** |
+| F11 | `IDENTITY_RESTORE_ENABLED=0` in prod | Email restore silently dead | Ban on tcmain env examples; boot throws | MainnetBoot |
 | F12 | User Super (`enableSuper`) | Uncertified spend/recovery | Beta warning; out of bar | Copy + UX |
 
 **P0 rule:** no P0 without a mitigation and a test or ops procedure id.
@@ -224,9 +228,9 @@ Each epic: goal, in/out of scope, tasks, exit, evidence.
 **Tasks:**
 
 - [x] Publish this program document
-- [ ] Super beta banner + legal: not fully audited; stay on simple or use at own risk
-- [ ] Align Super upgrade strings so they do not claim Identity `enableSuper` disables email restore
-- [ ] Freeze “no new hosted legacy Wallet.sol creates” in create/wallet-config
+- [x] Super beta banner + legal: unaudited; stay on simple or use at own risk
+- [x] Align Super upgrade strings so they do not claim Identity `enableSuper` disables email restore
+- [x] Freeze “no new hosted legacy Wallet.sol creates” in create/wallet-config
 
 **Exit:** Policy in this file; security.md describes IdentityStore operator, not only AdminGuardian.
 
@@ -244,13 +248,13 @@ Each epic: goal, in/out of scope, tasks, exit, evidence.
 
 **Tasks:**
 
-- [ ] API/UI: hide receive address until identity has ≥2 on-chain methods
-- [ ] wallet-deployer: skip `createAccount` until ≥2 methods (persist-log still covers premature deposits)
-- [ ] Solidity: if `restoreEnabled == false`, revert `removeMethod` that would leave zero methods
-- [ ] Solidity (preferred): revert `disableRestore` unless `methodCount >= 2`
+- [x] API/UI: hide receive address until identity has ≥2 on-chain methods
+- [x] wallet-deployer: skip `createAccount` until ≥2 methods (persist-log still covers premature deposits)
+- [x] Solidity: if `restoreEnabled == false`, revert `removeMethod` that would leave zero methods
+- [x] Solidity (preferred): revert `disableRestore` unless `methodCount >= 2`
 - [ ] Operator runbook: reco 2-of-3 as `recoveryOperator`; S10/S12 procedures; break-glass `setRecoveryOperator` only via Epic 2 timelock
-- [ ] Hardhat: cancel mined before delay wins against `executeRestore` (F8)
-- [ ] Remove or ignore `IDENTITY_RESTORE_ENABLED` on tcmain examples; fail boot if set in production-like config
+- [x] Hardhat: cancel mined before delay wins against `executeRestore` (F8)
+- [x] Remove or ignore `IDENTITY_RESTORE_ENABLED` on tcmain examples; fail boot if set in production-like config
 - [ ] Keep lost-device cancel UX on simple; do not require user Super for cancel
 
 **Exit:** every matrix cell has a named test id or ops procedure; no cell is “hope the worker is up” without **TBD-S12**.
@@ -265,12 +269,12 @@ Each epic: goal, in/out of scope, tasks, exit, evidence.
 
 **Tasks:**
 
-- [ ] Bytecode/ABI snapshots for IdentityStore, IdentityWallet, IdentityWalletFactory
-- [ ] Certify in docs: new implementation requires new factory and new addresses
+- [x] Bytecode/ABI snapshots for IdentityStore, IdentityWallet, IdentityWalletFactory
+- [x] Certify in docs: new implementation requires new factory and new addresses
 - [ ] Production store owner = timelocked multisig; `setRecoveryOperator` / `setRestoreDelay` are break-glass
-- [ ] Hardhat: spend after successful restore; spend after disableRestore using remaining EOA/Yubi; AA24 still holds
+- [x] Hardhat: spend after successful restore; spend after disableRestore using remaining EOA/Yubi; AA24 still holds
 - [ ] Document F4: deployer min-balance + persist-log; never “unreachable because never deployed”
-- [ ] User Super: beta warning on convert; converting **leaves the certified bar**
+- [x] User Super: beta warning on convert; converting **leaves the certified bar**
 
 **Exit:** threat table fully filled; no P0 without mitigation.
 
@@ -286,12 +290,12 @@ Each epic: goal, in/out of scope, tasks, exit, evidence.
 
 **Tasks:**
 
-- [ ] Tag suite `wallet-cert`: existing IdentityStore delay/cancel/execute/disable + IdentityWallet UserOp + Super-as-operator initiateRestore ([`test/IdentityWalletE2e.ts`](../test/IdentityWalletE2e.ts) “2-of-3 initiates a delayed identity restore”) + new matrix / F8 / last-method tests
-- [ ] Required GitHub Actions job for [`ui/e2e/identity-email-restore.spec.ts`](../ui/e2e/identity-email-restore.spec.ts) (or a headless subset). Precommit may stay `npm test` + `ui:build` if the e2e job is required on PRs
-- [ ] ABI/bytecode snapshots; PR fails on accidental bytecode change
-- [ ] `CODEOWNERS` on `contracts/wallet/Identity*.sol` and cert tests
+- [x] Tag suite `wallet-cert`: existing IdentityStore delay/cancel/execute/disable + IdentityWallet UserOp + Super-as-operator initiateRestore ([`test/IdentityWalletE2e.ts`](../test/IdentityWalletE2e.ts) “2-of-3 initiates a delayed identity restore”) + new matrix / F8 / last-method tests. The GitHub job is not a required check until branch protection says so
+- [ ] Required GitHub Actions job for [`ui/e2e/identity-email-restore.spec.ts`](../ui/e2e/identity-email-restore.spec.ts) (or a headless subset). The workflow runs it; branch protection still has to require the check
+- [x] ABI/bytecode snapshots; PR fails on accidental bytecode change
+- [x] `CODEOWNERS` on `contracts/wallet/Identity*.sol` and cert tests
 - [ ] Optional later: Foundry invariants (method count, pending XOR restoreEnabled, operator Super threshold)
-- [ ] Ban `IDENTITY_RESTORE_ENABLED` in [`deploy/overlays/env.api.tcmain.example`](../deploy/overlays/env.api.tcmain.example) and dist copies
+- [x] Ban `IDENTITY_RESTORE_ENABLED` in [`deploy/overlays/env.api.tcmain.example`](../deploy/overlays/env.api.tcmain.example) and dist copies
 
 **Exit:** a commit that breaks path A or B fails CI.
 

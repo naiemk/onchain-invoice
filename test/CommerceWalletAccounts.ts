@@ -111,6 +111,7 @@ describe("commerce wallet accounts API", function () {
       expect(body.implementationAddress?.toLowerCase()).to.equal(IMPL.toLowerCase());
       expect(body.chains.length).to.be.greaterThan(0);
       expect(body.advancedWalletAbi?.length).to.be.greaterThan(0);
+      expect((body as { legacyAccountCreate?: boolean }).legacyAccountCreate).to.equal(false);
     });
   });
 

@@ -1,0 +1,11 @@
+# Identity wallet contracts and the wallet-cert suite.
+/contracts/wallet/Identity*.sol @naiemk
+/test/IdentityStore.ts @naiemk
+/test/IdentityWalletE2e.ts @naiemk
+/test/IdentityDeployerGate.ts @naiemk
+/test/IdentityStoreTimelock.ts @naiemk
+/test/IdentityBytecode.ts @naiemk
+/test/IdentityFundable.ts @naiemk
+/test/LaunchCopy.ts @naiemk
+/test/MainnetBoot.ts @naiemk
+/test/snapshots/identity-bytecode.json @naiemk
