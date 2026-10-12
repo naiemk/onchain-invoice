@@ -13,6 +13,8 @@ flowchart LR
 
 Hosted **simple wallet** (IdentityWallet + IdentityStore, Base) has its own certification program: [`docs/wallet-mainnet-assurance.md`](docs/wallet-mainnet-assurance.md). That path is not gated on M5 (commerce/sweeper audit). Super Wallet remains beta until a later program.
 
+Ordered tasks, descriptions, and definitions of done from this tree to public mainnet: [`docs/mainnet-launch.md`](docs/mainnet-launch.md).
+
 ---
 
 ## M1 — Base, Tron, and Solana (testnet)

@@ -9,7 +9,7 @@ Crypto invoices with deterministic on-chain payment addresses. Merchants share a
 !!! note "Launch chains"
     Ethereum Sepolia (USDC) and TRON Nile (USDT) are live in product. Solana Devnet (USDC, PDA settle) is implemented under `solana/` — enable via `SOLANA_PROGRAM_ID` / sweeper role `solana`. See [ROADMAP.md](https://github.com/naiemk/onchain-invoice/blob/main/ROADMAP.md).
 
-Product sequence (Base/Tron/Solana testnets → mainnet → ops → agent docs → audit): [ROADMAP.md](https://github.com/naiemk/onchain-invoice/blob/main/ROADMAP.md).
+Product sequence (Base/Tron/Solana testnets → mainnet → ops → agent docs → audit): [ROADMAP.md](https://github.com/naiemk/onchain-invoice/blob/main/ROADMAP.md). Task list through public launch: [Mainnet launch](mainnet-launch.md).
 
 ## Platform integrations
 

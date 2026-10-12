@@ -19,6 +19,7 @@ nav:
   - Vercel UI: vercel.md
   - Security: security.md
   - Simple wallet assurance: wallet-mainnet-assurance.md
+  - Mainnet launch: mainnet-launch.md
 markdown_extensions:
   - admonition
   - pymdownx.superfences
