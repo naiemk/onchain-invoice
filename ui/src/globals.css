@@ -175,3 +175,9 @@ html[lang="fa"] body {
 .status-pill.ok { @apply bg-ok/15 text-ok; }
 .status-pill.warn { @apply bg-warn/15 text-warn; }
 .status-pill.danger { @apply bg-destructive/15 text-destructive; }
+
+@media print {
+  body * { visibility: hidden; }
+  #invoice-preview, #invoice-preview * { visibility: visible; }
+  #invoice-preview { position: absolute; left: 0; top: 0; width: 100%; border: 0; box-shadow: none; }
+}
