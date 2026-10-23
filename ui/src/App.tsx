@@ -22,13 +22,19 @@ import { LegalHubPage, LegalPage } from "@/pages/react/LegalPage";
 import type { MessageKey } from "@/i18n/t.js";
 import { SITE } from "@/shared/site";
 import seoRoutes from "@/shared/seo-routes.json";
+import { LANDING_PAGES, landingFor } from "@/pages/seo/landing-content";
+import { LandingPage } from "@/pages/seo/LandingPage";
 import { NotFoundPage } from "@/pages/react/NotFoundPage";
 
-const KNOWN_ROUTES = [...seoRoutes.indexable, ...seoRoutes.appOnly];
 
 function isKnownRoute(pathname: string): boolean {
   const clean = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
-  return KNOWN_ROUTES.some((r) => (r === "/" ? clean === "/" : clean === r || clean.startsWith(`${r}/`)));
+  return (
+    seoRoutes.indexable.includes(clean) ||
+    seoRoutes.appOnly.some((r) => clean === r || clean.startsWith(`${r}/`)) ||
+    clean.startsWith("/merchant/") ||
+    clean.startsWith("/wallet/")
+  );
 }
 
 /** Routes that are stateful/private app screens: never index. */
@@ -65,6 +71,18 @@ function usePageMeta() {
       canonical.remove();
     }
 
+    const setMeta = (attr: "name" | "property", key: string, value: string) =>
+      setHeadTag(`meta[${attr}="${key}"]`, () => {
+        const m = document.createElement("meta");
+        m.setAttribute(attr, key);
+        return m;
+      }).setAttribute("content", value);
+    setMeta("property", "og:title", meta.title);
+    setMeta("property", "og:description", meta.description);
+    setMeta("property", "og:url", `${SITE.origin}${pathname === "/" ? "/" : pathname.replace(/\/$/, "")}`);
+    setMeta("name", "twitter:title", meta.title);
+    setMeta("name", "twitter:description", meta.description);
+
     const robots = setHeadTag('meta[name="robots"]', () => {
       const m = document.createElement("meta");
       m.setAttribute("name", "robots");
@@ -76,6 +94,8 @@ function usePageMeta() {
 }
 
 function pageMeta(path: string, t: (key: MessageKey) => string): { title: string; description: string } {
+  const landing = landingFor(path);
+  if (landing) return { title: landing.metaTitle, description: landing.metaDescription };
   switch (path) {
     case "/get-paid":
       return { title: t("meta.getPaidTitle"), description: t("meta.getPaidDescription") };
@@ -189,6 +209,9 @@ function AppRoutes() {
         <Route path="/risks" element={<LegalPage docId="risks" />} />
         <Route path="/security-checks" element={<LegalPage docId="security-checks" />} />
         <Route path="/wallet/*" element={<WalletRouter />} />
+        {LANDING_PAGES.map((c) => (
+          <Route key={c.path} path={c.path} element={<LandingPage content={c} />} />
+        ))}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>

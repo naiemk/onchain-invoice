@@ -8,6 +8,14 @@ import { saveWalletMode } from "@/shared/wallet-mode.js";
 import { SITE } from "@/shared/site.js";
 import { cn } from "@/lib/utils";
 
+const SITE_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "Organization", name: "Trustless Commerce", url: SITE.origin, logo: `${SITE.origin}/logo.png`, sameAs: [SITE.githubUrl, SITE.telegramChannel] },
+    { "@type": "WebSite", name: "Trustless Commerce", url: SITE.origin },
+  ],
+};
+
 export function HomePage() {
   const { t } = useLocale();
   const navigate = useNavigate();
@@ -41,23 +49,24 @@ export function HomePage() {
             breadcrumb={t("home.eyebrow")}
             title={
               <>
-                The wallet you run{" "}
-                <span className="text-emphasis">business from.</span>
+                Accept stablecoin payments.{" "}
+                <span className="text-emphasis">Keep control of your money.</span>
               </>
             }
-            lede={t("home.lede")}
+            lede="Create crypto invoices, share payment links, and integrate non-custodial checkout. Built for businesses and developers that want direct-to-wallet payments."
           />
           <div className="flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link to="/wallet">
-                {t("home.ctaOpenWallet")}
+              <Link to="/create">
+                {t("home.ctaCreate")}
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button asChild variant="secondary" size="lg">
-              <a href={SITE.docsUrl} target="_blank" rel="noopener noreferrer">
-                {t("home.ctaFieldGuide")}
-              </a>
+              <Link to="/developers/crypto-payment-api">Explore the API</Link>
+            </Button>
+            <Button asChild variant="ghost" size="lg">
+              <Link to="/wallet">{t("home.ctaOpenWallet")}</Link>
             </Button>
           </div>
         </div>
@@ -69,6 +78,29 @@ export function HomePage() {
             className="h-full w-full object-cover"
           />
         </div>
+      </section>
+
+      <section className="mt-20 space-y-4" id="use-cases">
+        <h2 className="text-2xl font-semibold tracking-tight">Ways to get paid</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            { to: "/crypto-invoices", title: "Crypto invoices", body: "Bill a client in stablecoins and track created, paid and swept states." },
+            { to: "/crypto-payment-links", title: "Payment links", body: "Share a link or embed checkout; customers pay to a unique address." },
+            { to: "/developers/crypto-payment-api", title: "Payment API", body: "Create invoices with one request and poll status from your backend." },
+          ].map((c) => (
+            <Link key={c.to} to={c.to} className="rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/30">
+              <h3 className="text-base font-semibold">{c.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{c.body}</p>
+            </Link>
+          ))}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Flow: create an invoice, the customer pays, the payment is detected, and the funds are swept to your address.{" "}
+          <Link className="underline" to="/stablecoin-payments">
+            How stablecoin payments work
+          </Link>
+          .
+        </p>
       </section>
 
       <section className="mt-20 space-y-6" id="loop">
@@ -138,6 +170,7 @@ export function HomePage() {
           </Button>
         </PageCard>
       </section>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_LD) }} />
     </div>
   );
 }
