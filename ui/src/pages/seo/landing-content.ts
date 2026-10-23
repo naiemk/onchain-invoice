@@ -133,6 +133,34 @@ export const LANDING_PAGES: LandingContent[] = [
     ],
     related: ["/developers", "/integrations", "/crypto-invoices"],
   },
+  {
+    path: "/integrations/woocommerce",
+    metaTitle: "Accept USDC & USDT on WooCommerce | Trustless Commerce",
+    metaDescription:
+      "Native WooCommerce payment gateway with hosted crypto checkout. Enter your API URL and payout wallet; orders update automatically when payment is detected.",
+    eyebrow: "WooCommerce",
+    h1: "Accept stablecoin payments on WooCommerce",
+    lede: "The Trustless Commerce plugin adds a crypto option at checkout. Customers pay on a hosted page, and the order is marked paid when the on-chain payment is confirmed.",
+    primaryCta: { label: "View the setup guide", to: `${SITE.githubUrl}/tree/main/platforms/woocommerce`, external: true },
+    secondaryCta: { label: "All integrations", to: "/integrations" },
+    steps: [
+      { title: "Install the plugin", body: "Copy the plugin folder to wp-content/plugins and activate Trustless Commerce for WooCommerce." },
+      { title: "Configure", body: "Under WooCommerce, Settings, Payments, enter your API URL and your payout wallet (EVM, and optionally Tron), plus the default network and token." },
+      { title: "Customer checks out", body: "The plugin creates an invoice for the order and redirects the customer to the hosted checkout page." },
+      { title: "Order updates", body: "A callback to your shop's wc-api endpoint marks the order paid. The callback URL is sent automatically; no manual webhook setup is needed." },
+    ],
+    points: [
+      { title: "Requirements", body: "WordPress 6.0+, WooCommerce 8.0+, PHP 8.1+, and a reachable Trustless Commerce API." },
+      { title: "Idempotent orders", body: "Each WooCommerce order uses an idempotency key, so retries do not create duplicate invoices." },
+      { title: "Your wallet, your payout", body: "Funds settle to the wallet addresses you enter in the plugin settings." },
+    ],
+    faq: [
+      STATUS_FAQ,
+      FEE_FAQ,
+      { q: "Is the plugin listed in the WordPress directory?", a: "Not as far as this page is concerned. Install it from the repository as described in the setup guide." },
+    ],
+    related: ["/crypto-payment-links", "/developers/crypto-payment-api", "/integrations"],
+  },
 ];
 
 export function landingFor(path: string): LandingContent | undefined {

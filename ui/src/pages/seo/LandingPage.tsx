@@ -4,18 +4,25 @@ import { Button } from "@/components/ui/button";
 import { PageHero } from "@/components/PageHero";
 import { PageCard } from "@/components/PageSplit";
 import { SITE } from "@/shared/site";
+import { trackEvent } from "@/shared/analytics";
 import { LANDING_PAGES, ROADMAP_URL, type LandingContent } from "./landing-content";
 
-function CtaLink({ cta, variant }: { cta: { label: string; to: string; external?: boolean }; variant?: "secondary" }) {
+function CtaLink({ cta, variant, page }: { cta: { label: string; to: string; external?: boolean }; variant?: "secondary"; page: string }) {
+  const onClick = () => {
+    trackEvent("seo_cta_clicked", { page, cta: cta.label });
+    if (cta.to.startsWith("/create")) trackEvent("invoice_create_started", { source: page });
+    if (cta.external && cta.to.includes("woocommerce")) trackEvent("integration_guide_opened", { platform: "woocommerce" });
+    if (cta.external && cta.to.startsWith(SITE.docsUrl)) trackEvent("developer_docs_opened", { source: page });
+  };
   return (
     <Button asChild size="lg" variant={variant}>
       {cta.external ? (
-        <a href={cta.to} target="_blank" rel="noopener noreferrer">
+        <a href={cta.to} onClick={onClick} target="_blank" rel="noopener noreferrer">
           {cta.label}
           <ArrowUpRight className="h-4 w-4" />
         </a>
       ) : (
-        <Link to={cta.to}>{cta.label}</Link>
+        <Link to={cta.to} onClick={onClick}>{cta.label}</Link>
       )}
     </Button>
   );
@@ -43,8 +50,8 @@ export function LandingPage({ content }: { content: LandingContent }) {
     <div className="mx-auto max-w-5xl px-4 pb-14 pt-10 md:px-8">
       <PageHero breadcrumb={content.eyebrow} title={content.h1} lede={content.lede} />
       <div className="flex flex-wrap gap-3">
-        <CtaLink cta={content.primaryCta} />
-        <CtaLink cta={content.secondaryCta} variant="secondary" />
+        <CtaLink cta={content.primaryCta} page={content.path} />
+        <CtaLink cta={content.secondaryCta} variant="secondary" page={content.path} />
       </div>
 
       <section className="mt-16 space-y-4">
