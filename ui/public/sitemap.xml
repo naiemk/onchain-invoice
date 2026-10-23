@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://trustlesscommerce.app/</loc></url>
-  <url><loc>https://trustlesscommerce.app/integrations</loc></url>
-  <url><loc>https://trustlesscommerce.app/create</loc></url>
-  <url><loc>https://trustlesscommerce.app/merchant</loc></url>
-  <url><loc>https://trustlesscommerce.app/legal</loc></url>
-  <url><loc>https://trustlesscommerce.app/terms</loc></url>
-  <url><loc>https://trustlesscommerce.app/privacy</loc></url>
-  <url><loc>https://trustlesscommerce.app/cookies</loc></url>
-  <url><loc>https://trustlesscommerce.app/risks</loc></url>
-  <url><loc>https://trustlesscommerce.app/security-checks</loc></url>
+  <url><loc>https://trustless-commerce.com/</loc></url>
+  <url><loc>https://trustless-commerce.com/get-paid</loc></url>
+  <url><loc>https://trustless-commerce.com/developers</loc></url>
+  <url><loc>https://trustless-commerce.com/integrations</loc></url>
+  <url><loc>https://trustless-commerce.com/security</loc></url>
+  <url><loc>https://trustless-commerce.com/create</loc></url>
+  <url><loc>https://trustless-commerce.com/legal</loc></url>
+  <url><loc>https://trustless-commerce.com/terms</loc></url>
+  <url><loc>https://trustless-commerce.com/privacy</loc></url>
+  <url><loc>https://trustless-commerce.com/cookies</loc></url>
+  <url><loc>https://trustless-commerce.com/risks</loc></url>
+  <url><loc>https://trustless-commerce.com/security-checks</loc></url>
 </urlset>

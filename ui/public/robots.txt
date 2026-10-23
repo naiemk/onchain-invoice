@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://trustlesscommerce.app/sitemap.xml
+Sitemap: https://trustless-commerce.com/sitemap.xml
