@@ -1,0 +1,23 @@
+{
+  "indexable": [
+    "/",
+    "/get-paid",
+    "/developers",
+    "/integrations",
+    "/security",
+    "/create",
+    "/legal",
+    "/terms",
+    "/privacy",
+    "/cookies",
+    "/risks",
+    "/security-checks"
+  ],
+  "appOnly": [
+    "/pay",
+    "/buy",
+    "/merchant",
+    "/wallet",
+    "/admin"
+  ]
+}

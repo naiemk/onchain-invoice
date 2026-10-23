@@ -8,10 +8,12 @@ COPY ui ./ui
 COPY commerce/shared ./commerce/shared
 # Vite resolves the onchain-invoice browser alias inside ui/; no full package build needed.
 ENV VITE_API_BASE_URL=
-RUN npm ci && npm run ui:build
+# Chromium is needed only at build time to prerender marketing routes (ui/scripts/prerender.mjs).
+RUN npm ci && npx playwright-core install --with-deps chromium && npm run ui:build:seo
 
 FROM nginx:1.27-alpine
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY deploy/nginx/ui.conf /etc/nginx/conf.d/default.conf
+COPY deploy/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/dist-ui /usr/share/nginx/html
 EXPOSE 80

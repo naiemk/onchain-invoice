@@ -60,8 +60,19 @@ export const en = {
     switchToDark: "Switch to dark theme",
   },
 
+  notFound: {
+    title: "Page not found",
+    lede: "The page you are looking for does not exist or has moved.",
+    home: "Back to home",
+  },
+
   meta: {
     homeTitle: "Trustless Commerce",
+    developersTitle: "Developers · API and docs · Trustless Commerce",
+    developersDescription:
+      "Create crypto invoices through the Trustless Commerce API, read the docs, and hand the integration skill to your AI agent.",
+    notFoundTitle: "Page not found · Trustless Commerce",
+    notFoundDescription: "This page does not exist.",
     homeDescription:
       "The operating wallet for a crypto-native business — get paid, pay, cash in and out, passkey secured.",
     createTitle: "Create invoice · Trustless Commerce",
