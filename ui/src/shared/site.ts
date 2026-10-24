@@ -1,5 +1,7 @@
 /** Public site / docs / social links (dummy TG until live). */
 export const SITE = {
+  /** Canonical public origin (no trailing slash). */
+  origin: "https://trustless-commerce.com",
   docsUrl: "https://naiemk.github.io/onchain-invoice/",
   platformIntegrationDocsUrl: "https://naiemk.github.io/onchain-invoice/platform-integration/",
   agentsDocsUrl: "https://naiemk.github.io/onchain-invoice/agents/",
