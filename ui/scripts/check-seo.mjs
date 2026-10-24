@@ -41,6 +41,17 @@ for (const path of indexable) {
   }
 }
 
+// Internal links on prerendered pages must resolve to a known route (no broken nav).
+const known = new Set([...indexable, ...appOnly]);
+for (const path of indexable) {
+  const html = readFileSync(join(dist, path === "/" ? "" : path, "index.html"), "utf8");
+  for (const m of html.matchAll(/<a [^>]*href="(\/[^"#?]*)/g)) {
+    const href = m[1].length > 1 ? m[1].replace(/\/$/, "") : m[1];
+    const ok = known.has(href) || [...appOnly].some((r) => href.startsWith(r + "/")) || existsSync(join(dist, href));
+    if (!ok) fail.push(`${path}: broken internal link ${href}`);
+  }
+}
+
 const sm = readFileSync(join(dist, "sitemap.xml"), "utf8");
 const locs = [...sm.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
 if (new Set(locs).size !== locs.length) fail.push("sitemap: duplicates");
