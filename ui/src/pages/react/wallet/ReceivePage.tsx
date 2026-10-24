@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import QRCode from "qrcode";
 import { ArrowUpRight, Copy, Share2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { ExplorerLink } from "@/components/ExplorerLink";
 import { useLocale } from "@/providers/LocaleProvider";
 import { copyText } from "@/shared/dom.js";
 import { deploymentMode } from "@/shared/networks.js";
+import { useIdentityFundable } from "@/shared/identity-fundable.js";
 import { loadWalletSession } from "@/shared/wallet-session.js";
 import { shortAddress } from "@/shared/wallet-session.js";
 import { WalletFrame } from "./WalletFrame";
@@ -20,20 +22,27 @@ export function ReceivePage() {
   const { t } = useLocale();
   const navigate = useNavigate();
   const session = loadWalletSession();
+  const fundable = useIdentityFundable(session?.identityId);
   const [qrUrl, setQrUrl] = useState("");
   const [copied, setCopied] = useState(false);
   const [requestAmount, setRequestAmount] = useState("");
   const mode = deploymentMode();
+  const address = session?.address ?? "";
 
   useEffect(() => {
     if (!session) {
       navigate("/wallet", { replace: true });
       return;
     }
-    void QRCode.toDataURL(session.address, { margin: 2, width: 280 }).then(setQrUrl).catch(() => setQrUrl(""));
-  }, [session, navigate]);
+    if (fundable !== true) {
+      setQrUrl("");
+      return;
+    }
+    void QRCode.toDataURL(address, { margin: 2, width: 280 }).then(setQrUrl).catch(() => setQrUrl(""));
+  }, [session, navigate, fundable, address]);
 
   if (!session) return null;
+  const showAddress = fundable === true;
 
   const copyAddress = async () => {
     await copyText(session.address);
@@ -57,10 +66,10 @@ export function ReceivePage() {
     >
       <PageSplit>
         <PageCard className="flex flex-col items-center text-center">
-          {qrUrl ? (
+          {showAddress && qrUrl ? (
             <img src={qrUrl} alt={t("wallet.receiveQrAlt")} className="h-56 w-56 rounded-lg" width={224} height={224} />
           ) : (
-            <div className="flex h-56 w-56 items-center justify-center rounded-lg bg-muted" aria-busy="true" />
+            <div className="flex h-56 w-56 items-center justify-center rounded-lg bg-muted" aria-busy={fundable === null} />
           )}
           <StatusBadge tone="available" className="mt-4">
             {t("wallet.merchantWalletPill", { mode: mode === "testnet" ? t("common.testnet") : t("common.mainnet") })}
@@ -68,9 +77,10 @@ export function ReceivePage() {
         </PageCard>
 
         <PageCard className="space-y-6">
+          {showAddress ? (
           <div className="space-y-2">
             <Label>{t("wallet.receiveAddressLabel")}</Label>
-            <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 font-mono text-sm">
+            <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 font-mono text-sm" data-testid="receive-address">
               {shortAddress(session.address)}
               <ExplorerLink chainId={session.chainId} value={session.address} />
             </div>
@@ -85,6 +95,16 @@ export function ReceivePage() {
               </Button>
             </div>
           </div>
+          ) : (
+            <Alert data-testid="receive-needs-second-method">
+              <AlertDescription>
+                {t("wallet.receiveNeedsSecondMethod")}{" "}
+                <Link to="/wallet/security" className="font-medium underline">
+                  {t("wallet.addSecurityKey")}
+                </Link>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="border-t border-border pt-6">
             <Label htmlFor="request-amount">{t("wallet.requestAmountLabel")}</Label>

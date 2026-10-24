@@ -463,6 +463,9 @@ function IdentityUpgradeSection({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">{t("wallet.superWalletUpgradeTitle")}</h2>
         <p className="text-sm text-muted-foreground">{t("wallet.superWalletIdentityLede")}</p>
+        <Alert data-testid="super-wallet-beta">
+          <AlertDescription>{t("wallet.superWalletIdentityBeta")}</AlertDescription>
+        </Alert>
       </section>
       {funded && !onChainReady && (
         <Alert variant="warn">

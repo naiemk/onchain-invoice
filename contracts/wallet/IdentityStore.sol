@@ -187,6 +187,7 @@ contract IdentityStore is Ownable, IdentityErrors {
         IdentityTypes.Identity storage idn = _identities[identityId];
         if (!idn.exists) revert IdentityNotFound();
         if (!idn.restoreEnabled) revert RestoreAlreadyDisabled();
+        if (idn.methodCount < 2) revert RestoreNeedsSecondMethod();
         if (idn.eoaCount == 0) revert RestoreRequiresEoa();
         if (!_isIdentityEoa(identityId, msg.sender)) revert NotIdentityEoa();
         idn.restoreEnabled = false;

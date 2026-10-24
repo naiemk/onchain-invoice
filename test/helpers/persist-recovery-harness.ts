@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Contract, JsonRpcProvider, Wallet, getAddress } from "ethers";
+import { Contract, JsonRpcProvider, Wallet, ZeroAddress, getAddress } from "ethers";
 import {
   ENTRYPOINT_V09,
   ERC7821_BATCH_MODE,
@@ -15,7 +15,8 @@ import { resetRateLimitBuckets } from "../../commerce/server/rate-limit.js";
 import { SweeperWorker, type SweeperConfig } from "../../commerce/sweeper/worker.js";
 import { WalletDeployerWorker, type WalletDeployerConfig } from "../../commerce/wallet-deployer/worker.js";
 import { createIdentityWalletViaApi } from "./identity-commerce.js";
-import { simulatePasskey } from "./identity-signing.js";
+import { identityPasskeyBlob, simulatePasskey } from "./identity-signing.js";
+import { METHOD_WEBAUTHN } from "../../commerce/shared/identity-store.js";
 
 export const HH_DEPLOYER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 export const PRODUCT_CHAIN_ID = "11155111";
@@ -246,7 +247,9 @@ export async function createPasskeyWallet(
   baseUrl: string,
   factory: string,
   impl: string,
-  index: number
+  index: number,
+  /** Simple wallets deploy only after a second on-chain method; pass to add one right after creation. */
+  secondMethod?: { rpcUrl: string; storeAddress: string }
 ): Promise<{ address: string; salt: string; ownerQx: string; ownerQy: string; credentialId: string }> {
   const key = simulatePasskey();
   const created = await createIdentityWalletViaApi(baseUrl, {
@@ -255,6 +258,27 @@ export async function createPasskeyWallet(
     qy: key.qy,
     credentialId: `cred-persist-${index}`,
   });
+  if (secondMethod) {
+    const store = new Contract(
+      secondMethod.storeAddress,
+      [
+        "function hashAddMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa) view returns (bytes32)",
+        "function addMethod(bytes32 identityId, uint8 kind, bytes32 qx, bytes32 qy, address eoa, bytes authorization)",
+      ],
+      new Wallet(HH_DEPLOYER_KEY, new JsonRpcProvider(secondMethod.rpcUrl))
+    );
+    const second = simulatePasskey();
+    const digest = (await store.hashAddMethod(created.identityId, METHOD_WEBAUTHN, second.qx, second.qy, ZeroAddress)) as string;
+    const tx = await store.addMethod(
+      created.identityId,
+      METHOD_WEBAUTHN,
+      second.qx,
+      second.qy,
+      ZeroAddress,
+      identityPasskeyBlob({ identityId: created.identityId, key, message: digest })
+    );
+    await tx.wait();
+  }
   return {
     address: created.address,
     salt: created.salt,

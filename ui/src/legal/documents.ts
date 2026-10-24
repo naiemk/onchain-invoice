@@ -61,7 +61,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocId, LegalDocument> = {
           "Pairing additional trusted devices before you need them.",
           "Configuring email and guardian recovery where available.",
           "Verifying recipient addresses and transaction details before signing.",
-          "Understanding that Super Wallet upgrades are irreversible and disable email recovery.",
+          "Understanding that a legacy Super Wallet upgrade is irreversible and disables email recovery. An Identity Super Wallet is beta, unaudited, and email recovery stays available.",
         ],
       },
       {
@@ -370,7 +370,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocId, LegalDocument> = {
       {
         heading: "9. Super Wallet",
         paragraphs: [
-          "Upgrading to Super Wallet is irreversible. Email recovery is permanently disabled after upgrade. Team multisig adds operational complexity; loss of quorum keys can lock funds.",
+          "A legacy wallet upgrade to Super Wallet is irreversible and permanently disables email recovery. Converting an Identity wallet to Super Wallet is beta and unaudited; you can stay on a simple wallet, and that conversion keeps email recovery. Team multisig adds operational complexity; loss of quorum keys can lock funds.",
         ],
       },
       {
@@ -423,7 +423,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocId, LegalDocument> = {
         heading: "5. Optional backup and recovery",
         paragraphs: [
           "You may add a YubiKey or compatible security key as an additional signing method. You may also configure email recovery with a guardian approval delay for simple wallets.",
-          "Super Wallet upgrades disable email recovery permanently. Plan recovery and device access before upgrading.",
+          "Legacy Super Wallet upgrades disable email recovery permanently. Identity Super Wallet is beta and unaudited; email recovery stays available. Plan recovery and device access before upgrading.",
         ],
       },
       {

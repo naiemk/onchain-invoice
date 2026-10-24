@@ -14,6 +14,7 @@ abstract contract IdentityErrors {
     error InvalidSignature();
     error RestoreIsDisabled();
     error RestoreRequiresEoa();
+    error RestoreNeedsSecondMethod();
     error NotIdentityEoa();
     error RestoreAlreadyDisabled();
     error NotRecoveryOperator();
@@ -28,4 +29,7 @@ abstract contract IdentityErrors {
     error SignerExists();
     error SignerNotFound();
     error ZeroAddress();
+    error NotProposer();
+    error TimelockNotScheduled();
+    error TimelockNotReady();
 }

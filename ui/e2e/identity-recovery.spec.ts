@@ -3,6 +3,7 @@ import { Wallet } from "ethers";
 import { apiBase, loadLocalStack, withWorkerTicks } from "./helpers/stack.js";
 import {
   createIdentityWalletFromUi,
+  ensureSecondMethod,
   fundUsdc,
   openDevice,
   pairGuestDevice,
@@ -47,6 +48,7 @@ test.describe("identity recovery", () => {
   test("other keys YubiKey recovery adds a passkey", async ({ browser }) => {
     const host = await openDevice(browser);
     const created = await createIdentityWalletFromUi(host.page, "E2E Yubi Recover");
+    await ensureSecondMethod(host);
     await fundUsdc(created.address, 5_000_000n);
     await waitForDeployed(created.address);
     await host.page.goto("/wallet/security");
@@ -137,6 +139,7 @@ test.describe("identity recovery", () => {
     const page = await context.newPage();
     const host: DeviceSession = { context, page, keys };
     const created = await createIdentityWalletFromUi(host.page, "E2E Eoa No Gas");
+    await ensureSecondMethod(host);
     await fundUsdc(created.address, 5_000_000n);
     await waitForDeployed(created.address);
     await host.page.goto("/wallet/security");
@@ -196,6 +199,7 @@ test.describe("identity recovery", () => {
   test("pairs a guest device from the new-device wizard", async ({ browser }) => {
     const host = await openDevice(browser);
     const created = await createIdentityWalletFromUi(host.page, "E2E Pair Host");
+    await ensureSecondMethod(host);
     await fundUsdc(created.address, 5_000_000n);
     await waitForDeployed(created.address);
     const guest = await openDevice(browser);

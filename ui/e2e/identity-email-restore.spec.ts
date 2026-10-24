@@ -8,6 +8,7 @@ import {
   confirmSimpleSend,
   convertIdentitySuper,
   createIdentityWalletFromUi,
+  ensureSecondMethod,
   fundUsdc,
   increaseChainTime,
   loginIdentityFromEmail,
@@ -45,6 +46,7 @@ test.describe.serial("identity email restore", () => {
     const created2 = await createIdentityWalletFromUi(reco2.page, "Reco Two");
     const created3 = await createIdentityWalletFromUi(reco3.page, "Reco Three");
     superAddress = created1.address;
+    await ensureSecondMethod(reco1);
     await fundUsdc(superAddress, 10_000_000n);
     await waitForDeployed(superAddress);
     await convertIdentitySuper(reco1, [created2.email, created3.email], 2);
@@ -94,6 +96,7 @@ test.describe.serial("identity email restore", () => {
     const stack = await loadLocalStack();
     const alice = await openDevice(browser);
     const created = await createIdentityWalletFromUi(alice.page, "Alice Funded");
+    await ensureSecondMethod(alice);
     await fundUsdc(created.address, 5_000_000n);
     await waitForDeployed(created.address);
     await signOut(alice);
