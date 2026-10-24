@@ -27,7 +27,7 @@ export function chainHasOnrampSupport(root: HTMLElement, chainId: string): boole
   return supported.has(`${chainId}:USDC`) || supported.has(`${chainId}:USDT`);
 }
 
-/** Locked rail for fiat: Base USDC (MetaMask pay-in). */
+/** Locked rail for fiat: Base USDC (pay-in). */
 export function fiatMinimumChainIds(): string[] {
   return ["8453"];
 }

@@ -72,4 +72,4 @@ rateLimit:
   publicPerIpPerSecond: 20
   sweeperPerIpPerSecond: 50
 claimLeaseMs: 180000
-# MetaMask pay-in (/buy, invoice card, wallet cash-in). Default ON. Settles as Base USDC.
+# Fiat pay-in is controlled by env PAY_IN_ENABLED (default off; no on-ramp provider wired in yet).

@@ -396,7 +396,7 @@ export const walletFa = {
     "با کارت یا انتقال بانکی USDC یا USDT بخرید. رمزارز مستقیم به کیف پول می‌رود — بدون برداشت فاکتور.",
   depositFiatLabel: "با این می‌پردازید",
   depositContinue: "ادامه به تسویه‌حساب",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "حالت آزمایشی — بدون هزینهٔ واقعی و بدون تأمین روی زنجیره.",
   depositLoading: "در حال بارگذاری تسویه‌حساب…",

@@ -73,8 +73,8 @@ export interface AppConfig {
   rateLimit: RateLimitConfig;
   claimLeaseMs: number;
   configPath?: string;
-  /** MetaMask aggregator pay-in (/buy, invoice card, wallet cash-in). Default on. */
-  metamaskOnramp: MetamaskOnrampConfig;
+  /** Fiat pay-in (card/bank → USDC on Base). Off by default; no provider is wired in yet. */
+  payIn: PayInConfig;
   /** Passkey smart wallet factory (Sepolia / per-chain). */
   wallet: WalletConfig;
   /** Testnet faucet for fiat-only invoice e2e (secret-gated). */
@@ -166,13 +166,8 @@ export interface WalletChainEntry {
   networkLabel: string;
 }
 
-export interface MetamaskOnrampConfig {
+export interface PayInConfig {
   enabled: boolean;
-  ordersUrl: string;
-  regionsUrl: string;
-  geoUrl: string;
-  buyOrigin: string;
-  redirectUrl: string;
 }
 
 interface YamlFile {
@@ -211,14 +206,6 @@ interface YamlFile {
   claimLeaseMs?: number;
   email?: { resendApiKey?: string; from?: string; notifyTo?: string };
   walletAdminGuardian?: string;
-  metamaskOnramp?: {
-    enabled?: boolean;
-    ordersUrl?: string;
-    regionsUrl?: string;
-    geoUrl?: string;
-    buyOrigin?: string;
-    redirectUrl?: string;
-  };
   faucet?: {
     enabled?: boolean;
     secret?: string;
@@ -326,7 +313,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     claimLeaseMs: Number(env.CLAIM_LEASE_MS ?? file.claimLeaseMs ?? 180_000),
     configPath,
-    metamaskOnramp: loadMetamaskOnrampConfig(env, file.metamaskOnramp),
+    payIn: { enabled: ["1", "true", "yes"].includes((env.PAY_IN_ENABLED ?? "").trim().toLowerCase()) },
     wallet: loadWalletConfig(env, legacy?.rpcUrl, evmChains, file.wallet),
     faucet: loadFaucetConfig(env, file.faucet, {
       sweeperPrivateKey: blankToUndefined(expand(env.SWEEPER_PRIVATE_KEY ?? file.evm?.sweeperPrivateKey ?? "")),
@@ -611,37 +598,6 @@ function loadWalletChains(
     }
   }
   return entries;
-}
-
-function loadMetamaskOnrampConfig(
-  env: NodeJS.ProcessEnv,
-  file: YamlFile["metamaskOnramp"] | undefined
-): MetamaskOnrampConfig {
-  const enabledRaw = (env.METAMASK_ONRAMP_ENABLED ?? "").trim().toLowerCase();
-  const explicitlyOff =
-    enabledRaw === "0" || enabledRaw === "false" || enabledRaw === "no" || file?.enabled === false;
-  const ordersUrl = blankToUndefined(expand(env.METAMASK_ONRAMP_ORDERS_URL ?? file?.ordersUrl ?? "")) ??
-    "https://on-ramp.api.cx.metamask.io";
-  const regionsUrl =
-    blankToUndefined(expand(env.METAMASK_ONRAMP_REGIONS_URL ?? file?.regionsUrl ?? "")) ??
-    "https://on-ramp-cache.api.cx.metamask.io";
-  const geoUrl =
-    blankToUndefined(expand(env.METAMASK_ONRAMP_GEO_URL ?? file?.geoUrl ?? "")) ??
-    `${ordersUrl.replace(/\/$/, "")}/geolocation`;
-  const buyOrigin =
-    blankToUndefined(expand(env.METAMASK_ONRAMP_BUY_ORIGIN ?? file?.buyOrigin ?? "")) ??
-    "https://portfolio.metamask.io";
-  const redirectUrl =
-    blankToUndefined(expand(env.METAMASK_ONRAMP_REDIRECT_URL ?? file?.redirectUrl ?? "")) ??
-    buyOrigin.replace(/\/$/, "");
-  return {
-    enabled: !explicitlyOff,
-    ordersUrl: ordersUrl.replace(/\/$/, ""),
-    regionsUrl: regionsUrl.replace(/\/$/, ""),
-    geoUrl,
-    buyOrigin: buyOrigin.replace(/\/$/, ""),
-    redirectUrl: redirectUrl.replace(/\/$/, ""),
-  };
 }
 
 function loadEvmChains(env: NodeJS.ProcessEnv, fileEvm: YamlFile["evm"] | undefined): EvmNetworksConfig {

@@ -2,9 +2,9 @@
 export const buyEn = {
   breadcrumb: "Buy",
   title: "Buy USDC with card or bank",
-  lede: "Quotes from MetaMask. Funds settle as USDC on Base to the address you set.",
+  lede: "Quotes from our payment partners. Funds settle as USDC on Base to the address you set.",
   metaTitle: "Buy USDC · Trustless Commerce",
-  metaDescription: "Buy USDC on Base with card or bank through MetaMask on-ramp quotes.",
+  metaDescription: "Buy USDC on Base with card or bank through our payment partners.",
   countryLabel: "Country",
   currencyLabel: "Currency",
   amountLabel: "Amount to spend",
