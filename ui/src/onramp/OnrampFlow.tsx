@@ -22,7 +22,7 @@ import {
   type PayInCountry,
   type PayInQuoteRow,
 } from "@/shared/pay-in.js";
-import { metamaskOnrampAdapter } from "./adapters/metamask.js";
+import { apiOnrampAdapter } from "./adapters/api.js";
 import { closeCheckoutTab, navigateCheckoutTab, openBlankCheckoutTab } from "./openCheckoutTab.js";
 import type { OnrampConfig, OnrampFlowProps } from "./types.js";
 
@@ -36,7 +36,7 @@ export function OnrampFlow({
   initialRegion,
   invoicePrice,
   invoiceId,
-  adapter = metamaskOnrampAdapter,
+  adapter = apiOnrampAdapter,
 }: OnrampFlowProps) {
   const { t } = useLocale();
   const [config, setConfig] = useState<OnrampConfig | null>(null);

@@ -330,7 +330,7 @@ export const walletUk = {
     "Купіть USDC або USDT карткою чи банківським переказом. Криптовалюта надійде одразу на гаманець — без sweep рахунку.",
   depositFiatLabel: "Оплата",
   depositContinue: "Перейти до оплати",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "Режим пісочниці — без реального списання і без on-chain зарахування.",
   depositLoading: "Завантаження оплати…",

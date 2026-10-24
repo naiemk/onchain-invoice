@@ -322,7 +322,7 @@ export const walletVi = {
     "Mua USDC hoặc USDT bằng thẻ hoặc chuyển khoản. Crypto được gửi thẳng tới ví — không quét hóa đơn.",
   depositFiatLabel: "Bạn thanh toán bằng",
   depositContinue: "Tiếp tục tới checkout",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "Chế độ sandbox — không trừ tiền thật và không nạp on-chain.",
   depositLoading: "Đang tải checkout…",
