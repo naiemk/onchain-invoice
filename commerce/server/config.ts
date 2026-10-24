@@ -278,6 +278,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const file = configPath && existsSync(configPath) ? readYamlFile(configPath) : {};
 
   const port = Number(env.PORT ?? file.port ?? 8080);
+  const baseUrl = expand(env.BASE_URL ?? file.baseUrl ?? `http://localhost:${port}`);
+  assertMainnetOmitsRestoreOverride(env, baseUrl);
   const evmChains = loadEvmChains(env, file.evm);
   const legacy = evmChains[EVM_LEGACY_CHAIN_ID];
   const dbPathRaw = expand(env.DB_PATH ?? file.db?.path ?? "./trustless-commerce.db");
@@ -286,7 +288,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const persistLogDir = blankToUndefined(expand(env.PERSIST_LOG_DIR ?? file.persistLogDir ?? ""));
   return {
     port,
-    baseUrl: expand(env.BASE_URL ?? file.baseUrl ?? `http://localhost:${port}`),
+    baseUrl,
     dbPath,
     persistLogDir,
     sweeperApiKey: expand(env.SWEEPER_API_KEY ?? file.sweeperApiKey ?? ""),
@@ -417,6 +419,24 @@ function loadIdentityConfig(
       (env.IDENTITY_DEV_OTP ?? "").trim().toLowerCase() === "true",
     restoreEnabledOverride: parseRestoreEnabledOverride(env.IDENTITY_RESTORE_ENABLED),
   };
+}
+
+/** tcmain must not boot with the test override that can hide email restore. */
+export function assertMainnetOmitsRestoreOverride(env: NodeJS.ProcessEnv, baseUrl: string): void {
+  const raw = (env.IDENTITY_RESTORE_ENABLED ?? "").trim();
+  if (!raw) return;
+  let host = "";
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    host = "";
+  }
+  const product = (env.TC_PRODUCT ?? "").trim().toLowerCase();
+  const mainnet =
+    product === "tcmain" || host === "trustless-commerce.com" || host === "www.trustless-commerce.com";
+  if (mainnet) {
+    throw new Error("IDENTITY_RESTORE_ENABLED is a test hook and must be unset on tcmain");
+  }
 }
 
 function parseRestoreEnabledOverride(raw: string | undefined): boolean | undefined {

@@ -209,8 +209,109 @@ describe("IdentityStore", function () {
     const identityId = randomIdentityId();
     const passkey = simulatePasskey();
     await store.register(identityId, passkey.qx, passkey.qy);
-    await expectRevert(store.connect(eoa).disableRestore.staticCall(identityId), "RestoreRequiresEoa");
+    await expectRevert(store.connect(eoa).disableRestore.staticCall(identityId), "RestoreNeedsSecondMethod");
     await expectRevert(store.disableRestore.staticCall(randomIdentityId()), "IdentityNotFound");
+  });
+
+  it("disableRestore needs two methods and an EOA, then the last method cannot be removed", async function () {
+    const { store, eoa } = await deployStore();
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    const yubi = simulatePasskey();
+    await store.register(identityId, passkey.qx, passkey.qy);
+
+    const yDigest = await store.hashAddMethod(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
+    await store.addMethod(
+      identityId,
+      METHOD_YUBIKEY,
+      yubi.qx,
+      yubi.qy,
+      ZeroAddress,
+      identityPasskeyBlob({ identityId, key: passkey, message: yDigest })
+    );
+    await expectRevert(store.connect(eoa).disableRestore.staticCall(identityId), "RestoreRequiresEoa");
+
+    const eoaDigest = await store.hashAddMethod(
+      identityId,
+      METHOD_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      eoa.address
+    );
+    await store.addMethod(
+      identityId,
+      METHOD_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      eoa.address,
+      identityPasskeyBlob({ identityId, key: passkey, message: eoaDigest })
+    );
+    await store.connect(eoa).disableRestore(identityId);
+    expect((await store.getIdentity(identityId)).restoreEnabled).to.equal(false);
+    await expectRevert(
+      store.initiateRestore.staticCall(identityId, METHOD_WEBAUTHN, simulatePasskey().qx, simulatePasskey().qy, ZeroAddress),
+      "RestoreIsDisabled"
+    );
+
+    const extra = simulatePasskey();
+    const extraDigest = await store.hashAddMethod(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress);
+    await store.addMethod(
+      identityId,
+      METHOD_WEBAUTHN,
+      extra.qx,
+      extra.qy,
+      ZeroAddress,
+      yubikeyBlob(identityId, yubi, extraDigest)
+    );
+    expect((await store.getIdentity(identityId)).methodCount).to.equal(4n);
+    const extraId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, extra.qx, extra.qy, ZeroAddress);
+    await store.removeMethod(
+      identityId,
+      extraId,
+      identityPasskeyBlob({ identityId, key: passkey, message: await store.hashRemoveMethod(identityId, extraId) })
+    );
+
+    const yubiId = computeIdentityMethodId(identityId, METHOD_YUBIKEY, yubi.qx, yubi.qy, ZeroAddress);
+    const eoaId = computeIdentityMethodId(identityId, METHOD_EOA, zeroPadValue("0x00", 32), zeroPadValue("0x00", 32), eoa.address);
+    await store.removeMethod(
+      identityId,
+      yubiId,
+      identityPasskeyBlob({ identityId, key: passkey, message: await store.hashRemoveMethod(identityId, yubiId) })
+    );
+    await store.removeMethod(
+      identityId,
+      eoaId,
+      identityPasskeyBlob({ identityId, key: passkey, message: await store.hashRemoveMethod(identityId, eoaId) })
+    );
+    expect((await store.getIdentity(identityId)).methodCount).to.equal(1n);
+    const passkeyId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, passkey.qx, passkey.qy, ZeroAddress);
+    await expectRevert(
+      store.removeMethod.staticCall(
+        identityId,
+        passkeyId,
+        identityPasskeyBlob({ identityId, key: passkey, message: await store.hashRemoveMethod(identityId, passkeyId) })
+      ),
+      "LastMethod"
+    );
+    const login = keccak256(toUtf8Bytes("still-spends"));
+    expect(await store.verify(login, identityPasskeyBlob({ identityId, key: passkey, message: login }))).to.equal(identityId);
+  });
+
+  it("cancel before the delay blocks executeRestore", async function () {
+    const { ethers, store } = await deployStore();
+    await store.setRestoreDelay(60);
+    const identityId = randomIdentityId();
+    const passkey = simulatePasskey();
+    const recovered = simulatePasskey();
+    await store.register(identityId, passkey.qx, passkey.qy);
+    await store.initiateRestore(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
+    const cancelDigest = await store.hashCancelRestore(identityId);
+    await store.cancelRestore(identityId, identityPasskeyBlob({ identityId, key: passkey, message: cancelDigest }));
+    await ethers.provider.send("evm_increaseTime", [120]);
+    await ethers.provider.send("evm_mine", []);
+    await expectRevert(store.executeRestore.staticCall(identityId), "RestoreNotPending");
+    const login = keccak256(toUtf8Bytes("old-key-still-valid"));
+    expect(await store.verify(login, identityPasskeyBlob({ identityId, key: passkey, message: login }))).to.equal(identityId);
   });
 
   it("restoreAddMethod works while restore is on and is blocked after disable", async function () {

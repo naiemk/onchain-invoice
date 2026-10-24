@@ -19,3 +19,28 @@ jobs:
       - run: npx playwright-core install --with-deps chromium
       - run: npm run ui:build:seo
       - run: node ui/scripts/check-nginx-routes.mjs
+
+  wallet-cert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:wallet-cert
+
+  identity-email-restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx tsc
+      - run: npm run commerce:build
+      - run: npx playwright test ui/e2e/identity-email-restore.spec.ts ui/e2e/identity-fund-gate.spec.ts

@@ -460,5 +460,112 @@ describe("IdentityWallet e2e (Hardhat simulated signing)", function () {
     expect(
       await stack.store.verify(login, identityPasskeyBlob({ identityId: alice, key: recovered, message: login }))
     ).to.equal(alice);
+    const aliceWallet = await createWallet(stack, alice, keccak256(toUtf8Bytes("alice-wallet")));
+    const restoredPing = keccak256(toUtf8Bytes("restored-spend"));
+    const aliceCall = encodeExecuteCallData([
+      { target: stack.pingAddress, value: 0n, data: PING_IFACE.encodeFunctionData("ping", [restoredPing]) },
+    ]);
+    const aliceNonce = await stack.entryPoint.getNonce(aliceWallet.walletAddress, 0);
+    const aliceUnsigned = buildPackedUserOperation({ sender: aliceWallet.walletAddress, nonce: aliceNonce, callData: aliceCall });
+    const aliceHash = await stack.entryPoint.getUserOpHash(userOpToTuple(aliceUnsigned));
+    const aliceOp = buildPackedUserOperation({
+      sender: aliceWallet.walletAddress,
+      nonce: aliceNonce,
+      callData: aliceCall,
+      signature: identityPasskeyBlob({ identityId: alice, key: recovered, message: aliceHash }),
+    });
+    await stack.entryPoint.handleOps([userOpToTuple(aliceOp)], stack.owner.address);
+    expect(await stack.ping.lastPing()).to.equal(restoredPing);
+  });
+
+  it("remaining passkey still spends after disableRestore removes every other method", async function () {
+    const stack = await deployIdentityStack();
+    const identityId = randomIdentityId();
+    const pk = simulatePasskey();
+    await stack.store.register(identityId, pk.qx, pk.qy);
+    const { walletAddress } = await createWallet(stack, identityId, keccak256(toUtf8Bytes("w-last")));
+    const eoaDigest = await stack.store.hashAddMethod(
+      identityId,
+      METHOD_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      stack.eoa.address
+    );
+    await stack.store.addMethod(
+      identityId,
+      METHOD_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      stack.eoa.address,
+      identityPasskeyBlob({ identityId, key: pk, message: eoaDigest })
+    );
+    await stack.store.connect(stack.eoa).disableRestore(identityId);
+    const eoaId = computeIdentityMethodId(
+      identityId,
+      METHOD_EOA,
+      zeroPadValue("0x00", 32),
+      zeroPadValue("0x00", 32),
+      stack.eoa.address
+    );
+    await stack.store.removeMethod(
+      identityId,
+      eoaId,
+      identityPasskeyBlob({ identityId, key: pk, message: await stack.store.hashRemoveMethod(identityId, eoaId) })
+    );
+    const passkeyId = computeIdentityMethodId(identityId, METHOD_WEBAUTHN, pk.qx, pk.qy, ZeroAddress);
+    await expectRevert(
+      stack.store.removeMethod.staticCall(
+        identityId,
+        passkeyId,
+        identityPasskeyBlob({ identityId, key: pk, message: await stack.store.hashRemoveMethod(identityId, passkeyId) })
+      ),
+      "LastMethod"
+    );
+
+    const callData = encodeExecuteCallData([
+      { target: stack.pingAddress, value: 0n, data: PING_IFACE.encodeFunctionData("ping", [keccak256(toUtf8Bytes("last"))]) },
+    ]);
+    const nonce = await stack.entryPoint.getNonce(walletAddress, 0);
+    const unsigned = buildPackedUserOperation({ sender: walletAddress, nonce, callData });
+    const userOpHash = await stack.entryPoint.getUserOpHash(userOpToTuple(unsigned));
+    const userOp = buildPackedUserOperation({
+      sender: walletAddress,
+      nonce,
+      callData,
+      signature: identityPasskeyBlob({ identityId, key: pk, message: userOpHash }),
+    });
+    await stack.entryPoint.handleOps([userOpToTuple(userOp)], stack.owner.address);
+    expect(await stack.ping.lastPing()).to.equal(keccak256(toUtf8Bytes("last")));
+  });
+
+  it("cancel before the delay blocks execute and the old key still spends", async function () {
+    const stack = await deployIdentityStack();
+    const identityId = randomIdentityId();
+    const pk = simulatePasskey();
+    const recovered = simulatePasskey();
+    await stack.store.register(identityId, pk.qx, pk.qy);
+    await stack.store.setRestoreDelay(60);
+    const { walletAddress } = await createWallet(stack, identityId, keccak256(toUtf8Bytes("w-cancel")));
+    await stack.store.initiateRestore(identityId, METHOD_WEBAUTHN, recovered.qx, recovered.qy, ZeroAddress);
+    const cancelDigest = await stack.store.hashCancelRestore(identityId);
+    await stack.store.cancelRestore(identityId, identityPasskeyBlob({ identityId, key: pk, message: cancelDigest }));
+    await stack.ethers.provider.send("evm_increaseTime", [120]);
+    await stack.ethers.provider.send("evm_mine", []);
+    await expectRevert(stack.store.executeRestore.staticCall(identityId), "RestoreNotPending");
+
+    const callData = encodeExecuteCallData([
+      { target: stack.pingAddress, value: 0n, data: PING_IFACE.encodeFunctionData("ping", [keccak256(toUtf8Bytes("kept"))]) },
+    ]);
+    const nonce = await stack.entryPoint.getNonce(walletAddress, 0);
+    const unsigned = buildPackedUserOperation({ sender: walletAddress, nonce, callData });
+    const userOpHash = await stack.entryPoint.getUserOpHash(userOpToTuple(unsigned));
+    const userOp = buildPackedUserOperation({
+      sender: walletAddress,
+      nonce,
+      callData,
+      signature: identityPasskeyBlob({ identityId, key: pk, message: userOpHash }),
+    });
+    await stack.entryPoint.handleOps([userOpToTuple(userOp)], stack.owner.address);
+    expect(await stack.ping.lastPing()).to.equal(keccak256(toUtf8Bytes("kept")));
   });
 });

@@ -85,7 +85,8 @@ describe("commerce persist-log recovery e2e", function () {
         baseUrl,
         stack.factoryAddress,
         stack.implementationAddress,
-        keyOffset + i
+        keyOffset + i,
+        { rpcUrl, storeAddress: stack.storeAddress }
       );
       const invoices = [];
       for (let j = 0; j < INVOICES_PER_WALLET; j++) {

@@ -255,6 +255,15 @@ export const overlayFillIdentity = assemble({
     superWalletIdentityLede: enAll(
       "Add other identities by email. Those identities will sign together as a Super Wallet — used as the email-restore operator."
     ),
+    superWalletIdentityBeta: enAll(
+      "Beta — this upgrade is unaudited. You can stay on a simple wallet. Email recovery stays available."
+    ),
+    receiveNeedsSecondMethod: enAll(
+      "Add a second key (a security key or a crypto wallet) before this address can receive funds."
+    ),
+    sendNeedsSecondMethod: enAll(
+      "Add a second key (a security key or a crypto wallet) before this wallet can send."
+    ),
     superWalletIdentityEmails: enAll("Other identity emails (one per line)"),
     superWalletIdentityMissing: enAll("No identity found for {email}."),
     superWalletRestoreInboxTitle: enAll("Pending email restores"),

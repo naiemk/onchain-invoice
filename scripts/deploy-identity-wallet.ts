@@ -1,6 +1,15 @@
+import { execSync } from "node:child_process";
 import { network } from "hardhat";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+
+function gitTag(): string {
+  try {
+    return execSync("git describe --tags --always --dirty", { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
+}
 
 function envOptional(name: string, fallback = ""): string {
   return process.env[name]?.trim() || fallback;
@@ -45,6 +54,7 @@ async function main() {
     restoreDelay: restoreDelay.toString(),
     deployer: deployer.address,
     deployedAt: new Date().toISOString(),
+    gitTag: gitTag(),
   };
 
   console.log(JSON.stringify(result, null, 2));

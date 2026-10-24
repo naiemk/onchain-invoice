@@ -617,6 +617,12 @@ export const walletEn = {
   superWalletHomeCta: "Convert to Super Wallet",
   superWalletIdentityLede:
     "Add other identities by email. Those identities will sign together as a Super Wallet — used as the email-restore operator.",
+  superWalletIdentityBeta:
+    "Beta — this upgrade is unaudited. You can stay on a simple wallet. Email recovery stays available.",
+  receiveNeedsSecondMethod:
+    "Add a second key (a security key or a crypto wallet) before this address can receive funds.",
+  sendNeedsSecondMethod:
+    "Add a second key (a security key or a crypto wallet) before this wallet can send.",
   superWalletIdentityEmails: "Other identity emails (one per line)",
   superWalletIdentityMissing: "No identity found for {email}.",
   superWalletRestoreInboxTitle: "Pending email restores",

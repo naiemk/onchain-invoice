@@ -1,0 +1,17 @@
+{
+  "compiler": "0.8.26",
+  "contracts": {
+    "IdentityStore": {
+      "bytecodeSha256": "7a0e546b755099b3467390988710864b62144140656e70e6673fa28d618f65a6",
+      "abiSha256": "1ed6f2551d8bcf4ca4692d9e09230fbd8ad98fbbe1a138f3a3e4c5937fe17c82"
+    },
+    "IdentityWallet": {
+      "bytecodeSha256": "981748175e32aeaddc4958b12c77061909700f0193a5c0a10f4f1b3ce763d959",
+      "abiSha256": "8cec09e05be0d44beb58061e857f38e37f80a06ed7c530247b8248156eb0a98a"
+    },
+    "IdentityWalletFactory": {
+      "bytecodeSha256": "27f2b5d53c5ea5ede3ee1b272067672763bcab18c3ef7fcba0f96f71741d5161",
+      "abiSha256": "f029952c20a4b132e3f0e01f35de7eec3f87aabde913fe53b6860f485cd81e54"
+    }
+  }
+}
