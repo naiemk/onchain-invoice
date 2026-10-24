@@ -24,6 +24,8 @@ import { SITE } from "@/shared/site";
 import seoRoutes from "@/shared/seo-routes.json";
 import { LANDING_PAGES, landingFor } from "@/pages/seo/landing-content";
 import { LandingPage } from "@/pages/seo/LandingPage";
+import { GUIDES, GuidePage, guideFor } from "@/pages/seo/GuidePage";
+import { GENERATOR_META, InvoiceGeneratorPage } from "@/pages/seo/InvoiceGeneratorPage";
 import { NotFoundPage } from "@/pages/react/NotFoundPage";
 
 
@@ -96,6 +98,9 @@ function usePageMeta() {
 function pageMeta(path: string, t: (key: MessageKey) => string): { title: string; description: string } {
   const landing = landingFor(path);
   if (landing) return { title: landing.metaTitle, description: landing.metaDescription };
+  const guide = guideFor(path);
+  if (guide) return { title: guide.metaTitle, description: guide.metaDescription };
+  if (path === "/tools/crypto-invoice-generator") return { title: GENERATOR_META.title, description: GENERATOR_META.description };
   switch (path) {
     case "/get-paid":
       return { title: t("meta.getPaidTitle"), description: t("meta.getPaidDescription") };
@@ -212,6 +217,10 @@ function AppRoutes() {
         {LANDING_PAGES.map((c) => (
           <Route key={c.path} path={c.path} element={<LandingPage content={c} />} />
         ))}
+        {GUIDES.map((g) => (
+          <Route key={g.path} path={g.path} element={<GuidePage guide={g} />} />
+        ))}
+        <Route path="/tools/crypto-invoice-generator" element={<InvoiceGeneratorPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>
