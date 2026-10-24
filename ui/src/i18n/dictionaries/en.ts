@@ -9,6 +9,7 @@ import { createPasskeyEn } from "./create-passkey-en.js";
 import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
 import { payFaucetEn } from "./pay-faucet-en.js";
+import { notFoundEn, seoMetaEn } from "./seo-en.js";
 import { buyEn } from "./buy-en.js";
 
 export const en = {
@@ -60,8 +61,11 @@ export const en = {
     switchToDark: "Switch to dark theme",
   },
 
+  notFound: notFoundEn,
+
   meta: {
     homeTitle: "Trustless Commerce",
+    ...seoMetaEn,
     homeDescription:
       "The operating wallet for a crypto-native business — get paid, pay, cash in and out, passkey secured.",
     createTitle: "Create invoice · Trustless Commerce",
