@@ -382,7 +382,7 @@ export const walletNb = {
   depositLede: "Buy USDC on Base with a card or bank transfer. Crypto is sent directly to this wallet — no invoice sweep.",
   depositFiatLabel: "You pay with",
   depositContinue: "Continue to checkout",
-  depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+  depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
   depositSandboxNote: "Sandbox mode — no real charge and no on-chain funding.",
   depositLoading: "Loading checkout…",
   depositIframeTitle: "Deposit checkout",

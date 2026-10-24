@@ -27,7 +27,7 @@ import type {
 } from "../shared/types.js";
 import { apiUrl } from "../shared/site.js";
 import { mountOnrampFlow } from "../onramp/mountOnrampFlow.js";
-import { PAY_IN_CHAIN_ID, PAY_IN_TOKEN } from "../../../commerce/shared/metamask-onramp.js";
+import { PAY_IN_CHAIN_ID, PAY_IN_TOKEN } from "../../../commerce/shared/pay-in.js";
 import { qrThemeColors } from "../shared/qr-colors.js";
 
 const ACTIVATION_KEY = (invoiceId: string) => `tc.activation.${invoiceId}`;

@@ -7,7 +7,7 @@ import {
 } from "@/shared/pay-in.js";
 import type { OnrampAdapter } from "../types.js";
 
-export const metamaskOnrampAdapter: OnrampAdapter = {
+export const apiOnrampAdapter: OnrampAdapter = {
   getConfig: fetchPayInConfig,
   getCountries: fetchPayInCountries,
   getGeo: fetchPayInGeo,

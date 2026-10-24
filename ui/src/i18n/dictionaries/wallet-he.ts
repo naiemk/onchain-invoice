@@ -312,7 +312,7 @@ export const walletHe = {
     "קנו USDC או USDT בכרטיס או בהעברה בנקאית. הקריפטו נשלח ישירות לארנק — בלי איסוף חשבונית.",
   depositFiatLabel: "משלמים ב",
   depositContinue: "המשך לתשלום",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "מצב ארגז חול — בלי חיוב אמיתי ובלי מימון בשרשרת.",
   depositLoading: "טוען תשלום…",

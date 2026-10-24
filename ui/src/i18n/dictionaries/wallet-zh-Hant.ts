@@ -308,7 +308,7 @@ export const walletZhHant = {
   depositLede: "用卡或銀行轉帳購買 USDC 或 USDT。加密貨幣直接進入你的錢包 — 無需發票歸集。",
   depositFiatLabel: "付款方式",
   depositContinue: "繼續結帳",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "沙盒模式 — 不會真實扣款，也不會鏈上入金。",
   depositLoading: "正在載入結帳…",
