@@ -129,8 +129,8 @@ fi
 
 ACTIVITY_LOG_PATH="${ACTIVITY_LOG_PATH:-/data/logs/activity.jsonl}"
 LOGS_DIR="${LOGS_DIR:-./logs}"
-mkdir -p "$LOGS_DIR"
-LOGS_ABS="$(cd "$LOGS_DIR" && pwd)"
+mkdir -p "$LOGS_DIR/activity"
+LOGS_ABS="$(cd "$LOGS_DIR/activity" && pwd)"  # container-owned subdir; logs/ stays host-owned
 if [[ "$(id -u)" -eq 0 ]]; then
   chown -R 1000:1000 "$LOGS_ABS" || true
 elif command -v sudo >/dev/null 2>&1; then

@@ -31,7 +31,8 @@ package_one() {
   cp -f "$OVERLAYS/update-api.sh" "$out/update-api.sh"
   cp -f "$OVERLAYS/start-nodes.sh" "$out/start-nodes.sh"
   cp -f "$OVERLAYS/update-nodes.sh" "$out/update-nodes.sh"
-  chmod +x "$out"/start-*.sh "$out"/update-*.sh
+  cp -f "$OVERLAYS/config-record.sh" "$out/config-record.sh"
+  chmod +x "$out"/start-*.sh "$out"/update-*.sh "$out"/config-record.sh
 
   cp -f "$OVERLAYS/docker-compose.workers.${product}.yml" "$out/docker-compose.workers.yml"
   cp -f "$OVERLAYS/onchain-invoice-bundler.yaml" "$out/onchain-invoice-bundler.yaml"
