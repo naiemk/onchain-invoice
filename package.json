@@ -68,6 +68,7 @@
     "persist:replay": "node scripts/replay-wallet-persist-log.mjs",
     "test:live-persist-recovery": "LIVE_PERSIST_RECOVERY=1 hardhat test test/live/LivePersistRecovery.ts",
     "test:wallet-advanced": "hardhat test test/WalletAdvanced.ts test/CommerceWalletAdvanced.ts",
+    "pretest:wallet-cert": "tsc",
     "test:wallet-cert": "hardhat test test/IdentityStore.ts test/IdentityWalletE2e.ts test/IdentityDeployerGate.ts test/IdentityStoreTimelock.ts test/IdentityBytecode.ts test/MainnetBoot.ts test/IdentityFundable.ts test/LaunchCopy.ts",
     "test:ui-e2e": "npm run commerce:build && playwright test",
     "test:ui-e2e:local-stack": "npm run commerce:build && playwright test ui/e2e/local-stack.spec.ts",

@@ -39,5 +39,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: npx tsc
       - run: npm run commerce:build
       - run: npx playwright test ui/e2e/identity-email-restore.spec.ts ui/e2e/identity-fund-gate.spec.ts
