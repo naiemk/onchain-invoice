@@ -20,6 +20,19 @@ import { GuardianPage } from "@/pages/react/GuardianPage";
 import { WalletRouter } from "@/pages/react/wallet/WalletRouter";
 import { LegalHubPage, LegalPage } from "@/pages/react/LegalPage";
 import type { MessageKey } from "@/i18n/t.js";
+import { SITE } from "@/shared/site";
+
+/** Routes that are stateful/private app screens: never index. */
+const NOINDEX_PREFIXES = ["/pay", "/buy", "/merchant", "/wallet", "/admin"];
+
+function setHeadTag(selector: string, create: () => HTMLElement): HTMLElement {
+  let el = document.head.querySelector<HTMLElement>(selector);
+  if (!el) {
+    el = create();
+    document.head.appendChild(el);
+  }
+  return el;
+}
 
 function usePageMeta() {
   const location = useLocation();
@@ -32,6 +45,21 @@ function usePageMeta() {
     document.title = meta.title;
     const desc = document.querySelector('meta[name="description"]');
     if (desc) desc.setAttribute("content", meta.description);
+
+    const canonical = setHeadTag('link[rel="canonical"]', () => {
+      const l = document.createElement("link");
+      l.rel = "canonical";
+      return l;
+    });
+    canonical.setAttribute("href", `${SITE.origin}${pathname === "/" ? "/" : pathname.replace(/\/$/, "")}`);
+
+    const robots = setHeadTag('meta[name="robots"]', () => {
+      const m = document.createElement("meta");
+      m.setAttribute("name", "robots");
+      return m;
+    });
+    const noindex = NOINDEX_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    robots.setAttribute("content", noindex ? "noindex, nofollow" : "index, follow");
   }, [location.pathname, t]);
 }
 
