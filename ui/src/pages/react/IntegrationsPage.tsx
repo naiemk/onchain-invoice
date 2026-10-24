@@ -67,6 +67,13 @@ export function IntegrationsPage() {
         ))}
       </div>
 
+      <p className="mt-6 text-sm text-muted-foreground">
+        Guide:{" "}
+        <Link to="/integrations/woocommerce" className="font-medium text-foreground underline underline-offset-2">
+          Accept stablecoin payments on WooCommerce
+        </Link>
+      </p>
+
       <TrustNotice className="mt-8">
         {t("integrations.contractBody")}{" "}
         <Link to="/security" className="font-medium text-foreground underline underline-offset-2">
