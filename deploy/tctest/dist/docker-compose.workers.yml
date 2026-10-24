@@ -23,7 +23,7 @@ services:
       SWEEPER_CONFIG: /tmp/sweeper.yaml
       ACTIVITY_LOG_PATH: /data/logs/activity-evm.jsonl
     volumes:
-      - ./logs:/data/logs
+      - ./logs/activity:/data/logs
       - ./nodes-workers.yaml:/tmp/sweeper.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -41,7 +41,7 @@ services:
       SWEEPER_CONFIG: /tmp/sweeper.yaml
       ACTIVITY_LOG_PATH: /data/logs/activity-tron.jsonl
     volumes:
-      - ./logs:/data/logs
+      - ./logs/activity:/data/logs
       - ./nodes-workers.yaml:/tmp/sweeper.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -60,7 +60,7 @@ services:
       SWEEPER_CONFIG: /tmp/sweeper.yaml
       ACTIVITY_LOG_PATH: /data/logs/activity-solana.jsonl
     volumes:
-      - ./logs:/data/logs
+      - ./logs/activity:/data/logs
       - ./nodes-workers.yaml:/tmp/sweeper.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -79,7 +79,7 @@ services:
       BUNDLER_CONFIG: /tmp/bundler.yaml
       ACTIVITY_LOG_PATH: /data/logs/activity-bundler.jsonl
     volumes:
-      - ./logs:/data/logs
+      - ./logs/activity:/data/logs
       - ./onchain-invoice-bundler.yaml:/tmp/bundler.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -98,7 +98,7 @@ services:
       WALLET_DEPLOYER_CONFIG: /tmp/wallet-deployer.yaml
       ACTIVITY_LOG_PATH: /data/logs/activity-wallet-deployer.jsonl
     volumes:
-      - ./logs:/data/logs
+      - ./logs/activity:/data/logs
       - ./onchain-invoice-wallet-deployer.yaml:/tmp/wallet-deployer.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"

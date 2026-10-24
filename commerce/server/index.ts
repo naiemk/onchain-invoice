@@ -5,6 +5,10 @@ import { log } from "./logger.js";
 const config = loadConfig();
 const app = createApp(config);
 
+if (!config.email.resendApiKey && !config.identity.devOtp) {
+  log("warn", "RESEND_API_KEY is not set: sign-in and recovery OTP emails are NOT sent (codes are only logged)", {});
+}
+
 app.server.listen(config.port, () => {
   log("info", "trustless-commerce API listening", {
     baseUrl: config.baseUrl,

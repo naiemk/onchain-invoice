@@ -337,7 +337,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         blankToUndefined(expand(env.RESEND_FROM ?? env.RECOVERY_EMAIL_FROM ?? file.email?.from ?? "")) ??
         "Trustless Commerce <noreply@trustless-commerce.com>",
       notifyTo: blankToUndefined(
-        expand(env.WALLET_RECOVERY_NOTIFY_EMAIL ?? file.email?.notifyTo ?? "")
+        expand(env.WALLET_RECOVERY_NOTIFY_EMAIL ?? env.RECOVERY_ADMIN_EMAIL ?? file.email?.notifyTo ?? "")
       ),
     },
     walletAdminGuardian: blankToUndefined(

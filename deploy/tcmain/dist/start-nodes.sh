@@ -146,8 +146,15 @@ fi
 
 ACTIVITY_LOG_PATH="${ACTIVITY_LOG_PATH:-/data/logs/activity.jsonl}"
 LOGS_DIR="${LOGS_DIR:-./logs}"
-mkdir -p "$LOGS_DIR"
+# Host-owned: auto-update.log etc. written by whichever user runs install/cron.
+# Container-owned (uid 1000): activity-*.jsonl live in logs/activity so the two never share ownership.
+if ! mkdir -p "$LOGS_DIR/activity" 2>/dev/null || [[ ! -w "$LOGS_DIR" ]]; then
+  echo "ERROR: $LOGS_DIR is not writable by $(id -un). It is probably owned by another user (e.g. an earlier install as ubuntu)." >&2
+  echo "Fix once:  sudo chown $(id -un):$(id -gn) $LOGS_DIR   (then re-run)" >&2
+  exit 1
+fi
 LOGS_ABS="$(cd "$LOGS_DIR" && pwd)"
+ACTIVITY_ABS="$LOGS_ABS/activity"
 # Image runs as USER node (uid/gid 1000).
 chown_uid1000() {
   local path="$1"
@@ -161,8 +168,12 @@ chown_uid1000() {
     echo "warning: could not chown $path to 1000:1000 — activity log may fail to write" >&2
   fi
 }
-chown_uid1000 "$LOGS_ABS"
-chmod 755 "$LOGS_ABS" 2>/dev/null || true
+# Migrate activity logs written by older installs (logs/activity-*.jsonl) into logs/activity/.
+for f in "$LOGS_ABS"/activity*.jsonl; do
+  [[ -e "$f" ]] && mv -n "$f" "$ACTIVITY_ABS/" 2>/dev/null || true
+done
+chown_uid1000 "$ACTIVITY_ABS"
+chmod 755 "$ACTIVITY_ABS" 2>/dev/null || true
 
 # HMAC wallets must exist in the API DB or every tick 401s ("Sweeper not registered
 # or disabled") and invoices stay awaiting_payment. Idempotent upsert; warn if the
@@ -242,9 +253,9 @@ if [[ -f "$COMPOSE_FILE" && "${USE_COMPOSE:-1}" != "0" ]]; then
   echo "Nodes up (container names from $COMPOSE_FILE)"
   register_api_wallets
   if [[ "$solana_enabled" -eq 1 ]]; then
-    echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-solana.jsonl $LOGS_ABS/activity-bundler.jsonl $LOGS_ABS/activity-wallet-deployer.jsonl"
+    echo "Activity: tail -f $ACTIVITY_ABS/activity-evm.jsonl $ACTIVITY_ABS/activity-tron.jsonl $ACTIVITY_ABS/activity-solana.jsonl $ACTIVITY_ABS/activity-bundler.jsonl $ACTIVITY_ABS/activity-wallet-deployer.jsonl"
   else
-    echo "Activity: tail -f $LOGS_ABS/activity-evm.jsonl $LOGS_ABS/activity-tron.jsonl $LOGS_ABS/activity-bundler.jsonl $LOGS_ABS/activity-wallet-deployer.jsonl"
+    echo "Activity: tail -f $ACTIVITY_ABS/activity-evm.jsonl $ACTIVITY_ABS/activity-tron.jsonl $ACTIVITY_ABS/activity-bundler.jsonl $ACTIVITY_ABS/activity-wallet-deployer.jsonl"
     echo "(Solana sweeper off — set SWEEPER_SOLANA_ENABLED=1 to start)"
   fi
   exit 0
@@ -301,7 +312,7 @@ docker create \
   --restart "$RESTART" \
   "${MEM_ARGS[@]}" \
   "${EXTRA_HOSTS[@]}" \
-  -v "${LOGS_ABS}:/data/logs" \
+  -v "${ACTIVITY_ABS}:/data/logs" \
   -e SWEEPER_CONFIG="$SWEEPER_CONFIG_IN_CONTAINER" \
   "${env_args[@]}" \
   "$IMAGE" >/dev/null
@@ -314,5 +325,5 @@ docker start "$NAME" >/dev/null
 
 echo "Sweeper node running as $NAME"
 echo "Logs: docker logs -f $NAME"
-echo "Activity: tail -f $LOGS_ABS/activity.jsonl"
+echo "Activity: tail -f $ACTIVITY_ABS/activity.jsonl"
 register_api_wallets

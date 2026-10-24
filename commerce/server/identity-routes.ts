@@ -278,6 +278,7 @@ export function registerIdentityRoutes(
           purpose: "login",
           codeHash: hashOtpCode(code),
         });
+        let delivered = true;
         try {
           await sendOtpEmail(config.email, {
             to: email,
@@ -286,9 +287,10 @@ export function registerIdentityRoutes(
             logCode: config.identity.devOtp,
           });
         } catch (err) {
+          delivered = false;
           console.error("[identity] OTP email failed", err);
         }
-        handlers.sendJson(res, 200, { ok: true, email: maskEmail(email) });
+        handlers.sendJson(res, 200, { ok: true, delivered, email: maskEmail(email) });
         return true;
       }
 
