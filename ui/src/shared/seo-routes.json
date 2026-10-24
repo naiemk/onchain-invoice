@@ -1,6 +1,10 @@
 {
   "indexable": [
     "/",
+    "/stablecoin-payments",
+    "/crypto-invoices",
+    "/crypto-payment-links",
+    "/developers/crypto-payment-api",
     "/get-paid",
     "/developers",
     "/integrations",

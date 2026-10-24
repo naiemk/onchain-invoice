@@ -23,6 +23,11 @@ for (const path of indexable) {
   const canon = html.match(/<link rel="canonical" href="([^"]*)"/)?.[1];
   const h1s = (html.match(/<h1[\s>]/g) ?? []).length;
   const robots = html.match(/<meta name="robots" content="([^"]*)"/)?.[1];
+  const ogUrl = html.match(/<meta property="og:url" content="([^"]*)"/)?.[1];
+  if (ogUrl !== ORIGIN + path) fail.push(`${path}: og:url ${ogUrl}`);
+  for (const m of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+    try { JSON.parse(m[1]); } catch { fail.push(`${path}: invalid JSON-LD`); }
+  }
   if (!title) fail.push(`${path}: no title`);
   if (!desc) fail.push(`${path}: no description`);
   if (canon !== ORIGIN + path) fail.push(`${path}: canonical ${canon}`);
