@@ -5,6 +5,7 @@ import { createPasskeyEn } from "./create-passkey-en.js";
 import { createWizardEn } from "./create-wizard-en.js";
 import { onrampErrorsEn } from "./onramp-errors-en.js";
 import { payFaucetEn } from "./pay-faucet-en.js";
+import { notFoundEn, seoMetaEn } from "./seo-en.js";
 import { en } from "./en.js";
 import { ar } from "./ar.js";
 import { bn } from "./bn.js";
@@ -42,6 +43,8 @@ function withPasskeyCreate(messages: Omit<Messages, "buy"> & { buy?: Messages["b
     buy: { ...buyEn, ...messages.buy },
     create: { ...createPasskeyEn, ...createWizardEn, ...messages.create },
     pay: { ...payFaucetEn, ...messages.pay },
+    meta: { ...seoMetaEn, ...messages.meta },
+    notFound: { ...notFoundEn, ...(messages as { notFound?: typeof notFoundEn }).notFound },
     errors: { ...onrampErrorsEn, ...messages.errors },
   } as Messages;
 }
