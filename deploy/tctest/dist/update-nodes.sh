@@ -9,6 +9,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 # shellcheck source=lib-env.sh
 source "$SCRIPT_DIR/lib-env.sh"
+
+# A failed log write must never abort an update (e.g. logs/ owned by another user): print, try logs/, then a per-user state dir.
+log_update() {
+  local dir="${1:-.}" msg="$2" line state
+  line="$(date -u +"%Y-%m-%dT%H:%M:%SZ") $msg"
+  echo "$line"
+  state="${XDG_STATE_HOME:-$HOME/.local/state}/trustless-commerce"
+  { mkdir -p "$dir/logs" && echo "$line" >> "$dir/logs/auto-update.log"; } 2>/dev/null \
+    || { mkdir -p "$state" && echo "$line" >> "$state/auto-update.log"; } 2>/dev/null || true
+}
 load_dotenv .env
 
 if ! role_auto_update_on NODES_AUTO_UPDATE; then
