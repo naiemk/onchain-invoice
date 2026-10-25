@@ -21,9 +21,25 @@ import { WalletRouter } from "@/pages/react/wallet/WalletRouter";
 import { LegalHubPage, LegalPage } from "@/pages/react/LegalPage";
 import type { MessageKey } from "@/i18n/t.js";
 import { SITE } from "@/shared/site";
+import seoRoutes from "@/shared/seo-routes.json";
+import { LANDING_PAGES, landingFor } from "@/pages/seo/landing-content";
+import { LandingPage } from "@/pages/seo/LandingPage";
+import { GUIDES, GuidePage, guideFor } from "@/pages/seo/GuidePage";
+import { GENERATOR_META, InvoiceGeneratorPage } from "@/pages/seo/InvoiceGeneratorPage";
+import { NotFoundPage } from "@/pages/react/NotFoundPage";
+
+
+function isKnownRoute(pathname: string): boolean {
+  const clean = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
+  return (
+    seoRoutes.indexable.includes(clean) ||
+    seoRoutes.appOnly.some((r) => clean === r || clean.startsWith(`${r}/`)) ||
+    clean.startsWith("/merchant/") ||
+    clean.startsWith("/wallet/")
+  );
+}
 
 /** Routes that are stateful/private app screens: never index. */
-const NOINDEX_PREFIXES = ["/pay", "/buy", "/merchant", "/wallet", "/admin"];
 
 function setHeadTag(selector: string, create: () => HTMLElement): HTMLElement {
   let el = document.head.querySelector<HTMLElement>(selector);
@@ -51,22 +67,45 @@ function usePageMeta() {
       l.rel = "canonical";
       return l;
     });
-    canonical.setAttribute("href", `${SITE.origin}${pathname === "/" ? "/" : pathname.replace(/\/$/, "")}`);
+    if (isKnownRoute(pathname)) {
+      canonical.setAttribute("href", `${SITE.origin}${pathname === "/" ? "/" : pathname.replace(/\/$/, "")}`);
+    } else {
+      canonical.remove();
+    }
+
+    const setMeta = (attr: "name" | "property", key: string, value: string) =>
+      setHeadTag(`meta[${attr}="${key}"]`, () => {
+        const m = document.createElement("meta");
+        m.setAttribute(attr, key);
+        return m;
+      }).setAttribute("content", value);
+    setMeta("property", "og:title", meta.title);
+    setMeta("property", "og:description", meta.description);
+    setMeta("property", "og:url", `${SITE.origin}${pathname === "/" ? "/" : pathname.replace(/\/$/, "")}`);
+    setMeta("name", "twitter:title", meta.title);
+    setMeta("name", "twitter:description", meta.description);
 
     const robots = setHeadTag('meta[name="robots"]', () => {
       const m = document.createElement("meta");
       m.setAttribute("name", "robots");
       return m;
     });
-    const noindex = NOINDEX_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    const noindex = !isKnownRoute(pathname) || seoRoutes.appOnly.some((p) => (pathname === p || pathname.startsWith(`${p}/`)));
     robots.setAttribute("content", noindex ? "noindex, nofollow" : "index, follow");
   }, [location.pathname, t]);
 }
 
 function pageMeta(path: string, t: (key: MessageKey) => string): { title: string; description: string } {
+  const landing = landingFor(path);
+  if (landing) return { title: landing.metaTitle, description: landing.metaDescription };
+  const guide = guideFor(path);
+  if (guide) return { title: guide.metaTitle, description: guide.metaDescription };
+  if (path === "/tools/crypto-invoice-generator") return { title: GENERATOR_META.title, description: GENERATOR_META.description };
   switch (path) {
     case "/get-paid":
       return { title: t("meta.getPaidTitle"), description: t("meta.getPaidDescription") };
+    case "/developers":
+      return { title: t("meta.developersTitle"), description: t("meta.developersDescription") };
     case "/security":
       return { title: t("meta.securityTitle"), description: t("meta.securityDescription") };
     case "/create":
@@ -96,6 +135,9 @@ function pageMeta(path: string, t: (key: MessageKey) => string): { title: string
     case "/security-checks":
       return { title: t("meta.securityChecksTitle"), description: t("meta.securityChecksDescription") };
     default:
+      if (!isKnownRoute(path)) {
+        return { title: t("meta.notFoundTitle"), description: t("meta.notFoundDescription") };
+      }
       if (path.startsWith("/wallet")) {
         return { title: t("meta.walletTitle"), description: t("meta.walletDescription") };
       }
@@ -172,7 +214,14 @@ function AppRoutes() {
         <Route path="/risks" element={<LegalPage docId="risks" />} />
         <Route path="/security-checks" element={<LegalPage docId="security-checks" />} />
         <Route path="/wallet/*" element={<WalletRouter />} />
-        <Route path="*" element={<HomePage />} />
+        {LANDING_PAGES.map((c) => (
+          <Route key={c.path} path={c.path} element={<LandingPage content={c} />} />
+        ))}
+        {GUIDES.map((g) => (
+          <Route key={g.path} path={g.path} element={<GuidePage guide={g} />} />
+        ))}
+        <Route path="/tools/crypto-invoice-generator" element={<InvoiceGeneratorPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>
   );

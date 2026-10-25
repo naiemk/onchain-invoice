@@ -213,6 +213,19 @@ function FullFooter() {
             {t("nav.support")}
           </a>
         </div>
+        <nav aria-label="Use cases" className="flex flex-wrap gap-x-3 gap-y-1">
+          <Link to="/stablecoin-payments" className="hover:text-foreground">Stablecoin payments</Link>
+          <FooterLinkSep />
+          <Link to="/crypto-invoices" className="hover:text-foreground">Crypto invoices</Link>
+          <FooterLinkSep />
+          <Link to="/crypto-payment-links" className="hover:text-foreground">Payment links</Link>
+          <FooterLinkSep />
+          <Link to="/developers/crypto-payment-api" className="hover:text-foreground">Payment API</Link>
+          <FooterLinkSep />
+          <Link to="/tools/crypto-invoice-generator" className="hover:text-foreground">Invoice generator</Link>
+          <FooterLinkSep />
+          <Link to="/guides/accept-usdc-payments" className="hover:text-foreground">Accept USDC guide</Link>
+        </nav>
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           <span className="font-medium text-foreground">{t("footer.legal")}</span>
           <FooterLinkSep />

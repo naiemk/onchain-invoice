@@ -16,7 +16,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run ui:build
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run ui:build:seo
+      - run: node ui/scripts/check-nginx-routes.mjs
 
   wallet-cert:
     runs-on: ubuntu-latest

@@ -40,6 +40,7 @@
     "commerce:wallet-deployer": "node commerce-dist/wallet-deployer/index.js",
     "ui": "vite --config ui/vite.config.ts",
     "ui:build": "vite build --config ui/vite.config.ts",
+    "ui:build:seo": "npm run ui:build && node ui/scripts/prerender.mjs && node ui/scripts/check-seo.mjs",
     "ui:verify": "bash ui/scripts/verify-ui-steps.sh",
     "docker:certs": "bash deploy/gen-dev-certs.sh",
     "docker:up": "docker compose -f deploy/docker-compose.yml up --build -d",

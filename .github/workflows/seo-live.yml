@@ -1,0 +1,21 @@
+name: SEO live check
+
+# Weekly + manual (run after deploys): verifies canonical, prerendered HTML, sitemap/robots and real 404s on production.
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: Origin to check
+        default: https://trustless-commerce.com
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node ui/scripts/check-live-seo.mjs "${{ inputs.origin || 'https://trustless-commerce.com' }}"
