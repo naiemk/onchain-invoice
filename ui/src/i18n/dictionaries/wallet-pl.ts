@@ -329,7 +329,7 @@ export const walletPl = {
     "Kup USDC lub USDT kartą albo przelewem. Krypto trafia bezpośrednio do portfela — bez sweepu faktury.",
   depositFiatLabel: "Płacisz",
   depositContinue: "Przejdź do kasy",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "Tryb sandbox — bez realnej opłaty i bez zasilenia on-chain.",
   depositLoading: "Ładowanie kasy…",

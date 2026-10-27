@@ -8,7 +8,7 @@ Trustless Commerce invoices use `paymentMode` (not a separate `invoiceType` fiel
 | `crypto_or_fiat` | Combined | Payer may pay with crypto **or** card/bank |
 | `fiat` | Fiat | Card/bank only; settlement still lands on-chain as USDC |
 
-Fiat modes require MetaMask pay-in enabled (`METAMASK_ONRAMP_ENABLED`, default on). They **lock to Base (`8453`) USDC**. Crypto-only invoices stay multi-chain.
+Fiat modes require pay-in enabled (`PAY_IN_ENABLED`, default **off**: no on-ramp provider is wired in yet, so fiat invoices are rejected). They **lock to Base (`8453`) USDC**. Crypto-only invoices stay multi-chain.
 
 ## Per-type fields
 
@@ -30,7 +30,7 @@ Same as crypto, but the API forces `chains: ["8453"]` and `tokens: ["USDC"]`. Op
 |-------|----------|-------|
 | `displayFiat` | no | Preferred customer currency (e.g. `EUR`) |
 | `displayAmount` | no | Hint only; settlement is `price` |
-| `quoteCountry` | no | ISO-3166 alpha-2 / MetaMask region hint |
+| `quoteCountry` | no | ISO-3166 alpha-2 region hint |
 
 ### Fiat (`paymentMode: "fiat"`)
 

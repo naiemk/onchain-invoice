@@ -325,7 +325,7 @@ export const walletBn = {
     "কার্ড বা ব্যাংক ট্রান্সফার দিয়ে USDC বা USDT কিনুন। ক্রিপ্টো সরাসরি আপনার ওয়ালেটে যায় — কোনো ইনভয়েস সুইপ নয়।",
   depositFiatLabel: "আপনি পরিশোধ করেন",
   depositContinue: "চেকআউটে এগোন",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "স্যান্ডবক্স মোড — কোনো প্রকৃত চার্জ নেই, অন-চেইন ফান্ডিংও নেই।",
   depositLoading: "চেকআউট লোড হচ্ছে…",

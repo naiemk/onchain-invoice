@@ -330,7 +330,7 @@ export const walletMs = {
     "Beli USDC atau USDT dengan kad atau pindahan bank. Kripto dihantar terus ke dompet anda — tiada sapuan invois.",
   depositFiatLabel: "Anda bayar dengan",
   depositContinue: "Teruskan ke checkout",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "Mod sandbox — tiada caj sebenar dan tiada pembiayaan on-chain.",
   depositLoading: "Memuatkan checkout…",

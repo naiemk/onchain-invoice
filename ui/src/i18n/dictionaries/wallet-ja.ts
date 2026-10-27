@@ -309,7 +309,7 @@ export const walletJa = {
   depositLede: "カードまたは銀行振込で USDC または USDT を購入します。暗号資産はこのウォレットへ直接送られます — 請求書のスイープはありません。",
   depositFiatLabel: "支払い手段",
   depositContinue: "チェックアウトへ進む",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "サンドボックスモード — 実際の課金もオンチェーン入金もありません。",
   depositLoading: "チェックアウトを読み込み中…",

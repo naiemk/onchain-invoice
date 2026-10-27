@@ -328,7 +328,7 @@ export const walletNl = {
     "Koop USDC of USDT met een kaart of overschrijving. Crypto gaat rechtstreeks naar je wallet — geen factuur-sweep.",
   depositFiatLabel: "Je betaalt met",
   depositContinue: "Doorgaan naar checkout",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "Sandboxmodus — geen echte afschrijving en geen on-chain-storting.",
   depositLoading: "Checkout laden…",
