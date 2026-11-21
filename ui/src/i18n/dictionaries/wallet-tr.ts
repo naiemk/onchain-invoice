@@ -328,7 +328,7 @@ export const walletTr = {
     "Kart veya havale ile USDC veya USDT alın. Kripto doğrudan cüzdanınıza gider — fatura sweep’i yok.",
   depositFiatLabel: "Şununla ödersiniz",
   depositContinue: "Checkout’a devam et",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "Sandbox modu — gerçek ücret yok ve zincir üstü fonlama yok.",
   depositLoading: "Checkout yükleniyor…",

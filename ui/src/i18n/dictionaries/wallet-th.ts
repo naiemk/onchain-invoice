@@ -321,7 +321,7 @@ export const walletTh = {
     "ซื้อ USDC หรือ USDT ด้วยบัตรหรือโอนธนาคาร คริปโตส่งตรงเข้าวอลเล็ต — ไม่กวาดจากใบแจ้งหนี้",
   depositFiatLabel: "คุณจ่ายด้วย",
   depositContinue: "ไปต่อที่ checkout",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "โหมด sandbox — ไม่คิดเงินจริงและไม่เติมเงินบนเชน",
   depositLoading: "กำลังโหลด checkout…",

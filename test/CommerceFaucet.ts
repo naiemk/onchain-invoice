@@ -7,6 +7,7 @@ import { loadConfig } from "../commerce/server/config.js";
 
 const BASE_ENV = {
   PORT: "0",
+  PAY_IN_ENABLED: "1",
   ADMIN_API_KEY: "admin-faucet-test",
   SWEEPER_API_KEY: "sweeper-faucet-test",
   RATE_LIMIT_CREATE_PER_SECOND: "100",

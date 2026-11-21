@@ -309,7 +309,7 @@ export const walletKo = {
   depositLede: "카드 또는 계좌이체로 USDC 또는 USDT를 구매합니다. 암호화폐는 이 지갑으로 바로 보내집니다 — 인보이스 스윕 없음.",
   depositFiatLabel: "결제 수단",
   depositContinue: "결제로 계속",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "샌드박스 모드 — 실제 청구와 온체인 입금이 없습니다.",
   depositLoading: "결제를 불러오는 중…",

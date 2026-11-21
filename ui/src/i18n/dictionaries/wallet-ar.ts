@@ -320,7 +320,7 @@ export const walletAr = {
     "اشترِ USDC أو USDT ببطاقة أو تحويل بنكي. تُرسل العملة مباشرة إلى محفظتك — بلا تحويل فاتورة.",
   depositFiatLabel: "تدفع بـ",
   depositContinue: "المتابعة إلى الدفع",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "وضع تجريبي — بلا رسوم حقيقية وبلا تمويل على السلسلة.",
   depositLoading: "جارٍ تحميل الدفع…",

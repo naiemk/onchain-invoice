@@ -2,7 +2,9 @@
 
 Public endpoints that quote and start card/bank checkout into **USDC on Base** (`8453`). Used by `/buy`, invoice card checkout on `/pay`, and wallet cash-in.
 
-Requires MetaMask pay-in enabled on the instance (`METAMASK_ONRAMP_ENABLED`, default on). Checkout opens in a **new tab** at the provider (MoonPay, Banxa, Ramp, Coinbase). There is no create-time quote and no Onramper session.
+> **Status:** no on-ramp provider is wired in yet (the MetaMask aggregator was removed; MoonPay is planned). Only `GET /api/public/pay-in/config` responds (`enabled:false` unless `PAY_IN_ENABLED=1`); every other `/api/public/pay-in/*` route returns **503** until a provider is integrated. The sections below describe the contract the UI expects.
+
+Checkout opens in a **new tab** at the provider. There is no create-time quote and no Onramper session.
 
 Fiat and combined invoices settle as Base USDC. Crypto-only invoices stay multi-chain.
 
@@ -21,7 +23,7 @@ Instance capability probe.
 
 ## `GET /api/public/pay-in/countries`
 
-Regions MetaMask can quote (id, name, default fiat).
+Regions the provider can quote (id, name, default fiat).
 
 ## `GET /api/public/pay-in/geo`
 
@@ -35,7 +37,7 @@ Payer country from CDN/edge IP headers (`CF-IPCountry`, `x-vercel-ip-country`, â
 
 | Query | Notes |
 |-------|-------|
-| `region` or `country` | MetaMask region id (`de`, `us-mi`) |
+| `region` or `country` | Provider region id (`de`, `us-mi`) |
 | `fiat` | e.g. `EUR` |
 | `amount` | Fiat to spend |
 | `address` or `walletAddress` | Destination EVM wallet (required) |

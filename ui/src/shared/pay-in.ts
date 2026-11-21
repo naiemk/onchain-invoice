@@ -5,7 +5,7 @@ import {
   type PayInCountry,
   type PayInQuoteRow,
   type PayInQuotesResult,
-} from "../../../commerce/shared/metamask-onramp.js";
+} from "../../../commerce/shared/pay-in.js";
 
 export { isPayInEvmAddress, matchCountryFromGeo };
 export type { PayInCountry, PayInQuoteRow, PayInQuotesResult };
@@ -17,8 +17,6 @@ export interface PayInConfig {
   tokenAddress: string;
   networkLabel: string;
   defaultAmount: string;
-  geoUrl: string;
-  buyOrigin: string;
 }
 
 export interface PayInWidgetSession {
@@ -90,9 +88,8 @@ export async function fetchPayInWidget(input: {
 }
 
 /**
- * Country from the payer's IP. MetaMask `/geolocation` is not usable in the browser
- * (`cross-origin-resource-policy: same-origin`). Cloudflare trace sees the client IP;
- * the API fallback uses CDN country headers (`CF-IPCountry`, etc.).
+ * Country from the payer's IP. Cloudflare trace sees the client IP; the API fallback
+ * uses CDN country headers (`CF-IPCountry`, etc.).
  */
 export async function fetchPayInGeo(): Promise<string> {
   const fromCf = await fetchCloudflareTraceCountry();

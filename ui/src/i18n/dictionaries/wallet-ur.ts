@@ -324,7 +324,7 @@ export const walletUr = {
     "کارڈ یا بینک ٹرانسفر سے USDC یا USDT خریدیں۔ کرپٹو سیدھا آپ کے والیٹ میں جاتا ہے — کوئی انوائس سویپ نہیں۔",
   depositFiatLabel: "آپ ادا کرتے ہیں",
   depositContinue: "چیک آؤٹ جاری رکھیں",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "سینڈ باکس موڈ — کوئی حقیقی چارج نہیں اور کوئی آن چین فنڈنگ نہیں۔",
   depositLoading: "چیک آؤٹ لوڈ ہو رہا ہے…",

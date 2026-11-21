@@ -27,18 +27,7 @@ import {
 import type { InvoiceStatus, PayLinkFields, PaymentMode } from "../shared/types.js";
 import { parsePaymentMode, parseSlippageBps, paymentModeAllowsFiat } from "../shared/payment-mode.js";
 import { walletStableTokensForChain } from "../shared/evm-stables.js";
-import {
-  countryFromGeoHeaders,
-  fetchPayInCountries,
-  fetchPayInQuotes,
-  fetchPayInWidget,
-  isPayInEvmAddress,
-  isPayInSettlement,
-  payInConfigPayload,
-  PAY_IN_CHAIN_ID,
-  PAY_IN_TOKEN,
-  PAY_IN_TOKEN_ADDRESS,
-} from "../shared/metamask-onramp.js";
+import { isPayInSettlement, PAY_IN_CHAIN_ID, PAY_IN_TOKEN, payInConfigPayload } from "../shared/pay-in.js";
 import { requireApiKey, requireMerchant } from "./auth.js";
 import { verifyCaptcha } from "./captcha.js";
 import { resolveEvmChain, type AppConfig } from "./config.js";
@@ -143,34 +132,13 @@ export function createRouter(context: RouteContext): (req: IncomingMessage, res:
       }
 
       if (req.method === "GET" && url.pathname === "/api/public/pay-in/config") {
-        const mm = context.config.metamaskOnramp;
-        sendJson(res, 200, payInConfigPayload(mm, mm.enabled));
+        sendJson(res, 200, payInConfigPayload(context.config.payIn.enabled));
         return;
       }
 
-      if (req.method === "GET" && url.pathname === "/api/public/pay-in/countries") {
-        await getPayInCountries(res, context);
-        return;
-      }
-
-      if (req.method === "GET" && url.pathname === "/api/public/pay-in/geo") {
-        getPayInGeo(req, res, context);
-        return;
-      }
-
-      if (req.method === "GET" && url.pathname === "/api/public/pay-in/quotes") {
-        await getPayInQuotes(res, context, url);
-        return;
-      }
-
-      if (req.method === "GET" && url.pathname === "/api/public/pay-in/buy-url") {
-        await getPayInBuyUrl(res, context, url);
-        return;
-      }
-
-      if (req.method === "GET" && url.pathname === "/api/public/pay-in/widget") {
-        await getPayInBuyUrl(res, context, url);
-        return;
+      // Provider endpoints (countries, geo, quotes, widget) return once an on-ramp provider is wired in.
+      if (req.method === "GET" && url.pathname.startsWith("/api/public/pay-in/")) {
+        throw Object.assign(new Error("No on-ramp provider is configured on this instance"), { statusCode: 503 });
       }
 
       if (req.method === "GET" && url.pathname === "/api/public/wallet-config") {
@@ -580,68 +548,6 @@ async function createSessionDeprecated(
   });
 }
 
-function requirePayInEnabled(config: AppConfig): void {
-  if (!config.metamaskOnramp.enabled) {
-    throw Object.assign(new Error("MetaMask pay-in is not enabled on this instance"), { statusCode: 503 });
-  }
-}
-
-async function getPayInCountries(res: ServerResponse, { config }: RouteContext): Promise<void> {
-  requirePayInEnabled(config);
-  const countries = await fetchPayInCountries(config.metamaskOnramp);
-  sendJson(res, 200, { countries });
-}
-
-function getPayInGeo(req: IncomingMessage, res: ServerResponse, { config }: RouteContext): void {
-  requirePayInEnabled(config);
-  sendJson(res, 200, { country: countryFromGeoHeaders(req.headers) });
-}
-
-async function getPayInQuotes(res: ServerResponse, { config }: RouteContext, url: URL): Promise<void> {
-  requirePayInEnabled(config);
-  const region = String(url.searchParams.get("region") ?? url.searchParams.get("country") ?? "").trim();
-  const fiat = String(url.searchParams.get("fiat") ?? "").trim();
-  const amount = String(url.searchParams.get("amount") ?? "").trim();
-  const walletAddress = String(
-    url.searchParams.get("address") ?? url.searchParams.get("walletAddress") ?? ""
-  ).trim();
-  const result = await fetchPayInQuotes(config.metamaskOnramp, { region, fiat, amount, walletAddress });
-  sendJson(res, 200, result);
-}
-
-async function getPayInBuyUrl(res: ServerResponse, { config }: RouteContext, url: URL): Promise<void> {
-  requirePayInEnabled(config);
-  const region = String(url.searchParams.get("region") ?? url.searchParams.get("country") ?? "").trim();
-  const fiat = String(url.searchParams.get("fiat") ?? "USD").trim().toUpperCase();
-  const amount = String(url.searchParams.get("amount") ?? "").trim();
-  const walletAddress = String(
-    url.searchParams.get("address") ?? url.searchParams.get("walletAddress") ?? ""
-  ).trim();
-  const paymentMethodId = String(url.searchParams.get("paymentMethodId") ?? "").trim() || undefined;
-  const providerId = String(url.searchParams.get("providerId") ?? url.searchParams.get("provider") ?? "").trim();
-  if (!providerId) throw Object.assign(new Error("providerId is required"), { statusCode: 400 });
-  if (!isPayInEvmAddress(walletAddress)) {
-    throw Object.assign(new Error("walletAddress must be an EVM address"), { statusCode: 400 });
-  }
-  const widget = await fetchPayInWidget(config.metamaskOnramp, {
-    region,
-    fiat,
-    amount,
-    walletAddress: getAddress(walletAddress),
-    providerId,
-    paymentMethodId,
-    redirectUrl: config.metamaskOnramp.redirectUrl,
-  });
-  sendJson(res, 200, {
-    widgetUrl: widget.widgetUrl,
-    buyUrl: widget.widgetUrl,
-    orderId: widget.orderId ?? null,
-    provider: widget.provider,
-    embeddable: widget.embeddable,
-    tokenAddress: PAY_IN_TOKEN_ADDRESS,
-  });
-}
-
 async function fundInvoiceFaucet(
   req: IncomingMessage,
   res: ServerResponse,
@@ -677,7 +583,7 @@ function assertPaymentModeAllowed(
   config: AppConfig
 ): void {
   if (paymentMode === "crypto") return;
-  if (!config.metamaskOnramp.enabled) {
+  if (!config.payIn.enabled) {
     throw Object.assign(new Error("Card and bank payments are not enabled on this instance"), {
       statusCode: 400,
     });

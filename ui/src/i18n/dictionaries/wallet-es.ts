@@ -332,7 +332,7 @@ export const walletEs = {
     "Compra USDC o USDT con tarjeta o transferencia bancaria. La cripto se envía directo a tu cartera — sin barrido de factura.",
   depositFiatLabel: "Pagas con",
   depositContinue: "Continuar al checkout",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "Modo sandbox — sin cargo real y sin fondeo on-chain.",
   depositLoading: "Cargando el checkout…",

@@ -17,7 +17,7 @@ export interface PayLinkFields {
   title?: string;
   description?: string;
   allowPartial: boolean;
-  /** Default crypto. Fiat modes require MetaMask pay-in (Base USDC). */
+  /** Default crypto. Fiat modes require pay-in (PAY_IN_ENABLED, Base USDC). */
   paymentMode: PaymentMode;
   /** Customer-facing fiat currency (e.g. SEK) for fiat-priced invoices. */
   displayFiat?: string;
@@ -27,7 +27,7 @@ export interface PayLinkFields {
   quoteCountry?: string;
   /** Customer-facing fiat currency (e.g. SEK) shown at checkout. */
   quotePaymentMethod?: string;
-  /** Optional checkout region hint (ISO-3166 / MetaMask region). */
+  /** Optional checkout region hint (ISO-3166 region). */
   quoteProvider?: string;
   /** Max settlement drift in basis points (100 = 1%). Pay-time requote must stay within this. */
   quoteSlippageBps?: number;

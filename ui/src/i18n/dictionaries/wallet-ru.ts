@@ -331,7 +331,7 @@ export const walletRu = {
     "Купите USDC или USDT картой или банковским переводом. Криптовалюта поступит сразу на ваш кошелёк — без свипа счёта.",
   depositFiatLabel: "Оплата",
   depositContinue: "Перейти к оплате",
-    depositHint: "Quotes come from MetaMask. USDC settles on Base to this wallet. Finish checkout in the new tab.",
+    depositHint: "Quotes come from our payment partners. USDC settles on Base to this wallet. Finish checkout in the new tab.",
 
   depositSandboxNote: "Режим песочницы — без реального списания и без ончейн-зачисления.",
   depositLoading: "Загрузка оплаты…",

@@ -9,7 +9,7 @@
 | POST | `/api/invoices` | Create (rate limited — `create` bucket) |
 | GET | `/api/invoices/:id` | Status + events |
 | GET | `/api/invoices?to=0x…` | Merchant list (signed) |
-| GET | `/api/public/pay-in/config` | MetaMask pay-in capability (Base USDC) |
+| GET | `/api/public/pay-in/config` | Fiat pay-in capability flag (Base USDC; `enabled:false` until an on-ramp provider is wired in) |
 | GET | `/api/public/pay-in/countries` | Quote regions |
 | GET | `/api/public/pay-in/geo` | Payer country from CDN IP headers |
 | GET | `/api/public/pay-in/quotes` | Card/bank quotes ([Pay-in API](quote.md)) |
