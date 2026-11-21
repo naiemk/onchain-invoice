@@ -9,7 +9,8 @@ Wallet-signed, config-driven deploys for Trustless Commerce. **Localhost only** 
 3. You connect **MetaMask** (gas payer only). The UI switches / adds Base, BNB, or Sepolia when needed. Owner / fee recipient stay as addresses in the config (hardware wallet / multisig OK).
 4. Deploy + optional Hardhat verify; CLI stdout/stderr stream into the UI.
 5. Writes `sweeper` / `forwarderImplementation` back into `config.yaml`.
-6. Solana: build via CLI stream, record `programId` / authority pubkeys in config (Tron needs no contract deploy).
+6. **Identity wallet stack** (step 6): MetaMask deploys `IdentityStore` → `IdentityWallet` impl → `IdentityWalletFactory`, sets `restoreDelay`, optionally transfers store ownership. Resumable; mainnet refuses delay ≠ 259200 or an empty store owner. Addresses land in `config.yaml` under `identity.chains.<chain>`.
+7. Solana: build via CLI stream, record `programId` / authority pubkeys in config (Tron needs no contract deploy).
 
 ## Setup
 
@@ -17,7 +18,7 @@ Wallet-signed, config-driven deploys for Trustless Commerce. **Localhost only** 
 cp deploy/operator/config.example.yaml deploy/operator/config.yaml
 # edit seed, feeRecipient, owner (non-zero addresses)
 # enable Base + BNB (already in the example); optional Sepolia for test
-npm run deploy:console
+npm run deploy:console   # needs `npx hardhat compile` first (or use step 3)
 ```
 
 Open http://127.0.0.1:5179
@@ -39,6 +40,7 @@ Copy addresses into API / nodes env:
 - Base: `EVM_8453_SWEEPER_ADDRESS` / `EVM_8453_FORWARDER_IMPLEMENTATION` ← `chains.base.*`
 - BNB: `EVM_56_SWEEPER_ADDRESS` / `EVM_56_FORWARDER_IMPLEMENTATION` ← `chains.bsc.*`
 - Sepolia (test): `SWEEPER_ADDRESS` / `FORWARDER_IMPLEMENTATION` ← `chains.sepolia.*`
+- Identity (Base): `IDENTITY_STORE_ADDRESS` / `WALLET_FACTORY_ADDRESS` ← `identity.chains.base.identityStore` / `.factory`
 - `SOLANA_PROGRAM_ID` ← `solana.programId` (after program deploy + initialize)
 
 ## Mainnet launch checklist (Tron + Base + BNB)

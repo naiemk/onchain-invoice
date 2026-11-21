@@ -71,3 +71,11 @@ solana:
   configPda: ""
   deployedAt: ""
   initializeTx: ""
+
+# Identity wallet stack (IdentityStore + IdentityWallet + IdentityWalletFactory), deployed from the console step 6.
+# Mainnet: recoveryOperator = reco 2-of-3 Super Wallet, storeOwner = timelocked multisig.
+identity:
+  recoveryOperator: "0x0000000000000000000000000000000000000000"
+  storeOwner: ""          # empty = deployer keeps ownership (testnet only)
+  restoreDelay: 259200    # 3 days; required by docs/wallet-mainnet-assurance.md
+  chains: {}              # filled per chain key (base, sepolia) after deploy

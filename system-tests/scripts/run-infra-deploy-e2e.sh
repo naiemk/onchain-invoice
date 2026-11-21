@@ -58,7 +58,9 @@ cleanup() {
     tctest-bundler-evm tctest-wallet-deployer-evm \
     >/dev/null 2>&1 || true
   docker network rm "$DOCKER_NETWORK" >/dev/null 2>&1 || true
-  rm -rf "$DEPLOY_ROOT"
+  # Containers write root-owned logs; remove via a container if the host rm fails.
+  rm -rf "$DEPLOY_ROOT" 2>/dev/null || docker run --rm -v "$DEPLOY_ROOT:/clean" alpine sh -c 'rm -rf /clean/* /clean/.[!.]* 2>/dev/null' >/dev/null 2>&1 || true
+  rm -rf "$DEPLOY_ROOT" 2>/dev/null || true
   exit "$code"
 }
 trap cleanup EXIT

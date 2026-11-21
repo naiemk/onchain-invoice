@@ -28,6 +28,28 @@ export type SolanaChainConfig = {
   initializeTx?: string;
 };
 
+export type IdentityChainResult = {
+  identityStore?: string;
+  walletImplementation?: string;
+  factory?: string;
+  deployer?: string;
+  restoreDelaySet?: boolean;
+  ownershipTransferred?: boolean;
+  deployedAt?: string;
+};
+
+/** Identity wallet stack (IdentityStore + IdentityWallet impl + IdentityWalletFactory). Addresses only. */
+export type IdentityConfig = {
+  /** Production: reco 2-of-3 Super Wallet. */
+  recoveryOperator: string;
+  /** Production: timelocked multisig. Empty = keep deployer as owner (not mainnet-safe). */
+  storeOwner: string;
+  /** Seconds; assurance doc requires 259200 (3 days). */
+  restoreDelay: number;
+  /** Keyed by chain key in `chains` (base, sepolia). */
+  chains: Record<string, IdentityChainResult>;
+};
+
 export type OperatorConfig = {
   seed: string;
   feeBps: number;
@@ -36,6 +58,7 @@ export type OperatorConfig = {
   create2Factory: string;
   chains: Record<string, EvChainConfig>;
   solana?: SolanaChainConfig;
+  identity?: IdentityConfig;
 };
 
 export type LogEvent = {

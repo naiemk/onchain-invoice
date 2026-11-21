@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, JsonRpcProvider, getAddress } from "ethers";
+import { BrowserProvider, Contract, ContractFactory, JsonRpcProvider, getAddress, isAddress } from "ethers";
 import type { OperatorConfig, LogEvent, EvChainConfig } from "../lib/types";
 
 const API = ""; // same-origin via Vite proxy → :8790
@@ -73,6 +73,7 @@ const state = {
     compile: false,
     deploy: false,
     verify: false,
+    identity: false,
   },
 };
 
@@ -212,6 +213,7 @@ function render(): void {
           ${step("compile", "3. Compile artifacts", state.steps.compile, compileBody())}
           ${step("deploy", "4. Deploy (CREATE2)", state.steps.deploy, deployBody(evmChains))}
           ${step("verify", "5. Verify + Solana helpers", state.steps.verify, verifyBody())}
+          ${step("identity", "6. Identity wallet stack (Base)", state.steps.identity, identityBody())}
         </div>
         <div id="err" class="err"></div>
       </div>
@@ -353,6 +355,136 @@ function deployBody(evmChains: [string, EvChainConfig][]): string {
     </div>`;
 }
 
+function identityBody(): string {
+  const id = state.config?.identity;
+  const res = id?.chains?.[state.selectedChain] ?? {};
+  const canDeploy = Boolean(state.wallet && networksMatch());
+  const line = (label: string, v?: string) =>
+    `<div class="chain-item"><span>${label}</span><span class="mono">${esc(v || "—")}</span></div>`;
+  return `
+    <p class="sub" style="margin:0.3rem 0">Deploys IdentityStore → IdentityWallet impl → IdentityWalletFactory on the chain selected in step 4
+      (use <strong>Base</strong> for mainnet). 3 deploy txs + setRestoreDelay + optional transferOwnership. Resumable: finished steps are skipped.</p>
+    <label>Recovery operator (reco 2-of-3 Super Wallet)</label>
+    <input id="id-operator" class="mono" value="${esc(id?.recoveryOperator ?? "")}" placeholder="0x…" />
+    <label>Store owner (timelocked multisig; empty = keep deployer, testnet only)</label>
+    <input id="id-owner" class="mono" value="${esc(id?.storeOwner ?? "")}" placeholder="0x… or empty" />
+    <label>Restore delay (seconds; mainnet must be 259200)</label>
+    <input id="id-delay" type="number" value="${id?.restoreDelay ?? 259200}" />
+    <div class="chain-list">
+      ${line("IdentityStore", res.identityStore)}
+      ${line("IdentityWallet impl", res.walletImplementation)}
+      ${line("IdentityWalletFactory", res.factory)}
+      ${line("restoreDelay set", res.restoreDelaySet ? "yes" : "no")}
+      ${line("ownership transferred", res.ownershipTransferred ? "yes" : "no / not requested")}
+    </div>
+    <p class="sub" style="margin:0.4rem 0 0">After deploy → IDENTITY_STORE_ADDRESS / WALLET_FACTORY_ADDRESS (tcmain API + nodes env)</p>
+    <div class="row">
+      <button type="button" class="primary" id="deploy-identity" ${canDeploy ? "" : "disabled"}>Deploy identity stack</button>
+    </div>`;
+}
+
+async function saveIdentityResult(result: Record<string, unknown>): Promise<void> {
+  const res = await fetch(`${API}/api/config/identity-result`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ chainKey: state.selectedChain, result }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "identity-result failed");
+  state.config = body.config;
+}
+
+async function deployIdentity(): Promise<void> {
+  if (!state.config || !window.ethereum) return;
+  const operator = (document.querySelector<HTMLInputElement>("#id-operator")?.value ?? "").trim();
+  const storeOwner = (document.querySelector<HTMLInputElement>("#id-owner")?.value ?? "").trim();
+  const delay = Number(document.querySelector<HTMLInputElement>("#id-delay")?.value ?? 0);
+  if (!isAddress(operator) || /^0x0{40}$/i.test(operator)) return showErr("Recovery operator must be a non-zero address");
+  if (storeOwner && !isAddress(storeOwner)) return showErr("Store owner must be an address or empty");
+  const meta = CHAIN_META[state.selectedChain];
+  if (meta?.mainnet) {
+    if (delay !== 259200) return showErr("Mainnet restoreDelay must be 259200 (3 days)");
+    if (!storeOwner) return showErr("Mainnet requires a store owner (timelocked multisig) — refusing to leave the deployer as owner");
+  }
+  if (!networksMatch()) {
+    try { await switchToSelectedChain(); } catch (e) { return showErr(`Switch wallet first: ${e instanceof Error ? e.message : e}`); }
+  }
+  if (!networksMatch()) return showErr(`Wallet on chain ${state.walletChainId}, need ${selectedChainId()}.`);
+
+  const artRes = await fetch(`${API}/api/identity/artifacts`);
+  const art = await artRes.json();
+  if (!artRes.ok) return showErr(art.error ?? "artifacts missing — run step 3 compile");
+
+  // Persist intent (operator/owner/delay) so a half-finished run is resumable.
+  const cfg = state.config;
+  cfg.identity ??= { recoveryOperator: "", storeOwner: "", restoreDelay: 259200, chains: {} };
+  cfg.identity.recoveryOperator = operator;
+  cfg.identity.storeOwner = storeOwner;
+  cfg.identity.restoreDelay = delay;
+  await fetch(`${API}/api/config`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ config: cfg }) });
+
+  const provider = new BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  const deployer = await signer.getAddress();
+  const have = { ...(cfg.identity.chains[state.selectedChain] ?? {}) };
+  const hasCode = async (a?: string) => Boolean(a) && (await provider.getCode(a!)) !== "0x";
+
+  try {
+    if (!(await hasCode(have.identityStore))) {
+      appendLocal("info", "deploying IdentityStore…");
+      const c = await new ContractFactory(art.IdentityStore.abi, art.IdentityStore.bytecode, signer).deploy(operator, deployer);
+      await c.waitForDeployment();
+      have.identityStore = await c.getAddress();
+      have.deployer = deployer;
+      have.restoreDelaySet = false;
+      have.ownershipTransferred = false;
+      await saveIdentityResult(have);
+      appendLocal("success", `IdentityStore ${have.identityStore}`);
+    }
+    const store = new Contract(have.identityStore!, art.IdentityStore.abi, signer);
+    if (!(await hasCode(have.walletImplementation))) {
+      appendLocal("info", "deploying IdentityWallet implementation…");
+      const c = await new ContractFactory(art.IdentityWallet.abi, art.IdentityWallet.bytecode, signer).deploy();
+      await c.waitForDeployment();
+      have.walletImplementation = await c.getAddress();
+      await saveIdentityResult(have);
+      appendLocal("success", `IdentityWallet impl ${have.walletImplementation}`);
+    }
+    if (!(await hasCode(have.factory))) {
+      appendLocal("info", "deploying IdentityWalletFactory…");
+      const c = await new ContractFactory(art.IdentityWalletFactory.abi, art.IdentityWalletFactory.bytecode, signer).deploy(
+        have.walletImplementation, have.identityStore, deployer);
+      await c.waitForDeployment();
+      have.factory = await c.getAddress();
+      await saveIdentityResult(have);
+      appendLocal("success", `IdentityWalletFactory ${have.factory}`);
+    }
+    // Reconcile config flags against chain state (idempotent).
+    const owner = (await store.owner()) as string;
+    const onchainDelay = BigInt(await store.restoreDelay());
+    if (onchainDelay !== BigInt(delay) && owner.toLowerCase() === deployer.toLowerCase()) {
+      appendLocal("info", `setRestoreDelay(${delay})…`);
+      await (await store.setRestoreDelay(delay)).wait();
+    }
+    have.restoreDelaySet = BigInt(await store.restoreDelay()) === BigInt(delay);
+    if (storeOwner && owner.toLowerCase() !== storeOwner.toLowerCase()) {
+      if (owner.toLowerCase() !== deployer.toLowerCase()) throw new Error(`Store owned by ${owner}; connected wallet cannot transfer`);
+      appendLocal("warn", `transferOwnership → ${storeOwner} (irreversible from this wallet)`);
+      await (await store.transferOwnership(storeOwner)).wait();
+    }
+    const finalOwner = (await store.owner()) as string;
+    have.ownershipTransferred = Boolean(storeOwner) && finalOwner.toLowerCase() === storeOwner.toLowerCase();
+    const op = (await store.recoveryOperator()) as string;
+    if (op.toLowerCase() !== operator.toLowerCase()) throw new Error(`on-chain recoveryOperator ${op} != ${operator}`);
+    await saveIdentityResult(have);
+    state.steps.identity = Boolean(have.restoreDelaySet) && (!storeOwner || have.ownershipTransferred === true);
+    appendLocal("success", `Identity stack ready. IDENTITY_STORE_ADDRESS=${have.identityStore} WALLET_FACTORY_ADDRESS=${have.factory}`);
+  } catch (error) {
+    showErr(`Identity deploy stopped (rerun to resume): ${error instanceof Error ? error.message : String(error)}`);
+  }
+  render();
+}
+
 function resolvedSweeper(): string {
   // config.yaml uses sweeper: "" as a placeholder — empty string must not block the CREATE2 plan.
   const fromConfig = state.config?.chains[state.selectedChain]?.sweeper?.trim() ?? "";
@@ -406,6 +538,7 @@ function wire(): void {
       render();
     });
   });
+  document.querySelector("#deploy-identity")?.addEventListener("click", () => void deployIdentity());
   document.querySelector("#plan")?.addEventListener("click", () => void loadPlan());
   document.querySelector("#deploy")?.addEventListener("click", () => void deployEvm());
   document.querySelector("#verify")?.addEventListener("click", () => void verifyEvm());

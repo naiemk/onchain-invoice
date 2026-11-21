@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { createReadStream } from "node:fs";
 import { ensureConfig, loadConfig, saveConfig, CONFIG_PATH, OPERATOR_ROOT } from "./lib/config.ts";
 import { loadSweeperArtifact, planSweeperCreate2, DEFAULT_CREATE2_FACTORY } from "./lib/create2.ts";
-import type { LogEvent, OperatorConfig } from "./lib/types.ts";
+import type { LogEvent, OperatorConfig, IdentityChainResult } from "./lib/types.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../..");
@@ -314,6 +314,52 @@ async function handler(req: IncomingMessage, res: ServerResponse): Promise<void>
         return;
       }
       sendJson(res, 200, JSON.parse(readFileSync(keypairPath, "utf8")));
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/identity/artifacts") {
+      const names = ["IdentityStore", "IdentityWallet", "IdentityWalletFactory"] as const;
+      const out: Record<string, { abi: unknown[]; bytecode: string }> = {};
+      for (const name of names) {
+        const file = resolve(REPO_ROOT, `artifacts/contracts/wallet/${name}.sol/${name}.json`);
+        if (!existsSync(file)) {
+          sendJson(res, 400, { error: `${name} artifact missing — run hardhat compile first` });
+          return;
+        }
+        const json = JSON.parse(readFileSync(file, "utf8")) as { abi: unknown[]; bytecode: string };
+        if (!json.bytecode || json.bytecode === "0x") {
+          sendJson(res, 400, { error: `${name} bytecode empty — run hardhat compile` });
+          return;
+        }
+        out[name] = { abi: json.abi, bytecode: json.bytecode };
+      }
+      sendJson(res, 200, out);
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/config/identity-result") {
+      const body = JSON.parse(await readBody(req)) as { chainKey: string; result: IdentityChainResult };
+      const config = loadConfig();
+      if (!config.chains[body.chainKey]) {
+        sendJson(res, 400, { error: "unknown chain" });
+        return;
+      }
+      for (const k of ["identityStore", "walletImplementation", "factory", "deployer"] as const) {
+        const v = body.result[k];
+        if (v && !/^0x[0-9a-fA-F]{40}$/.test(v)) {
+          sendJson(res, 400, { error: `invalid address for ${k}` });
+          return;
+        }
+      }
+      config.identity ??= { recoveryOperator: "", storeOwner: "", restoreDelay: 259200, chains: {} };
+      config.identity.chains[body.chainKey] = {
+        ...config.identity.chains[body.chainKey],
+        ...body.result,
+        deployedAt: new Date().toISOString(),
+      };
+      saveConfig(config);
+      logLine("success", `Saved identity ${body.chainKey}: ${JSON.stringify(body.result)}`);
+      sendJson(res, 200, { ok: true, config });
       return;
     }
 
