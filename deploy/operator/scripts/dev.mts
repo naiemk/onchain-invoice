@@ -23,7 +23,6 @@ function run(label: string, command: string, args: string[]): void {
 
 run("api", process.execPath, [
   "--experimental-strip-types",
-  "--experimental-transform-types",
   "deploy/operator/server.ts",
 ]);
 run("ui", resolve(root, "node_modules/.bin/vite"), [

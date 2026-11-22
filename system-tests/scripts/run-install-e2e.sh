@@ -39,7 +39,9 @@ cleanup_install() {
     tctest-bundler-evm tctest-wallet-deployer-evm \
     >/dev/null 2>&1 || true
   docker volume rm -f "${API_CONTAINER}-data" >/dev/null 2>&1 || true
-  rm -rf "$INSTALL_ROOT"
+  # Containers write root-owned logs; remove via a container if the host rm fails.
+  rm -rf "$INSTALL_ROOT" 2>/dev/null || docker run --rm -v "$INSTALL_ROOT:/clean" alpine sh -c 'rm -rf /clean/* /clean/.[!.]* 2>/dev/null' >/dev/null 2>&1 || true
+  rm -rf "$INSTALL_ROOT" 2>/dev/null || true
 }
 trap cleanup_install EXIT
 
